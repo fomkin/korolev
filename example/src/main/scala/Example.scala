@@ -1,7 +1,9 @@
+import korolev.Korolev.EventFactory
 import korolev.{KorolevServer, Shtml}
 
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
+
 /**
   * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
   */
@@ -30,7 +32,26 @@ object Example extends App with Shtml {
         state.copy(todos = updated)
     },
     initRender = { access =>
-      val inputId = access.id()
+
+      // Handler to input
+      val inputId = access.id(())
+
+      // Generate actions when clicking checkboxes
+      val todoClick: EventFactory[(Int, Todo)] =
+        access.event("click") { case (i, todo) =>
+          val res = Action.TodoSetDone(i, done = !todo.done)
+          Future.successful(res)
+        }
+
+      // Generate AddTodo action when 'Add' button clicked
+      val addTodoClick: EventFactory[Unit] =
+        access.event("click") { _ =>
+          inputId[String]('value) map { value =>
+            Action.AddTodo(Todo(value, done = false))
+          }
+        }
+
+      // Create a DOM using state
       state => {
         'div(
           'div("Super TODO tracker"),
@@ -41,10 +62,7 @@ object Example extends App with Shtml {
                   'input(
                     'type /= "checkbox",
                     'checked := todo.done,
-                    access.event("click") {
-                      val res = Action.TodoSetDone(i, done = !todo.done)
-                      Future.successful(res)
-                    }
+                    todoClick(i, todo)
                   ),
                   if (!todo.done) 'span(todo.text)
                   else 'strike(todo.text)
@@ -59,11 +77,7 @@ object Example extends App with Shtml {
             ),
             'button(
               "Add todo",
-              access.event("click") {
-                inputId[String]('value) map { value =>
-                  Action.AddTodo(Todo(value, done = false))
-                }
-              }
+              addTodoClick(())
             )
           )
         )

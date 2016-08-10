@@ -17,16 +17,14 @@ object Korolev {
   import VDom._
   import Change._
 
-  type DefinePropertyAccessor = () => PropertyAccessor
-  type DefineEventHandler[Action] = String => (=> Future[Action]) => Event
-
-  case class KorolevAccess[Action](
-    event: DefineEventHandler[Action],
-    id: DefinePropertyAccessor
-  )
+  trait KorolevAccess[Action] {
+    def event[Payload](`type`: String)(onFile: Payload => Future[Action])(payload: Payload): Event
+    def id(pl: Any): PropertyAccessor
+  }
 
   type Render[State] = State => VDom.Node
   type InitRender[State, Action] = KorolevAccess[Action] => Render[State]
+  type EventFactory[Payload] = Payload => Event
 
   def apply[State, Action](jsAccess: JSAccess,
                            initialState: State,
@@ -50,32 +48,38 @@ object Korolev {
 
       var reduceRealT = 0l
 
-      val eventFactory: DefineEventHandler[Action] = { eventType => f =>
-        new Event {
-          val `type` = eventType
-          def fire(): Unit = f onComplete {
-            case Success(action) =>
-              reduceRealT = System.currentTimeMillis()
-              dux.dispatch(action)
-            case Failure(exception) => exception.printStackTrace()
+      val korolevAccess = new KorolevAccess[Action] {
+        def event[Payload](eventType: String)(onFile: (Payload) => Future[Action])(pl: Payload): Event = {
+          new Event {
+            val `type` = eventType
+            def payload = pl
+            def fire(): Unit = onFile(pl) onComplete {
+              case Success(action) =>
+                reduceRealT = System.currentTimeMillis()
+                dux.dispatch(action)
+              case Failure(exception) => exception.printStackTrace()
+            }
+          }
+        }
+
+        def id(pl: Any): PropertyAccessor = {
+          new PropertyAccessor {
+            val payload = pl
+            def apply[T](property: Symbol): Future[T] = {
+              println("propertyAccessorFactory " + propertyAccessors.get(this))
+              Option(propertyAccessors.get(this)) match {
+                case Some(id) =>
+                  val future = korolevJS.call("ExtractProperty", id, property.name)
+                  jsAccess.flush()
+                  future
+                case None => Future.failed(new Exception("No element matched for accessor"))
+              }
+            }
           }
         }
       }
 
-      def propertyAccessorFactory(): PropertyAccessor = new PropertyAccessor {
-        def apply[T](property: Symbol): Future[T] = {
-          println("propertyAccessorFactory " + propertyAccessors.get(this))
-          Option(propertyAccessors.get(this)) match {
-            case Some(id) =>
-              val future = korolevJS.call("ExtractProperty", id, property.name)
-              jsAccess.flush()
-              future
-            case None => Future.failed(new Exception("No element matched for accessor"))
-          }
-        }
-      }
-
-      val render = initRender(KorolevAccess(eventFactory, propertyAccessorFactory))
+      val render = initRender(korolevAccess)
 
       val onState: State => Unit = { state =>
         println("RRT: " + (System.currentTimeMillis() - reduceRealT) / 1000d)
