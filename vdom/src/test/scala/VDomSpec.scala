@@ -1,6 +1,8 @@
 import korolev.{Shtml, VDom}
 import org.scalatest.{FlatSpec, Matchers}
 
+import scala.language.implicitConversions
+
 /**
   * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
   */
@@ -37,15 +39,17 @@ object VDomSpec extends Shtml {
       )
     )
 
+    implicit def toId(s: String): VDom.Id = VDom.Id(s)
+
     val diff = List(
-      RemoveAttr("el_0_0_0", 'text),
-      SetAttr("el_0_0_1", 'text, "Olga"),
-      CreateText("el_0_0_2", "el_0_0_2_0", "Cow"),
-      Create("el_0_0_2", "el_0_0_2_1", 'p),
-      SetAttr("el_0_0_3", 'text, "Elena"),
-      Create("el_0_0", "el_0_0_2", 'span),
-      Create("el_0_0", "el_0_0_3", 'li),
-      Remove("el_0_1")
+      Remove("0_0", "0_0_1"),
+      Create("0_0_0", "0_0_0_2", "span"),
+      Create("0_0_0", "0_0_0_3", "li"),
+      CreateText("0_0_0_2", "0_0_0_2_0", "Cow"),
+      Create("0_0_0_2", "0_0_0_2_1", "p"),
+      RemoveAttr("0_0_0_0", "text", false),
+      SetAttr("0_0_0_1", "text", "Olga", false),
+      SetAttr("0_0_0_3", "text", "Elena", false)
     )
     (a, b, diff)
   }

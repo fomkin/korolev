@@ -1,7 +1,7 @@
 import com.typesafe.sbt.packager.archetypes.JavaAppPackaging
 import com.typesafe.sbt.packager.universal.UniversalPlugin
 
-lazy val http4sVersion = "0.14.1"
+lazy val http4sVersion = "0.14.4"
 
 val publishSettings = Seq(
   publishMavenStyle := true,
@@ -38,8 +38,11 @@ val publishSettings = Seq(
 val commonSettings = publishSettings ++ Seq(
   scalaVersion := "2.11.8",
   organization := "com.github.fomkin",
-  version := "0.1.0",
-  libraryDependencies += "org.scalatest" %%% "scalatest" % "3.0.0-M15" % "test",
+  version := "0.0.1-PRE",
+  libraryDependencies ++= Seq(
+    "org.scalatest" %%% "scalatest" % "3.0.0-M15" % "test",
+    "com.lihaoyi" %% "pprint" % "0.4.1" % "test"
+  ),
   scalacOptions ++= Seq(
     "-deprecation",
     "-feature",
@@ -83,15 +86,12 @@ lazy val example = project.
   enablePlugins(JavaAppPackaging).
   enablePlugins(UniversalPlugin).
   settings(commonSettings: _*).
+  settings(publish := {}).
   settings(
     javaOptions in Universal ++= Seq("-J-Xmx512m"),
     normalizedName := "korolev-example",
     publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo"))),
-    publishArtifact := false,
-    libraryDependencies ++= Seq(
-      "org.http4s" %% "http4s-dsl" % http4sVersion,
-      "org.http4s" %% "http4s-blaze-server" % http4sVersion
-    )
+    publishArtifact := false
   ).
   dependsOn(server)
 
@@ -116,10 +116,9 @@ lazy val korolev = crossProject.crossType(CrossType.Pure).
 lazy val korolevJS = korolev.js
 lazy val korolevJVM = korolev.jvm
 
-publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
-publishArtifact := false
 
 lazy val root = project.in(file(".")).
+  settings(publish := {}).
   aggregate(
     korolevJS, korolevJVM,
     vdomJS, vdomJVM,

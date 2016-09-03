@@ -43,7 +43,10 @@ object VDom {
   }
 
   object Id {
-    def apply(x: Int): Id = new Id(Vector(x))
+
+    def apply(xs: String): Id = Id(xs.split("_").toVector.map(_.toInt))
+    def apply(x: Int): Id = Id(Vector(x))
+
     implicit val idOrdering = new Ordering[Id] {
       val int = implicitly[Ordering[Int]]
       def compare(x: Id, y: Id): Int = {
