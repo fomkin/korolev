@@ -20,7 +20,9 @@ class JsonQueuedJsAccess(sendJson: String => Unit)(implicit val executionContext
         case s: String if !s.startsWith("[") ⇒ "\"" + s + "\""
         case any ⇒ any
       }
-    "[" + xs2.reduce(_ + ", " + _) + "]"
+    val res = "[" + xs2.reduce(_ + ", " + _) + "]"
+    println(res)
+    res
   }
 
   override def platformDependentPack(value: Any): Any = value match {

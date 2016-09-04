@@ -16,6 +16,25 @@ object VDom {
                   misc: List[Misc])
       extends VDom
       with NodeLike {
+
+    /**
+      * Get subnode for id. Works only when root.
+      */
+    def apply(id: Id): Node = {
+      @tailrec def loop(node: Node, v: Vector[Int]): Node = v.length match {
+        case 0 => node
+        case 1 => node.children(v.head) match {
+          case child: Node => child
+          case _ => node
+        }
+        case _ => node.children(v.head) match {
+          case child: Node => loop(child, v.tail)
+          case _ => node
+        }
+      }
+      loop(this, id.vec.drop(2))
+    }
+
     def needReplace(b: NodeLike): Boolean = b match {
       case el: Node => tag != el.tag
       case _ => true
@@ -149,9 +168,9 @@ object VDom {
       (as, bs) match {
         case (Nil, Nil) => acc
         case (ax :: asTl, Nil) =>
-          changesBetweenMisc(id, AddMisc(id, ax) :: acc, asTl, Nil)
+          changesBetweenMisc(id, RemoveMisc(id, ax) :: acc, asTl, Nil)
         case (Nil, bx :: bsTl) =>
-          changesBetweenMisc(id, RemoveMisc(id, bx) :: acc, Nil, bsTl)
+          changesBetweenMisc(id, AddMisc(id, bx) :: acc, Nil, bsTl)
         case (ax :: asTl, bx :: bsTl) if ax != bx =>
           val newAcc = RemoveMisc(id, ax) :: AddMisc(id, bx) :: acc
           changesBetweenMisc(id, newAcc, asTl, bsTl)
@@ -259,8 +278,8 @@ object VDom {
           val change = Remove(curr, id)
           changesLoop(curr, i + 1, change :: acc, astl, Nil, ctx)
         case (ax :: astl, bx :: bstl) if ax.needReplace(bx) =>
-          val create = elToChanges(curr, i, acc, List(bx), None)
-          changesLoop(curr, i + 1, create, Nil, bstl, ctx)
+          val create = Remove(curr, id) :: elToChanges(curr, i, acc, List(bx), None)
+          changesLoop(curr, i + 1, create, astl, bstl, ctx)
         case ((ax: Node) :: astl, (bx: Node) :: bstl) =>
           val attrChanges = changesBetweenAttrs(id, acc, ax.attrs, bx.attrs)
           val miscChanges = changesBetweenMisc(

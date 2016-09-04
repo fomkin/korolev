@@ -52,7 +52,7 @@ object Shtml {
     }
 
     def :=(value: Any): Attr =
-      Attr(htmlName(self), value, isProperty = true)
+      Attr(self.name, value, isProperty = true)
 
     def /=(value: String): Attr =
       Attr(htmlName(self), value, isProperty = false)

@@ -15,5 +15,10 @@ trait Event extends Misc {
     case event: Event => event.payload == payload
     case _ => false
   }
+
+  override def toString: String = {
+    s"Event(${`type`}, $payload)"
+  }
+
 }
 

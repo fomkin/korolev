@@ -4,6 +4,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 import bridge.JSAccess
 
+import scala.collection.concurrent.TrieMap
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
@@ -32,8 +33,9 @@ object Korolev {
                            initRender: InitRender[State, Action])(
       implicit ec: ExecutionContext): Dux[State, Action] = {
 
-    val propertyAccessors = new ConcurrentHashMap[PropertyAccessor, String]()
-    val events = new ConcurrentHashMap[String, Event]()
+    val propertyAccessors = TrieMap.empty[PropertyAccessor, String]
+    val events = TrieMap.empty[String, Event]
+
     @volatile var lastRender = VDom.Node("void", Nil, Nil, Nil)
 
     // Prepare frontend
@@ -42,7 +44,7 @@ object Korolev {
     val dux = Dux[State, Action](initialState, reducer)
 
     jsAccess.registerCallback[String] { targetAndType =>
-      Option(events.get(targetAndType)).foreach(_.fire())
+      events.get(targetAndType).foreach(_.fire())
     } foreach { eventCallback =>
       korolevJS.call("RegisterGlobalEventHandler", eventCallback)
 
@@ -66,8 +68,7 @@ object Korolev {
           new PropertyAccessor {
             val payload = pl
             def apply[T](property: Symbol): Future[T] = {
-              println("propertyAccessorFactory " + propertyAccessors.get(this))
-              Option(propertyAccessors.get(this)) match {
+              propertyAccessors.get(this) match {
                 case Some(id) =>
                   val future = korolevJS.call("ExtractProperty", id, property.name)
                   jsAccess.flush()
@@ -88,6 +89,7 @@ object Korolev {
         println("render: " + (System.currentTimeMillis() - tr) / 1000d)
         val t = System.currentTimeMillis()
         val changes = VDom.changes(lastRender, newRender)
+        val prevRender = lastRender
         println("diff: " + (System.currentTimeMillis() - t) / 1000d)
         lastRender = newRender
 
@@ -97,7 +99,13 @@ object Korolev {
             korolevJS.call("Create", id.toString, childId.toString, tag)
           case CreateText(id, childId, text) =>
             korolevJS.call("CreateText", id.toString, childId.toString, text)
-          case Remove(id, childId) => korolevJS.call("Remove", id.toString, childId.toString)
+          case Remove(id, childId) =>
+            println(prevRender(childId).misc)
+            prevRender(childId).misc foreach {
+              case pa: PropertyAccessor => propertyAccessors.remove(pa)
+              case event: Event => events.remove(s"$childId:${event.`type`}")
+            }
+            korolevJS.call("Remove", id.toString, childId.toString)
           case SetAttr(id, name, value, isProperty) =>
             korolevJS.call("SetAttr", id.toString, name, value, isProperty)
           case RemoveAttr(id, name, isProperty) =>
