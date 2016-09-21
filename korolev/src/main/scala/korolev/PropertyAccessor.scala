@@ -16,4 +16,8 @@ trait PropertyAccessor extends Misc {
     case accessor: PropertyAccessor => accessor.payload == payload
     case _ => false
   }
+
+  override def toString: String = {
+    s"PropertyAccessor($payload)"
+  }
 }

@@ -1,7 +1,7 @@
 import com.typesafe.sbt.packager.archetypes.JavaAppPackaging
 import com.typesafe.sbt.packager.universal.UniversalPlugin
 
-lazy val http4sVersion = "0.14.4"
+val http4sVersion = "0.14.4"
 
 val publishSettings = Seq(
   publishMavenStyle := true,
@@ -38,7 +38,7 @@ val publishSettings = Seq(
 val commonSettings = publishSettings ++ Seq(
   scalaVersion := "2.11.8",
   organization := "com.github.fomkin",
-  version := "0.0.1-PRE",
+  version := "0.0.3-PRE-SNAPSHOT",
   libraryDependencies ++= Seq(
     "org.scalatest" %%% "scalatest" % "3.0.0-M15" % "test",
     "com.lihaoyi" %% "pprint" % "0.4.1" % "test"
@@ -51,8 +51,6 @@ val commonSettings = publishSettings ++ Seq(
     "-language:implicitConversions"
   )
 )
-
-val vaskaVersion = "0.1.0-SNAPSHOT"
 
 lazy val vdom = crossProject.crossType(CrossType.Pure).
   settings(commonSettings: _*).
@@ -86,12 +84,10 @@ lazy val example = project.
   enablePlugins(JavaAppPackaging).
   enablePlugins(UniversalPlugin).
   settings(commonSettings: _*).
-  settings(publish := {}).
   settings(
     javaOptions in Universal ++= Seq("-J-Xmx512m"),
     normalizedName := "korolev-example",
-    publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo"))),
-    publishArtifact := false
+    publish := {}
   ).
   dependsOn(server)
 
@@ -99,6 +95,10 @@ lazy val bridge = crossProject.crossType(CrossType.Pure).
   settings(commonSettings: _*).
   settings(
     normalizedName := "korolev-bridge",
+    libraryDependencies ++= Seq(
+      "com.lihaoyi" %% "utest" % "0.4.3" % "test"
+    ),
+    testFrameworks += new TestFramework("utest.runner.Framework"),
     unmanagedResourceDirectories in Compile += file("bridge") / "src" / "main" / "resources"
   )
 
@@ -116,12 +116,14 @@ lazy val korolev = crossProject.crossType(CrossType.Pure).
 lazy val korolevJS = korolev.js
 lazy val korolevJVM = korolev.jvm
 
-
 lazy val root = project.in(file(".")).
   settings(publish := {}).
   aggregate(
     korolevJS, korolevJVM,
+    bridgeJS, bridgeJVM,
     vdomJS, vdomJVM,
     duxJS, duxJVM,
-    server
+    server, example
   )
+
+publish := {}

@@ -16,6 +16,24 @@ object VDom {
                   misc: List[Misc])
       extends VDom
       with NodeLike {
+
+    /**
+      * Get subnode for id. Works only when root.
+      */
+    def apply(id: Id): Option[Node] = {
+      @tailrec def loop(i: Int, node: Node, v: Vector[Int]): Option[Node] = i match {
+        case _ if i == v.length => Some(node)
+        case _ if i < node.children.length =>
+          node.children(i) match {
+            case child: Node => loop(i + 1, child, v)
+            case _ => Some(node)
+          }
+        case _ => None
+      }
+      // 1 - skip head
+      loop(1, this, id.vec)
+    }
+
     def needReplace(b: NodeLike): Boolean = b match {
       case el: Node => tag != el.tag
       case _ => true
@@ -44,6 +62,7 @@ object VDom {
 
   object Id {
 
+    def apply(): Id = Id(Vector.empty)
     def apply(xs: String): Id = Id(xs.split("_").toVector.map(_.toInt))
     def apply(x: Int): Id = Id(Vector(x))
 
@@ -149,9 +168,9 @@ object VDom {
       (as, bs) match {
         case (Nil, Nil) => acc
         case (ax :: asTl, Nil) =>
-          changesBetweenMisc(id, AddMisc(id, ax) :: acc, asTl, Nil)
+          changesBetweenMisc(id, RemoveMisc(id, ax) :: acc, asTl, Nil)
         case (Nil, bx :: bsTl) =>
-          changesBetweenMisc(id, RemoveMisc(id, bx) :: acc, Nil, bsTl)
+          changesBetweenMisc(id, AddMisc(id, bx) :: acc, Nil, bsTl)
         case (ax :: asTl, bx :: bsTl) if ax != bx =>
           val newAcc = RemoveMisc(id, ax) :: AddMisc(id, bx) :: acc
           changesBetweenMisc(id, newAcc, asTl, bsTl)
@@ -259,8 +278,8 @@ object VDom {
           val change = Remove(curr, id)
           changesLoop(curr, i + 1, change :: acc, astl, Nil, ctx)
         case (ax :: astl, bx :: bstl) if ax.needReplace(bx) =>
-          val create = elToChanges(curr, i, acc, List(bx), None)
-          changesLoop(curr, i + 1, create, Nil, bstl, ctx)
+          val create = Remove(curr, id) :: elToChanges(curr, i, acc, List(bx), None)
+          changesLoop(curr, i + 1, create, astl, bstl, ctx)
         case ((ax: Node) :: astl, (bx: Node) :: bstl) =>
           val attrChanges = changesBetweenAttrs(id, acc, ax.attrs, bx.attrs)
           val miscChanges = changesBetweenMisc(
@@ -279,6 +298,6 @@ object VDom {
       }
     }
 
-    changesLoop(Id(0), 0, Nil, List(a), List(b), None).sorted
+    changesLoop(Id(), 0, Nil, List(a), List(b), None).sorted
   }
 }

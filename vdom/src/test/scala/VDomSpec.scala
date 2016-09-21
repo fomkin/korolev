@@ -42,14 +42,15 @@ object VDomSpec extends Shtml {
     implicit def toId(s: String): VDom.Id = VDom.Id(s)
 
     val diff = List(
-      Remove("0_0", "0_0_1"),
-      Create("0_0_0", "0_0_0_2", "span"),
-      Create("0_0_0", "0_0_0_3", "li"),
-      CreateText("0_0_0_2", "0_0_0_2_0", "Cow"),
-      Create("0_0_0_2", "0_0_0_2_1", "p"),
-      RemoveAttr("0_0_0_0", "text", false),
-      SetAttr("0_0_0_1", "text", "Olga", false),
-      SetAttr("0_0_0_3", "text", "Elena", false)
+      Remove("0", "0_1"),
+      Remove("0_0", "0_0_2"),
+      Create("0_0", "0_0_2", "span"),
+      Create("0_0", "0_0_3", "li"),
+      CreateText("0_0_2", "0_0_2_0", "Cow"),
+      Create("0_0_2", "0_0_2_1", "p"),
+      RemoveAttr("0_0_0", "text", isProperty = false),
+      SetAttr("0_0_1", "text", "Olga", isProperty = false),
+      SetAttr("0_0_3", "text", "Elena", isProperty = false)
     )
     (a, b, diff)
   }
