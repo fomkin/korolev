@@ -52,8 +52,6 @@ val commonSettings = publishSettings ++ Seq(
   )
 )
 
-val vaskaVersion = "0.1.0-SNAPSHOT"
-
 lazy val vdom = crossProject.crossType(CrossType.Pure).
   settings(commonSettings: _*).
   settings(normalizedName := "korolev-vdom")
@@ -97,6 +95,10 @@ lazy val bridge = crossProject.crossType(CrossType.Pure).
   settings(commonSettings: _*).
   settings(
     normalizedName := "korolev-bridge",
+    libraryDependencies ++= Seq(
+      "com.lihaoyi" %% "utest" % "0.4.3" % "test"
+    ),
+    testFrameworks += new TestFramework("utest.runner.Framework"),
     unmanagedResourceDirectories in Compile += file("bridge") / "src" / "main" / "resources"
   )
 
@@ -121,7 +123,7 @@ lazy val root = project.in(file(".")).
     bridgeJS, bridgeJVM,
     vdomJS, vdomJVM,
     duxJS, duxJVM,
-    server
+    server, example
   )
 
 publish := {}

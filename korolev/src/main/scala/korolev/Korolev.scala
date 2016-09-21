@@ -1,7 +1,5 @@
 package korolev
 
-import java.util.concurrent.ConcurrentHashMap
-
 import bridge.JSAccess
 
 import scala.collection.concurrent.TrieMap
@@ -13,13 +11,15 @@ trait Korolev
 /**
   * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
   */
-object Korolev {
+object Korolev extends EventPropagation {
 
   import VDom._
   import Change._
+  import Event._
 
   trait KorolevAccess[Action] {
-    def event[Payload](`type`: String)(onFile: Payload => Future[Action])(payload: Payload): Event
+    def event[Payload](`type`: String, phase: Phase = AtTarget)(
+        onFile: Payload => (Boolean, Future[Action]))(payload: Payload): Event
     def id(pl: Any): PropertyAccessor
   }
 
@@ -44,22 +44,30 @@ object Korolev {
     val dux = Dux[State, Action](initialState, reducer)
 
     jsAccess.registerCallback[String] { targetAndType =>
-      events.get(targetAndType).foreach(_.fire())
+      val Array(target, tpe) = targetAndType.split(':')
+      propagateEvent(events, Id(target), tpe)
+
     } foreach { eventCallback =>
       korolevJS.call("RegisterGlobalEventHandler", eventCallback)
 
       var reduceRealT = 0l
 
       val korolevAccess = new KorolevAccess[Action] {
-        def event[Payload](eventType: String)(onFile: (Payload) => Future[Action])(pl: Payload): Event = {
+        def event[Payload](eventType: String, eventPhase: Phase)(
+            onFire: Payload => (Boolean, Future[Action]))(pl: Payload): Event = {
           new Event {
             val `type` = eventType
+            val phase = eventPhase
             def payload = pl
-            def fire(): Unit = onFile(pl) onComplete {
-              case Success(action) =>
-                reduceRealT = System.currentTimeMillis()
-                dux.dispatch(action)
-              case Failure(exception) => exception.printStackTrace()
+            def fire(): Boolean = {
+              val (continuePropagation, future) = onFire(pl)
+              future onComplete {
+                case Success(action) =>
+                  reduceRealT = System.currentTimeMillis()
+                  dux.dispatch(action)
+                case Failure(exception) => exception.printStackTrace()
+              }
+              continuePropagation
             }
           }
         }
@@ -70,10 +78,13 @@ object Korolev {
             def apply[T](property: Symbol): Future[T] = {
               propertyAccessors.get(this) match {
                 case Some(id) =>
-                  val future = korolevJS.call("ExtractProperty", id, property.name)
+                  val future =
+                    korolevJS.call("ExtractProperty", id, property.name)
                   jsAccess.flush()
                   future
-                case None => Future.failed(new Exception("No element matched for accessor"))
+                case None =>
+                  Future.failed(
+                    new Exception("No element matched for accessor"))
               }
             }
           }
@@ -100,8 +111,8 @@ object Korolev {
           case CreateText(id, childId, text) =>
             korolevJS.call("CreateText", id.toString, childId.toString, text)
           case Remove(id, childId) =>
-            println(prevRender(childId).misc)
-            prevRender(childId).misc foreach {
+            //println(prevRender(childId).misc)
+            prevRender(childId).toList.flatMap(_.misc) foreach {
               case pa: PropertyAccessor => propertyAccessors.remove(pa)
               case event: Event => events.remove(s"$childId:${event.`type`}")
             }
@@ -111,16 +122,16 @@ object Korolev {
           case RemoveAttr(id, name, isProperty) =>
             korolevJS.call("RemoveAttr", id.toString, name, isProperty)
           case AddMisc(id, event: Event) =>
-            events.put(s"$id:${event.`type`}", event)
+            events.put(s"$id:${event.`type`}:${event.phase}", event)
           case RemoveMisc(id, event: Event) =>
-            val typeAndId = s"$id:${event.`type`}"
+            val typeAndId = s"$id:${event.`type`}:${event.phase}"
             events.remove(typeAndId)
           case AddMisc(id, pa: PropertyAccessor) =>
             propertyAccessors.put(pa, id.toString)
           case RemoveMisc(id, pa: PropertyAccessor) =>
             propertyAccessors.remove(pa)
-          //case CreateAbstractNode(id) => pussyJS.call("CreateAbstractNode", id, )
           case _ =>
+          // do nothing
         }
         println("SCT: " + (System.currentTimeMillis() - scT) / 1000d)
         jsAccess.flush()

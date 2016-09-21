@@ -20,19 +20,18 @@ object VDom {
     /**
       * Get subnode for id. Works only when root.
       */
-    def apply(id: Id): Node = {
-      @tailrec def loop(node: Node, v: Vector[Int]): Node = v.length match {
-        case 0 => node
-        case 1 => node.children(v.head) match {
-          case child: Node => child
-          case _ => node
-        }
-        case _ => node.children(v.head) match {
-          case child: Node => loop(child, v.tail)
-          case _ => node
-        }
+    def apply(id: Id): Option[Node] = {
+      @tailrec def loop(i: Int, node: Node, v: Vector[Int]): Option[Node] = i match {
+        case _ if i == v.length => Some(node)
+        case _ if i < node.children.length =>
+          node.children(i) match {
+            case child: Node => loop(i + 1, child, v)
+            case _ => Some(node)
+          }
+        case _ => None
       }
-      loop(this, id.vec.drop(2))
+      // 1 - skip head
+      loop(1, this, id.vec)
     }
 
     def needReplace(b: NodeLike): Boolean = b match {
@@ -63,6 +62,7 @@ object VDom {
 
   object Id {
 
+    def apply(): Id = Id(Vector.empty)
     def apply(xs: String): Id = Id(xs.split("_").toVector.map(_.toInt))
     def apply(x: Int): Id = Id(Vector(x))
 
@@ -298,6 +298,6 @@ object VDom {
       }
     }
 
-    changesLoop(Id(0), 0, Nil, List(a), List(b), None).sorted
+    changesLoop(Id(), 0, Nil, List(a), List(b), None).sorted
   }
 }

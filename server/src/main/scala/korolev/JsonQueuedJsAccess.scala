@@ -17,12 +17,10 @@ class JsonQueuedJsAccess(sendJson: String => Unit)(implicit val executionContext
   def seqToJSON(xs: Seq[Any]): String = {
     val xs2 =
       xs map {
-        case s: String if !s.startsWith("[") ⇒ "\"" + s + "\""
+        case s: String if !s.startsWith("[") ⇒ "\"" + s.replace("\n", "\\n") + "\""
         case any ⇒ any
       }
-    val res = "[" + xs2.reduce(_ + ", " + _) + "]"
-    println(res)
-    res
+    "[" + xs2.reduce(_ + ", " + _) + "]"
   }
 
   override def platformDependentPack(value: Any): Any = value match {
