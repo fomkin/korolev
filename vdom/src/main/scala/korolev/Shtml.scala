@@ -12,6 +12,11 @@ trait Shtml {
 
   implicit def toTextNode(text: String): Text = Text(text)
 
+  implicit def toOptionNode(opt: Option[VDom]): VDom = opt match {
+    case Some(nl) => nl
+    case None => <>
+  }
+
   implicit def toNodeLikes(xs: Iterable[NodeLike]): NodeLikes = NodeLikes(xs.toList)
 
   implicit def ShtmlSymbolOps(name: Symbol): ShtmlSymbolOps =
@@ -57,4 +62,10 @@ object Shtml {
     def /=(value: String): Attr =
       Attr(htmlName(self), value, isProperty = false)
   }
+//
+//  sealed trait InputType
+//
+//  object InputType {
+//    case object Text extends InputType
+//  }
 }

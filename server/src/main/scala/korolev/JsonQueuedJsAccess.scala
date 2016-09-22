@@ -17,7 +17,11 @@ class JsonQueuedJsAccess(sendJson: String => Unit)(implicit val executionContext
   def seqToJSON(xs: Seq[Any]): String = {
     val xs2 =
       xs map {
-        case s: String if !s.startsWith("[") ⇒ "\"" + s.replace("\n", "\\n") + "\""
+        case s: String if !s.startsWith("[") ⇒
+          val escaped = s
+            .replace("\n", "\\n")
+            .replace("\"", "\\\"")
+          s""""$escaped""""
         case any ⇒ any
       }
     "[" + xs2.reduce(_ + ", " + _) + "]"
@@ -25,6 +29,9 @@ class JsonQueuedJsAccess(sendJson: String => Unit)(implicit val executionContext
 
   override def platformDependentPack(value: Any): Any = value match {
     case xs: Seq[Any] ⇒ seqToJSON(xs)
+    case s: String ⇒ s
+      .replace("\n", "\\n")
+      .replace("\"", "\\\"")
     case x ⇒ super.platformDependentPack(x)
   }
 
@@ -43,8 +50,10 @@ class JsonQueuedJsAccess(sendJson: String => Unit)(implicit val executionContext
       queue = Queue.empty
       items
     }
-    val requests = rawRequests.mkString(",")
-    sendJson(s"""["batch",$requests]""")
+    if (rawRequests.nonEmpty) {
+      val requests = rawRequests.mkString(",")
+      sendJson(s"""["batch",$requests]""")
+    }
   }
 
   def receive(message: String): Unit = {

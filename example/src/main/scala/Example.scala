@@ -53,7 +53,7 @@ object Example extends App with Shtml {
         }
 
       // Create a DOM using state
-      state => {
+      { case state =>
         'div(
           'div("Super TODO tracker"),
           'div('style /= "height: 250px; overflow-y: scroll",

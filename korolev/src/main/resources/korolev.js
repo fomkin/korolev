@@ -2,8 +2,28 @@ var debugCreateTime = false
 document.addEventListener("DOMContentLoaded", function() {
   window.Korolev = (function() {
     var els = { "0": document.body };
+    var addHandler = null;
+    var removeHandler = null;
+    var scheduledAddHandlerItems = [];
 
+    function scheduleAddHandler(element) {
+      if (!addHandler)
+        return;
+      if (scheduledAddHandlerItems.length == 0) {
+        setTimeout(function() {
+          scheduledAddHandlerItems.forEach(addHandler);
+          scheduledAddHandlerItems.length = 0;
+        }, 0);
+      }
+      scheduledAddHandlerItems.push(element);
+    }
     return {
+      RegisterGlobalAddHandler: function(f) {
+        addHandler = f;
+      },
+      RegisterGlobalRemoveHandler: function(f) {
+        removeHandler = f;
+      },
       RegisterGlobalEventHandler: function(eventHandler) {
         var listen = function(name) {
           document.body.addEventListener(name, function(event) {
@@ -12,6 +32,7 @@ document.addEventListener("DOMContentLoaded", function() {
           });
         }
         listen('click');
+        listen('submit');
         listen('mousedown');
         listen('mouseup');
       },
@@ -23,6 +44,7 @@ document.addEventListener("DOMContentLoaded", function() {
         if (!parent) return;
         newElement = document.createElement(tag);
         newElement.vId = childId;
+        scheduleAddHandler(newElement);
         if (child && child.parentNode == parent) {
           parent.replaceChild(newElement, child);
         } else {
@@ -54,6 +76,7 @@ document.addEventListener("DOMContentLoaded", function() {
           child = els[childId];
         if (!parent) return;
         if (child) {
+          if (removeHandler) removeHandler(child);
           parent.removeChild(child);
         }
       },

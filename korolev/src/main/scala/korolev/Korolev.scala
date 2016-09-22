@@ -23,7 +23,7 @@ object Korolev extends EventPropagation {
     def id(pl: Any): PropertyAccessor
   }
 
-  type Render[State] = State => VDom.Node
+  type Render[State] = PartialFunction[State, VDom.Node]
   type InitRender[State, Action] = KorolevAccess[Action] => Render[State]
   type EventFactory[Payload] = Payload => Event
 
@@ -91,50 +91,54 @@ object Korolev extends EventPropagation {
         }
       }
 
-      val render = initRender(korolevAccess)
+      val render = initRender(korolevAccess).lift
 
       val onState: State => Unit = { state =>
         println("RRT: " + (System.currentTimeMillis() - reduceRealT) / 1000d)
         val tr = System.currentTimeMillis()
-        val newRender = render(state)
-        println("render: " + (System.currentTimeMillis() - tr) / 1000d)
-        val t = System.currentTimeMillis()
-        val changes = VDom.changes(lastRender, newRender)
-        val prevRender = lastRender
-        println("diff: " + (System.currentTimeMillis() - t) / 1000d)
-        lastRender = newRender
+        render(state) match {
+          case Some(newRender) =>
+            println("render: " + (System.currentTimeMillis() - tr) / 1000d)
+            val t = System.currentTimeMillis()
+            val changes = VDom.changes(lastRender, newRender)
+            val prevRender = lastRender
+            println("diff: " + (System.currentTimeMillis() - t) / 1000d)
+            lastRender = newRender
 
-        val scT = System.currentTimeMillis()
-        changes foreach {
-          case Create(id, childId, tag) =>
-            korolevJS.call("Create", id.toString, childId.toString, tag)
-          case CreateText(id, childId, text) =>
-            korolevJS.call("CreateText", id.toString, childId.toString, text)
-          case Remove(id, childId) =>
-            //println(prevRender(childId).misc)
-            prevRender(childId).toList.flatMap(_.misc) foreach {
-              case pa: PropertyAccessor => propertyAccessors.remove(pa)
-              case event: Event => events.remove(s"$childId:${event.`type`}")
+            val scT = System.currentTimeMillis()
+            changes foreach {
+              case Create(id, childId, tag) =>
+                korolevJS.call("Create", id.toString, childId.toString, tag)
+              case CreateText(id, childId, text) =>
+                korolevJS.call("CreateText", id.toString, childId.toString, text)
+              case Remove(id, childId) =>
+                //println(prevRender(childId).misc)
+                prevRender(childId).toList.flatMap(_.misc) foreach {
+                  case pa: PropertyAccessor => propertyAccessors.remove(pa)
+                  case event: Event => events.remove(s"$childId:${event.`type`}")
+                }
+                korolevJS.call("Remove", id.toString, childId.toString)
+              case SetAttr(id, name, value, isProperty) =>
+                korolevJS.call("SetAttr", id.toString, name, value, isProperty)
+              case RemoveAttr(id, name, isProperty) =>
+                korolevJS.call("RemoveAttr", id.toString, name, isProperty)
+              case AddMisc(id, event: Event) =>
+                events.put(s"$id:${event.`type`}:${event.phase}", event)
+              case RemoveMisc(id, event: Event) =>
+                val typeAndId = s"$id:${event.`type`}:${event.phase}"
+                events.remove(typeAndId)
+              case AddMisc(id, pa: PropertyAccessor) =>
+                propertyAccessors.put(pa, id.toString)
+              case RemoveMisc(id, pa: PropertyAccessor) =>
+                propertyAccessors.remove(pa)
+              case _ =>
+              // do nothing
             }
-            korolevJS.call("Remove", id.toString, childId.toString)
-          case SetAttr(id, name, value, isProperty) =>
-            korolevJS.call("SetAttr", id.toString, name, value, isProperty)
-          case RemoveAttr(id, name, isProperty) =>
-            korolevJS.call("RemoveAttr", id.toString, name, isProperty)
-          case AddMisc(id, event: Event) =>
-            events.put(s"$id:${event.`type`}:${event.phase}", event)
-          case RemoveMisc(id, event: Event) =>
-            val typeAndId = s"$id:${event.`type`}:${event.phase}"
-            events.remove(typeAndId)
-          case AddMisc(id, pa: PropertyAccessor) =>
-            propertyAccessors.put(pa, id.toString)
-          case RemoveMisc(id, pa: PropertyAccessor) =>
-            propertyAccessors.remove(pa)
-          case _ =>
-          // do nothing
+            println("SCT: " + (System.currentTimeMillis() - scT) / 1000d)
+            jsAccess.flush()
+          case None =>
+            println(s"Render is nod defined for ${state.getClass.getSimpleName}")
         }
-        println("SCT: " + (System.currentTimeMillis() - scT) / 1000d)
-        jsAccess.flush()
       }
 
       dux.subscribe(onState)

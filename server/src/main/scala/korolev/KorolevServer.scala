@@ -48,8 +48,8 @@ class KorolevServer[State, Action](
   import KorolevServer._
 
   private lazy val indexHtml: String = {
-    val scriptEntries = staticJs.map(s => s"""<script src="$s"></script>""")
-    val linkEntries = staticCss.map(s => s"""<link rel="stylesheet" href="$s">""")
+    val scriptEntries = staticJs.map(s => s"""<script src="$s"></script>""").mkString("\n")
+    val linkEntries = staticCss.map(s => s"""<link rel="stylesheet" href="$s">""").mkString("\n")
     val korolevJs = {
       val stream =
         classOf[Korolev].getClassLoader.getResourceAsStream("korolev.js")
