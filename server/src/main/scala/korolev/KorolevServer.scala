@@ -27,9 +27,11 @@ object KorolevServer {
       port: Int = 7181,
       initialState: State,
       reducer: Reducer[State, Action],
-      initRender: InitRender[State, Action]
+      initRender: InitRender[State, Action],
+      staticCss: Seq[String] = Nil,
+      staticJs: Seq[String] = Nil
   )(implicit ec: ExecutionContext): KorolevServer[State, Action] = {
-    new KorolevServer(host, port, initialState, reducer, initRender)
+    new KorolevServer(host, port, initialState, reducer, initRender, staticCss, staticJs)
   }
 }
 
@@ -38,12 +40,16 @@ class KorolevServer[State, Action](
     port: Int = 7181,
     initialState: State,
     reducer: Dux.Reducer[State, Action],
-    initRender: Korolev.InitRender[State, Action]
+    initRender: Korolev.InitRender[State, Action],
+    staticCss: Seq[String],
+    staticJs: Seq[String]
 )(implicit ec: ExecutionContext) {
 
   import KorolevServer._
 
   private lazy val indexHtml: String = {
+    val scriptEntries = staticJs.map(s => s"""<script src="$s"></script>""")
+    val linkEntries = staticCss.map(s => s"""<link rel="stylesheet" href="$s">""")
     val korolevJs = {
       val stream =
         classOf[Korolev].getClassLoader.getResourceAsStream("korolev.js")
@@ -57,8 +63,10 @@ class KorolevServer[State, Action](
     s"""
        |<html>
        |<head>
+       |$linkEntries
        |<script>$bridgeJsStream</script>
        |<script>$korolevJs</script>
+       |$scriptEntries
        |</head>
        |<body>
        |</body>
