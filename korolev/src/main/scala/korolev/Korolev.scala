@@ -19,7 +19,7 @@ object Korolev extends EventPropagation {
 
   trait KorolevAccess[Action] {
     def event[Payload](`type`: String, phase: Phase = AtTarget)(
-        onFile: Payload => (Boolean, Future[Action]))(payload: Payload): Event
+        onFile: Payload => EventResult[Action])(payload: Payload): Event
     def id(pl: Any): PropertyAccessor
   }
 
@@ -54,20 +54,23 @@ object Korolev extends EventPropagation {
 
       val korolevAccess = new KorolevAccess[Action] {
         def event[Payload](eventType: String, eventPhase: Phase)(
-            onFire: Payload => (Boolean, Future[Action]))(pl: Payload): Event = {
+            onFire: Payload => EventResult[Action])(pl: Payload): Event = {
           new Event {
             val `type` = eventType
             val phase = eventPhase
             def payload = pl
             def fire(): Boolean = {
-              val (continuePropagation, future) = onFire(pl)
-              future onComplete {
-                case Success(action) =>
-                  reduceRealT = System.currentTimeMillis()
-                  dux.dispatch(action)
-                case Failure(exception) => exception.printStackTrace()
+              val result = onFire(pl)
+              result._immediateAction.foreach(dux.dispatch)
+              result._deferredAction foreach { actionFuture =>
+                actionFuture onComplete {
+                  case Success(action) =>
+                    reduceRealT = System.currentTimeMillis()
+                    dux.dispatch(action)
+                  case Failure(exception) => exception.printStackTrace()
+                }
               }
-              continuePropagation
+              !result._stopPropagation
             }
           }
         }

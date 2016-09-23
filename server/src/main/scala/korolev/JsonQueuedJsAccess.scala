@@ -1,7 +1,5 @@
 package korolev
 
-package vaska
-
 import bridge.JSAccess
 
 import scala.collection.immutable.Queue

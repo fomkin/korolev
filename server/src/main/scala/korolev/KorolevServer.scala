@@ -3,7 +3,6 @@ package korolev
 import bridge.JSAccess
 import korolev.Dux.Reducer
 import korolev.Korolev.InitRender
-import korolev.vaska.JsonQueuedJsAccess
 import org.http4s._
 import org.http4s.dsl._
 import org.http4s.headers.`Content-Type`

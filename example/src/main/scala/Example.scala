@@ -1,13 +1,14 @@
 import korolev.Korolev.EventFactory
 import korolev.{Event, KorolevServer, Shtml}
 
-import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 
 /**
   * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
   */
 object Example extends App with Shtml {
+
+  import korolev.EventResult._
 
   sealed trait Action
 
@@ -39,17 +40,17 @@ object Example extends App with Shtml {
       // Generate actions when clicking checkboxes
       val todoClick: EventFactory[(Int, Todo)] =
         access.event("click", Event.AtTarget) { case (i, todo) =>
-          val res = Action.TodoSetDone(i, done = !todo.done)
-          true -> Future.successful(res)
+          immediateAction(Action.TodoSetDone(i, done = !todo.done))
         }
 
       // Generate AddTodo action when 'Add' button clicked
       val addTodoClick: EventFactory[Unit] =
         access.event("click") { _ =>
-          val future = inputId[String]('value) map { value =>
-            Action.AddTodo(Todo(value, done = false))
+          deferredAction {
+            inputId[String]('value) map { value =>
+              Action.AddTodo(Todo(value, done = false))
+            }
           }
-          true -> future
         }
 
       // Create a DOM using state
