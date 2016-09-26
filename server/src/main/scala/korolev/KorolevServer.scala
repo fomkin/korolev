@@ -27,10 +27,10 @@ object KorolevServer {
       initialState: State,
       reducer: Reducer[State, Action],
       initRender: InitRender[State, Action],
-      staticCss: Seq[String] = Nil,
+      head: VDom.Node = VDom.Node("head", Nil, Nil, Nil),
       staticJs: Seq[String] = Nil
   )(implicit ec: ExecutionContext): KorolevServer[State, Action] = {
-    new KorolevServer(host, port, initialState, reducer, initRender, staticCss, staticJs)
+    new KorolevServer(host, port, initialState, reducer, initRender, head)
   }
 }
 
@@ -40,37 +40,34 @@ class KorolevServer[State, Action](
     initialState: State,
     reducer: Dux.Reducer[State, Action],
     initRender: Korolev.InitRender[State, Action],
-    staticCss: Seq[String],
-    staticJs: Seq[String]
-)(implicit ec: ExecutionContext) {
+    head: VDom.Node
+)(implicit ec: ExecutionContext) extends Shtml {
 
   import KorolevServer._
 
   private lazy val indexHtml: String = {
-    val scriptEntries = staticJs.map(s => s"""<script src="$s"></script>""").mkString("\n")
-    val linkEntries = staticCss.map(s => s"""<link rel="stylesheet" href="$s">""").mkString("\n")
+
     val korolevJs = {
       val stream =
         classOf[Korolev].getClassLoader.getResourceAsStream("korolev.js")
       Source.fromInputStream(stream).mkString
     }
-    val bridgeJsStream = {
+    val bridgeJs = {
       val stream =
         classOf[JSAccess].getClassLoader.getResourceAsStream("bridge.js")
       Source.fromInputStream(stream).mkString
     }
-    s"""
-       |<html>
-       |<head>
-       |$linkEntries
-       |<script>$bridgeJsStream</script>
-       |<script>$korolevJs</script>
-       |$scriptEntries
-       |</head>
-       |<body>
-       |</body>
-       |</html>
-    """.stripMargin
+
+    val dom = 'html(
+      head.copy(children =
+        'script(bridgeJs) ::
+        'script(korolevJs) ::
+        head.children
+      ),
+      'body()
+    )
+
+    "<!DOCTYPE html>" + dom.html
   }
 
   private val route = HttpService {

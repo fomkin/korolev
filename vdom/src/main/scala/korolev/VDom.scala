@@ -2,7 +2,24 @@ package korolev
 
 import scala.annotation.tailrec
 
-trait VDom
+trait VDom {
+  def html: String = this match {
+    case VDom.Node(tag, children, attrs, _) =>
+      val childrenHtml = children
+        .map(_.html)
+        .filter(_.nonEmpty)
+        .mkString
+      val attrsHtml = attrs
+        .map(_.html)
+        .filter(_.nonEmpty)
+        .mkString(" ")
+      s"<$tag $attrsHtml>$childrenHtml</$tag>"
+    case VDom.Attr(name, value, false) =>
+      s"""$name="$value""""
+    case VDom.Text(value) => value
+    case _ => ""
+  }
+}
 
 object VDom {
   
@@ -51,7 +68,7 @@ object VDom {
 
   case class Attr(name: String, value: Any, isProperty: Boolean = true)
       extends VDom
-  case class NodeLikes(xs: List[NodeLike]) extends VDom
+  case class VDoms(xs: List[VDom]) extends VDom
   case object Empty extends VDom
 
   case class Id(vec: Vector[Int]) {

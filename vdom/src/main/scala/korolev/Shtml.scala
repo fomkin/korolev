@@ -17,7 +17,7 @@ trait Shtml {
     case None => <>
   }
 
-  implicit def toNodeLikes(xs: Iterable[NodeLike]): NodeLikes = NodeLikes(xs.toList)
+  implicit def toVDoms(xs: Iterable[VDom]): VDoms = VDoms(xs.toList)
 
   implicit def ShtmlSymbolOps(name: Symbol): ShtmlSymbolOps =
     new ShtmlSymbolOps(name)
@@ -48,8 +48,7 @@ object Shtml {
         case (x: NodeLike) :: xs => loop(x :: children, attrs, misc, xs)
         case (x: Attr) :: xs => loop(children, x :: attrs, misc, xs)
         case (x: Misc) :: xs => loop(children, attrs, x :: misc, xs)
-        case NodeLikes(nodes) :: xs =>
-          loop(children ::: nodes.reverse, attrs, misc, xs)
+        case VDoms(nodes) :: xs => loop(children, attrs, misc, nodes ::: xs)
         case _ :: xs =>
           loop(children, attrs, misc, xs)
       }

@@ -5,7 +5,7 @@ import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success}
 
 trait Dux[+State, -Action] {
-  def state: Future[State]
+  def state: State
   def subscribe[U](f: State => U): Dux.Unsubscribe
   def dispatch(action: Action): Future[Unit]
 }
@@ -58,7 +58,7 @@ object Dux {
         promise.future
       }
 
-      def state = Future.successful(_state)
+      def state = _state
 
       def subscribe[U](f: State => U): Dux.Unsubscribe = {
         subscribers = f :: subscribers

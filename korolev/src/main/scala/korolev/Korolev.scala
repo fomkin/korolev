@@ -17,14 +17,15 @@ object Korolev extends EventPropagation {
   import Change._
   import Event._
 
-  trait KorolevAccess[Action] {
+  trait KorolevAccess[State, Action] {
     def event[Payload](`type`: String, phase: Phase = AtTarget)(
         onFile: Payload => EventResult[Action])(payload: Payload): Event
     def id(pl: Any): PropertyAccessor
+    def dux: Dux[State, Action]
   }
 
   type Render[State] = PartialFunction[State, VDom.Node]
-  type InitRender[State, Action] = KorolevAccess[Action] => Render[State]
+  type InitRender[State, Action] = KorolevAccess[State, Action] => Render[State]
   type EventFactory[Payload] = Payload => Event
 
   def apply[State, Action](jsAccess: JSAccess,
@@ -41,7 +42,7 @@ object Korolev extends EventPropagation {
     // Prepare frontend
     jsAccess.global.getAndSaveAs("Korolev", "@Korolev")
     val korolevJS = jsAccess.obj("@Korolev")
-    val dux = Dux[State, Action](initialState, reducer)
+    val localDux = Dux[State, Action](initialState, reducer)
 
     jsAccess.registerCallback[String] { targetAndType =>
       val Array(target, tpe) = targetAndType.split(':')
@@ -52,7 +53,7 @@ object Korolev extends EventPropagation {
 
       var reduceRealT = 0l
 
-      val korolevAccess = new KorolevAccess[Action] {
+      val korolevAccess = new KorolevAccess[State, Action] {
         def event[Payload](eventType: String, eventPhase: Phase)(
             onFire: Payload => EventResult[Action])(pl: Payload): Event = {
           new Event {
@@ -92,6 +93,8 @@ object Korolev extends EventPropagation {
             }
           }
         }
+
+        def dux = localDux
       }
 
       val render = initRender(korolevAccess).lift
@@ -144,11 +147,11 @@ object Korolev extends EventPropagation {
         }
       }
 
-      dux.subscribe(onState)
+      localDux.subscribe(onState)
       onState(initialState)
     }
 
     jsAccess.flush()
-    dux
+    localDux
   }
 }

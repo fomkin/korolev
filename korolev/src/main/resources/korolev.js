@@ -1,7 +1,8 @@
-var debugCreateTime = false
-document.addEventListener("DOMContentLoaded", function() {
-  window.Korolev = (function() {
-    var els = { "0": document.body };
+(function(global) {
+
+  global.Korolev = (function() {
+    var root = null;
+    var els = null;
     var addHandler = null;
     var removeHandler = null;
     var scheduledAddHandlerItems = [];
@@ -18,6 +19,10 @@ document.addEventListener("DOMContentLoaded", function() {
       scheduledAddHandlerItems.push(element);
     }
     return {
+      RegisterRoot: function(node) {
+        root = node;
+        els = { "0": node };
+      },
       RegisterGlobalAddHandler: function(f) {
         addHandler = f;
       },
@@ -26,7 +31,7 @@ document.addEventListener("DOMContentLoaded", function() {
       },
       RegisterGlobalEventHandler: function(eventHandler) {
         var listen = function(name) {
-          document.body.addEventListener(name, function(event) {
+          root.addEventListener(name, function(event) {
             if (event.target.vId)
               eventHandler(event.target.vId + ':' + event.type);
           });
@@ -37,7 +42,6 @@ document.addEventListener("DOMContentLoaded", function() {
         listen('mouseup');
       },
       Create: function(id, childId, tag) {
-        var t = Date.now()
         var parent = els[id],
           child = els[childId],
           newElement;
@@ -50,12 +54,9 @@ document.addEventListener("DOMContentLoaded", function() {
         } else {
           parent.appendChild(newElement);
         }
-        if (debugCreateTime)
-          console.log("Create time: " + (Date.now() -t ) / 1000)
         els[childId] = newElement;
       },
       CreateText: function(id, childId, text) {
-        var t = Date.now()
         var parent = els[id],
           child = els[childId],
           newElement;
@@ -67,8 +68,6 @@ document.addEventListener("DOMContentLoaded", function() {
         } else {
           parent.appendChild(newElement);
         }
-        if (debugCreateTime)
-          console.log("Create time: " + (Date.now() -t ) / 1000)
         els[childId] = newElement;
       },
       Remove: function(id, childId) {
@@ -97,10 +96,14 @@ document.addEventListener("DOMContentLoaded", function() {
     }
   })();
 
-  var loc = window.location;
-  var wsUri;
-  if (loc.protocol === "https:") wsUri = "wss://";
-  else wsUri = "ws://";
-  wsUri += loc.host + loc.pathname + "/bridge";
-  Bridge.webSocket(wsUri)
-});
+  document.addEventListener("DOMContentLoaded", function() {
+    global.Korolev.RegisterRoot(document.body);
+    var loc = window.location;
+    var wsUri;
+    if (loc.protocol === "https:") wsUri = "wss://";
+    else wsUri = "ws://";
+    wsUri += loc.host + loc.pathname + "/bridge";
+    Bridge.webSocket(wsUri)
+  });
+
+})(this);
