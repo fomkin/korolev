@@ -61,8 +61,8 @@ object Korolev extends EventPropagation {
             def payload = pl
             def fire(): Boolean = {
               val result = onFire(pl)
-              result._immediateAction.foreach(dux.apply)
-              result._deferredAction foreach { actionFuture =>
+              result._immediateTransition.foreach(dux.apply)
+              result._deferredTransition foreach { actionFuture =>
                 actionFuture onComplete {
                   case Success(action) =>
                     reduceRealT = System.currentTimeMillis()

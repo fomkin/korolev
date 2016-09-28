@@ -26,7 +26,7 @@ object Example extends App with Shtml {
       // Generate actions when clicking checkboxes
       val todoClick: EventFactory[(Int, Todo)] =
         access.event("click", Event.AtTarget) { case (i, todo) =>
-          immediateAction { state =>
+          immediateTransition { state =>
             val updated = state.todos.updated(i, state.todos(i).copy(done = !todo.done))
             state.copy(todos = updated)
           }
@@ -35,7 +35,7 @@ object Example extends App with Shtml {
       // Generate AddTodo action when 'Add' button clicked
       val addTodoClick: EventFactory[Unit] =
         access.event("click") { _ =>
-          deferredAction {
+          deferredTransition {
             inputId[String]('value) map { value =>
               val todo = Todo(value, done = false)
               state => state.copy(todos = state.todos :+ todo)
