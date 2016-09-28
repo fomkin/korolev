@@ -10,28 +10,14 @@ object Example extends App with Shtml {
 
   import korolev.EventResult._
 
-  sealed trait Action
-
-  object Action {
-    case class AddTodo(todo: Todo) extends Action
-    case class TodoSetDone(i: Int, done: Boolean) extends Action
-  }
-
   case class Todo(text: String, done: Boolean)
 
   case class State(todos: Vector[Todo] = (0 to 10).toVector map {
     i => Todo(s"This is TODO #$i", done = false)
   })
 
-  KorolevServer[State, Action](
+  KorolevServer[State](
     initialState = State(),
-    reducer = {
-      case (state, Action.AddTodo(todo)) =>
-        state.copy(todos = state.todos :+ todo)
-      case (state, Action.TodoSetDone(i, done)) =>
-        val updated = state.todos.updated(i, state.todos(i).copy(done = done))
-        state.copy(todos = updated)
-    },
     initRender = { access =>
 
       // Handler to input
@@ -40,7 +26,10 @@ object Example extends App with Shtml {
       // Generate actions when clicking checkboxes
       val todoClick: EventFactory[(Int, Todo)] =
         access.event("click", Event.AtTarget) { case (i, todo) =>
-          immediateAction(Action.TodoSetDone(i, done = !todo.done))
+          immediateAction { state =>
+            val updated = state.todos.updated(i, state.todos(i).copy(done = !todo.done))
+            state.copy(todos = updated)
+          }
         }
 
       // Generate AddTodo action when 'Add' button clicked
@@ -48,7 +37,8 @@ object Example extends App with Shtml {
         access.event("click") { _ =>
           deferredAction {
             inputId[String]('value) map { value =>
-              Action.AddTodo(Todo(value, done = false))
+              val todo = Todo(value, done = false)
+              state => state.copy(todos = state.todos :+ todo)
             }
           }
         }

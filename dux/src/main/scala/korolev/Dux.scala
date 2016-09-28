@@ -1,42 +1,37 @@
 package korolev
 
-import scala.collection.immutable.Queue
+import java.util.concurrent.ConcurrentLinkedQueue
+
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success}
 
-trait Dux[+State, -Action] {
+trait Dux[State] {
   def state: State
   def subscribe[U](f: State => U): Dux.Unsubscribe
-  def dispatch(action: Action): Future[Unit]
+  def apply(action: State => State): Future[Unit]
 }
 
 object Dux {
 
   type Unsubscribe = () => Unit
-  type Reducer[State, Action] = (State, Action) => State
+  type Transition[State] = State => State
 
+  def apply[State](
+      initialState: State)(
+      implicit ec: ExecutionContext): Dux[State] = {
 
-  def apply[State, Action](
-      initialState: State, reducer: Reducer[State, Action])(
-      implicit ec: ExecutionContext): Dux[State, Action] = {
+    new Dux[State] {
 
-    new Dux[State, Action] {
+      val queue = new ConcurrentLinkedQueue[(Promise[Unit], Transition[State])]
 
       @volatile var _state = initialState
-      @volatile var queue = Queue.empty[(Promise[Unit], Action)]
       @volatile var subscribers = List.empty[State => _]
       @volatile var inProgress = false
 
-      def dispatch(action: Action): Future[Unit] = {
+      def apply(transition: Transition[State]): Future[Unit] = {
         def executeNext(): Unit = {
-          val ((promise, action), queueTail) = queue.dequeue
-          queue = queueTail
-          Future {
-            val t = System.currentTimeMillis()
-            val res = reducer(_state, action)
-            println("reduce: " + (System.currentTimeMillis() - t) / 1000d)
-            res
-          } onComplete {
+          val (promise, transition) = queue.poll()
+          Future(transition(_state)) onComplete {
             case Success(newState) =>
               _state = newState
               subscribers.foreach(f => f(newState))
@@ -50,7 +45,7 @@ object Dux {
           }
         }
         val promise = Promise[Unit]()
-        queue = queue.enqueue(promise -> action)
+        queue.add(promise -> transition)
         if (!inProgress) {
           inProgress = true
           executeNext()

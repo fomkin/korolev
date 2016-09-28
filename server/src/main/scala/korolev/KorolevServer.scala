@@ -1,7 +1,6 @@
 package korolev
 
 import bridge.JSAccess
-import korolev.Dux.Reducer
 import korolev.Korolev.InitRender
 import org.http4s._
 import org.http4s.dsl._
@@ -19,27 +18,26 @@ import scalaz.stream.{Exchange, Process, Sink}
 
 object KorolevServer {
 
+//  implicit val scheduler = new ScheduledThreadPoolExecutor(2)
+
   val htmlContentType = Some(`Content-Type`(MediaType.`text/html`))
 
-  def apply[State, Action](
+  def apply[State](
       host: String = ServerBuilder.DefaultHost,
       port: Int = 7181,
       initialState: State,
-      reducer: Reducer[State, Action],
-      initRender: InitRender[State, Action],
-      head: VDom.Node = VDom.Node("head", Nil, Nil, Nil),
-      staticJs: Seq[String] = Nil
-  )(implicit ec: ExecutionContext): KorolevServer[State, Action] = {
-    new KorolevServer(host, port, initialState, reducer, initRender, head)
+      initRender: InitRender[State],
+      head: VDom.Node = VDom.Node("head", Nil, Nil, Nil)
+  )(implicit ec: ExecutionContext): KorolevServer[State] = {
+    new KorolevServer(host, port, initialState, initRender, head)
   }
 }
 
-class KorolevServer[State, Action](
+class KorolevServer[State](
     host: String = ServerBuilder.DefaultHost,
     port: Int = 7181,
     initialState: State,
-    reducer: Dux.Reducer[State, Action],
-    initRender: Korolev.InitRender[State, Action],
+    initRender: Korolev.InitRender[State],
     head: VDom.Node
 )(implicit ec: ExecutionContext) extends Shtml {
 
@@ -84,7 +82,7 @@ class KorolevServer[State, Action](
         case Text(t, _) => Task.fork(Task.now(jSAccess.receive(t)))
         case _ => Task.now(())
       }
-      Korolev(jSAccess, initialState, reducer, initRender)
+      Korolev(jSAccess, initialState, initRender)
       WS(Exchange(outgoingProcess, sink))
   }
 

@@ -17,22 +17,21 @@ object Korolev extends EventPropagation {
   import Change._
   import Event._
 
-  trait KorolevAccess[State, Action] {
+  trait KorolevAccess[State] {
     def event[Payload](`type`: String, phase: Phase = AtTarget)(
-        onFile: Payload => EventResult[Action])(payload: Payload): Event
+        onFile: Payload => EventResult[State])(payload: Payload): Event
     def id(pl: Any): PropertyAccessor
-    def dux: Dux[State, Action]
+    def dux: Dux[State]
   }
 
   type Render[State] = PartialFunction[State, VDom.Node]
-  type InitRender[State, Action] = KorolevAccess[State, Action] => Render[State]
+  type InitRender[State] = KorolevAccess[State] => Render[State]
   type EventFactory[Payload] = Payload => Event
 
-  def apply[State, Action](jsAccess: JSAccess,
+  def apply[State](jsAccess: JSAccess,
                            initialState: State,
-                           reducer: Dux.Reducer[State, Action],
-                           initRender: InitRender[State, Action])(
-      implicit ec: ExecutionContext): Dux[State, Action] = {
+                           initRender: InitRender[State])(
+      implicit ec: ExecutionContext): Dux[State] = {
 
     val propertyAccessors = TrieMap.empty[PropertyAccessor, String]
     val events = TrieMap.empty[String, Event]
@@ -42,7 +41,7 @@ object Korolev extends EventPropagation {
     // Prepare frontend
     jsAccess.global.getAndSaveAs("Korolev", "@Korolev")
     val korolevJS = jsAccess.obj("@Korolev")
-    val localDux = Dux[State, Action](initialState, reducer)
+    val localDux = Dux[State](initialState)
 
     jsAccess.registerCallback[String] { targetAndType =>
       val Array(target, tpe) = targetAndType.split(':')
@@ -53,21 +52,21 @@ object Korolev extends EventPropagation {
 
       var reduceRealT = 0l
 
-      val korolevAccess = new KorolevAccess[State, Action] {
+      val korolevAccess = new KorolevAccess[State] {
         def event[Payload](eventType: String, eventPhase: Phase)(
-            onFire: Payload => EventResult[Action])(pl: Payload): Event = {
+            onFire: Payload => EventResult[State])(pl: Payload): Event = {
           new Event {
             val `type` = eventType
             val phase = eventPhase
             def payload = pl
             def fire(): Boolean = {
               val result = onFire(pl)
-              result._immediateAction.foreach(dux.dispatch)
+              result._immediateAction.foreach(dux.apply)
               result._deferredAction foreach { actionFuture =>
                 actionFuture onComplete {
                   case Success(action) =>
                     reduceRealT = System.currentTimeMillis()
-                    dux.dispatch(action)
+                    dux.apply(action)
                   case Failure(exception) => exception.printStackTrace()
                 }
               }

@@ -416,15 +416,17 @@
       /**
        * Connect to remote server via WebSocket
        */
-      webSocket: function (url) {
+      webSocket: function (urlOrWs) {
         return new Promise(function (resolve, reject) {
-          var ws = new WebSocket(url),
-            bridge = new Bridge(function (data) {
-              if (protocolDebugEnabled) {
-                console.log('<-', data);
-              }
-              ws.send(JSON.stringify(data));
-            });
+          var ws = null;
+          if (typeof urlOrWs === 'object') ws = urlOrWs;
+          else ws = new WebSocket(urlOrWs);
+          var bridge = new Bridge(function (data) {
+            if (protocolDebugEnabled) {
+              console.log('<-', data);
+            }
+            ws.send(JSON.stringify(data));
+          });
           ws.addEventListener('message', function (event) {
             bridge.receive(JSON.parse(event.data));
           });
