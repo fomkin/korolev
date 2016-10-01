@@ -80,8 +80,6 @@ class KorolevServer[State](
       Ok(indexHtml).withContentType(htmlContentType)
     case req @ _ -> Root / "bridge" =>
       val outgoingQueue = unboundedQueue[WebSocketFrame]
-      val outgoingProcess = outgoingQueue.dequeue
-        .onComplete(Process.eval_(Task.delay(Console.println("Closed"))))
       time.awakeEvery(5.seconds)(Strategy.DefaultStrategy, DefaultScheduler)
         .map(_ => Ping())
         .to(outgoingQueue.enqueue)
@@ -92,13 +90,18 @@ class KorolevServer[State](
         case Text(t, _) => Task.fork(Task.now(jSAccess.receive(t)))
         case _ => Task.now(())
       }
-      Korolev(jSAccess, initialState, initRender)
+      val korolev = Korolev(jSAccess, initialState, initRender)
+      val outgoingProcess = outgoingQueue.dequeue
+        .onComplete(Process.eval_(Task delay {
+          Console.println("Closed")
+          korolev.destroy()
+        }))
       WS(Exchange(outgoingProcess, sink))
   }
 
   BlazeBuilder
     .withNio2(true)
-    .bindHttp(port)
+    .bindHttp(port, host)
     .withWebSockets(true)
     .mountService(route)
     .start

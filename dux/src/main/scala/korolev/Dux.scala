@@ -8,6 +8,8 @@ import scala.util.{Failure, Success}
 trait Dux[State] {
   def state: State
   def subscribe[U](f: State => U): Dux.Unsubscribe
+  def onDestroy[U](f: () => U): Dux.Unsubscribe
+  def destroy(): Unit
   def apply(action: State => State): Future[Unit]
 }
 
@@ -16,9 +18,7 @@ object Dux {
   type Unsubscribe = () => Unit
   type Transition[State] = State => State
 
-  def apply[State](
-      initialState: State)(
-      implicit ec: ExecutionContext): Dux[State] = {
+  def apply[State](initialState: State)(implicit ec: ExecutionContext): Dux[State] = {
 
     new Dux[State] {
 
@@ -26,6 +26,7 @@ object Dux {
 
       @volatile var _state = initialState
       @volatile var subscribers = List.empty[State => _]
+      @volatile var onDestroyListeners = List.empty[() => _]
       @volatile var inProgress = false
 
       def apply(transition: Transition[State]): Future[Unit] = {
@@ -53,7 +54,17 @@ object Dux {
         promise.future
       }
 
+      def destroy(): Unit = {
+        for (listener <- onDestroyListeners)
+          listener()
+      }
+
       def state = _state
+
+      def onDestroy[U](f: () => U): Unsubscribe = {
+        onDestroyListeners = f :: onDestroyListeners
+        () => onDestroyListeners = onDestroyListeners.filter(_ != f)
+      }
 
       def subscribe[U](f: State => U): Dux.Unsubscribe = {
         subscribers = f :: subscribers

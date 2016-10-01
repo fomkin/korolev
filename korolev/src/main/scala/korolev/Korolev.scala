@@ -18,8 +18,10 @@ object Korolev extends EventPropagation {
   import Event._
 
   trait KorolevAccess[State] {
-    def event[Payload](`type`: String, phase: Phase = AtTarget)(
-        onFile: Payload => EventResult[State])(payload: Payload): Event
+    def event[Payload](`type`: String, phase: Phase = Bubbling)
+      (onFile: Payload => EventResult[State])
+      (payload: Payload): Event
+
     def id(pl: Any): PropertyAccessor
     def dux: Dux[State]
   }
@@ -53,14 +55,17 @@ object Korolev extends EventPropagation {
       var reduceRealT = 0l
 
       val korolevAccess = new KorolevAccess[State] {
-        def event[Payload](eventType: String, eventPhase: Phase)(
-            onFire: Payload => EventResult[State])(pl: Payload): Event = {
-          new Event {
-            val `type` = eventType
-            val phase = eventPhase
-            def payload = pl
+
+        def event[P](eventType: String, eventPhase: Phase)(
+          onFire: P => EventResult[State])(payload: P): Event = {
+
+          case class EventImpl(`type`: String,
+            phase: Event.Phase,
+            payload: P,
+            onFire: P => EventResult[State]) extends Event {
+
             def fire(): Boolean = {
-              val result = onFire(pl)
+              val result = onFire(payload)
               result._immediateTransition.foreach(dux.apply)
               result._deferredTransition foreach { actionFuture =>
                 actionFuture onComplete {
@@ -72,7 +77,14 @@ object Korolev extends EventPropagation {
               }
               !result._stopPropagation
             }
+
+            override def equals(obj: Any): Boolean = obj match {
+              case event: EventImpl => event.onFire.getClass == onFire.getClass && super.equals(obj)
+              case _ => super.equals(obj)
+            }
           }
+
+          EventImpl(eventType, eventPhase, payload, onFire)
         }
 
         def id(pl: Any): PropertyAccessor = {

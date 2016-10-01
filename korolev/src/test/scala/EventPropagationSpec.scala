@@ -33,6 +33,7 @@ class EventPropagationSpec
       val events = Map(
         assertFired("0_0", tpe = "test", inPhase = Bubbling),
         assertFired("0_0_0", tpe = "test", inPhase = Bubbling),
+        assertFired("0_0_0_2", tpe = "test", inPhase = Bubbling),
         assertNotFired("0_0_0", tpe = "anotherType"),
         assertNotFired("0_0_1", tpe = "test")
       )

@@ -46,7 +46,7 @@ trait EventPropagation {
         case Some(event) =>
           if (event.fire())
             bubbling(captured)
-        case None => bubbling(captured)
+        case None => bubbling(target :: captured)
       }
     }
   }
