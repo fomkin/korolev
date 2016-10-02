@@ -1,5 +1,7 @@
 package korolev
 
+import korolev.Dux.Transition
+
 import scala.concurrent.Future
 
 /**
@@ -13,6 +15,7 @@ case class EventResult[S](
 
   def deferredTransition(transition: Future[Dux.Transition[S]]) =
     copy(_deferredTransition = Some(transition))
+
   def immediateTransition(transition: Dux.Transition[S]) =
     copy(_immediateTransition = Some(transition))
 
@@ -22,6 +25,16 @@ case class EventResult[S](
 object EventResult {
   def immediateTransition[S](transition: Dux.Transition[S]) =
     EventResult(Some(transition), None, _stopPropagation = false)
+
   def deferredTransition[S](transition: Future[Dux.Transition[S]]) =
     EventResult(None, Some(transition), _stopPropagation = false)
+
+  /**
+    * This is an immediateTransition return same state
+    */
+  def noTransition[S]: EventResult[S] = immediateTransition {
+    case anyState => anyState
+  }
+
+  def transition[S](t: Transition[S]): Transition[S] = t
 }

@@ -1,22 +1,20 @@
 package korolev
 
 import java.util.concurrent.ConcurrentLinkedQueue
-
 import scala.concurrent.{ExecutionContext, Future, Promise}
-import scala.util.{Failure, Success}
 
 trait Dux[State] {
   def state: State
   def subscribe[U](f: State => U): Dux.Unsubscribe
   def onDestroy[U](f: () => U): Dux.Unsubscribe
   def destroy(): Unit
-  def apply(action: State => State): Future[Unit]
+  def apply(action: Dux.Transition[State]): Future[Unit]
 }
 
 object Dux {
 
   type Unsubscribe = () => Unit
-  type Transition[State] = State => State
+  type Transition[State] = PartialFunction[State, State]
 
   def apply[State](initialState: State)(implicit ec: ExecutionContext): Dux[State] = {
 
@@ -32,17 +30,20 @@ object Dux {
       def apply(transition: Transition[State]): Future[Unit] = {
         def executeNext(): Unit = {
           val (promise, transition) = queue.poll()
-          Future(transition(_state)) onComplete {
-            case Success(newState) =>
-              _state = newState
-              subscribers.foreach(f => f(newState))
-              promise.success(())
-              if (queue.isEmpty) inProgress = false
-              else executeNext()
-            case Failure(exception) =>
-              promise.failure(exception)
-              if (queue.isEmpty) inProgress = false
-              else executeNext()
+          try {
+            transition.lift(_state) match {
+              case Some(newState) =>
+                _state = newState
+                subscribers.foreach(f => f(newState))
+                promise.success(())
+              case None =>
+                promise.failure(new Exception("Transition don't fit this state"))
+            }
+          } catch {
+            case e: Throwable => promise.failure(e)
+          } finally {
+            if (queue.isEmpty) inProgress = false
+            else executeNext()
           }
         }
         val promise = Promise[Unit]()

@@ -300,10 +300,10 @@ object VDom {
           changesLoop(curr, i + 1, change :: acc, astl, Nil, ctx)
         case ((ax: Node) :: astl, bx :: bstl) if ax.needReplace(bx) =>
           val removeMiscs = ax.misc.map(RemoveMisc(id, _))
-          val create = Remove(curr, id) :: removeMiscs ::: elToChanges(curr, i, acc, List(bx), None)
+          val create = removeMiscs ::: elToChanges(curr, i, acc, List(bx), None)
           changesLoop(curr, i + 1, create, astl, bstl, ctx)
         case (ax :: astl, bx :: bstl) if ax.needReplace(bx) =>
-          val create = Remove(curr, id) :: elToChanges(curr, i, acc, List(bx), None)
+          val create = elToChanges(curr, i, acc, List(bx), None)
           changesLoop(curr, i + 1, create, astl, bstl, ctx)
         case ((ax: Node) :: astl, (bx: Node) :: bstl) =>
           val attrChanges = changesBetweenAttrs(id, acc, ax.attrs, bx.attrs)
