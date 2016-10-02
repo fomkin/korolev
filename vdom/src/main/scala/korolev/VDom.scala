@@ -146,12 +146,6 @@ object VDom {
         extends Change
         with OrderByIdAndChildId with NodeChange
 
-    case class AddMisc(id: Id, value: Misc) extends Change with OrderById  with NotNodeChange
-
-    case class RemoveMisc(id: Id, value: Misc)
-        extends Change
-        with OrderById  with NotNodeChange
-
     implicit val changeOrdering = new Ordering[Change] {
       def compare(x: Change, y: Change): Int = (x, y) match {
         case (_: NodeChange, _: NotNodeChange) => -1
@@ -175,34 +169,19 @@ object VDom {
                                     tl: List[NodeLike],
                                     prev: Option[ElToChangesCtx])
 
+
+  def collectMisc(id: Id, nl: NodeLike): List[(Id, Misc)] = nl match {
+    case Node(_, children, _, misc) =>
+      misc.map(id -> _) ::: children.zipWithIndex.flatMap {
+        case (child, i) => collectMisc(id + i, child)
+      }
+    case _ => Nil
+  }
+
   def changes(a: NodeLike, b: NodeLike): Changes = {
 
     import Change._
 
-    @tailrec
-    def changesBetweenMisc(
-        id: Id, acc: Changes, as: List[Misc], bs: List[Misc]): Changes = {
-      (as, bs) match {
-        case (Nil, Nil) => acc
-        case (ax :: asTl, Nil) =>
-          changesBetweenMisc(id, RemoveMisc(id, ax) :: acc, asTl, Nil)
-        case (Nil, bx :: bsTl) =>
-          changesBetweenMisc(id, AddMisc(id, bx) :: acc, Nil, bsTl)
-        case (ax :: asTl, bx :: bsTl) if ax != bx =>
-          val newAcc = RemoveMisc(id, ax) :: AddMisc(id, bx) :: acc
-          changesBetweenMisc(id, newAcc, asTl, bsTl)
-        case (_ :: asTl, _ :: bsTl) =>
-          changesBetweenMisc(id, acc, asTl, bsTl)
-      }
-    }
-
-    @tailrec
-    def miscToChanges(id: Id, acc: Changes, misc: List[Misc]): Changes = {
-      misc match {
-        case Nil => acc
-        case x :: xs => miscToChanges(id, AddMisc(id, x) :: acc, xs)
-      }
-    }
     @tailrec
     def elToChanges(curr: Id,
                     i: Int,
@@ -219,15 +198,14 @@ object VDom {
             case None => acc
           }
         case Node(tag, Nil, attrs, misc) :: xs =>
-          val withAttrsAndMisc = miscToChanges(
-              id, attrToChanges(id, acc, attrs), misc)
+          val withAttrs = attrToChanges(id, acc, attrs)
           elToChanges(
-              curr, i + 1, Create(curr, id, tag) :: withAttrsAndMisc, xs, ctx)
+              curr, i + 1, Create(curr, id, tag) :: withAttrs, xs, ctx)
         case Node(tag, children, attrs, misc) :: xs =>
           elToChanges(
               id,
               0,
-              miscToChanges(id, attrToChanges(id, acc, attrs), misc),
+              attrToChanges(id, acc, attrs),
               children,
               Some(ElToChangesCtx(curr, i + 1, Create(curr, id, tag), xs, ctx))
           )
@@ -291,29 +269,19 @@ object VDom {
         case (Nil, bx :: bstl) =>
           val create = elToChanges(curr, i, acc, List(bx), None)
           changesLoop(curr, i + 1, create, Nil, bstl, ctx)
-        case ((ax: Node) :: astl, Nil) =>
-          val removeMiscs = ax.misc.map(RemoveMisc(id, _))
-          val change = Remove(curr, id)
-          changesLoop(curr, i + 1, change :: removeMiscs ::: acc, astl, Nil, ctx)
         case (ax :: astl, Nil) =>
           val change = Remove(curr, id)
           changesLoop(curr, i + 1, change :: acc, astl, Nil, ctx)
-        case ((ax: Node) :: astl, bx :: bstl) if ax.needReplace(bx) =>
-          val removeMiscs = ax.misc.map(RemoveMisc(id, _))
-          val create = removeMiscs ::: elToChanges(curr, i, acc, List(bx), None)
-          changesLoop(curr, i + 1, create, astl, bstl, ctx)
         case (ax :: astl, bx :: bstl) if ax.needReplace(bx) =>
           val create = elToChanges(curr, i, acc, List(bx), None)
           changesLoop(curr, i + 1, create, astl, bstl, ctx)
         case ((ax: Node) :: astl, (bx: Node) :: bstl) =>
           val attrChanges = changesBetweenAttrs(id, acc, ax.attrs, bx.attrs)
-          val miscChanges = changesBetweenMisc(
-              id, attrChanges, ax.misc, bx.misc)
           val newCtx = ChangesLoopCtx(curr, i + 1, astl, bstl, ctx)
           changesLoop(
               curr = id,
               i = 0,
-              acc = miscChanges,
+              acc = attrChanges,
               as = ax.children,
               bs = bx.children,
               ctx = Some(newCtx)

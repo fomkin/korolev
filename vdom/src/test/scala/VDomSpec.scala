@@ -43,7 +43,6 @@ object VDomSpec extends Shtml {
 
     val diff = List(
       Remove("0", "0_1"),
-      Remove("0_0", "0_0_2"),
       Create("0_0", "0_0_2", "span"),
       Create("0_0", "0_0_3", "li"),
       CreateText("0_0_2", "0_0_2_0", "Cow"),
