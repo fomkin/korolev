@@ -1,7 +1,7 @@
 import com.typesafe.sbt.packager.archetypes.JavaAppPackaging
 import com.typesafe.sbt.packager.universal.UniversalPlugin
 
-val http4sVersion = "0.14.4"
+val http4sVersion = "0.14.7"
 
 val publishSettings = Seq(
   publishMavenStyle := true,
@@ -38,7 +38,7 @@ val publishSettings = Seq(
 val commonSettings = publishSettings ++ Seq(
   scalaVersion := "2.11.8",
   organization := "com.github.fomkin",
-  version := "0.0.3-PRE-SNAPSHOT",
+  version := "0.0.4-PRE-SNAPSHOT",
   libraryDependencies ++= Seq(
     "org.scalatest" %%% "scalatest" % "3.0.0-M15" % "test",
     "com.lihaoyi" %% "pprint" % "0.4.1" % "test"

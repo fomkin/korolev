@@ -10,20 +10,20 @@ import org.http4s.server.blaze.BlazeBuilder
 import org.http4s.server.websocket._
 import org.http4s.websocket.WebsocketBits._
 
-import scala.concurrent.{ExecutionContext, Future}
-import scala.io.Source
 import scala.concurrent.duration._
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutorService, Future}
+import scala.io.Source
 import scalaz.concurrent.{Strategy, Task}
 import scalaz.stream.async.unboundedQueue
-import scalaz.stream.{Exchange, Process, Sink}
-import scalaz.stream.DefaultScheduler
-import scalaz.stream.time
+import scalaz.stream.{DefaultScheduler, Exchange, Process, Sink, time}
 
 object KorolevServer {
 
   val htmlContentType = Some(`Content-Type`(MediaType.`text/html`))
 
   val defaultRead = Future.successful(None)
+
+  val defaultEc = ExecutionContext.fromExecutorService(Strategy.DefaultExecutorService)
 
   def apply[State](
       host: String = ServerBuilder.DefaultHost,
@@ -33,20 +33,22 @@ object KorolevServer {
       head: VDom.Node = VDom.Node("head", Nil, Nil, Nil),
       writeState: (String, State) => _ = (_: String, _: State) => (),
       readState: String => Future[Option[State]] = (_: String) => defaultRead
-  )(implicit ec: ExecutionContext): KorolevServer[State] = {
+  )(implicit executor: ExecutionContextExecutorService = defaultEc): KorolevServer[State] = {
     new KorolevServer(host, port, initialState, initRender, head, writeState, readState)
   }
 }
 
 class KorolevServer[State](
-    host: String = ServerBuilder.DefaultHost,
-    port: Int = 7181,
+    host: String,
+    port: Int,
     initialState: State,
     initRender: Korolev.InitRender[State],
     head: VDom.Node,
     writeState: (String, State) => _,
     readState: String => Future[Option[State]]
-)(implicit ec: ExecutionContext) extends Shtml {
+)(implicit executor: ExecutionContextExecutorService) extends Shtml {
+
+  implicit val strategy: Strategy = Strategy.Executor
 
   import KorolevServer._
 
@@ -80,7 +82,7 @@ class KorolevServer[State](
       Ok(indexHtml).withContentType(htmlContentType)
     case req @ _ -> Root / "bridge" =>
       val outgoingQueue = unboundedQueue[WebSocketFrame]
-      time.awakeEvery(5.seconds)(Strategy.DefaultStrategy, DefaultScheduler)
+      time.awakeEvery(5.seconds)(strategy, DefaultScheduler)
         .map(_ => Ping())
         .to(outgoingQueue.enqueue)
         .run.runAsync(_ => ())
@@ -104,6 +106,7 @@ class KorolevServer[State](
     .bindHttp(port, host)
     .withWebSockets(true)
     .mountService(route)
+    .withServiceExecutor(executor)
     .start
     .run
   Thread.currentThread().join()
