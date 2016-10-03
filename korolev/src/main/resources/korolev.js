@@ -30,14 +30,18 @@
         removeHandler = f;
       },
       RegisterGlobalEventHandler: function(eventHandler) {
-        var listen = function(name) {
+        var listen = function(name, preventDefault) {
           root.addEventListener(name, function(event) {
-            if (event.target.vId)
+            if (event.target.vId) {
+              if (preventDefault) {
+                event.preventDefault();
+              }
               eventHandler(event.target.vId + ':' + event.type);
+            }
           });
         }
         listen('click');
-        listen('submit');
+        listen('submit', true);
         listen('mousedown');
         listen('mouseup');
       },
@@ -97,13 +101,19 @@
   })();
 
   document.addEventListener("DOMContentLoaded", function() {
-    global.Korolev.RegisterRoot(document.body);
+    var root = document.body;
+    global.Korolev.RegisterRoot(root);
     var loc = window.location;
     var wsUri;
     if (loc.protocol === "https:") wsUri = "wss://";
     else wsUri = "ws://";
     wsUri += loc.host + loc.pathname + "/bridge";
-    Bridge.webSocket(wsUri)
+    var ws = new WebSocket(wsUri)
+    ws.addEventListener('close', function() {
+      while (root.childNodes.length > 0)
+        root.removeChild(root.childNodes[0])
+    });
+    Bridge.webSocket(ws)
   });
 
 })(this);
