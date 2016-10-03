@@ -21,7 +21,7 @@ object Example extends App with Shtml {
     initRender = { access =>
 
       // Handler to input
-      val inputId = access.id(())
+      val inputId = access.id()
 
       // Generate actions when clicking checkboxes
       val todoClick: EventFactory[(Int, Todo)] =
@@ -36,7 +36,7 @@ object Example extends App with Shtml {
       val addTodoClick: EventFactory[Unit] =
         access.event("click") { _ =>
           deferredTransition {
-            inputId[String]('value) map { value =>
+            inputId.get[String]('value) map { value =>
               val todo = Todo(value, done = false)
               transition {
                 case state =>

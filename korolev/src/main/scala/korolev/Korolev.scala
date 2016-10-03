@@ -21,7 +21,7 @@ object Korolev extends EventPropagation {
       (onFile: Payload => EventResult[State])
       (payload: Payload): Event
 
-    def id(pl: Any): PropertyAccessor
+    def id(): ElementAccessor
     def dux: Dux[State]
   }
 
@@ -35,7 +35,7 @@ object Korolev extends EventPropagation {
       implicit ec: ExecutionContext): Dux[State] = {
 
     @volatile var lastRender = VDom.Node("void", Nil, Nil, Nil)
-    @volatile var propertyAccessors = Map.empty[PropertyAccessor, String]
+    @volatile var propertyAccessors = Map.empty[ElementAccessor, String]
     @volatile var events = Map.empty[String, Event]
 
     // Prepare frontend
@@ -81,20 +81,17 @@ object Korolev extends EventPropagation {
           EventImpl(eventType, eventPhase, payload, onFire)
         }
 
-        def id(pl: Any): PropertyAccessor = {
-          new PropertyAccessor {
-            val payload = pl
-            def apply[T](property: Symbol): Future[T] = {
-              propertyAccessors.get(this) match {
-                case Some(id) =>
-                  val future =
-                    korolevJS.call("ExtractProperty", id, property.name)
-                  jsAccess.flush()
-                  future
-                case None =>
-                  Future.failed(
-                    new Exception("No element matched for accessor"))
-              }
+        def id(): ElementAccessor = {
+          new ElementAccessor {
+            def get[T](property: Symbol): Future[T] = propertyAccessors.get(this) match {
+              case Some(id) =>
+                val future =
+                  korolevJS.call("ExtractProperty", id, property.name)
+                jsAccess.flush()
+                future
+              case None =>
+                Future.failed(
+                  new Exception("No element matched for accessor"))
             }
           }
         }
@@ -112,7 +109,7 @@ object Korolev extends EventPropagation {
             val misc = collectMisc(Id(0), newRender)
 
             events = misc.collect { case (id, event: Event) => s"$id:${event.`type`}:${event.phase}" -> event }.toMap
-            propertyAccessors = misc.collect { case (id, pa: PropertyAccessor) => pa -> id.toString }.toMap
+            propertyAccessors = misc.collect { case (id, pa: ElementAccessor) => pa -> id.toString }.toMap
             lastRender = newRender
 
             changes foreach {
