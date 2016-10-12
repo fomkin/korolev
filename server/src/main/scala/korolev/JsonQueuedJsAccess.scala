@@ -2,6 +2,7 @@ package korolev
 
 import bridge.JSAccess
 
+import scala.annotation.switch
 import scala.collection.immutable.Queue
 import scala.concurrent.ExecutionContext
 
@@ -12,14 +13,35 @@ class JsonQueuedJsAccess(sendJson: String => Unit)(implicit val executionContext
 
   @volatile var queue = Queue.empty[String]
 
+  def escape(sb: StringBuilder, s: String, unicode: Boolean): Unit = {
+    sb.append('"')
+    var i = 0
+    val len = s.length
+    while (i < len) {
+      (s.charAt(i): @switch) match {
+        case '"' => sb.append("\\\"")
+        case '\\' => sb.append("\\\\")
+        case '\b' => sb.append("\\b")
+        case '\f' => sb.append("\\f")
+        case '\n' => sb.append("\\n")
+        case '\r' => sb.append("\\r")
+        case '\t' => sb.append("\\t")
+        case c =>
+          if (c < ' ' || (c > '~' && unicode)) sb.append("\\u%04x" format c.toInt)
+          else sb.append(c)
+      }
+      i += 1
+    }
+    sb.append('"')
+  }
+
   def seqToJSON(xs: Seq[Any]): String = {
     val xs2 =
       xs map {
         case s: String if !s.startsWith("[") ⇒
-          val escaped = s
-            .replace("\n", "\\n")
-            .replace("\"", "\\\"")
-          s""""$escaped""""
+          val sb = new StringBuilder
+          escape(sb, s, unicode = true)
+          sb.mkString
         case any ⇒ any
       }
     "[" + xs2.reduce(_ + ", " + _) + "]"
@@ -27,9 +49,6 @@ class JsonQueuedJsAccess(sendJson: String => Unit)(implicit val executionContext
 
   override def platformDependentPack(value: Any): Any = value match {
     case xs: Seq[Any] ⇒ seqToJSON(xs)
-    case s: String ⇒ s
-      .replace("\n", "\\n")
-      .replace("\"", "\\\"")
     case x ⇒ super.platformDependentPack(x)
   }
 
