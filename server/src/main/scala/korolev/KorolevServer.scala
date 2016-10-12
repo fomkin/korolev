@@ -46,7 +46,7 @@ class KorolevServer[State](
     head: VDom.Node,
     writeState: (String, State) => _,
     readState: String => Future[Option[State]]
-)(implicit executor: ExecutionContextExecutorService) extends Shtml {
+)(implicit executor: ExecutionContextExecutorService) extends Shtml { self =>
 
   implicit val strategy: Strategy = Strategy.Executor
 
@@ -77,6 +77,29 @@ class KorolevServer[State](
     "<!DOCTYPE html>" + dom.html
   }
 
+  private object matchStatic {
+    def unapply(req: Request) = {
+      val path = req.pathInfo
+      val stream = getClass.getResourceAsStream(s"/static$path")
+
+      Option(stream) map { stream =>
+        val contentType = {
+          val index = path.lastIndexOf('.')
+          val mediaType = if (index > -1) {
+            MediaType.forExtension(path.substring(index + 1)) match {
+              case Some(detectedMediaType) => detectedMediaType
+              case None => MediaType.`application/octet-stream`
+            }
+          } else {
+            MediaType.`application/octet-stream`
+          }
+          Some(`Content-Type`(mediaType))
+        }
+        (stream, contentType)
+      }
+    }
+  }
+
   private val route = HttpService {
     case _ -> Root =>
       Ok(indexHtml).withContentType(htmlContentType)
@@ -99,6 +122,8 @@ class KorolevServer[State](
           korolev.destroy()
         }))
       WS(Exchange(outgoingProcess, sink))
+    case matchStatic(stream, contentType) =>
+      Ok(stream).withContentType(contentType)
   }
 
   BlazeBuilder

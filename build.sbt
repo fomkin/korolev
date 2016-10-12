@@ -38,7 +38,7 @@ val publishSettings = Seq(
 val commonSettings = publishSettings ++ Seq(
   scalaVersion := "2.11.8",
   organization := "com.github.fomkin",
-  version := "0.0.5-PRE",
+  version := "0.0.6-PRE-SNAPSHOT",
   libraryDependencies ++= Seq(
     "org.scalatest" %%% "scalatest" % "3.0.0-M15" % "test",
     "com.lihaoyi" %% "pprint" % "0.4.1" % "test"
@@ -87,6 +87,7 @@ lazy val example = project.
   settings(
     javaOptions in Universal ++= Seq("-J-Xmx512m"),
     normalizedName := "korolev-example",
+    libraryDependencies += "org.slf4j" % "slf4j-simple" % "1.7.21",
     publish := {}
   ).
   dependsOn(server)

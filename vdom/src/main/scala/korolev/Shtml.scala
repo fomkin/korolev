@@ -61,10 +61,4 @@ object Shtml {
     def /=(value: String): Attr =
       Attr(htmlName(self), value, isProperty = false)
   }
-//
-//  sealed trait InputType
-//
-//  object InputType {
-//    case object Text extends InputType
-//  }
 }
