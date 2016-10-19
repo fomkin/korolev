@@ -1,5 +1,7 @@
 package korolev
 
+import java.util.concurrent.atomic.AtomicInteger
+
 import bridge.JSAccess
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -37,6 +39,7 @@ object Korolev extends EventPropagation {
     @volatile var lastRender = VDom.Node("void", Nil, Nil, Nil)
     @volatile var propertyAccessors = Map.empty[ElementAccessor, String]
     @volatile var events = Map.empty[String, Event]
+    val currentRenderNum = new AtomicInteger(0)
 
     // Prepare frontend
     jsAccess.global.getAndSaveAs("Korolev", "@Korolev")
@@ -44,9 +47,9 @@ object Korolev extends EventPropagation {
     val localDux = Dux[State](initialState)
 
     jsAccess.registerCallback[String] { targetAndType =>
-      val Array(target, tpe) = targetAndType.split(':')
-      propagateEvent(events, Id(target), tpe)
-
+      val Array(renderNum, target, tpe) = targetAndType.split(':')
+      if (currentRenderNum.get == renderNum.toInt)
+        propagateEvent(events, Id(target), tpe)
     } foreach { eventCallback =>
       korolevJS.call("RegisterGlobalEventHandler", eventCallback)
 
@@ -103,6 +106,7 @@ object Korolev extends EventPropagation {
 
       val onState: State => Unit = { state =>
         val startRenderTime = System.nanoTime()
+        korolevJS.call("SetRenderNum", currentRenderNum.incrementAndGet())
         render(state) match {
           case Some(newRender) =>
             val changes = VDom.changes(lastRender, newRender)

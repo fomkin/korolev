@@ -6,6 +6,7 @@
     var addHandler = null;
     var removeHandler = null;
     var scheduledAddHandlerItems = [];
+    var renderNum = 0;
 
     function scheduleAddHandler(element) {
       if (!addHandler)
@@ -19,6 +20,9 @@
       scheduledAddHandlerItems.push(element);
     }
     return {
+      SetRenderNum: function(n) {
+        renderNum = n;
+      },
       RegisterRoot: function(node) {
         root = node;
         els = { "0": node };
@@ -36,7 +40,7 @@
               if (preventDefault) {
                 event.preventDefault();
               }
-              eventHandler(event.target.vId + ':' + event.type);
+              eventHandler(renderNum + ':' + event.target.vId + ':' + event.type);
             }
           });
         }
