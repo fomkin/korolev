@@ -58,6 +58,10 @@ object Shtml {
     def :=(value: Any): Attr =
       Attr(self.name, value, isProperty = true)
 
+    def when(value: Boolean): VDom =
+      if (value) Attr(htmlName(self), "true", isProperty = false)
+      else VDom.Empty
+
     def /=(value: String): Attr =
       Attr(htmlName(self), value, isProperty = false)
   }

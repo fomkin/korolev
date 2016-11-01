@@ -12,12 +12,13 @@ object Example extends App with Shtml {
 
   case class Todo(text: String, done: Boolean)
 
-  case class State(todos: Vector[Todo] = (0 to 10).toVector map {
+  case class State(todos: Vector[Todo] = (0 to 2).toVector map {
     i => Todo(s"This is TODO #$i", done = false)
   })
 
   KorolevServer[State](
     initialState = State(),
+    port = 7281,
     initRender = { access =>
 
       // Handler to input
@@ -48,7 +49,7 @@ object Example extends App with Shtml {
 
       // Create a DOM using state
       { case state =>
-        'div(
+        'body(
           'div("Super TODO tracker"),
           'div('style /= "height: 250px; overflow-y: scroll",
             (state.todos zipWithIndex) map {
@@ -56,7 +57,7 @@ object Example extends App with Shtml {
                 'div(
                   'input(
                     'type /= "checkbox",
-                    'checked := todo.done,
+                    'checked when todo.done,
                     todoClick(i, todo)
                   ),
                   if (!todo.done) 'span(todo.text)
