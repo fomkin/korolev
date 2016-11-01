@@ -24,9 +24,24 @@
       SetRenderNum: function(n) {
         renderNum = n;
       },
-      RegisterRoot: function(node) {
-        root = node;
-        els = { "0": node };
+      RegisterRoot: function(rootNode) {
+        function aux(prefix, node) {
+          var children = node.children;
+          for (var i = 0; i < children.length; i++) {
+            var child = children[i];
+            var id = prefix + '_' + i;
+            child.vId = id;
+            els[id] = child;
+            aux(id, child);
+          }
+        }
+        root = rootNode;
+        els = { "0": rootNode };
+        aux("0", rootNode);
+      },
+      CleanRoot: function() {
+        while (root.children.length > 0)
+          root.removeChild(root.children[0]);
       },
       RegisterGlobalAddHandler: function(f) {
         addHandler = f;
@@ -114,6 +129,7 @@
   })();
 
   document.addEventListener("DOMContentLoaded", function() {
+
     var root = document.body;
     var loc = window.location;
     var wsUri;
@@ -125,15 +141,21 @@
 
     function initializeBridge() {
       var ws = new WebSocket(wsUri)
-      ws.addEventListener('close', onClose);
-      Bridge.webSocket(ws);
+      ws.addEventListener('open', onOpen);
+      Bridge.webSocket(ws).catch(function(errorEvent) {
+        // Try to reconnect after 2s
+        setTimeout(initializeBridge, 2000);
+      });
     }
 
-    function onClose() {
-      while (root.childNodes.length > 0)
-        root.removeChild(root.childNodes[0]);
+    function onOpen(event) {
+      console.log("Connection opened.");
+      event.target.addEventListener('close', onClose);
+    }
+
+    function onClose(event) {
       Korolev.UnregisterGlobalEventHandler();
-      console.log("Connection closed. DOM destroyed. Try to reconnect");
+      console.log("Connection closed. Global event handler us unregistered. Try to reconnect.");
       initializeBridge();
     }
 

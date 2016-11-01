@@ -1,8 +1,8 @@
 import bridge.JSAccess
-import korolev.Korolev.{EventFactory, InitRender}
-import korolev.{Korolev, Shtml}
-import org.scalatest.{FlatSpec, Matchers}
 import korolev.EventResult._
+import korolev.Korolev.EventFactory
+import korolev.{Korolev, KorolevAccess, Shtml}
+import org.scalatest.{FlatSpec, Matchers}
 
 import scala.concurrent.ExecutionContext
 
@@ -21,7 +21,7 @@ class Issue14Spec extends FlatSpec with Matchers {
       implicit val executionContext = ec
     }
 
-    Korolev(jSAccess, "firstState", { access: Korolev.KorolevAccess[String] =>
+    Korolev(jSAccess, "firstState", { access: KorolevAccess[String] =>
       Issue14Spec.render(
         firstEvent = access.event("mousedown") { _ =>
           immediateTransition[String] { case _ =>
@@ -36,7 +36,7 @@ class Issue14Spec extends FlatSpec with Matchers {
           }
         }
       )
-    })
+    }, fromScratch = true)
 
     jSAccess.resolvePromise(0, isSuccess = true, "@obj:@Korolev")
     jSAccess.resolvePromise(1, isSuccess = true, "@obj:^cb0")

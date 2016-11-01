@@ -18,25 +18,16 @@ object Korolev extends EventPropagation {
   import Change._
   import Event._
 
-  trait KorolevAccess[State] {
-    def event[Payload](`type`: String, phase: Phase = Bubbling)
-      (onFile: Payload => EventResult[State])
-      (payload: Payload): Event
-
-    def id(): ElementAccessor
-    def dux: Dux[State]
-  }
-
   type Render[State] = PartialFunction[State, VDom.Node]
   type InitRender[State] = KorolevAccess[State] => Render[State]
   type EventFactory[Payload] = Payload => Event
 
   def apply[State](jsAccess: JSAccess,
                            initialState: State,
-                           initRender: InitRender[State])(
+                           initRender: InitRender[State],
+                           fromScratch: Boolean)(
       implicit ec: ExecutionContext): Dux[State] = {
 
-    @volatile var lastRender = VDom.Node("void", Nil, Nil, Nil)
     @volatile var propertyAccessors = Map.empty[ElementAccessor, String]
     @volatile var events = Map.empty[String, Event]
     val currentRenderNum = new AtomicInteger(0)
@@ -46,12 +37,19 @@ object Korolev extends EventPropagation {
     val korolevJS = jsAccess.obj("@Korolev")
     val localDux = Dux[State](initialState)
 
+    def updateMisc(renderResult: VDom.Node) = {
+      val misc = collectMisc(Id(0), renderResult)
+      events = misc.collect { case (id, event: Event) => s"$id:${event.`type`}:${event.phase}" -> event }.toMap
+      propertyAccessors = misc.collect { case (id, pa: ElementAccessor) => pa -> id.toString }.toMap
+    }
+
     jsAccess.registerCallback[String] { targetAndType =>
       val Array(renderNum, target, tpe) = targetAndType.split(':')
       if (currentRenderNum.get == renderNum.toInt)
         propagateEvent(events, Id(target), tpe)
     } foreach { eventCallback =>
       korolevJS.call("RegisterGlobalEventHandler", eventCallback)
+      korolevJS.call("SetRenderNum", 0)
 
       val korolevAccess = new KorolevAccess[State] {
 
@@ -103,6 +101,10 @@ object Korolev extends EventPropagation {
       }
 
       val render = initRender(korolevAccess).lift
+      @volatile var lastRender =
+        if (fromScratch) VDom.Node("body", Nil, Nil, Nil)
+        else render(initialState).get
+      updateMisc(lastRender)
 
       val onState: State => Unit = { state =>
         val startRenderTime = System.nanoTime()
@@ -110,10 +112,7 @@ object Korolev extends EventPropagation {
         render(state) match {
           case Some(newRender) =>
             val changes = VDom.changes(lastRender, newRender)
-            val misc = collectMisc(Id(0), newRender)
-
-            events = misc.collect { case (id, event: Event) => s"$id:${event.`type`}:${event.phase}" -> event }.toMap
-            propertyAccessors = misc.collect { case (id, pa: ElementAccessor) => pa -> id.toString }.toMap
+            updateMisc(newRender)
             lastRender = newRender
 
             changes foreach {
@@ -138,8 +137,12 @@ object Korolev extends EventPropagation {
       }
 
       localDux.subscribe(onState)
-      onState(initialState)
+      if (fromScratch) onState(initialState)
+      else jsAccess.flush()
     }
+
+    if (fromScratch)
+      korolevJS.call("CleanRoot")
 
     jsAccess.flush()
     localDux

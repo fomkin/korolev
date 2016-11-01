@@ -19,6 +19,7 @@ import scalaz.concurrent.{Strategy, Task}
 import scalaz.stream.async.unboundedQueue
 import scalaz.stream.{DefaultScheduler, Exchange, Process, Sink, time}
 import delorean._
+import korolev.Event.Phase
 import org.slf4j.LoggerFactory
 
 object KorolevServer {
@@ -54,29 +55,58 @@ class KorolevServer[State](
 
   import KorolevServer._
 
-  private lazy val indexHtml: String = {
+  private val korolevJs = {
+    val stream =
+      classOf[Korolev].getClassLoader.getResourceAsStream("korolev.js")
+    Source.fromInputStream(stream).mkString
+  }
 
-    val korolevJs = {
-      val stream =
-        classOf[Korolev].getClassLoader.getResourceAsStream("korolev.js")
-      Source.fromInputStream(stream).mkString
+  private val bridgeJs = {
+    val stream =
+      classOf[JSAccess].getClassLoader.getResourceAsStream("bridge.js")
+    Source.fromInputStream(stream).mkString
+  }
+
+  private def indexHtml(request: Request) = {
+    val sessionPair @ (isNewSession, sessionId) = sessionFromRequest(request)
+    val stateTask = sessionPair match {
+      case (true, sessionId) =>
+        Task.now(initialState)
+      case (false, sessionId) =>
+        stateStorage
+          .read(sessionId)
+          .toTask
+          .flatMap {
+            case Some(restoredState) => Task.now(restoredState)
+            case None => stateStorage
+              .write(sessionId, initialState)
+              .toTask
+              .map(_ => initialState)
+          }
     }
-    val bridgeJs = {
-      val stream =
-        classOf[JSAccess].getClassLoader.getResourceAsStream("bridge.js")
-      Source.fromInputStream(stream).mkString
+
+    val htmlTask = stateTask map { state =>
+      val render = initRender(KorolevAccess.dummy)
+      val body = render(state)
+      val dom = 'html(
+        head.copy(children =
+          'script(bridgeJs) ::
+          'script(korolevJs) ::
+          head.children
+        ),
+        body
+      )
+      "<!DOCTYPE html>" + dom.html
     }
 
-    val dom = 'html(
-      head.copy(children =
-        'script(bridgeJs) ::
-        'script(korolevJs) ::
-        head.children
-      ),
-      'body()
-    )
-
-    "<!DOCTYPE html>" + dom.html
+    if (isNewSession) {
+      Ok(htmlTask)
+        .addCookie("session", sessionId)
+        .withContentType(htmlContentType)
+    } else {
+      Ok(htmlTask)
+        .withContentType(htmlContentType)
+    }
   }
 
   private object matchStatic {
@@ -120,16 +150,7 @@ class KorolevServer[State](
 
   private val route = HttpService {
 
-    case request @_ -> Root =>
-      sessionFromRequest(request) match {
-        case (true, sessionId) =>
-          Ok(indexHtml)
-            .addCookie("session", sessionId)
-            .withContentType(htmlContentType)
-        case (false, sessionId) => Ok(indexHtml)
-          .withContentType(htmlContentType)
-      }
-
+    case request @ _ -> Root => indexHtml(request)
     case request @ _ -> Root / "bridge" =>
 
       val (isNewSession, sessionId) = sessionFromRequest(request)
@@ -148,13 +169,15 @@ class KorolevServer[State](
         case _ => Task.now(())
       }
 
+      logger.info(isNewSession.toString)
+
       val korolev = if (isNewSession) {
-        Task.now(Korolev(jSAccess, initialState, initRender))
+        Task.now(Korolev(jSAccess, initialState, initRender, isNewSession))
       } else {
         stateStorage.read(sessionId).toTask map { stateOpt =>
           val state = stateOpt match {
-            case Some(x) => Korolev(jSAccess, x, initRender)
-            case None => Korolev(jSAccess, initialState, initRender)
+            case Some(restoredState) => Korolev(jSAccess, restoredState, initRender, isNewSession)
+            case None => Korolev(jSAccess, initialState, initRender, true)
           }
           state subscribe { x =>
             stateStorage.write(sessionId, x)
@@ -184,6 +207,7 @@ class KorolevServer[State](
     .withServiceExecutor(executor)
     .start
     .run
+
   Thread.currentThread().join()
 
 }
