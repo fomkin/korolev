@@ -1,5 +1,7 @@
 sudo: false
 language: scala
+jdk:
+  - oraclejdk8
 scala:
    - 2.11.8
 script: sbt ++$TRAVIS_SCALA_VERSION -Dfile.encoding=UTF8 -J-XX:MaxPermSize=1024M test

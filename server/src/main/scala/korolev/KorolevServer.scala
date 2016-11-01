@@ -1,5 +1,7 @@
 package korolev
 
+import java.util.UUID
+
 import bridge.JSAccess
 import korolev.Korolev.InitRender
 import org.http4s._
@@ -16,12 +18,12 @@ import scala.io.Source
 import scalaz.concurrent.{Strategy, Task}
 import scalaz.stream.async.unboundedQueue
 import scalaz.stream.{DefaultScheduler, Exchange, Process, Sink, time}
+import delorean._
+import org.slf4j.LoggerFactory
 
 object KorolevServer {
 
   val htmlContentType = Some(`Content-Type`(MediaType.`text/html`))
-
-  val defaultRead = Future.successful(None)
 
   val defaultEc = ExecutionContext.fromExecutorService(Strategy.DefaultExecutorService)
 
@@ -31,10 +33,9 @@ object KorolevServer {
       initialState: State,
       initRender: InitRender[State],
       head: VDom.Node = VDom.Node("head", Nil, Nil, Nil),
-      writeState: (String, State) => _ = (_: String, _: State) => (),
-      readState: String => Future[Option[State]] = (_: String) => defaultRead
+      stateStorage: StateStorage[State] = StateStorage.inMemory[State]
   )(implicit executor: ExecutionContextExecutorService = defaultEc): KorolevServer[State] = {
-    new KorolevServer(host, port, initialState, initRender, head, writeState, readState)
+    new KorolevServer(host, port, initialState, initRender, head, stateStorage)
   }
 }
 
@@ -44,9 +45,10 @@ class KorolevServer[State](
     initialState: State,
     initRender: Korolev.InitRender[State],
     head: VDom.Node,
-    writeState: (String, State) => _,
-    readState: String => Future[Option[State]]
+    stateStorage: StateStorage[State]
 )(implicit executor: ExecutionContextExecutorService) extends Shtml { self =>
+
+  private val logger = LoggerFactory.getLogger(KorolevServer.getClass)
 
   implicit val strategy: Strategy = Strategy.Executor
 
@@ -100,28 +102,76 @@ class KorolevServer[State](
     }
   }
 
+  private def sessionFromRequest(request: Request): (Boolean, String) = {
+    def genSessionId = true -> UUID.randomUUID().toString
+    request.headers.get(org.http4s.headers.Cookie) match {
+      case None =>
+        // Cookies is empty. Create new one.
+        genSessionId
+      case Some(cookies) =>
+        val uuidOpt = cookies.values.collectFirst {
+          case cookie: org.http4s.Cookie if cookie.name == "session" =>
+            cookie.content
+        }
+        // Create UUID from cookie or create new one
+        uuidOpt.fold(genSessionId)(uuid => false -> uuid)
+    }
+  }
+
   private val route = HttpService {
-    case _ -> Root =>
-      Ok(indexHtml).withContentType(htmlContentType)
-    case req @ _ -> Root / "bridge" =>
+
+    case request @_ -> Root =>
+      sessionFromRequest(request) match {
+        case (true, sessionId) =>
+          Ok(indexHtml)
+            .addCookie("session", sessionId)
+            .withContentType(htmlContentType)
+        case (false, sessionId) => Ok(indexHtml)
+          .withContentType(htmlContentType)
+      }
+
+    case request @ _ -> Root / "bridge" =>
+
+      val (isNewSession, sessionId) = sessionFromRequest(request)
       val outgoingQueue = unboundedQueue[WebSocketFrame]
+
       time.awakeEvery(5.seconds)(strategy, DefaultScheduler)
         .map(_ => Ping())
         .to(outgoingQueue.enqueue)
         .run.runAsync(_ => ())
+
       val jSAccess =
         new JsonQueuedJsAccess(s => outgoingQueue.enqueueOne(Text(s)).run)
+
       val sink: Sink[Task, WebSocketFrame] = Process.constant {
         case Text(t, _) => Task.fork(Task.now(jSAccess.receive(t)))
         case _ => Task.now(())
       }
-      val korolev = Korolev(jSAccess, initialState, initRender)
-      val outgoingProcess = outgoingQueue.dequeue
-        .onComplete(Process.eval_(Task delay {
-          Console.println("Closed")
-          korolev.destroy()
-        }))
+
+      val korolev = if (isNewSession) {
+        Task.now(Korolev(jSAccess, initialState, initRender))
+      } else {
+        stateStorage.read(sessionId).toTask map { stateOpt =>
+          val state = stateOpt match {
+            case Some(x) => Korolev(jSAccess, x, initRender)
+            case None => Korolev(jSAccess, initialState, initRender)
+          }
+          state subscribe { x =>
+            stateStorage.write(sessionId, x)
+          }
+          state
+        }
+      }
+
+      val outgoingProcess = Process.eval(korolev) flatMap { korolev =>
+        outgoingQueue.dequeue onComplete {
+          val task = Task.delay(korolev.destroy())
+          Process.eval_(task)
+        }
+      }
+
       WS(Exchange(outgoingProcess, sink))
+
     case matchStatic(stream, contentType) =>
       Ok(stream).withContentType(contentType)
   }

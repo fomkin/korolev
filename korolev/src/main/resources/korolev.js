@@ -7,6 +7,7 @@
     var removeHandler = null;
     var scheduledAddHandlerItems = [];
     var renderNum = 0;
+    var rootListeners = [];
 
     function scheduleAddHandler(element) {
       if (!addHandler)
@@ -35,19 +36,27 @@
       },
       RegisterGlobalEventHandler: function(eventHandler) {
         var listen = function(name, preventDefault) {
-          root.addEventListener(name, function(event) {
+          var listener = function(event) {
             if (event.target.vId) {
               if (preventDefault) {
                 event.preventDefault();
               }
               eventHandler(renderNum + ':' + event.target.vId + ':' + event.type);
             }
-          });
+          }
+          root.addEventListener(name, listener);
+          rootListeners.push({ 'listener': listener, 'type': name });
         }
         listen('click');
         listen('submit', true);
         listen('mousedown');
         listen('mouseup');
+      },
+      UnregisterGlobalEventHandler: function() {
+        rootListeners.forEach(function(item) {
+          root.removeEventListener(item.type, item.listener);
+        });
+        rootListeners.length = 0;
       },
       Create: function(id, childId, tag) {
         var parent = els[id],
@@ -106,18 +115,29 @@
 
   document.addEventListener("DOMContentLoaded", function() {
     var root = document.body;
-    global.Korolev.RegisterRoot(root);
     var loc = window.location;
     var wsUri;
     if (loc.protocol === "https:") wsUri = "wss://";
     else wsUri = "ws://";
+
     wsUri += loc.host + loc.pathname + "/bridge";
-    var ws = new WebSocket(wsUri)
-    ws.addEventListener('close', function() {
+    global.Korolev.RegisterRoot(root);
+
+    function initializeBridge() {
+      var ws = new WebSocket(wsUri)
+      ws.addEventListener('close', onClose);
+      Bridge.webSocket(ws);
+    }
+
+    function onClose() {
       while (root.childNodes.length > 0)
-        root.removeChild(root.childNodes[0])
-    });
-    Bridge.webSocket(ws)
+        root.removeChild(root.childNodes[0]);
+      Korolev.UnregisterGlobalEventHandler();
+      console.log("Connection closed. DOM destroyed. Try to reconnect");
+      initializeBridge();
+    }
+
+    initializeBridge()
   });
 
 })(this);

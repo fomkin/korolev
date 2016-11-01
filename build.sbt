@@ -1,7 +1,7 @@
 import com.typesafe.sbt.packager.archetypes.JavaAppPackaging
 import com.typesafe.sbt.packager.universal.UniversalPlugin
 
-val http4sVersion = "0.14.7"
+val http4sVersion = "0.14.10"
 
 val publishSettings = Seq(
   publishMavenStyle := true,
@@ -75,7 +75,8 @@ lazy val server = project.
     normalizedName := "korolev-server",
     libraryDependencies ++= Seq(
       "org.http4s" %% "http4s-dsl" % http4sVersion,
-      "org.http4s" %% "http4s-blaze-server" % http4sVersion
+      "org.http4s" %% "http4s-blaze-server" % http4sVersion,
+      "io.verizon.delorean" %% "core" % "1.1.37"
     )
   ).
   dependsOn(korolevJVM)
