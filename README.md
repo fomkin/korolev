@@ -21,7 +21,7 @@ The project supports static page rendering to allow search engines to index a pa
 Add `korolev-server` to your `build.sbt`
 
 ```scala
-libraryDependencies += "com.github.fomkin" %% "korolev-server" % "0.0.5-PRE"
+libraryDependencies += "com.github.fomkin" %% "korolev-server" % "0.0.6"
 ```
 
 Look for [Example.scala](https://github.com/fomkin/korolev/blob/master/example/src/main/scala/Example.scala). It's updates very frequently, so we don't paste code here, sorry guys.
@@ -47,4 +47,4 @@ You can subscribe to client-side DOM events. Event flow is similar to [standard]
 
 ## Plans
 
-All new features and changes are registered in [issues](https://github.com/fomkin/korolev/issues) of this repository. First goal is to ship a ready to use version with semi-stable API.
+All features and changes are registered in [issues](https://github.com/fomkin/korolev/issues) of this repository. First goal is to ship a ready to use version with semi-stable API.

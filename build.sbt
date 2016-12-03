@@ -1,7 +1,7 @@
 import com.typesafe.sbt.packager.archetypes.JavaAppPackaging
 import com.typesafe.sbt.packager.universal.UniversalPlugin
 
-val http4sVersion = "0.14.10"
+val http4sVersion = "0.14.11"
 
 val publishSettings = Seq(
   publishMavenStyle := true,
@@ -38,10 +38,10 @@ val publishSettings = Seq(
 val commonSettings = publishSettings ++ Seq(
   scalaVersion := "2.11.8",
   organization := "com.github.fomkin",
-  version := "0.0.6-PRE-SNAPSHOT",
+  version := "0.0.6",
   libraryDependencies ++= Seq(
-    "org.scalatest" %%% "scalatest" % "3.0.0-M15" % "test",
-    "com.lihaoyi" %% "pprint" % "0.4.1" % "test"
+    "org.scalatest" %%% "scalatest" % "3.0.1" % "test"//,
+    //"com.lihaoyi" %% "pprint" % "0.4.1" % "test"
   ),
   scalacOptions ++= Seq(
     "-deprecation",
@@ -98,7 +98,7 @@ lazy val bridge = crossProject.crossType(CrossType.Pure).
   settings(
     normalizedName := "korolev-bridge",
     libraryDependencies ++= Seq(
-      "com.lihaoyi" %% "utest" % "0.4.3" % "test"
+      "com.lihaoyi" %% "utest" % "0.4.4" % "test"
     ),
     testFrameworks += new TestFramework("utest.runner.Framework"),
     unmanagedResourceDirectories in Compile += file("bridge") / "src" / "main" / "resources"
@@ -128,4 +128,9 @@ lazy val root = project.in(file(".")).
     server, example
   )
 
-publish := {}
+publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
+
+crossScalaVersions := Seq("2.11.8") //, "2.12.0")
+
+publishArtifact := false
+
