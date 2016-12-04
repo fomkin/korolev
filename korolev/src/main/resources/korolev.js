@@ -130,13 +130,19 @@
 
   document.addEventListener("DOMContentLoaded", function() {
 
+    var deviceId = getCookie('device');
+    var sessionId = Math.random().toString(36);
+    console.log(deviceId);
     var root = document.body;
     var loc = window.location;
     var wsUri;
     if (loc.protocol === "https:") wsUri = "wss://";
     else wsUri = "ws://";
 
-    wsUri += loc.host + loc.pathname + "/bridge";
+    wsUri += loc.host + loc.pathname +
+      '/bridge' +
+      '/' + deviceId +
+      '/' + sessionId;
     global.Korolev.RegisterRoot(root);
 
     function initializeBridge() {
@@ -162,4 +168,10 @@
     initializeBridge()
   });
 
+  function getCookie(name) {
+    var matches = document.cookie.match(new RegExp(
+      "(?:^|; )" + name.replace(/([\.$?*|{}\(\)\[\]\\\/\+^])/g, '\\$1') + "=([^;]*)"
+    ));
+    return matches ? decodeURIComponent(matches[1]) : undefined;
+  }
 })(this);

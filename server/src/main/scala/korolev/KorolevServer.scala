@@ -31,19 +31,17 @@ object KorolevServer {
   def apply[State](
       host: String = ServerBuilder.DefaultHost,
       port: Int = 7181,
-      initialState: State,
       initRender: InitRender[State],
-      head: VDom.Node = VDom.Node("head", Nil, Nil, Nil),
-      stateStorage: StateStorage[State] = StateStorage.inMemory[State]
+      stateStorage: StateStorage[State],
+      head: VDom.Node = VDom.Node("head", Nil, Nil, Nil)
   )(implicit executor: ExecutionContextExecutorService = defaultEc): KorolevServer[State] = {
-    new KorolevServer(host, port, initialState, initRender, head, stateStorage)
+    new KorolevServer(host, port, initRender, head, stateStorage)
   }
 }
 
 class KorolevServer[State](
     host: String,
     port: Int,
-    initialState: State,
     initRender: Korolev.InitRender[State],
     head: VDom.Node,
     stateStorage: StateStorage[State]
@@ -68,23 +66,8 @@ class KorolevServer[State](
   }
 
   private def indexHtml(request: Request) = {
-    val sessionPair @ (isNewSession, sessionId) = sessionFromRequest(request)
-    val stateTask = sessionPair match {
-      case (true, sessionId) =>
-        Task.now(initialState)
-      case (false, sessionId) =>
-        stateStorage
-          .read(sessionId)
-          .toTask
-          .flatMap {
-            case Some(restoredState) => Task.now(restoredState)
-            case None => stateStorage
-              .write(sessionId, initialState)
-              .toTask
-              .map(_ => initialState)
-          }
-    }
-
+    val (isNewDevice, deviceId) = deviceFromRequest(request)
+    val stateTask = stateStorage.initial(deviceId).toTask
     val htmlTask = stateTask map { state =>
       val render = initRender(KorolevAccess.dummy)
       val body = render(state)
@@ -99,9 +82,9 @@ class KorolevServer[State](
       "<!DOCTYPE html>" + dom.html
     }
 
-    if (isNewSession) {
+    if (isNewDevice) {
       Ok(htmlTask)
-        .addCookie("session", sessionId)
+        .addCookie("device", deviceId)
         .withContentType(htmlContentType)
     } else {
       Ok(htmlTask)
@@ -132,28 +115,30 @@ class KorolevServer[State](
     }
   }
 
-  private def sessionFromRequest(request: Request): (Boolean, String) = {
-    def genSessionId = true -> UUID.randomUUID().toString
+  private def deviceFromRequest(request: Request): (Boolean, String) = {
+    def genDeviceId() = true -> UUID.randomUUID().toString
+    // Check cookies
     request.headers.get(org.http4s.headers.Cookie) match {
       case None =>
-        // Cookies is empty. Create new one.
-        genSessionId
+        // Cookies are empty. Create new one.
+        genDeviceId()
       case Some(cookies) =>
+        // Lets find device cookie
         val uuidOpt = cookies.values.collectFirst {
-          case cookie: org.http4s.Cookie if cookie.name == "session" =>
+          case cookie: org.http4s.Cookie if cookie.name == "device" =>
             cookie.content
         }
-        // Create UUID from cookie or create new one
-        uuidOpt.fold(genSessionId)(uuid => false -> uuid)
+        // Create UUID from cookie (if found)
+        // or create new one
+        uuidOpt.fold(genDeviceId)(uuid => false -> uuid)
     }
   }
 
   private val route = HttpService {
 
     case request @ _ -> Root => indexHtml(request)
-    case request @ _ -> Root / "bridge" =>
+    case request @ _ -> Root / "bridge" / deviceId / sessionId =>
 
-      val (isNewSession, sessionId) = sessionFromRequest(request)
       val outgoingQueue = unboundedQueue[WebSocketFrame]
 
       time.awakeEvery(5.seconds)(strategy, DefaultScheduler)
@@ -169,20 +154,11 @@ class KorolevServer[State](
         case _ => Task.now(())
       }
 
-      logger.info(isNewSession.toString)
-
-      val korolev = if (isNewSession) {
-        Task.now(Korolev(jSAccess, initialState, initRender, isNewSession))
-      } else {
-        stateStorage.read(sessionId).toTask map { stateOpt =>
-          val state = stateOpt match {
-            case Some(restoredState) => Korolev(jSAccess, restoredState, initRender, isNewSession)
-            case None => Korolev(jSAccess, initialState, initRender, true)
-          }
-          state subscribe { x =>
-            stateStorage.write(sessionId, x)
-          }
-          state
+      val korolev =  {
+        stateStorage.read(deviceId, sessionId).toTask map { state =>
+          val korolev = Korolev(jSAccess, state, initRender, false)
+          korolev.subscribe(state => stateStorage.write(deviceId, sessionId, state))
+          korolev
         }
       }
 
