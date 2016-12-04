@@ -1,5 +1,5 @@
 import korolev.Korolev.EventFactory
-import korolev.{Event, KorolevServer, Shtml}
+import korolev.{Event, KorolevServer, Shtml, StateStorage}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -17,8 +17,8 @@ object Example extends App with Shtml {
   })
 
   KorolevServer[State](
-    initialState = State(),
-    port = 7281,
+    port = 7181,
+    stateStorage = StateStorage.default(State()),
     initRender = { access =>
 
       // Handler to input
@@ -34,8 +34,8 @@ object Example extends App with Shtml {
         }
 
       // Generate AddTodo action when 'Add' button clicked
-      val addTodoClick: EventFactory[Unit] =
-        access.event("click") { _ =>
+      val addTodoFromSubmit: EventFactory[Unit] =
+        access.event("submit") { _ =>
           deferredTransition {
             inputId.get[String]('value) map { value =>
               val todo = Todo(value, done = false)
@@ -65,16 +65,14 @@ object Example extends App with Shtml {
                 )
             }
           ),
-          'div(
+          'form(
+            addTodoFromSubmit(()),
             'input(
               inputId,
               'type /= "text",
               'placeholder /= "What should be done?"
             ),
-            'button(
-              "Add todo",
-              addTodoClick(())
-            )
+            'button("Add todo")
           )
         )
       }
