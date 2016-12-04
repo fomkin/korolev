@@ -1,6 +1,7 @@
 package korolev
 
 import java.util.concurrent.ConcurrentLinkedQueue
+
 import scala.concurrent.{ExecutionContext, Future, Promise}
 
 trait Dux[State] {

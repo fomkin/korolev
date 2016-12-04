@@ -40,8 +40,7 @@ val commonSettings = publishSettings ++ Seq(
   organization := "com.github.fomkin",
   version := "0.0.6",
   libraryDependencies ++= Seq(
-    "org.scalatest" %%% "scalatest" % "3.0.1" % "test"//,
-    //"com.lihaoyi" %% "pprint" % "0.4.1" % "test"
+    "org.scalatest" %%% "scalatest" % "3.0.1" % "test"
   ),
   scalacOptions ++= Seq(
     "-deprecation",
@@ -58,16 +57,6 @@ lazy val vdom = crossProject.crossType(CrossType.Pure).
 
 lazy val vdomJS = vdom.js
 lazy val vdomJVM = vdom.jvm
-
-lazy val dux = crossProject.crossType(CrossType.Pure).
-  settings(commonSettings: _*).
-  settings(
-    normalizedName := "korolev-dux",
-    description := "Dux like Redux"
-  )
-
-lazy val duxJS = dux.js
-lazy val duxJVM = dux.jvm
 
 lazy val server = project.
   settings(commonSettings: _*).
@@ -113,7 +102,7 @@ lazy val korolev = crossProject.crossType(CrossType.Pure).
     normalizedName := "korolev",
     unmanagedResourceDirectories in Compile += file("korolev") / "src" / "main" / "resources"
   ).
-  dependsOn(dux, vdom, bridge)
+  dependsOn(vdom, bridge)
 
 lazy val korolevJS = korolev.js
 lazy val korolevJVM = korolev.jvm
@@ -124,13 +113,12 @@ lazy val root = project.in(file(".")).
     korolevJS, korolevJVM,
     bridgeJS, bridgeJVM,
     vdomJS, vdomJVM,
-    duxJS, duxJVM,
     server, example
   )
 
 publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
 
-crossScalaVersions := Seq("2.11.8") //, "2.12.0")
+crossScalaVersions := Seq("2.11.8")
 
 publishArtifact := false
 
