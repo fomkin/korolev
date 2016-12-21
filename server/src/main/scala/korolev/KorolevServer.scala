@@ -59,7 +59,7 @@ class KorolevServer[State](
 
   private val bridgeJs = {
     val stream =
-      classOf[JSAccess].getClassLoader.getResourceAsStream("bridge.js")
+      classOf[JSAccess[Future]].getClassLoader.getResourceAsStream("bridge.js")
     Source.fromInputStream(stream).mkString
   }
 

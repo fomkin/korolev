@@ -2,7 +2,10 @@ package bridge
 
 import java.util.concurrent.atomic.AtomicInteger
 
-import scala.concurrent.{ExecutionContext, Future, Promise}
+import korolev.Async
+
+import scala.language.higherKinds
+import scala.util.{Failure, Success}
 
 object JSAccess {
 
@@ -23,15 +26,13 @@ object JSAccess {
  * Provide access to remote page with JavaScript engine
  * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
  */
-trait JSAccess { self ⇒
+abstract class JSAccess[F[_]: Async] { self ⇒
 
   import JSAccess._
 
-  implicit val executionContext: ExecutionContext
-
   lazy val global = obj("global")
 
-  case class Request(id: Int, args: Seq[Any], resultPromise: Promise[Any])
+  case class Request(id: Int, args: Seq[Any], resultPromise: Async.Promise[F, Any])
 
   /**
    * Increment it after request
@@ -44,7 +45,7 @@ trait JSAccess { self ⇒
    * List of promises of requests. Resolves by
    * income messages
    */
-  @volatile protected var promises = Map.empty[Int, Promise[Any]]
+  @volatile protected var promises = Map.empty[Int, Async.Promise[F, Any]]
 
   @volatile protected var callbacks = Map.empty[String, Any ⇒ Unit]
 
@@ -61,8 +62,8 @@ trait JSAccess { self ⇒
    * @return Future with result.
    *         It may be any basic type or [[JSLink]]
    */
-  def request[A](args: Any*): Future[A] = {
-    val promise = Promise[Any]()
+  def request[A](args: Any*): F[A] = {
+    val promise = Async[F].promise[Any]
     val requestId = lastReqId.getAndIncrement()
     val pair = (requestId, promise)
     promises += pair
@@ -70,12 +71,12 @@ trait JSAccess { self ⇒
     sendRequest(Request(requestId, Seq(requestId) ++ args, promise))
 
     // Unpack result
-    promise.future map unpackArg[A]
+    Async[F].map(promise.future)(unpackArg[A])
   }
 
   protected def sendRequest(request: Request): Unit = {
     sendRequest(request.args) { e ⇒
-      request.resultPromise.failure(e)
+      request.resultPromise.complete(Failure(e))
     }
   }
 
@@ -88,14 +89,14 @@ trait JSAccess { self ⇒
     }
   }
 
-  def array(linkId: String): JSArray = {
+  def array(linkId: String): JSArray[F] = {
     new JSArray() {
       val jsAccess = self
       val id = linkId
     }
   }
 
-  def obj(linkId: String): JSObj = {
+  def obj(linkId: String): JSObj[F] = {
     new JSObj() {
       val jsAccess = self
       val id = linkId
@@ -107,7 +108,7 @@ trait JSAccess { self ⇒
   def platformDependentUnpack(value: Any): Any = value
 
   def packArgs(args: Seq[Any]): Seq[Any] = args collect {
-    case anyLink: JSLink ⇒ LinkPrefix + anyLink.id
+    case anyLink: JSLink[F] ⇒ LinkPrefix + anyLink.id
     case xs: Seq[Any] ⇒ platformDependentPack(packArgs(xs))
     case hook: Hook ⇒ hook.requestString
     case otherwise ⇒ platformDependentPack(otherwise)
@@ -133,7 +134,7 @@ trait JSAccess { self ⇒
     promises.get(reqId) match {
       case Some(promise) ⇒
         if (isSuccess) {
-          promise.success(res)
+          promise.complete(Success(res))
         }
         else {
           val exception = res match {
@@ -141,7 +142,7 @@ trait JSAccess { self ⇒
             case i: Int ⇒ new JSSideErrorCode(i)
             case _ ⇒ new JSSideUnrecognizedException()
           }
-          promise.failure(exception)
+          promise.complete(Failure(exception))
         }
         promises -= reqId
       case None ⇒
@@ -152,7 +153,7 @@ trait JSAccess { self ⇒
     callbacks(callbackId)(unpackArg(arg))
   }
 
-  def registerCallback[T](f: T ⇒ Unit): Future[JSObj] = {
+  def registerCallback[T](f: T ⇒ Unit): F[JSObj[F]] = {
     val callbackId = s"^cb${lastCallbackId.getAndIncrement()}"
     val pair = (callbackId, f.asInstanceOf[Any ⇒ Unit])
     callbacks += pair

@@ -1,19 +1,19 @@
 package bridge
 
-import scala.concurrent.Future
-import scala.language.dynamics
+import scala.language.higherKinds
+import korolev.Async
 
 /**
  * JavaScript Array presentation
  * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
  */
-trait JSArray extends JSObj {
+abstract class JSArray[F[_]: Async] extends JSObj[F] {
 
-  def apply[A](i: Int): Future[A] = {
+  def apply[A](i: Int): F[A] = {
     jsAccess.request("get", this, i)
   }
 
-  def update(i: Int, value: Any): Future[Unit] = {
+  def update(i: Int, value: Any): F[Unit] = {
     jsAccess.request("set", this, i, value)
   }
 }

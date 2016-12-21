@@ -2,37 +2,38 @@ package korolev
 
 import korolev.Dux.Transition
 
-import scala.concurrent.Future
+import scala.language.higherKinds
 
 /**
   * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
   */
-case class EventResult[S](
+case class EventResult[F[_]: Async, S](
     _immediateTransition: Option[Dux.Transition[S]] = None,
-    _deferredTransition: Option[Future[Dux.Transition[S]]] = None,
+    _deferredTransition: Option[F[Dux.Transition[S]]] = None,
     _stopPropagation: Boolean = false
 ) {
 
-  def deferredTransition(transition: Future[Dux.Transition[S]]) =
+  def deferredTransition(transition: F[Dux.Transition[S]]): EventResult[F, S] =
     copy(_deferredTransition = Some(transition))
 
-  def immediateTransition(transition: Dux.Transition[S]) =
+  def immediateTransition(transition: Dux.Transition[S]): EventResult[F, S] =
     copy(_immediateTransition = Some(transition))
 
-  def stopPropagation = copy(_stopPropagation = true)
+  def stopPropagation: EventResult[F, S] = copy(_stopPropagation = true)
 }
 
 object EventResult {
-  def immediateTransition[S](transition: Dux.Transition[S]) =
-    EventResult(Some(transition), None, _stopPropagation = false)
 
-  def deferredTransition[S](transition: Future[Dux.Transition[S]]) =
-    EventResult(None, Some(transition), _stopPropagation = false)
+  def immediateTransition[F[_]: Async, S](transition: Dux.Transition[S]): EventResult[F, S] =
+    EventResult[F, S](Some(transition), None, _stopPropagation = false)
+
+  def deferredTransition[F[_]: Async, S](transition: F[Dux.Transition[S]]): EventResult[F, S] =
+    EventResult[F, S](None, Some(transition), _stopPropagation = false)
 
   /**
     * This is an immediateTransition return same state
     */
-  def noTransition[S]: EventResult[S] = immediateTransition {
+  def noTransition[F[_]: Async, S]: EventResult[F, S] = immediateTransition {
     case anyState => anyState
   }
 

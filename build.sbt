@@ -82,6 +82,13 @@ lazy val example = project.
   ).
   dependsOn(server)
 
+lazy val async = crossProject.crossType(CrossType.Pure).
+  settings(commonSettings: _*).
+  settings(normalizedName := "korolev-async")
+
+lazy val asyncJS = async.js
+lazy val asyncJVM = async.jvm
+
 lazy val bridge = crossProject.crossType(CrossType.Pure).
   settings(commonSettings: _*).
   settings(
@@ -91,7 +98,8 @@ lazy val bridge = crossProject.crossType(CrossType.Pure).
     ),
     testFrameworks += new TestFramework("utest.runner.Framework"),
     unmanagedResourceDirectories in Compile += file("bridge") / "src" / "main" / "resources"
-  )
+  ).
+  dependsOn(async)
 
 lazy val bridgeJS = bridge.js
 lazy val bridgeJVM = bridge.jvm
@@ -113,6 +121,7 @@ lazy val root = project.in(file(".")).
     korolevJS, korolevJVM,
     bridgeJS, bridgeJVM,
     vdomJS, vdomJVM,
+    asyncJS, asyncJVM,
     server, example
   )
 

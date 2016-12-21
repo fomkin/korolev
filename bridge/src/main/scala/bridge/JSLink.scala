@@ -1,6 +1,7 @@
 package bridge
 
-import scala.concurrent.Future
+import scala.language.higherKinds
+import korolev.Async
 
 /**
  * Link to entity on page side. By default, all links 
@@ -9,9 +10,9 @@ import scala.concurrent.Future
  * the link no more you can `free()` it.
  * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
  */
-trait JSLink {
+abstract class JSLink[F[_]: Async] {
 
-  val jsAccess: JSAccess
+  val jsAccess: JSAccess[F]
 
   val id: String
 
@@ -19,21 +20,21 @@ trait JSLink {
    * Tell page to save reference to the link to avoid
    * garbage collection 
    */
-  def save(): Future[this.type] = {
+  def save(): F[Unit] = {
     jsAccess.request("save", this, id)
   }
 
   /**
    * Tell page to save reference to the link with new id
    */
-  def saveAs(newId: String): Future[this.type] = {
+  def saveAs(newId: String): F[Unit] = {
     jsAccess.request("save", this, newId)
   }
 
   /**
    * Tell page you don't need the link no more.
    */
-  def free(): Future[Unit] = {
+  def free(): F[Unit] = {
     jsAccess.request("free", this, id)
   }
 }

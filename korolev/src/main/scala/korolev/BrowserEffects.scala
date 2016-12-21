@@ -1,9 +1,8 @@
 package korolev
 
-import scala.concurrent.Future
-import scala.reflect.ClassTag
+import scala.language.higherKinds
 
-trait BrowserEffects[S] {
+abstract class BrowserEffects[F[_]: Async, S] {
 
   import BrowserEffects._
   import EventPhase._
@@ -11,35 +10,35 @@ trait BrowserEffects[S] {
   def elementId = new ElementId()
 
   def event(name: Symbol, phase: EventPhase = Bubbling)(
-      effect: => EventResult[S]): SimpleEvent[S] =
-    SimpleEvent(name, phase, () => effect)
+      effect: => EventResult[F, S]): SimpleEvent[F, S] =
+    SimpleEvent[F, S](name, phase, () => effect)
 
   def eventWithAccess(name: Symbol, phase: EventPhase = Bubbling)(
-      effect: BrowserAccess => EventResult[S]): EventWithAccess[S] =
+      effect: BrowserAccess[F] => EventResult[F, S]): EventWithAccess[F, S] =
     EventWithAccess(name, phase, effect)
 }
 
 object BrowserEffects {
 
-  trait BrowserAccess {
-    def property[T](id: ElementId, propName: Symbol): Future[T]
+  abstract class BrowserAccess[F[_]: Async] {
+    def property[T](id: ElementId, propName: Symbol): F[T]
   }
 
-  sealed trait Event[S] extends VDom.Misc {
+  sealed abstract class Event[F[_]: Async, S] extends VDom.Misc {
     def name: Symbol
     def phase: EventPhase
   }
 
-  case class EventWithAccess[S](
+  case class EventWithAccess[F[_]: Async, S](
       name: Symbol,
       phase: EventPhase,
-      effect: BrowserAccess => EventResult[S])
-      extends Event[S]
+      effect: BrowserAccess[F] => EventResult[F, S])
+      extends Event[F, S]
 
-  case class SimpleEvent[S](name: Symbol,
+  case class SimpleEvent[F[_]: Async,S](name: Symbol,
                                       phase: EventPhase,
-                                      effect: () => EventResult[S])
-    extends Event[S]
+                                      effect: () => EventResult[F, S])
+    extends Event[F, S]
 
   class ElementId extends VDom.Misc
 
