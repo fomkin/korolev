@@ -3,9 +3,9 @@ package korolev
 import java.util.concurrent.atomic.AtomicInteger
 
 import bridge.JSAccess
+import korolev.BrowserEffects.{BrowserAccess, ElementId}
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.{Failure, Success}
 
 trait Korolev
 
@@ -16,20 +16,18 @@ object Korolev extends EventPropagation {
 
   import VDom._
   import Change._
-  import Event._
 
   type Render[State] = PartialFunction[State, VDom.Node]
-  type InitRender[State] = KorolevAccess[State] => Render[State]
-  type EventFactory[Payload] = Payload => Event
 
   def apply[State](jsAccess: JSAccess,
                            initialState: State,
-                           initRender: InitRender[State],
+                           render: Render[State],
                            fromScratch: Boolean)(
       implicit ec: ExecutionContext): Dux[State] = {
 
-    @volatile var propertyAccessors = Map.empty[ElementAccessor, String]
-    @volatile var events = Map.empty[String, Event]
+    @volatile var elementIds = Map.empty[BrowserEffects.ElementId, String]
+    @volatile var events = Map.empty[String, BrowserEffects.Event[State]]
+
     val currentRenderNum = new AtomicInteger(0)
 
     // Prepare frontend
@@ -38,78 +36,57 @@ object Korolev extends EventPropagation {
     val localDux = Dux[State](initialState)
 
     def updateMisc(renderResult: VDom.Node) = {
+
       val misc = collectMisc(Id(0), renderResult)
-      events = misc.collect { case (id, event: Event) => s"$id:${event.`type`}:${event.phase}" -> event }.toMap
-      propertyAccessors = misc.collect { case (id, pa: ElementAccessor) => pa -> id.toString }.toMap
+
+      events = {
+        val xs = misc.collect {
+          case (id, event: BrowserEffects.Event[_]) =>
+            val typedEvent = event.asInstanceOf[BrowserEffects.Event[State]]
+            s"$id:${event.name.name}:${event.phase}" -> typedEvent
+        }
+        xs.toMap
+      }
+
+      elementIds = {
+        val xs = misc.collect {
+          case (id, eId: BrowserEffects.ElementId) => eId -> id.toString
+        }
+        xs.toMap
+      }
+    }
+
+    val browserAccess = new BrowserAccess {
+      def property[T](eId: ElementId, propName: Symbol): Future[T] = elementIds.get(eId) match {
+        case Some(id) =>
+          val future = korolevJS.call("ExtractProperty", id, propName.name)
+          jsAccess.flush()
+          future
+        case None =>
+          Future.failed(new Exception("No element matched for accessor"))
+      }
     }
 
     jsAccess.registerCallback[String] { targetAndType =>
       val Array(renderNum, target, tpe) = targetAndType.split(':')
       if (currentRenderNum.get == renderNum.toInt)
-        propagateEvent(events, Id(target), tpe)
+        propagateEvent(events, localDux.apply, browserAccess, Id(target), tpe)
     } foreach { eventCallback =>
       korolevJS.call("RegisterGlobalEventHandler", eventCallback)
       korolevJS.call("SetRenderNum", 0)
 
-      val korolevAccess = new KorolevAccess[State] {
+      val renderOpt = render.lift
 
-        def event[P](eventType: String, eventPhase: Phase)(
-          onFire: P => EventResult[State])(payload: P): Event = {
-
-          case class EventImpl(`type`: String,
-            phase: Event.Phase,
-            payload: P,
-            onFire: P => EventResult[State]) extends Event {
-
-            def fire(): Boolean = {
-              val result = onFire(payload)
-              result._immediateTransition.foreach(dux.apply)
-              result._deferredTransition foreach { actionFuture =>
-                actionFuture onComplete {
-                  case Success(action) => dux.apply(action)
-                  case Failure(exception) => exception.printStackTrace()
-                }
-              }
-              !result._stopPropagation
-            }
-
-            override def equals(obj: Any): Boolean = obj match {
-              case event: EventImpl => event.onFire.getClass == onFire.getClass && super.equals(obj)
-              case _ => super.equals(obj)
-            }
-          }
-
-          EventImpl(eventType, eventPhase, payload, onFire)
-        }
-
-        def id(): ElementAccessor = {
-          new ElementAccessor {
-            def get[T](property: Symbol): Future[T] = propertyAccessors.get(this) match {
-              case Some(id) =>
-                val future =
-                  korolevJS.call("ExtractProperty", id, property.name)
-                jsAccess.flush()
-                future
-              case None =>
-                Future.failed(
-                  new Exception("No element matched for accessor"))
-            }
-          }
-        }
-
-        def dux = localDux
-      }
-
-      val render = initRender(korolevAccess).lift
       @volatile var lastRender =
         if (fromScratch) VDom.Node("body", Nil, Nil, Nil)
-        else render(initialState).get
+        else renderOpt(initialState).get
+
       updateMisc(lastRender)
 
       val onState: State => Unit = { state =>
         val startRenderTime = System.nanoTime()
         korolevJS.call("SetRenderNum", currentRenderNum.incrementAndGet())
-        render(state) match {
+        renderOpt(state) match {
           case Some(newRender) =>
             val changes = VDom.changes(lastRender, newRender)
             updateMisc(newRender)

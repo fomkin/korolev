@@ -1,8 +1,10 @@
+import korolev.BrowserEffects.{BrowserAccess, ElementId}
 import korolev.VDom.Id
-import korolev.{Event, EventPropagation}
+import korolev._
 import org.scalatest.{FlatSpec, Matchers}
 
 import scala.collection.mutable
+import scala.concurrent.{ExecutionContext, Future}
 
 /**
   * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
@@ -13,18 +15,22 @@ class EventPropagationSpec
     with EventPropagation
     with EventTesting {
 
-  import Event._
+  import EventPhase._
+
+  implicit object RunNowExecutionContext extends ExecutionContext {
+    def execute(runnable: Runnable): Unit = runnable.run()
+    def reportFailure(cause: Throwable): Unit = cause.printStackTrace()
+  }
 
   "propagateEvent" should "fire events climb the hierarchy" in {
     assertEvent { implicit context =>
       val events = Map(
         assertFired("0_0", tpe = "test", inPhase = Capturing),
         assertFired("0_0_0", tpe = "test", inPhase = Capturing),
-        assertNotFired("0_0_0", tpe = "anotherType"),
-        assertNotFired("0_0_1", tpe = "test")
+        assertNotFired("0_0_0", tpe = "anotherType", inPhase = Bubbling),
+        assertNotFired("0_0_1", tpe = "test", inPhase = Bubbling)
       )
-
-      propagateEvent(events, Id("0_0_0_2"), "test")
+      propagateEvent(events, duxApply, BA, Id("0_0_0_2"), "test")
     }
   }
 
@@ -34,10 +40,10 @@ class EventPropagationSpec
         assertFired("0_0", tpe = "test", inPhase = Bubbling),
         assertFired("0_0_0", tpe = "test", inPhase = Bubbling),
         assertFired("0_0_0_2", tpe = "test", inPhase = Bubbling),
-        assertNotFired("0_0_0", tpe = "anotherType"),
-        assertNotFired("0_0_1", tpe = "test")
+        assertNotFired("0_0_0", tpe = "anotherType", inPhase = Bubbling),
+        assertNotFired("0_0_1", tpe = "test", inPhase = Bubbling)
       )
-      propagateEvent(events, Id("0_0_0_2"), "test")
+      propagateEvent(events, duxApply, BA, Id("0_0_0_2"), "test")
     }
   }
 
@@ -48,7 +54,7 @@ class EventPropagationSpec
         assertNotFired("0_0_0_2", tpe = "test", inPhase = Capturing),
         assertNotFired("0_0_0_2", tpe = "test", inPhase = Bubbling)
       )
-      propagateEvent(events, Id("0_0_0_2"), "test")
+      propagateEvent(events, duxApply, BA, Id("0_0_0_2"), "test")
     }
   }
 
@@ -60,7 +66,7 @@ class EventPropagationSpec
         assertNotFired("0_0_0_2", tpe = "test", inPhase = AtTarget),
         assertNotFired("0_0_0", tpe = "test", inPhase = Bubbling)
       )
-      propagateEvent(events, Id("0_0_0_2"), "test")
+      propagateEvent(events, duxApply, BA, Id("0_0_0_2"), "test")
     }
   }
 
@@ -72,7 +78,7 @@ class EventPropagationSpec
         assertFired("0_0_0_2", tpe = "test", inPhase = AtTarget, stop = true),
         assertNotFired("0_0_0", tpe = "test", inPhase = Bubbling)
       )
-      propagateEvent(events, Id("0_0_0_2"), "test")
+      propagateEvent(events, duxApply, BA, Id("0_0_0_2"), "test")
     }
   }
 
@@ -81,54 +87,56 @@ class EventPropagationSpec
 
 trait EventTesting extends FlatSpec {
 
-  import Event.Phase
+  type S = String
+  type R = (String, BrowserEffects.Event[S])
 
-  type Context = mutable.Map[String, Boolean]
+  type ShouldFire = Boolean
+  type Comment = String
+  type EventAssertion = (ShouldFire, Comment)
+  type Context = mutable.Map[String, EventAssertion]
+
+  def duxApply(implicit context: Context): Dux.Transition[S] => Future[Unit] = { t =>
+    val key = t("")
+    context(key) match {
+      case (false, comment) => fail(comment)
+      case (true, _) => context.remove(key)
+    }
+    Future.successful(())
+  }
+
+  object BA extends BrowserAccess {
+    def property[T](id: ElementId, propName: Symbol): Future[T] =
+      Future.failed(new Exception())
+  }
 
   def assertEvent[U](fillContext: Context => U): Unit = {
     val context: Context = mutable.Map.empty
     fillContext(context)
     context foreach {
-      case (s, false) =>
-        val Array(_, _, phase) = s.split(':')
-        fail(s"Event $s should fired in $phase")
+      case (_, (true, comment)) => fail(comment)
       case _ =>
     }
   }
 
-  def assertNotFired(id: String, tpe: String, inPhase: Phase = null) = {
-    val pair = s"$id:$tpe:$inPhase"
-    pair -> new Event {
-      def payload: Any = ()
-      def fire(): Boolean = {
-        Option(inPhase) match {
-          case None => fail(s"Event $pair should not be fired")
-          case Some(`inPhase`) =>
-            fail(s"Event $pair should not be fired in $inPhase")
-          case _ => true
-        }
-      }
-      val phase = inPhase
-      def `type`: String = tpe
-    }
+  def assertNotFired(id: String, tpe: String, inPhase: EventPhase)
+    (implicit context: Context): R = {
+    val key = s"$id:$tpe:$inPhase"
+    context.put(key, (false, s"Event $key should not be fired in $inPhase"))
+    key -> BrowserEffects.SimpleEvent(Symbol(tpe), inPhase, () =>
+      EventResult.immediateTransition[S] { case _ => key })
   }
 
   def assertFired(id: String,
                   tpe: String,
-                  inPhase: Phase,
-                  stop: Boolean = false)(implicit context: Context) = {
+                  inPhase: EventPhase,
+                  stop: Boolean = false)(implicit context: Context): R = {
     val key = s"$id:$tpe:$inPhase"
-    context.put(key, false)
-    key -> new Event {
-      def payload: Any = ()
-      def fire(): Boolean = {
-        context.put(key, true)
-        !stop
-      }
-      val phase = inPhase
-      def `type`: String = tpe
+    val f = { () =>
+      val t = EventResult.immediateTransition[S] { case _ => key }
+      if (stop) t.stopPropagation else t
     }
-
+    context.put(key, (true, s"Event $key should be fired in $inPhase"))
+    key -> BrowserEffects.SimpleEvent(Symbol(tpe), inPhase, f)
   }
 
 }

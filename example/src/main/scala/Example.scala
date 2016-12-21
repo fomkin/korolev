@@ -1,51 +1,21 @@
-import korolev.Korolev.EventFactory
-import korolev.{Event, KorolevServer, Shtml, StateStorage}
+import korolev.{BrowserEffects, KorolevServer, Shtml, StateStorage}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
 /**
   * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
   */
-object Example extends App with Shtml {
+object Example extends App with Shtml with BrowserEffects[State] {
 
   import korolev.EventResult._
 
-  case class Todo(text: String, done: Boolean)
-
-  case class State(todos: Vector[Todo] = (0 to 2).toVector map {
-    i => Todo(s"This is TODO #$i", done = false)
-  })
-
   KorolevServer[State](
-    port = 7181,
+    port = 8181,
     stateStorage = StateStorage.default(State()),
-    initRender = { access =>
+    render = {
 
       // Handler to input
-      val inputId = access.id()
-
-      // Generate actions when clicking checkboxes
-      val todoClick: EventFactory[(Int, Todo)] =
-        access.event("click", Event.AtTarget) { case (i, todo) =>
-          immediateTransition { case state =>
-            val updated = state.todos.updated(i, state.todos(i).copy(done = !todo.done))
-            state.copy(todos = updated)
-          }
-        }
-
-      // Generate AddTodo action when 'Add' button clicked
-      val addTodoFromSubmit: EventFactory[Unit] =
-        access.event("submit") { _ =>
-          deferredTransition {
-            inputId.get[String]('value) map { value =>
-              val todo = Todo(value, done = false)
-              transition {
-                case state =>
-                  state.copy(todos = state.todos :+ todo)
-              }
-            }
-          }
-        }
+      val inputId = elementId
 
       // Create a DOM using state
       { case state =>
@@ -58,7 +28,14 @@ object Example extends App with Shtml {
                   'input(
                     'type /= "checkbox",
                     'checked when todo.done,
-                    todoClick(i, todo)
+                    // Generate transition when clicking checkboxes
+                    event('click) {
+                      immediateTransition { case tState =>
+                        val updated = tState.todos.updated(i, tState.todos(i).copy(done = !todo.done))
+                        tState.copy(todos = updated)
+                      }
+                    }
+
                   ),
                   if (!todo.done) 'span(todo.text)
                   else 'strike(todo.text)
@@ -66,7 +43,17 @@ object Example extends App with Shtml {
             }
           ),
           'form(
-            addTodoFromSubmit(()),
+            // Generate AddTodo action when 'Add' button clicked
+            eventWithAccess('submit) { access =>
+              deferredTransition {
+                access.property[String](inputId, 'value) map { value =>
+                  val todo = Todo(value, done = false)
+                  transition { case tState =>
+                    tState.copy(todos = tState.todos :+ todo)
+                  }
+                }
+              }
+            },
             'input(
               inputId,
               'type /= "text",
@@ -79,3 +66,10 @@ object Example extends App with Shtml {
     }
   )
 }
+
+case class Todo(text: String, done: Boolean)
+
+case class State(todos: Vector[Todo] = (0 to 2).toVector map {
+  i => Todo(s"This is TODO #$i", done = false)
+})
+
