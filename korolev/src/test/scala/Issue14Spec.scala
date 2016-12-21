@@ -1,7 +1,7 @@
 import bridge.JSAccess
+import korolev.BrowserEffects.Event
 import korolev.EventResult._
-import korolev.Korolev.EventFactory
-import korolev.{Korolev, KorolevAccess, Shtml}
+import korolev.{BrowserEffects, Korolev, Shtml}
 import org.scalatest.{FlatSpec, Matchers}
 
 import scala.concurrent.ExecutionContext
@@ -9,7 +9,7 @@ import scala.concurrent.ExecutionContext
 /**
   * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
   */
-class Issue14Spec extends FlatSpec with Matchers {
+class Issue14Spec extends FlatSpec with Matchers with BrowserEffects[Issue14Spec.S] {
 
   "Korolev" should "ignore events from outdated DOM" in {
 
@@ -21,22 +21,25 @@ class Issue14Spec extends FlatSpec with Matchers {
       implicit val executionContext = ec
     }
 
-    Korolev(jSAccess, "firstState", { access: KorolevAccess[String] =>
-      Issue14Spec.render(
-        firstEvent = access.event("mousedown") { _ =>
+    Korolev(
+      jsAccess = jSAccess,
+      initialState = "firstState",
+      fromScratch = true,
+      render = Issue14Spec.render(
+        firstEvent = event('mousedown) {
           immediateTransition[String] { case _ =>
             counter += 1
             "secondState"
           }
         },
-        secondEvent = access.event("click") { _ =>
+        secondEvent = event('click) {
           immediateTransition[String] { case _ =>
             counter += 1
             "firstState"
           }
         }
       )
-    }, fromScratch = true)
+    )
 
     jSAccess.resolvePromise(0, isSuccess = true, "@obj:@Korolev")
     jSAccess.resolvePromise(1, isSuccess = true, "@obj:^cb0")
@@ -51,19 +54,21 @@ class Issue14Spec extends FlatSpec with Matchers {
 
 object Issue14Spec extends Shtml {
 
-  def render(firstEvent: EventFactory[Unit], secondEvent: EventFactory[Unit]): Korolev.Render[String] = {
+  type S = String
+
+  def render(firstEvent: Event[S], secondEvent: Event[S]): Korolev.Render[S] = {
     case "firstState" =>
       'div(
         'div("Hello"),
         'div(
-          'button("Click me", firstEvent(()) )
+          'button("Click me", firstEvent)
         )
       )
     case "secondState" =>
       'div(
         'div("Hello"),
         'ul(
-          'li("One", secondEvent(())),
+          'li("One", secondEvent),
           'li("Two"),
           'li("Three")
         ),

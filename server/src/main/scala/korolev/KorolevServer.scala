@@ -3,7 +3,6 @@ package korolev
 import java.util.UUID
 
 import bridge.JSAccess
-import korolev.Korolev.InitRender
 import org.http4s._
 import org.http4s.dsl._
 import org.http4s.headers.`Content-Type`
@@ -19,7 +18,6 @@ import scalaz.concurrent.{Strategy, Task}
 import scalaz.stream.async.unboundedQueue
 import scalaz.stream.{DefaultScheduler, Exchange, Process, Sink, time}
 import delorean._
-import korolev.Event.Phase
 import org.slf4j.LoggerFactory
 
 object KorolevServer {
@@ -31,18 +29,18 @@ object KorolevServer {
   def apply[State](
       host: String = ServerBuilder.DefaultHost,
       port: Int = 7181,
-      initRender: InitRender[State],
+      render: Korolev.Render[State],
       stateStorage: StateStorage[State],
       head: VDom.Node = VDom.Node("head", Nil, Nil, Nil)
   )(implicit executor: ExecutionContextExecutorService = defaultEc): KorolevServer[State] = {
-    new KorolevServer(host, port, initRender, head, stateStorage)
+    new KorolevServer(host, port, render, head, stateStorage)
   }
 }
 
 class KorolevServer[State](
     host: String,
     port: Int,
-    initRender: Korolev.InitRender[State],
+    render: Korolev.Render[State],
     head: VDom.Node,
     stateStorage: StateStorage[State]
 )(implicit executor: ExecutionContextExecutorService) extends Shtml { self =>
@@ -69,7 +67,6 @@ class KorolevServer[State](
     val (isNewDevice, deviceId) = deviceFromRequest(request)
     val stateTask = stateStorage.initial(deviceId).toTask
     val htmlTask = stateTask map { state =>
-      val render = initRender(KorolevAccess.dummy)
       val body = render(state)
       val dom = 'html(
         head.copy(children =
@@ -156,7 +153,7 @@ class KorolevServer[State](
 
       val korolev =  {
         stateStorage.read(deviceId, sessionId).toTask map { state =>
-          val korolev = Korolev(jSAccess, state, initRender, false)
+          val korolev = Korolev(jSAccess, state, render, false)
           korolev.subscribe(state => stateStorage.write(deviceId, sessionId, state))
           korolev
         }
