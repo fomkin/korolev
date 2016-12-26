@@ -4,16 +4,23 @@ import korolev.EventResult._
 import korolev.{BrowserEffects, Korolev, Shtml}
 import org.scalatest.{FlatSpec, Matchers}
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.Future
 
 /**
   * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
   */
-class Issue14Spec extends FlatSpec with Matchers with BrowserEffects[Issue14Spec.S] {
+class Issue14Spec extends FlatSpec with Matchers {
+
+  val ba = {
+    import RunNowExecutionContext.instance
+    new BrowserEffects[Future, Issue14Spec.S] {}
+  }
+  import ba._
+
 
   "Korolev" should "ignore events from outdated DOM" in {
 
-    implicit val ec = new Issue14Spec.RunNowExecutionContext()
+    implicit val ec = RunNowExecutionContext.instance
     var counter = 0
 
     val jSAccess = new JSAccess {
@@ -27,13 +34,13 @@ class Issue14Spec extends FlatSpec with Matchers with BrowserEffects[Issue14Spec
       fromScratch = true,
       render = Issue14Spec.render(
         firstEvent = event('mousedown) {
-          immediateTransition[String] { case _ =>
+          immediateTransition[Future, String] { case _ =>
             counter += 1
             "secondState"
           }
         },
         secondEvent = event('click) {
-          immediateTransition[String] { case _ =>
+          immediateTransition[Future, String] { case _ =>
             counter += 1
             "firstState"
           }
@@ -56,7 +63,7 @@ object Issue14Spec extends Shtml {
 
   type S = String
 
-  def render(firstEvent: Event[S], secondEvent: Event[S]): Korolev.Render[S] = {
+  def render(firstEvent: Event[Future, S], secondEvent: Event[Future, S]): Korolev.Render[S] = {
     case "firstState" =>
       'div(
         'div("Hello"),
@@ -74,10 +81,5 @@ object Issue14Spec extends Shtml {
         ),
         'div("Cow")
       )
-  }
-
-  class RunNowExecutionContext extends ExecutionContext {
-    def execute(runnable: Runnable): Unit = runnable.run()
-    def reportFailure(cause: Throwable): Unit = cause.printStackTrace()
   }
 }
