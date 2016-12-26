@@ -3,7 +3,7 @@ package korolev
 import korolev.VDom.Id
 
 import scala.annotation.tailrec
-import scala.concurrent.{ExecutionContext, Future}
+import scala.language.higherKinds
 import scala.util.{Failure, Success}
 
 /**
@@ -14,19 +14,19 @@ trait EventPropagation {
   import BrowserEffects._
   import EventPhase._
 
-  def propagateEvent[S](events: collection.Map[String, Event[S]],
-                        dux: Dux.Transition[S] => Future[Unit],
-                        browserAccess: BrowserAccess,
-                        target: Id,
-                        tpe: String)(implicit ec: ExecutionContext): Unit = {
+  def propagateEvent[F[_]: Async, S](events: collection.Map[String, Event[F, S]],
+                                     dux: Dux.Transition[S] => F[Unit],
+                                     browserAccess: BrowserAccess[F],
+                                     target: Id,
+                                     tpe: String): Unit = {
 
-    def fire(event: Event[S]): Boolean = {
+    def fire(event: Event[F, S]): Boolean = {
       val EventResult(it, dt, haveToStop) = event match {
         case EventWithAccess(_, _, effect) => effect(browserAccess)
         case SimpleEvent(_, _, effect) => effect()
       }
-      Seq(it.map(Future.successful), dt).flatten foreach {
-        _ onComplete {
+      Seq(it.map(Async[F].pure[Dux.Transition[S]](_)), dt).flatten foreach { m =>
+        Async[F].run(m) {
           case Success(t) => dux(t)
           case Failure(e) => e.printStackTrace()
         }

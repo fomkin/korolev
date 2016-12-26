@@ -2,6 +2,7 @@ package bridge
 
 import utest._
 
+import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
 /**
@@ -9,13 +10,13 @@ import scala.util.{Failure, Success}
  */
 object JSAccessSuite extends TestSuite {
 
-  class TestJSAccess extends JSAccess {
+  import utest.framework.ExecutionContext.RunNow
 
-    implicit val executionContext = utest.framework.ExecutionContext.RunNow
+  class TestJSAccess extends JSAccess[Future] {
 
     var outgoing = List.empty[Seq[Any]]
 
-    def receive(msg: Any*) = {
+    def receive(msg: Any*): Unit = {
       val reqId = msg(0).asInstanceOf[Int]
       if (reqId == -1) {
         val callbackId = msg(1).asInstanceOf[String]
@@ -77,13 +78,13 @@ object JSAccessSuite extends TestSuite {
       val acc = new TestJSAccess()
       "JSObj  " - {
         val arg = "@obj:myObj"
-        val res: JSObj = acc.unpackArg(arg)
-        assert(!res.isInstanceOf[JSArray])
+        val res: JSObj[Future] = acc.unpackArg(arg)
+        assert(!res.isInstanceOf[JSArray[Future]])
         assert(res.id == "myObj")
       }
       "JSArray" - {
         val arg = "@arr:myArray"
-        val res: JSArray = acc.unpackArg(arg)
+        val res: JSArray[Future] = acc.unpackArg(arg)
         assert(res.id == "myArray")
       }
       "Unit   " - {
@@ -102,8 +103,6 @@ object JSAccessSuite extends TestSuite {
     }
 
     "Check request" - {
-
-      import utest.framework.ExecutionContext.RunNow
 
       "Success" - {
         val acc = new TestJSAccess()

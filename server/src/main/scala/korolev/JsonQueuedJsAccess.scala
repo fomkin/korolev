@@ -4,12 +4,12 @@ import bridge.JSAccess
 
 import scala.annotation.switch
 import scala.collection.immutable.Queue
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 
 /**
   * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
   */
-class JsonQueuedJsAccess(sendJson: String => Unit)(implicit val executionContext: ExecutionContext) extends JSAccess {
+class JsonQueuedJsAccess(sendJson: String => Unit)(implicit val executionContext: ExecutionContext) extends JSAccess[Future] {
 
   @volatile var queue = Queue.empty[String]
 

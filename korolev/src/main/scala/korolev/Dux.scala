@@ -2,14 +2,15 @@ package korolev
 
 import java.util.concurrent.ConcurrentLinkedQueue
 
-import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.language.higherKinds
+import scala.util.{Failure, Success}
 
-trait Dux[State] {
+abstract class Dux[F[_]: Async, State] {
   def state: State
   def subscribe[U](f: State => U): Dux.Unsubscribe
   def onDestroy[U](f: () => U): Dux.Unsubscribe
   def destroy(): Unit
-  def apply(action: Dux.Transition[State]): Future[Unit]
+  def apply(action: Dux.Transition[State]): F[Unit]
 }
 
 object Dux {
@@ -17,37 +18,36 @@ object Dux {
   type Unsubscribe = () => Unit
   type Transition[State] = PartialFunction[State, State]
 
-  def apply[State](initialState: State)(implicit ec: ExecutionContext): Dux[State] = {
+  def apply[F[_]: Async, S](initialState: S): Dux[F, S] = {
+    new Dux[F, S] {
 
-    new Dux[State] {
+      val queue = new ConcurrentLinkedQueue[(Async.Promise[F, Unit], Transition[S])]
 
-      val queue = new ConcurrentLinkedQueue[(Promise[Unit], Transition[State])]
-
-      @volatile var _state = initialState
-      @volatile var subscribers = List.empty[State => _]
+      @volatile var currentState = initialState
+      @volatile var subscribers = List.empty[S => _]
       @volatile var onDestroyListeners = List.empty[() => _]
       @volatile var inProgress = false
 
-      def apply(transition: Transition[State]): Future[Unit] = {
+      def apply(transition: Transition[S]): F[Unit] = {
         def executeNext(): Unit = {
           val (promise, transition) = queue.poll()
           try {
-            transition.lift(_state) match {
+            transition.lift(currentState) match {
               case Some(newState) =>
-                _state = newState
+                currentState = newState
                 subscribers.foreach(f => f(newState))
-                promise.success(())
+                promise.complete(Success(()))
               case None =>
-                promise.failure(new Exception("Transition don't fit this state"))
+                promise.complete(Failure(new Exception("Transition don't fit this state")))
             }
           } catch {
-            case e: Throwable => promise.failure(e)
+            case e: Throwable => promise.complete(Failure(e))
           } finally {
             if (queue.isEmpty) inProgress = false
             else executeNext()
           }
         }
-        val promise = Promise[Unit]()
+        val promise = Async[F].promise[Unit]
         queue.add(promise -> transition)
         if (!inProgress) {
           inProgress = true
@@ -61,14 +61,14 @@ object Dux {
           listener()
       }
 
-      def state = _state
+      def state: S = currentState
 
       def onDestroy[U](f: () => U): Unsubscribe = {
         onDestroyListeners = f :: onDestroyListeners
         () => onDestroyListeners = onDestroyListeners.filter(_ != f)
       }
 
-      def subscribe[U](f: State => U): Dux.Unsubscribe = {
+      def subscribe[U](f: S => U): Dux.Unsubscribe = {
         subscribers = f :: subscribers
         () => subscribers = subscribers.filter(_ != f)
       }

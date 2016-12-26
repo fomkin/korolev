@@ -1,11 +1,12 @@
 import korolev.{BrowserEffects, KorolevServer, Shtml, StateStorage}
 
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 
 /**
   * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
   */
-object Example extends App with Shtml with BrowserEffects[State] {
+object Example extends BrowserEffects[Future, State] with App with Shtml {
 
   import korolev.EventResult._
 
