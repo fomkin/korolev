@@ -25,6 +25,8 @@ object Korolev extends EventPropagation {
                            render: Render[S],
                            fromScratch: Boolean): Dux[F, S] = {
 
+    // This event type should be listen on client side
+    @volatile var enabledEvents = Set('submit)
     @volatile var elementIds = Map.empty[BrowserEffects.ElementId, String]
     @volatile var events = Map.empty[String, BrowserEffects.Event[F, S]]
 
@@ -43,9 +45,20 @@ object Korolev extends EventPropagation {
         val xs = misc.collect {
           case (id, event: BrowserEffects.Event[_, _]) =>
             val typedEvent = event.asInstanceOf[BrowserEffects.Event[F, S]]
-            s"$id:${event.name.name}:${event.phase}" -> typedEvent
+            s"$id:${event.`type`.name}:${event.phase}" -> typedEvent
         }
         xs.toMap
+      }
+
+      events.values foreach { event =>
+        val `type` = event.`type`
+        if (!enabledEvents.contains(`type`)) {
+          enabledEvents = enabledEvents + `type`
+          Async[F].run(korolevJS.call("ListenEvent", `type`.name, false)) {
+            case Success(_) => // do nothing
+            case Failure(e) => e.printStackTrace()
+          }
+        }
       }
 
       elementIds = {
@@ -72,6 +85,7 @@ object Korolev extends EventPropagation {
       if (currentRenderNum.get == renderNum.toInt)
         propagateEvent(events, localDux.apply, browserAccess, Id(target), tpe)
     }
+
     Async[F].run(eventCallbackF) {
       case Success(eventCallback) =>
         korolevJS.call("RegisterGlobalEventHandler", eventCallback)

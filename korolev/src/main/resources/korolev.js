@@ -1,13 +1,14 @@
 (function(global) {
 
   global.Korolev = (function() {
-    var root = null;
-    var els = null;
-    var addHandler = null;
-    var removeHandler = null;
-    var scheduledAddHandlerItems = [];
-    var renderNum = 0;
-    var rootListeners = [];
+    var root = null,
+      els = null,
+      addHandler = null,
+      removeHandler = null,
+      scheduledAddHandlerItems = [],
+      renderNum = 0,
+      rootListeners = [],
+      listenFun = null;
 
     function scheduleAddHandler(element) {
       if (!addHandler)
@@ -50,7 +51,7 @@
         removeHandler = f;
       },
       RegisterGlobalEventHandler: function(eventHandler) {
-        var listen = function(name, preventDefault) {
+        listenFun = function(name, preventDefault) {
           var listener = function(event) {
             if (event.target.vId) {
               if (preventDefault) {
@@ -62,16 +63,17 @@
           root.addEventListener(name, listener);
           rootListeners.push({ 'listener': listener, 'type': name });
         }
-        listen('click');
-        listen('submit', true);
-        listen('mousedown');
-        listen('mouseup');
+        listenFun('submit', true);
       },
       UnregisterGlobalEventHandler: function() {
         rootListeners.forEach(function(item) {
           root.removeEventListener(item.type, item.listener);
         });
+        listenFun = null;
         rootListeners.length = 0;
+      },
+      ListenEvent: function(type, preventDefault) {
+        listenFun(type, preventDefault);
       },
       Create: function(id, childId, tag) {
         var parent = els[id],
