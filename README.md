@@ -6,21 +6,21 @@
 [![Gitter](https://badges.gitter.im/fomkin/korolev.svg)](https://gitter.im/fomkin/korolev?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 [![Join the chat at https://telegram.me/korolev_io](https://img.shields.io/badge/chat-on_telegram_(russian)-0088cc.svg)](https://telegram.me/korolev_io)
 
-Not long ago we enter to the era of single-page applications. Some people say we no longer need a server. They say JavaScript applications can connect to DBMS directly. Fat clients. We are disagree with it. This project is an approach to solve problem of modern fat web.
+Not long ago we have entered the era of single-page applications. Some people say that we no longer need a server. They say that JavaScript applications can connect to DBMS directly. Fat clients. **We disagree with this.** This project is an attempt to solve the problems of modern fat web.
 
-Korolev runs single-page application on the server side, keeping in browser  only the bridge to receive commands and send events. The page loads instantly and works fast, cause doesn't produce almost no computations. It's important that Korolev makes single environment for full stack development. Client and server now is one app without REST protocol or something else.
+Korolev runs a single-page application on the server side, keeping in the browser only a bridge to receive commands and send events. The page loads instantly and works fast, because it does a minimal amount of computation. It's important that Korolev provides a unified environment for full stack development. Client and server are now combined into a single app without any REST protocol or something else in the middle.
 
-The project supports static page rendering to allow search engines to index a pages and view pages immediately.
+Our project supports static page rendering, so that search engines can index pages and view them immediately.
 
-**Warning!** Korolev is under heavy development and not ready to use until 0.1.0 release. API is unstable.
+**Warning!** Korolev is under heavy development and isn't ready to use until 0.1.0 release. API is unstable.
 
 ## Principles
 
-1. **Thin client.** Let's be fair, modern JavaScript application are too greedy. Any JavaScript developer thinks that his page is special. But user has different opinion. He opens dozens of tabs. Every tab contains a tons of code, and this works very slow. So we make our JavaScript bridge as lightweight as possible.
+1. **Thin client.** Let's be honest, modern JavaScript applications are too greedy. Every JavaScript developer thinks that his page is special. But the user has a different opinion. He opens dozens of tabs. Each tab contains a ton of code, and this works very slowly. So we make our JavaScript bridge as lightweight as possible.
 
-2. **Immutable and pure.** Really, we don't need mutability even in frontend. Especially in frontend. Most of modern JavaScript frameworks trying to be functional. And we are too.
+2. **Immutable and pure.** Really, we don't need mutability even on the frontend. Especially on the frontend. The majority of modern JavaScript frameworks are trying to be functional. And so are we.
 
-3. **Rapid development.** Everything for efficiency. We trying to make Korolev bullshit and boilerplate free. Hope our words are not bullshit.
+3. **Rapid development.** Efficiency is everything. We are trying to make Korolev bullshit- and boilerplate-free. Hope our words are no bullshit.
 
 ## Quick Start
 
@@ -30,27 +30,27 @@ Add `korolev-server` to your `build.sbt`
 libraryDependencies += "com.github.fomkin" %% "korolev-server" % "0.0.6"
 ```
 
-Look for [Example.scala](https://github.com/fomkin/korolev/blob/master/example/src/main/scala/Example.scala). It's updates very frequently, so we don't paste code here, sorry guys.
+Look at [Example.scala](https://github.com/fomkin/korolev/blob/master/example/src/main/scala/Example.scala). It updates very frequently, so we don't paste the code here, sorry guys.
 
 ## Architecture
 
 ### Summary
-Every *session* has the *State*. When *Event* happened you can modify *State* with *Transition*. Every state *renders* to pseudo-HTML. Browser receives only list of changes via WebSocket.
+Every *session* has a *State*. When an *Event* happens, you can modify the *State* with a *Transition*. Every state *renders* to pseudo-HTML. The browser receives only a list of changes via WebSocket.
 
 ![Principle Diagram](principle-diagram.png)
 
 ### State
 
-Single source of truth as [Redux guys say](http://redux.js.org/docs/introduction/ThreePrinciples.html#single-source-of-truth). The only one source of data to render a page. If you have something you want to display it should be stored in *State*. Usually it is a sealed trait with several case classes correspond to GUI screen. State should be immutable.
+Single source of truth as [Redux guys say](http://redux.js.org/docs/introduction/ThreePrinciples.html#single-source-of-truth). The only source of data to render a page. If you have something you want to display, it should be stored in *State*. Usually it is a sealed trait with several case classes corresponding to rendered screens. State should be immutable.
 
 ### Transition
 
-A function that takes current *State* and transform it to new *State*. This is a only one way to modify a *State*.
+A function that takes the current *State* and transforms it into a new *State*. This is the only way to modify a *State*.
 
-### Events
+### Event
 
-You can subscribe to client-side DOM events. Event flow is similar to [standard](http://www.w3.org/TR/uievents/#event-flow).   Event handlers produce *Transitions*.
+You can subscribe to client-side DOM events. Event flow is similar to the [W3 standard](http://www.w3.org/TR/uievents/#event-flow). Event handlers produce *Transitions*.
 
-## Plans
+## Future plans
 
-All features and changes are registered in [issues](https://github.com/fomkin/korolev/issues) of this repository. First goal is to ship a ready to use version with semi-stable API.
+All features and changes are registered in the [issues](https://github.com/fomkin/korolev/issues). Our first goal is to ship a ready-to-use version with a semi-stable API.
