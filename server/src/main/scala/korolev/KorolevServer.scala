@@ -104,22 +104,25 @@ class KorolevServer[State](
   private object matchStatic {
     def unapply(req: Request) = {
       val path = req.pathInfo
-      val stream = getClass.getResourceAsStream(s"/static$path")
-
-      Option(stream) map { stream =>
-        val contentType = {
-          val index = path.lastIndexOf('.')
-          val mediaType = if (index > -1) {
-            MediaType.forExtension(path.substring(index + 1)) match {
-              case Some(detectedMediaType) => detectedMediaType
-              case None => MediaType.`application/octet-stream`
+      if (path != "/") {
+        val stream = getClass.getResourceAsStream(s"/static$path")
+        Option(stream) map { stream =>
+          val contentType = {
+            val index = path.lastIndexOf('.')
+            val mediaType = if (index > -1) {
+              MediaType.forExtension(path.substring(index + 1)) match {
+                case Some(detectedMediaType) => detectedMediaType
+                case None => MediaType.`application/octet-stream`
+              }
+            } else {
+              MediaType.`application/octet-stream`
             }
-          } else {
-            MediaType.`application/octet-stream`
+            Some(`Content-Type`(mediaType))
           }
-          Some(`Content-Type`(mediaType))
+          (stream, contentType)
         }
-        (stream, contentType)
+      } else {
+        None
       }
     }
   }

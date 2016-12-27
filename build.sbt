@@ -51,6 +51,11 @@ val commonSettings = publishSettings ++ Seq(
   )
 )
 
+val exampleSettings = commonSettings ++ Seq(
+  libraryDependencies += "org.slf4j" % "slf4j-simple" % "1.7.21",
+  publish := {}
+)
+
 lazy val vdom = crossProject.crossType(CrossType.Pure).
   settings(commonSettings: _*).
   settings(normalizedName := "korolev-vdom")
@@ -69,18 +74,6 @@ lazy val server = project.
     )
   ).
   dependsOn(korolevJVM)
-
-lazy val example = project.
-  enablePlugins(JavaAppPackaging).
-  enablePlugins(UniversalPlugin).
-  settings(commonSettings: _*).
-  settings(
-    javaOptions in Universal ++= Seq("-J-Xmx512m"),
-    normalizedName := "korolev-example",
-    libraryDependencies += "org.slf4j" % "slf4j-simple" % "1.7.21",
-    publish := {}
-  ).
-  dependsOn(server)
 
 lazy val async = crossProject.crossType(CrossType.Pure).
   settings(commonSettings: _*).
@@ -115,6 +108,27 @@ lazy val korolev = crossProject.crossType(CrossType.Pure).
 lazy val korolevJS = korolev.js
 lazy val korolevJVM = korolev.jvm
 
+// Examples
+val examples = file("examples")
+
+lazy val simpleExample = (project in  examples / "simple").
+  enablePlugins(JavaAppPackaging).
+  enablePlugins(UniversalPlugin).
+  settings(exampleSettings: _*).
+  dependsOn(server)
+
+lazy val routingExample = (project in examples / "routing").
+  enablePlugins(JavaAppPackaging).
+  enablePlugins(UniversalPlugin).
+  settings(exampleSettings: _*).
+  dependsOn(server)
+
+lazy val gameOfLifeExample = (project in examples / "game-of-life").
+  enablePlugins(JavaAppPackaging).
+  enablePlugins(UniversalPlugin).
+  settings(exampleSettings: _*).
+  dependsOn(server)
+
 lazy val root = project.in(file(".")).
   settings(publish := {}).
   aggregate(
@@ -122,7 +136,8 @@ lazy val root = project.in(file(".")).
     bridgeJS, bridgeJVM,
     vdomJS, vdomJVM,
     asyncJS, asyncJVM,
-    server, example
+    server, simpleExample,
+    routingExample, gameOfLifeExample
   )
 
 publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
