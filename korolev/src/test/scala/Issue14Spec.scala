@@ -1,7 +1,7 @@
 import bridge.JSAccess
 import korolev.BrowserEffects.Event
 import korolev.EventResult._
-import korolev.{BrowserEffects, Korolev, Shtml}
+import korolev.{BrowserEffects, Korolev, Router, Shtml}
 import org.scalatest.{FlatSpec, Matchers}
 
 import scala.concurrent.Future
@@ -32,6 +32,7 @@ class Issue14Spec extends FlatSpec with Matchers {
       jsAccess = jSAccess,
       initialState = "firstState",
       fromScratch = true,
+      router = Router.empty[Future, String, String],
       render = Issue14Spec.render(
         firstEvent = event('mousedown) {
           immediateTransition[Future, String] { case _ =>
@@ -49,11 +50,12 @@ class Issue14Spec extends FlatSpec with Matchers {
     )
 
     jSAccess.resolvePromise(0, isSuccess = true, "@obj:@Korolev")
-    jSAccess.resolvePromise(1, isSuccess = true, "@obj:^cb0")
+    jSAccess.resolvePromise(1, isSuccess = true, "@obj:^cb0") // pop state handler
+    jSAccess.resolvePromise(2, isSuccess = true, "@obj:^cb1") // event handler
 
-    jSAccess.fireCallback("^cb0", "1:0_1_0:mousedown")
-    jSAccess.fireCallback("^cb0", "1:0_1_0:mouseup")
-    jSAccess.fireCallback("^cb0", "1:0_1_0:click")
+    jSAccess.fireCallback("^cb1", "1:0_1_0:mousedown")
+    jSAccess.fireCallback("^cb1", "1:0_1_0:mouseup")
+    jSAccess.fireCallback("^cb1", "1:0_1_0:click")
 
     counter should be (1)
   }

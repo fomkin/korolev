@@ -81,7 +81,8 @@ object Korolev extends EventPropagation {
       }
     }
 
-    val historyCallbackF = jsAccess.registerCallback[String] { path =>
+    val historyCallbackF = jsAccess.registerCallback[String] { pathString =>
+      val path = Router.Path.fromString(pathString)
       val maybeState = router.toState.lift(localDux.state, path)
       maybeState foreach { asyncState =>
         val unit = Async[F].flatMap(asyncState)(localDux.update)
@@ -124,7 +125,7 @@ object Korolev extends EventPropagation {
           // Set page url if router exists
           router.
             fromState.lift(state).
-            foreach(client.call("ChangePageUrl", _))
+            foreach(path => client.call("ChangePageUrl", path.toString))
 
           val startRenderTime = System.nanoTime()
           client.call("SetRenderNum", currentRenderNum.incrementAndGet())

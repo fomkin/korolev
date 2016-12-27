@@ -1,5 +1,6 @@
 package korolev
 
+import scala.annotation.tailrec
 import scala.language.higherKinds
 
 /**
@@ -28,7 +29,26 @@ case class Router[F[_]: Async, S, Ctx]
 
 object Router {
 
-  type Path = String
+  sealed trait Path {
+    override def toString: String = {
+      @tailrec def aux(acc: List[String], path: Path): List[String] = path match {
+        case Root => acc
+        case prev / s => aux(s :: acc, prev)
+      }
+      "/" + aux(Nil, this).mkString("/")
+    }
+  }
+  case class /(prev: Path, value: String) extends Path
+  case object Root extends Path {
+    def /(s: String): Path = Router./(this, s)
+  }
+
+  object Path {
+    val fromString: String => Path = _.split("/")
+      .toList
+      .filter(_.nonEmpty)
+      .foldLeft(Root: Path)((xs, x) => /(xs, x))
+  }
 
   def empty[F[_]: Async, S, Ctx]: Router[F, S, Ctx] = Router()
 }

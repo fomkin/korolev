@@ -142,6 +142,7 @@
         }
       },
       ChangePageUrl: function(path) {
+        console.log(path);
         if (path !== global.location.pathname)
           global.history.pushState(path, '', path);
       }

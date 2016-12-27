@@ -12,7 +12,7 @@ case class ServerRouter[F[_]: Async, S](
   dynamic: (DeviceId, SessionId) => Router[F, S, S],
   rootPath: String = "/") {
 
-  def withRootPath(value: Router.Path): ServerRouter[F, S] = {
+  def withRootPath(value: String): ServerRouter[F, S] = {
     copy(rootPath = value)
   }
 

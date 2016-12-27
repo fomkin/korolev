@@ -71,7 +71,7 @@ class KorolevServer[State](
     val (isNewDevice, deviceId) = deviceFromRequest(request)
     val stateTask = serverRouter.
       static(deviceId).
-      toState.lift(((), path)).
+      toState.lift(((), Router.Path.fromString(path))).
       getOrElse(stateStorage.initial(deviceId)).
       toTask
 
