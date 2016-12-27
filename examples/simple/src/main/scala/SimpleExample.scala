@@ -6,7 +6,7 @@ import scala.concurrent.Future
 /**
   * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
   */
-object Example extends App with Shtml {
+object SimpleExample extends App with Shtml {
 
   import State.effects._
   import korolev.EventResult._

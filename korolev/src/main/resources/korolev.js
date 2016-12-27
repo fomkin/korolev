@@ -8,7 +8,9 @@
       scheduledAddHandlerItems = [],
       renderNum = 0,
       rootListeners = [],
-      listenFun = null;
+      listenFun = null,
+      historyHandler = null,
+      initialPath = global.location.pathname;
 
     function scheduleAddHandler(element) {
       if (!addHandler)
@@ -126,6 +128,23 @@
         var element = els[id];
         if (isProperty) element[name] = undefined
         else element.removeAttribute(name);
+      },
+      RegisterHistoryHandler: function(handler) {
+        global.addEventListener('popstate', historyHandler = function(event) {
+          if (event.state === null) handler(initialPath);
+          else handler(event.state);
+        });
+      },
+      UnregisterHistoryHandler: function() {
+        if (historyHandler !== null) {
+          global.removeEventListener('popstate', historyHandler);
+          historyHandler = null;
+        }
+      },
+      ChangePageUrl: function(path) {
+        console.log(path);
+        if (path !== global.location.pathname)
+          global.history.pushState(path, '', path);
       }
     }
   })();
@@ -134,14 +153,13 @@
 
     var deviceId = getCookie('device');
     var sessionId = Math.random().toString(36);
-    console.log(deviceId);
     var root = document.body;
     var loc = window.location;
     var wsUri;
     if (loc.protocol === "https:") wsUri = "wss://";
     else wsUri = "ws://";
 
-    wsUri += loc.host + loc.pathname +
+    wsUri += loc.host + KorolevServerRootPath +
       '/bridge' +
       '/' + deviceId +
       '/' + sessionId;
@@ -163,6 +181,7 @@
 
     function onClose(event) {
       Korolev.UnregisterGlobalEventHandler();
+      Korolev.UnregisterHistoryHandler();
       console.log("Connection closed. Global event handler us unregistered. Try to reconnect.");
       initializeBridge();
     }

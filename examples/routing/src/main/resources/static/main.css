@@ -1,0 +1,17 @@
+.todos {
+  height: 250px;
+  overflow-y: scroll;
+}
+
+.checkbox {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border: 1px solid green;
+  border-radius: 10px;
+  margin-right: 5px;
+}
+
+.checkbox__checked {
+  background-color: green;
+}

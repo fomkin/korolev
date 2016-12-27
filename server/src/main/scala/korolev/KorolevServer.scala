@@ -18,6 +18,7 @@ import scalaz.concurrent.{Strategy, Task}
 import scalaz.stream.async.unboundedQueue
 import scalaz.stream.{DefaultScheduler, Exchange, Process, Sink, time}
 import delorean._
+import korolev.StateStorage.{DeviceId, SessionId}
 import org.slf4j.LoggerFactory
 
 object KorolevServer {
@@ -31,9 +32,11 @@ object KorolevServer {
       port: Int = 7181,
       render: Korolev.Render[State],
       stateStorage: StateStorage[State],
+      router: ServerRouter[Future, State] =
+        ServerRouter.empty[Future, State](Async.futureAsync(defaultEc)),
       head: VDom.Node = VDom.Node("head", Nil, Nil, Nil)
   )(implicit executor: ExecutionContextExecutorService = defaultEc): KorolevServer[State] = {
-    new KorolevServer(host, port, render, head, stateStorage)
+    new KorolevServer(host, port, render, head, router, stateStorage)
   }
 }
 
@@ -42,6 +45,7 @@ class KorolevServer[State](
     port: Int,
     render: Korolev.Render[State],
     head: VDom.Node,
+    serverRouter: ServerRouter[Future, State],
     stateStorage: StateStorage[State]
 )(implicit executor: ExecutionContextExecutorService) extends Shtml { self =>
 
@@ -63,15 +67,23 @@ class KorolevServer[State](
     Source.fromInputStream(stream).mkString
   }
 
-  private def indexHtml(request: Request) = {
+  private def indexHtml(request: Request, path: String) = {
     val (isNewDevice, deviceId) = deviceFromRequest(request)
-    val stateTask = stateStorage.initial(deviceId).toTask
+    val stateTask = serverRouter.
+      static(deviceId).
+      toState.lift(((), Router.Path.fromString(path))).
+      getOrElse(stateStorage.initial(deviceId)).
+      toTask
+
     val htmlTask = stateTask map { state =>
       val body = render(state)
       val dom = 'html(
         head.copy(children =
           'script(bridgeJs) ::
-          'script(korolevJs) ::
+          'script(
+            s"var KorolevServerRootPath = '${serverRouter.rootPath}';\n" +
+            korolevJs
+          ) ::
           head.children
         ),
         body
@@ -92,22 +104,25 @@ class KorolevServer[State](
   private object matchStatic {
     def unapply(req: Request) = {
       val path = req.pathInfo
-      val stream = getClass.getResourceAsStream(s"/static$path")
-
-      Option(stream) map { stream =>
-        val contentType = {
-          val index = path.lastIndexOf('.')
-          val mediaType = if (index > -1) {
-            MediaType.forExtension(path.substring(index + 1)) match {
-              case Some(detectedMediaType) => detectedMediaType
-              case None => MediaType.`application/octet-stream`
+      if (path != "/") {
+        val stream = getClass.getResourceAsStream(s"/static$path")
+        Option(stream) map { stream =>
+          val contentType = {
+            val index = path.lastIndexOf('.')
+            val mediaType = if (index > -1) {
+              MediaType.forExtension(path.substring(index + 1)) match {
+                case Some(detectedMediaType) => detectedMediaType
+                case None => MediaType.`application/octet-stream`
+              }
+            } else {
+              MediaType.`application/octet-stream`
             }
-          } else {
-            MediaType.`application/octet-stream`
+            Some(`Content-Type`(mediaType))
           }
-          Some(`Content-Type`(mediaType))
+          (stream, contentType)
         }
-        (stream, contentType)
+      } else {
+        None
       }
     }
   }
@@ -133,43 +148,38 @@ class KorolevServer[State](
 
   private val route = HttpService {
 
-    case request @ _ -> Root => indexHtml(request)
     case request @ _ -> Root / "bridge" / deviceId / sessionId =>
-
       val outgoingQueue = unboundedQueue[WebSocketFrame]
-
       time.awakeEvery(5.seconds)(strategy, DefaultScheduler)
         .map(_ => Ping())
         .to(outgoingQueue.enqueue)
         .run.runAsync(_ => ())
-
-      val jSAccess =
-        new JsonQueuedJsAccess(s => outgoingQueue.enqueueOne(Text(s)).run)
-
+      val jSAccess = new JsonQueuedJsAccess(s => outgoingQueue.enqueueOne(Text(s)).run)
       val sink: Sink[Task, WebSocketFrame] = Process.constant {
         case Text(t, _) => Task.fork(Task.now(jSAccess.receive(t)))
         case _ => Task.now(())
       }
-
       val korolev =  {
         stateStorage.read(deviceId, sessionId).toTask map { state =>
-          val korolev = Korolev(jSAccess, state, render, false)
+          val router = serverRouter.dynamic(deviceId, sessionId)
+          val korolev = Korolev(jSAccess, state, render, router, false)
           korolev.subscribe(state => stateStorage.write(deviceId, sessionId, state))
           korolev
         }
       }
-
       val outgoingProcess = Process.eval(korolev) flatMap { korolev =>
         outgoingQueue.dequeue onComplete {
           val task = Task.delay(korolev.destroy())
           Process.eval_(task)
         }
       }
-
       WS(Exchange(outgoingProcess, sink))
 
     case matchStatic(stream, contentType) =>
       Ok(stream).withContentType(contentType)
+
+    case request =>
+      indexHtml(request, request.pathInfo)
   }
 
   BlazeBuilder

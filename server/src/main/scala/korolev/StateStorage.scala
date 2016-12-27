@@ -8,12 +8,15 @@ import scala.concurrent.Future
   */
 trait StateStorage[T] {
 
+  import StateStorage.DeviceId
+  import StateStorage.SessionId
+
   /**
     * Initialize a new state for a new session under the device
     * @param deviceId Identifier of device
     * @return Future with new state
     */
-  def initial(deviceId: String): Future[T]
+  def initial(deviceId: DeviceId): Future[T]
 
   /**
     * Restore session from storage
@@ -21,16 +24,19 @@ trait StateStorage[T] {
     *         already exists or future
     *         with None with if doesn't
     */
-  def read(deviceId: String, sessionId: String): Future[T]
+  def read(deviceId: DeviceId, sessionId: SessionId): Future[T]
 
   /**
     * Save session to storage
     * @return Future of successful saving
     */
-  def write(deviceId: String, sessionId: String, value: T): Future[Unit]
+  def write(deviceId: DeviceId, sessionId: SessionId, value: T): Future[Unit]
 }
 
 object StateStorage {
+
+  type DeviceId = String
+  type SessionId = String
 
   /**
     * Initialize simple in-memory storage (based on TrieMap).
@@ -42,7 +48,7 @@ object StateStorage {
 
     val storage = TrieMap.empty[String, T]
 
-    def read(deviceId: String, sessionId: String): Future[T] = {
+    def read(deviceId: DeviceId, sessionId: SessionId): Future[T] = {
       val state = storage.getOrElseUpdate(deviceId + sessionId, initialState)
       Future.successful(state)
     }

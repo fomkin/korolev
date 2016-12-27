@@ -10,7 +10,8 @@ abstract class Dux[F[_]: Async, State] {
   def subscribe[U](f: State => U): Dux.Unsubscribe
   def onDestroy[U](f: () => U): Dux.Unsubscribe
   def destroy(): Unit
-  def apply(action: Dux.Transition[State]): F[Unit]
+  def apply(transition: Dux.Transition[State]): F[Unit]
+  def update(state: State): F[Unit]
 }
 
 object Dux {
@@ -27,6 +28,8 @@ object Dux {
       @volatile var subscribers = List.empty[S => _]
       @volatile var onDestroyListeners = List.empty[() => _]
       @volatile var inProgress = false
+
+      def update(state: S): F[Unit] = apply { case _ => state }
 
       def apply(transition: Transition[S]): F[Unit] = {
         def executeNext(): Unit = {

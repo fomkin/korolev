@@ -23,6 +23,7 @@ object Korolev extends EventPropagation {
   def apply[F[_]: Async, S](jsAccess: JSAccess[F],
                            initialState: S,
                            render: Render[S],
+                           router: Router[F, S, S],
                            fromScratch: Boolean): Dux[F, S] = {
 
     // This event type should be listen on client side
@@ -34,7 +35,7 @@ object Korolev extends EventPropagation {
 
     // Prepare frontend
     jsAccess.global.getAndSaveAs("Korolev", "@Korolev")
-    val korolevJS = jsAccess.obj("@Korolev")
+    val client = jsAccess.obj("@Korolev")
     val localDux = Dux[F, S](initialState)
 
     def updateMisc(renderResult: VDom.Node) = {
@@ -54,7 +55,7 @@ object Korolev extends EventPropagation {
         val `type` = event.`type`
         if (!enabledEvents.contains(`type`)) {
           enabledEvents = enabledEvents + `type`
-          Async[F].run(korolevJS.call("ListenEvent", `type`.name, false)) {
+          Async[F].run(client.call("ListenEvent", `type`.name, false)) {
             case Success(_) => // do nothing
             case Failure(e) => e.printStackTrace()
           }
@@ -72,12 +73,32 @@ object Korolev extends EventPropagation {
     val browserAccess = new BrowserAccess {
       def property[T](eId: ElementId, propName: Symbol): F[T] = elementIds.get(eId) match {
         case Some(id) =>
-          val future = korolevJS.call[T]("ExtractProperty", id, propName.name)
+          val future = client.call[T]("ExtractProperty", id, propName.name)
           jsAccess.flush()
           future
         case None =>
           Async[F].fromTry(Failure(new Exception("No element matched for accessor")))
       }
+    }
+
+    val historyCallbackF = jsAccess.registerCallback[String] { pathString =>
+      val path = Router.Path.fromString(pathString)
+      val maybeState = router.toState.lift(localDux.state, path)
+      maybeState foreach { asyncState =>
+        val unit = Async[F].flatMap(asyncState)(localDux.update)
+        Async[F].run(unit) {
+          case Success(_) => // do nothing
+          case Failure(e) => e.printStackTrace()
+        }
+      }
+    }
+
+    Async[F].run(historyCallbackF) {
+      case Success(callback) =>
+        client.call("RegisterHistoryHandler", callback)
+        jsAccess.flush()
+      case Failure(e) =>
+        e.printStackTrace()
     }
 
     val eventCallbackF = jsAccess.registerCallback[String] { targetAndType =>
@@ -88,8 +109,8 @@ object Korolev extends EventPropagation {
 
     Async[F].run(eventCallbackF) {
       case Success(eventCallback) =>
-        korolevJS.call("RegisterGlobalEventHandler", eventCallback)
-        korolevJS.call("SetRenderNum", 0)
+        client.call("RegisterGlobalEventHandler", eventCallback)
+        client.call("SetRenderNum", 0)
 
         val renderOpt = render.lift
 
@@ -100,8 +121,15 @@ object Korolev extends EventPropagation {
         updateMisc(lastRender)
 
         val onState: S => Unit = { state =>
+
+          // Set page url if router exists
+          router.
+            fromState.lift(state).
+            foreach(path => client.call("ChangePageUrl", path.toString))
+
           val startRenderTime = System.nanoTime()
-          korolevJS.call("SetRenderNum", currentRenderNum.incrementAndGet())
+          client.call("SetRenderNum", currentRenderNum.incrementAndGet())
+
           renderOpt(state) match {
             case Some(newRender) =>
               val changes = VDom.changes(lastRender, newRender)
@@ -110,15 +138,15 @@ object Korolev extends EventPropagation {
 
               changes foreach {
                 case Create(id, childId, tag) =>
-                  korolevJS.call("Create", id.toString, childId.toString, tag)
+                  client.call("Create", id.toString, childId.toString, tag)
                 case CreateText(id, childId, text) =>
-                  korolevJS.call("CreateText", id.toString, childId.toString, text)
+                  client.call("CreateText", id.toString, childId.toString, text)
                 case Remove(id, childId) =>
-                  korolevJS.call("Remove", id.toString, childId.toString)
+                  client.call("Remove", id.toString, childId.toString)
                 case SetAttr(id, name, value, isProperty) =>
-                  korolevJS.call("SetAttr", id.toString, name, value, isProperty)
+                  client.call("SetAttr", id.toString, name, value, isProperty)
                 case RemoveAttr(id, name, isProperty) =>
-                  korolevJS.call("RemoveAttr", id.toString, name, isProperty)
+                  client.call("RemoveAttr", id.toString, name, isProperty)
                 case _ =>
               }
               jsAccess.flush()
@@ -137,7 +165,7 @@ object Korolev extends EventPropagation {
     }
 
     if (fromScratch)
-      korolevJS.call("CleanRoot")
+      client.call("CleanRoot")
 
     jsAccess.flush()
     localDux
