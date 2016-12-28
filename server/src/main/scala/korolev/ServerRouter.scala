@@ -7,7 +7,7 @@ import scala.language.higherKinds
 /**
   * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
   */
-case class ServerRouter[F[_]: Async, S](
+case class ServerRouter[F[+_]: Async, S](
   static: DeviceId => Router[F, S, Unit],
   dynamic: (DeviceId, SessionId) => Router[F, S, S],
   rootPath: String = "/") {
@@ -25,16 +25,16 @@ case class ServerRouter[F[_]: Async, S](
 
 object ServerRouter {
 
-  def empty[F[_]: Async, S]: ServerRouter[F, S] =
+  def empty[F[+_]: Async, S]: ServerRouter[F, S] =
     ServerRouter(emptyStatic[F, S], emptyDynamic[F, S])
 
-  def apply[F[_]: Async, S]: ServerRouter[F, S] =
+  def apply[F[+_]: Async, S]: ServerRouter[F, S] =
     ServerRouter(emptyStatic[F, S], emptyDynamic[F, S])
 
-  def emptyStatic[F[_]: Async, S]: (DeviceId) => Router[F, S, Unit] =
+  def emptyStatic[F[+_]: Async, S]: (DeviceId) => Router[F, S, Unit] =
     _ => Router.empty[F, S, Unit]
 
-  def emptyDynamic[F[_]: Async, S]: (DeviceId, SessionId) => Router[F, S, S] =
+  def emptyDynamic[F[+_]: Async, S]: (DeviceId, SessionId) => Router[F, S, S] =
     (_, _) => Router.empty[F, S, S]
 }
 

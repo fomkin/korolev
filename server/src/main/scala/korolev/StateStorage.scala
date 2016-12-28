@@ -1,12 +1,12 @@
 package korolev
 
 import scala.collection.concurrent.TrieMap
-import scala.concurrent.Future
+import scala.language.higherKinds
 
 /**
   * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
   */
-trait StateStorage[T] {
+abstract class StateStorage[F[+_]: Async, T] {
 
   import StateStorage.DeviceId
   import StateStorage.SessionId
@@ -16,7 +16,7 @@ trait StateStorage[T] {
     * @param deviceId Identifier of device
     * @return Future with new state
     */
-  def initial(deviceId: DeviceId): Future[T]
+  def initial(deviceId: DeviceId): F[T]
 
   /**
     * Restore session from storage
@@ -24,13 +24,13 @@ trait StateStorage[T] {
     *         already exists or future
     *         with None with if doesn't
     */
-  def read(deviceId: DeviceId, sessionId: SessionId): Future[T]
+  def read(deviceId: DeviceId, sessionId: SessionId): F[T]
 
   /**
     * Save session to storage
     * @return Future of successful saving
     */
-  def write(deviceId: DeviceId, sessionId: SessionId, value: T): Future[Unit]
+  def write(deviceId: DeviceId, sessionId: SessionId, value: T): F[Unit]
 }
 
 object StateStorage {
@@ -44,20 +44,20 @@ object StateStorage {
     * @tparam T Type of state
     * @return The state storage
     */
-  def default[T](initialState: => T): StateStorage[T] = new StateStorage[T] {
+  def default[F[+_]: Async, T](initialState: => T): StateStorage[F, T] = new StateStorage[F, T] {
 
     val storage = TrieMap.empty[String, T]
 
-    def read(deviceId: DeviceId, sessionId: SessionId): Future[T] = {
+    def read(deviceId: DeviceId, sessionId: SessionId): F[T] = {
       val state = storage.getOrElseUpdate(deviceId + sessionId, initialState)
-      Future.successful(state)
+      Async[F].pure(state)
     }
 
-    def write(deviceId: String, sessionId: String, value: T): Future[Unit] = {
+    def write(deviceId: String, sessionId: String, value: T): F[Unit] = {
       storage.put(deviceId + sessionId, value)
-      Future.successful(())
+      Async[F].unit
     }
 
-    def initial(deviceId: String): Future[T] = Future.successful(initialState)
+    def initial(deviceId: String): F[T] = Async[F].pure(initialState)
   }
 }

@@ -5,7 +5,7 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import scala.language.higherKinds
 import scala.util.{Failure, Success}
 
-abstract class Dux[F[_]: Async, State] {
+abstract class Dux[F[+_]: Async, State] {
   def state: State
   def subscribe[U](f: State => U): Dux.Unsubscribe
   def onDestroy[U](f: () => U): Dux.Unsubscribe
@@ -19,7 +19,7 @@ object Dux {
   type Unsubscribe = () => Unit
   type Transition[State] = PartialFunction[State, State]
 
-  def apply[F[_]: Async, S](initialState: S): Dux[F, S] = {
+  def apply[F[+_]: Async, S](initialState: S): Dux[F, S] = {
     new Dux[F, S] {
 
       val queue = new ConcurrentLinkedQueue[(Async.Promise[F, Unit], Transition[S])]

@@ -56,7 +56,7 @@ object Shtml {
     }
 
     def :=(value: Any): Attr =
-      Attr(self.name, value, isProperty = true)
+      Attr(self.name, value)
 
     def when(value: Boolean): VDom =
       if (value) Attr(htmlName(self), "true", isProperty = false)

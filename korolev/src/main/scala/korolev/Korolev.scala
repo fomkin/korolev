@@ -20,7 +20,7 @@ object Korolev extends EventPropagation {
 
   type Render[S] = PartialFunction[S, VDom.Node]
 
-  def apply[F[_]: Async, S](jsAccess: JSAccess[F],
+  def apply[F[+_]: Async, S](jsAccess: JSAccess[F],
                            initialState: S,
                            render: Render[S],
                            router: Router[F, S, S],

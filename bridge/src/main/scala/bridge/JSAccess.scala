@@ -26,7 +26,7 @@ object JSAccess {
  * Provide access to remote page with JavaScript engine
  * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
  */
-abstract class JSAccess[F[_]: Async] { self ⇒
+abstract class JSAccess[F[+_]: Async] { self ⇒
 
   import JSAccess._
 
