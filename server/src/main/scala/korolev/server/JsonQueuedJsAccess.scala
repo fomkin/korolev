@@ -1,6 +1,7 @@
-package korolev
+package korolev.server
 
 import bridge.JSAccess
+import korolev.Async
 
 import scala.annotation.switch
 import scala.collection.immutable.Queue

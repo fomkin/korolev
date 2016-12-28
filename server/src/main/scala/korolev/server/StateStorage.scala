@@ -1,4 +1,6 @@
-package korolev
+package korolev.server
+
+import korolev.Async
 
 import scala.collection.concurrent.TrieMap
 import scala.language.higherKinds
@@ -8,8 +10,7 @@ import scala.language.higherKinds
   */
 abstract class StateStorage[F[+_]: Async, T] {
 
-  import StateStorage.DeviceId
-  import StateStorage.SessionId
+  import StateStorage.{DeviceId, SessionId}
 
   /**
     * Initialize a new state for a new session under the device

@@ -1,4 +1,5 @@
 import korolev._
+import korolev.server.StateStorage
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future

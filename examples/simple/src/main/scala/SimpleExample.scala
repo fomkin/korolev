@@ -1,4 +1,5 @@
-import korolev.{BrowserEffects, KorolevServer, Shtml, StateStorage}
+import korolev.server.StateStorage
+import korolev.{BrowserEffects, Shtml}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
