@@ -1,13 +1,16 @@
 import korolev._
+import korolev.Shtml._
 import korolev.server.{ServerRouter, StateStorage}
+import korolev.http4sServer.KorolevHttp4sServerApp
+import korolev.http4sServer.configureHttpService
+import korolev.scalazSupport._
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
+import scalaz.concurrent.Task
 
 /**
   * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
   */
-object RoutingExample extends App with Shtml {
+object RoutingExample extends KorolevHttp4sServerApp {
 
   import State.effects._
   import korolev.EventResult._
@@ -15,8 +18,7 @@ object RoutingExample extends App with Shtml {
   val storage = StateStorage.default(State())
   val inputId = elementId
 
-  KorolevServer[State](
-    port = 8181,
+  val service = configureHttpService[State](
     stateStorage = storage,
     head = 'head(
       'link(
@@ -87,7 +89,7 @@ object RoutingExample extends App with Shtml {
           )
         )
     },
-    router = {
+    serverRouter = {
       import korolev.Router._
       ServerRouter(
         dynamic = (_, _) => Router(
@@ -98,10 +100,10 @@ object RoutingExample extends App with Shtml {
           toState = {
             case (s, Root) =>
               val u = s.copy(selectedTab = s.todos.keys.head)
-              Future.successful(u)
+              Task.now(u)
             case (s, Root / name) =>
               val key = s.todos.keys.find(_.toLowerCase == name)
-              Future.successful(key.fold(s)(k => s.copy(selectedTab = k)))
+              Task.now(key.fold(s)(k => s.copy(selectedTab = k)))
           }
         ),
         static = (deviceId) => Router(
@@ -121,7 +123,7 @@ object RoutingExample extends App with Shtml {
 }
 
 case class State(
-  selectedTab: String = "Fomkin",
+  selectedTab: String = "Tab1",
   todos: Map[String, Vector[State.Todo]] = Map(
     "Tab1" -> State.Todo(5),
     "Tab2" -> State.Todo(7),
@@ -130,7 +132,7 @@ case class State(
 )
 
 object State {
-  val effects = BrowserEffects[Future, State]
+  val effects = BrowserEffects[Task, State]
   case class Todo(text: String, done: Boolean)
   object Todo {
     def apply(n: Int): Vector[Todo] = (0 to n).toVector map {
