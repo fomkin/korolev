@@ -8,7 +8,7 @@ import scala.language.implicitConversions
 
 trait Shtml {
 
-  import Shtml._
+  import ShtmlMisc._
 
   implicit def toTextNode(text: String): Text = Text(text)
 
@@ -25,8 +25,11 @@ trait Shtml {
   val <> = VDom.Empty
 }
 
-object Shtml {
+object Shtml extends Shtml
 
+private[korolev] object ShtmlMisc {
+
+  // Should be concurrent
   val nameCache = mutable.Map.empty[Symbol, String]
 
   val twoWayBindingDefaultEvents = Seq("input", "change")
@@ -56,7 +59,7 @@ object Shtml {
     }
 
     def :=(value: Any): Attr =
-      Attr(self.name, value, isProperty = true)
+      Attr(self.name, value)
 
     def when(value: Boolean): VDom =
       if (value) Attr(htmlName(self), "true", isProperty = false)

@@ -14,7 +14,7 @@ trait EventPropagation {
   import BrowserEffects._
   import EventPhase._
 
-  def propagateEvent[F[_]: Async, S](events: collection.Map[String, Event[F, S]],
+  def propagateEvent[F[+_]: Async, S](events: collection.Map[String, Event[F, S]],
                                      dux: Dux.Transition[S] => F[Unit],
                                      browserAccess: BrowserAccess[F],
                                      target: Id,

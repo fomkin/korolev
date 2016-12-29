@@ -1,18 +1,22 @@
-import korolev.{BrowserEffects, KorolevServer, Shtml, StateStorage}
+import korolev.server.StateStorage
+import korolev.BrowserEffects
+import korolev.Shtml._
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
+import korolev.http4sServer.KorolevHttp4sServerApp
+import korolev.http4sServer.configureHttpService
+import korolev.scalazSupport._
+
+import scalaz.concurrent.Task
 
 /**
   * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
   */
-object SimpleExample extends App with Shtml {
+object SimpleExample extends KorolevHttp4sServerApp {
 
   import State.effects._
   import korolev.EventResult._
 
-  KorolevServer[State](
-    port = 8181,
+  val service = configureHttpService[State](
     stateStorage = StateStorage.default(State()),
     render = {
 
@@ -73,7 +77,7 @@ case class State(todos: Vector[State.Todo] = (0 to 2).toVector map {
 })
 
 object State {
-  val effects = BrowserEffects[Future, State]
+  val effects = BrowserEffects[Task, State]
   case class Todo(text: String, done: Boolean)
 }
 

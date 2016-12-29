@@ -1,14 +1,19 @@
 import korolev._
+import korolev.Shtml._
+import korolev.http4sServer.configureHttpService
+import korolev.http4sServer.KorolevHttp4sServerApp
+import korolev.scalazSupport._
+import korolev.server.StateStorage
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
+import scalaz.concurrent.Task
 
 /**
   * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
   */
-object GameOfLife extends App with Shtml {
+object GameOfLife extends KorolevHttp4sServerApp {
 
   import korolev.EventResult._
+  import Universe.effects._
 
   val universeSize = 20
   val cellRadius = 10
@@ -19,14 +24,9 @@ object GameOfLife extends App with Shtml {
   val viewSideS = viewSide.toString
   val cellRadiusS = cellRadius.toString
 
-  val effects = BrowserEffects[Future, Universe]
-
-  KorolevServer[Universe](
-    port = 8181,
+  val service = configureHttpService[Universe](
     stateStorage = StateStorage.default(Universe(universeSize)),
     render = {
-      import effects._
-
       // Create a DOM using state
       { case universe =>
         'body(
@@ -89,13 +89,13 @@ case class Universe(cells: Vector[Universe.Cell], size: Int) {
     * Get a cell in (x, y)
     * @return the cell
     */
-  def apply(x: Int, y: Int) = cells(index(x, y))
+  def apply(x: Int, y: Int): Cell = cells(index(x, y))
 
   /**
     * Kill or resurrect a cell in (x, y)
     * @return Modified universe
     */
-  def check(x: Int, y: Int) = {
+  def check(x: Int, y: Int): Universe = {
     val i = index(x, y)
     val cell = cells(i)
     copy(cells = cells.updated(i, cell.copy(alive = !cell.alive)))
@@ -134,6 +134,8 @@ case class Universe(cells: Vector[Universe.Cell], size: Int) {
 }
 
 object Universe {
+
+  val effects = BrowserEffects[Task, Universe]
 
   case class Cell(x: Int, y: Int, alive: Boolean)
 

@@ -7,7 +7,7 @@ import korolev.Async
  * JavaScript Object presentation. 
  * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
  */
-abstract class JSObj[F[_]: Async] extends JSLink {
+abstract class JSObj[F[+_]: Async] extends JSLink {
 
   def get[A](name: String): F[A] = {
     jsAccess.request("get", this, name)

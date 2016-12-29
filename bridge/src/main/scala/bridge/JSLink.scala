@@ -10,7 +10,7 @@ import korolev.Async
  * the link no more you can `free()` it.
  * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
  */
-abstract class JSLink[F[_]: Async] {
+abstract class JSLink[F[+_]: Async] {
 
   val jsAccess: JSAccess[F]
 

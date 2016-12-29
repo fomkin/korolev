@@ -13,7 +13,7 @@ import scala.language.higherKinds
   *
   * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
   */
-case class Router[F[_]: Async, S, Ctx]
+case class Router[F[+_]: Async, S, Ctx]
 (
     /**
       * From current state to path
@@ -50,5 +50,5 @@ object Router {
       .foldLeft(Root: Path)((xs, x) => /(xs, x))
   }
 
-  def empty[F[_]: Async, S, Ctx]: Router[F, S, Ctx] = Router()
+  def empty[F[+_]: Async, S, Ctx]: Router[F, S, Ctx] = Router()
 }

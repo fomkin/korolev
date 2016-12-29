@@ -65,15 +65,19 @@ lazy val vdomJVM = vdom.jvm
 
 lazy val server = project.
   settings(commonSettings: _*).
+  settings(normalizedName := "korolev-server").
+  dependsOn(korolevJVM)
+
+lazy val `server-http4s` = project.
+  settings(commonSettings: _*).
   settings(
-    normalizedName := "korolev-server",
+    normalizedName := "korolev-server-http4s",
     libraryDependencies ++= Seq(
       "org.http4s" %% "http4s-dsl" % http4sVersion,
-      "org.http4s" %% "http4s-blaze-server" % http4sVersion,
-      "io.verizon.delorean" %% "core" % "1.1.37"
+      "org.http4s" %% "http4s-blaze-server" % http4sVersion
     )
   ).
-  dependsOn(korolevJVM)
+  dependsOn(server)
 
 lazy val async = crossProject.crossType(CrossType.Pure).
   settings(commonSettings: _*).
@@ -115,19 +119,19 @@ lazy val simpleExample = (project in  examples / "simple").
   enablePlugins(JavaAppPackaging).
   enablePlugins(UniversalPlugin).
   settings(exampleSettings: _*).
-  dependsOn(server)
+  dependsOn(`server-http4s`)
 
 lazy val routingExample = (project in examples / "routing").
   enablePlugins(JavaAppPackaging).
   enablePlugins(UniversalPlugin).
   settings(exampleSettings: _*).
-  dependsOn(server)
+  dependsOn(`server-http4s`)
 
 lazy val gameOfLifeExample = (project in examples / "game-of-life").
   enablePlugins(JavaAppPackaging).
   enablePlugins(UniversalPlugin).
   settings(exampleSettings: _*).
-  dependsOn(server)
+  dependsOn(`server-http4s`)
 
 lazy val root = project.in(file(".")).
   settings(publish := {}).
