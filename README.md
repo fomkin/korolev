@@ -27,7 +27,7 @@ Our project supports static page rendering, so that search engines can index pag
 Add `korolev-server` to your `build.sbt`
 
 ```scala
-libraryDependencies += "com.github.fomkin" %% "korolev-server" % "0.0.6"
+libraryDependencies += "com.github.fomkin" %% "korolev-server" % "0.0.7"
 ```
 
 Look at [examples](https://github.com/fomkin/korolev/tree/master/examples). It updates very frequently, so we don't paste the code here, sorry guys.
