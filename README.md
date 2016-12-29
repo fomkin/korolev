@@ -30,7 +30,7 @@ Add `korolev-server` to your `build.sbt`
 libraryDependencies += "com.github.fomkin" %% "korolev-server" % "0.0.7"
 ```
 
-Look at [examples](https://github.com/fomkin/korolev/tree/master/examples). It updates very frequently, so we don't paste the code here, sorry guys.
+Look at [examples](https://github.com/fomkin/korolev/tree/v0.0.7/examples). It updates very frequently, so we don't paste the code here, sorry guys.
 
 ## Architecture
 
