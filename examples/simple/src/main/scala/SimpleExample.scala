@@ -1,22 +1,23 @@
-import korolev.server.StateStorage
+import korolev.server.{ServerRouter, StateStorage}
 import korolev.BrowserEffects
 import korolev.Shtml._
 
-import korolev.http4sServer.KorolevHttp4sServerApp
-import korolev.http4sServer.configureHttpService
-import korolev.scalazSupport._
+import korolev.blazeServer.defaultExecutor
+import korolev.blazeServer.configureHttpService
+import korolev.blazeServer.runServer
 
-import scalaz.concurrent.Task
+import scala.concurrent.Future
 
 /**
   * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
   */
-object SimpleExample extends KorolevHttp4sServerApp {
+object SimpleExample extends App {
 
   import State.effects._
   import korolev.EventResult._
 
-  val service = configureHttpService[State](
+  val service = configureHttpService[Future, State](
+    serverRouter = ServerRouter.empty[Future, State],
     stateStorage = StateStorage.default(State()),
     render = {
 
@@ -70,6 +71,8 @@ object SimpleExample extends KorolevHttp4sServerApp {
       }
     }
   )
+
+  runServer(service)
 }
 
 case class State(todos: Vector[State.Todo] = (0 to 2).toVector map {
@@ -77,7 +80,7 @@ case class State(todos: Vector[State.Todo] = (0 to 2).toVector map {
 })
 
 object State {
-  val effects = BrowserEffects[Task, State]
+  val effects = BrowserEffects[Future, State]
   case class Todo(text: String, done: Boolean)
 }
 

@@ -4,4 +4,5 @@ jdk:
   - oraclejdk8
 scala:
    - 2.11.8
+   - 2.12.1
 script: sbt ++$TRAVIS_SCALA_VERSION -Dfile.encoding=UTF8 -J-XX:MaxPermSize=1024M test
