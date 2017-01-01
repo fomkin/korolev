@@ -9,6 +9,7 @@ import bridge.JSAccess
 import scala.collection.mutable
 import scala.io.Source
 import scala.language.higherKinds
+import scala.util.Random
 
 /**
   * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
@@ -28,18 +29,22 @@ package object server {
 
     def renderStatic(request: Request): F[Response] = {
       val (isNewDevice, deviceId) = deviceFromRequest(request)
+      val sessionId = Random.alphanumeric.take(16).mkString
       val stateF = serverRouter
         .static(deviceId)
         .toState
         .lift(((), request.path))
         .getOrElse(stateStorage.initial(deviceId))
 
-      Async[F].map(stateF) { state =>
+      val writeResultF = Async[F].flatMap(stateF)(stateStorage.write(deviceId, sessionId, _))
+
+      Async[F].map(writeResultF) { state =>
         val body = render(state)
-        val dom = 'html (
+        val dom = 'html(
           head.copy(children =
             'script(bridgeJs) ::
               'script(
+                s"var KorolevSessionId = '$sessionId';\n" +
                 s"var KorolevServerRootPath = '${serverRouter.rootPath}';\n" +
                   korolevJs
               ) ::
@@ -90,7 +95,7 @@ package object server {
       case matchStatic(stream, contentType) =>
         val response = Response.HttpResponse(stream, contentType, None)
         Async[F].pure(response)
-      case request @ Request(Root / "bridge" / deviceId / sessionId, params, cookie) =>
+      case Request(Root / "bridge" / deviceId / sessionId, _, _) =>
         // Queue
         val sendingQueue = mutable.Buffer.empty[String]
         var subscriber = Option.empty[String => Unit]
