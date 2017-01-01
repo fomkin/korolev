@@ -1,12 +1,7 @@
 package korolev
 
 import korolev.scalazSupport._
-import korolev.server.{
-  ServerRouter,
-  StateStorage,
-  Request => KorolevRequest,
-  Response => KorolevResponse
-}
+import korolev.server.{ServerRouter, StateStorage, Request => KorolevRequest, Response => KorolevResponse}
 import org.http4s.dsl._
 import org.http4s.headers.{`Content-Type`, Cookie => CookerHeader}
 import org.http4s.server.blaze.BlazeBuilder

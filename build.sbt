@@ -79,6 +79,14 @@ lazy val `server-http4s` = project.
   ).
   dependsOn(server)
 
+lazy val `server-blaze` = project.
+  settings(commonSettings: _*).
+  settings(
+    normalizedName := "korolev-server-blaze",
+    libraryDependencies ++= Seq("org.http4s" %% "blaze-http" % "0.12.4")
+  ).
+  dependsOn(server)
+
 lazy val async = crossProject.crossType(CrossType.Pure).
   settings(commonSettings: _*).
   settings(normalizedName := "korolev-async")
@@ -119,7 +127,7 @@ lazy val simpleExample = (project in  examples / "simple").
   enablePlugins(JavaAppPackaging).
   enablePlugins(UniversalPlugin).
   settings(exampleSettings: _*).
-  dependsOn(`server-http4s`)
+  dependsOn(`server-blaze`)
 
 lazy val routingExample = (project in examples / "routing").
   enablePlugins(JavaAppPackaging).
