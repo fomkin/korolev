@@ -123,7 +123,7 @@ object JSAccessSuite extends TestSuite {
         val acc = new TestJSAccess()
         val req = acc.request[Float]("get", acc.obj("myObj"), "width")
         var calls = 0
-        req.onFailure {
+        req.failed.foreach {
           case err ⇒
             assert(err.getMessage == "error")
             calls += 1

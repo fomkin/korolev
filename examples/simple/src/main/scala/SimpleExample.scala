@@ -1,6 +1,7 @@
 import korolev.server.{ServerRouter, StateStorage}
 import korolev.BrowserEffects
 import korolev.Shtml._
+
 import korolev.blazeServer.defaultExecutor
 import korolev.blazeServer.configureHttpService
 import korolev.blazeServer.runServer

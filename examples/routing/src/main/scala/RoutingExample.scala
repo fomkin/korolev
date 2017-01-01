@@ -1,28 +1,29 @@
 import korolev._
 import korolev.Shtml._
 import korolev.server.{ServerRouter, StateStorage}
-import korolev.http4sServer.KorolevHttp4sServerApp
-import korolev.http4sServer.configureHttpService
-import korolev.scalazSupport._
 
-import scalaz.concurrent.Task
+import korolev.blazeServer.defaultExecutor
+import korolev.blazeServer.configureHttpService
+import korolev.blazeServer.runServer
+
+import scala.concurrent.Future
 
 /**
   * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
   */
-object RoutingExample extends KorolevHttp4sServerApp {
+object RoutingExample extends App {
 
   import State.effects._
   import korolev.EventResult._
 
-  val storage = StateStorage.default(State())
+  val storage = StateStorage.default[Future, State](State())
   val inputId = elementId
 
-  val service = configureHttpService[State](
+  val service = configureHttpService[Future, State](
     stateStorage = storage,
     head = 'head(
       'link(
-        'href /= "main.css",
+        'href /= "/main.css",
         'rel /= "stylesheet",
         'type /= "text/css"
       )
@@ -100,10 +101,10 @@ object RoutingExample extends KorolevHttp4sServerApp {
           toState = {
             case (s, Root) =>
               val u = s.copy(selectedTab = s.todos.keys.head)
-              Task.now(u)
+              Future.successful(u)
             case (s, Root / name) =>
               val key = s.todos.keys.find(_.toLowerCase == name)
-              Task.now(key.fold(s)(k => s.copy(selectedTab = k)))
+              Future.successful(key.fold(s)(k => s.copy(selectedTab = k)))
           }
         ),
         static = (deviceId) => Router(
@@ -120,6 +121,8 @@ object RoutingExample extends KorolevHttp4sServerApp {
       )
     }
   )
+
+  runServer(service)
 }
 
 case class State(
@@ -132,7 +135,7 @@ case class State(
 )
 
 object State {
-  val effects = BrowserEffects[Task, State]
+  val effects = BrowserEffects[Future, State]
   case class Todo(text: String, done: Boolean)
   object Todo {
     def apply(n: Int): Vector[Todo] = (0 to n).toVector map {

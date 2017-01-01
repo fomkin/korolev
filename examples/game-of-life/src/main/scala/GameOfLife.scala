@@ -1,16 +1,16 @@
 import korolev._
 import korolev.Shtml._
-import korolev.http4sServer.configureHttpService
-import korolev.http4sServer.KorolevHttp4sServerApp
-import korolev.scalazSupport._
-import korolev.server.StateStorage
+import korolev.server.{ServerRouter, StateStorage}
+import korolev.blazeServer.defaultExecutor
+import korolev.blazeServer.configureHttpService
+import korolev.blazeServer.runServer
 
-import scalaz.concurrent.Task
+import scala.concurrent.Future
 
 /**
   * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
   */
-object GameOfLife extends KorolevHttp4sServerApp {
+object GameOfLife extends App {
 
   import korolev.EventResult._
   import Universe.effects._
@@ -24,8 +24,9 @@ object GameOfLife extends KorolevHttp4sServerApp {
   val viewSideS = viewSide.toString
   val cellRadiusS = cellRadius.toString
 
-  val service = configureHttpService[Universe](
+  val service = configureHttpService[Future, Universe](
     stateStorage = StateStorage.default(Universe(universeSize)),
+    serverRouter = ServerRouter.empty,
     render = {
       // Create a DOM using state
       { case universe =>
@@ -71,6 +72,8 @@ object GameOfLife extends KorolevHttp4sServerApp {
       }
     }
   )
+
+  runServer(service)
 }
 
 case class Universe(cells: Vector[Universe.Cell], size: Int) {
@@ -135,7 +138,7 @@ case class Universe(cells: Vector[Universe.Cell], size: Int) {
 
 object Universe {
 
-  val effects = BrowserEffects[Task, Universe]
+  val effects = BrowserEffects[Future, Universe]
 
   case class Cell(x: Int, y: Int, alive: Boolean)
 

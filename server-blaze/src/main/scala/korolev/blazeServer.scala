@@ -70,7 +70,7 @@ object blazeServer {
           val array = new Array[Byte](stream.available)
           stream.read(array)
           HttpResponse.Ok(
-            body = new String(array),
+            body = array,
             headers = {
               val contentTypeHeader = server.mimeTypes(ext).map(x => "content-type" -> x)
               val deviceHeader = maybeDevice.map(x => "set-cookie" -> s"device=$x")

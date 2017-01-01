@@ -1,8 +1,6 @@
 import com.typesafe.sbt.packager.archetypes.JavaAppPackaging
 import com.typesafe.sbt.packager.universal.UniversalPlugin
 
-val http4sVersion = "0.14.11"
-
 val publishSettings = Seq(
   publishMavenStyle := true,
   publishArtifact in Test := false,
@@ -68,17 +66,6 @@ lazy val server = project.
   settings(normalizedName := "korolev-server").
   dependsOn(korolevJVM)
 
-lazy val `server-http4s` = project.
-  settings(commonSettings: _*).
-  settings(
-    normalizedName := "korolev-server-http4s",
-    libraryDependencies ++= Seq(
-      "org.http4s" %% "http4s-dsl" % http4sVersion,
-      "org.http4s" %% "http4s-blaze-server" % http4sVersion
-    )
-  ).
-  dependsOn(server)
-
 lazy val `server-blaze` = project.
   settings(commonSettings: _*).
   settings(
@@ -133,13 +120,13 @@ lazy val routingExample = (project in examples / "routing").
   enablePlugins(JavaAppPackaging).
   enablePlugins(UniversalPlugin).
   settings(exampleSettings: _*).
-  dependsOn(`server-http4s`)
+  dependsOn(`server-blaze`)
 
 lazy val gameOfLifeExample = (project in examples / "game-of-life").
   enablePlugins(JavaAppPackaging).
   enablePlugins(UniversalPlugin).
   settings(exampleSettings: _*).
-  dependsOn(`server-http4s`)
+  dependsOn(`server-blaze`)
 
 lazy val root = project.in(file(".")).
   settings(publish := {}).
@@ -154,7 +141,7 @@ lazy val root = project.in(file(".")).
 
 publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
 
-crossScalaVersions := Seq("2.11.8")
+crossScalaVersions := Seq("2.11.8", "2.12.1")
 
 publishArtifact := false
 
