@@ -1,6 +1,6 @@
 package korolev
 
-import java.net.{InetAddress, InetSocketAddress}
+import java.net.InetSocketAddress
 import java.nio.channels.AsynchronousChannelGroup
 import java.util.concurrent.Executors
 
@@ -8,11 +8,10 @@ import korolev.server.{KorolevServiceConfig, MimeTypes, Request => KorolevReques
 import org.http4s.blaze.channel._
 import org.http4s.blaze.channel.nio2.NIO2SocketServerGroup
 import org.http4s.blaze.http._
-import org.http4s.blaze.http.websocket.WSStage
 import org.http4s.blaze.pipeline.{Command, LeafBuilder}
 import org.http4s.websocket.WebsocketBits._
 
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutorService, Promise}
+import scala.concurrent.{ExecutionContext, Promise}
 import scala.language.higherKinds
 
 /**
@@ -76,7 +75,8 @@ package object blazeServer {
           )
         case KorolevResponse.WebSocket(publish, subscribe, destroy) =>
           // TODO handle disconnect on failure
-          val stage = new WSStage {
+          val stage = new WebSocketStage {
+            def onDirtyDisconnect(e: Throwable): Unit = destroy()
             def onMessage(msg: WebSocketFrame): Unit = msg match {
               case Text(incomingMessage, _) => publish(incomingMessage)
               case Binary(_, _) => // ignore
@@ -91,7 +91,7 @@ package object blazeServer {
               }
             }
           }
-          WSResponse(WSStage.bufferingSegment(stage))
+          WSResponse(WebSocketStage.bufferingSegment(stage))
       }
 
       val promise = Promise[Response]()
