@@ -1,6 +1,6 @@
 import bridge.JSAccess
 import korolev.BrowserEffects.Event
-import korolev.{BrowserEffects, Korolev, Router, Shtml}
+import korolev.{BrowserEffects, Korolev, Render, Router, Shtml}
 import org.scalatest.{FlatSpec, Matchers}
 
 import scala.concurrent.Future
@@ -64,7 +64,7 @@ object Issue14Spec extends Shtml {
 
   type S = String
 
-  def render(firstEvent: Event[Future, S], secondEvent: Event[Future, S]): Korolev.Render[S] = {
+  def render(firstEvent: Event[Future, S], secondEvent: Event[Future, S]): Render[S] = {
     case "firstState" =>
       'div(
         'div("Hello"),

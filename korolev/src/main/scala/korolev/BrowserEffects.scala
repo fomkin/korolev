@@ -1,13 +1,15 @@
 package korolev
 
-import korolev.Dux.Transition
-
 import scala.language.higherKinds
 
 class BrowserEffects[F[+_]: Async, S] {
 
   import BrowserEffects._
   import EventPhase._
+
+  type Event = BrowserEffects.Event[F, S]
+  type EventFactory[T] = T => Event
+  type Transition = Dux.Transition[S]
 
   def elementId = new ElementId()
 
@@ -32,7 +34,7 @@ class BrowserEffects[F[+_]: Async, S] {
     case anyState => anyState
   }
 
-  def transition(t: Transition[S]): Transition[S] = t
+  def transition(t: Transition): Transition = t
 }
 
 object BrowserEffects {

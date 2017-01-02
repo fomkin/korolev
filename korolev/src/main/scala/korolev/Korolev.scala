@@ -18,8 +18,6 @@ object Korolev extends EventPropagation {
   import VDom._
   import Change._
 
-  type Render[S] = PartialFunction[S, VDom.Node]
-
   def apply[F[+_]: Async, S](jsAccess: JSAccess[F],
                            initialState: S,
                            render: Render[S],
