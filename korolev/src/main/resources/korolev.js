@@ -152,7 +152,6 @@
   document.addEventListener("DOMContentLoaded", function() {
 
     var deviceId = getCookie('device');
-    var sessionId = Math.random().toString(36);
     var root = document.body;
     var loc = window.location;
     var wsUri;
@@ -162,7 +161,7 @@
     wsUri += loc.host + KorolevServerRootPath +
       '/bridge' +
       '/' + deviceId +
-      '/' + sessionId;
+      '/' + KorolevSessionId;
     global.Korolev.RegisterRoot(root);
 
     function initializeBridge() {

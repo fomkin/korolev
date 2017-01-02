@@ -20,7 +20,7 @@ abstract class StateStorage[F[+_]: Async, T] {
   def initial(deviceId: DeviceId): F[T]
 
   /**
-    * Restore session from storage
+    * Restore session from storage on initialize a new one
     * @return Future with result if session
     *         already exists or future
     *         with None with if doesn't
@@ -31,7 +31,7 @@ abstract class StateStorage[F[+_]: Async, T] {
     * Save session to storage
     * @return Future of successful saving
     */
-  def write(deviceId: DeviceId, sessionId: SessionId, value: T): F[Unit]
+  def write(deviceId: DeviceId, sessionId: SessionId, value: T): F[T]
 }
 
 object StateStorage {
@@ -54,9 +54,9 @@ object StateStorage {
       Async[F].pure(state)
     }
 
-    def write(deviceId: String, sessionId: String, value: T): F[Unit] = {
+    def write(deviceId: String, sessionId: String, value: T): F[T] = {
       storage.put(deviceId + sessionId, value)
-      Async[F].unit
+      Async[F].pure(value)
     }
 
     def initial(deviceId: String): F[T] = Async[F].pure(initialState)
