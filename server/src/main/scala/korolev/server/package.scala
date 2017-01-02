@@ -16,11 +16,10 @@ import scala.util.Random
   */
 package object server {
 
-  def configureServer[F[+_]: Async, S](
-      render: Korolev.Render[S],
-      head: VDom.Node,
-      stateStorage: StateStorage[F, S],
-      serverRouter: ServerRouter[F, S]
+  type MimeTypes = String => Option[String]
+
+  def korolevService[F[+_]: Async, S](
+    config: KorolevServiceConfig[F, S]
   ): PartialFunction[Request, F[Response]] = {
 
     import misc._
@@ -28,28 +27,28 @@ package object server {
     def renderStatic(request: Request): F[Response] = {
       val (isNewDevice, deviceId) = deviceFromRequest(request)
       val sessionId = Random.alphanumeric.take(16).mkString
-      val stateF = serverRouter
+      val stateF = config.serverRouter
         .static(deviceId)
         .toState
         .lift(((), request.path))
-        .getOrElse(stateStorage.initial(deviceId))
+        .getOrElse(config.stateStorage.initial(deviceId))
 
-      val writeResultF = Async[F].flatMap(stateF)(stateStorage.write(deviceId, sessionId, _))
+      val writeResultF = Async[F].flatMap(stateF)(config.stateStorage.write(deviceId, sessionId, _))
 
       Async[F].map(writeResultF) { state =>
-        val body = render(state)
+        val body = config.render(state)
         val dom = 'html(
-          head.copy(children =
+          config.head.copy(children =
             'script(bridgeJs) ::
               'script(
                 s"var KorolevSessionId = '$sessionId';\n" +
-                s"var KorolevServerRootPath = '${serverRouter.rootPath}';\n" +
+                s"var KorolevServerRootPath = '${config.serverRouter.rootPath}';\n" +
                   korolevJs
               ) ::
-                head.children),
+            config.head.children),
           body
         )
-        Response.HttpResponse(
+        Response.Http(
           body = {
             val html = "<!DOCTYPE html>" + dom.html
             val bytes = html.getBytes(StandardCharsets.UTF_8)
@@ -91,7 +90,7 @@ package object server {
 
     val service: PartialFunction[Request, F[Response]] = {
       case matchStatic(stream, contentType) =>
-        val response = Response.HttpResponse(stream, contentType, None)
+        val response = Response.Http(stream, contentType, None)
         Async[F].pure(response)
       case Request(Root / "bridge" / deviceId / sessionId, _, _) =>
         // Queue
@@ -102,13 +101,12 @@ package object server {
           JsonQueuedJsAccess(subscriber.fold(appendQueue)(identity)(_))
         }
         // Session storage access
-        Async[F].map(stateStorage.read(deviceId, sessionId)) { state =>
+        Async[F].map(config.stateStorage.read(deviceId, sessionId)) { state =>
           // Create Korolev with dynamic router
-          val router = serverRouter.dynamic(deviceId, sessionId)
-          val korolev = Korolev(jsAccess, state, render, router, fromScratch = false)
+          val router = config.serverRouter.dynamic(deviceId, sessionId)
+          val korolev = Korolev(jsAccess, state, config.render, router, fromScratch = false)
           // Subscribe on state updates an push them to storage
-          korolev.subscribe(state =>
-            stateStorage.write(deviceId, sessionId, state))
+          korolev.subscribe(state => config.stateStorage.write(deviceId, sessionId, state))
           // Initialize websocket
           Response.WebSocket(
             destroyHandler = () => korolev.destroy(),

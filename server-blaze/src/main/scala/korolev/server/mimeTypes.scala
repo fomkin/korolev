@@ -5,10 +5,10 @@ package korolev.server
   */
 object mimeTypes extends (String => Option[String]) {
 
-  def apply(key: String): Option[String] = mapping.get(key)
+  def apply(key: String): Option[String] = default.get(key)
 
   // http://svn.apache.org/repos/asf/httpd/httpd/trunk/docs/conf/mime.types
-  val mapping = Map(
+  val default = Map(
     "ez" -> "application/andrew-inset",
     "aw" -> "application/applixware",
     "atom" -> "application/atom+xml",

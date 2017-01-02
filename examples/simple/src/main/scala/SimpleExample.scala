@@ -1,23 +1,20 @@
-import korolev.server._
 import korolev._
-
-import korolev.blazeServer.defaultExecutor
-import korolev.blazeServer.configureHttpService
-import korolev.blazeServer.runServer
+import korolev.server._
+import korolev.blazeServer._
 
 import scala.concurrent.Future
 
 /**
   * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
   */
-object SimpleExample extends App {
+object SimpleExample extends KorolevBlazeServer {
 
   import State.effects._
 
   // Handler to input
   val inputId = elementId
 
-  val service = configureHttpService[Future, State](
+  val service = blazeService[Future, State] from KorolevServiceConfig(
     serverRouter = ServerRouter.empty[Future, State],
     stateStorage = StateStorage.default(State()),
     render = {
@@ -66,8 +63,6 @@ object SimpleExample extends App {
         )
     }
   )
-
-  runServer(service)
 }
 
 case class State(todos: Vector[State.Todo] = (0 to 2).toVector map {

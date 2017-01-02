@@ -1,16 +1,13 @@
 import korolev._
 import korolev.server._
-
-import korolev.blazeServer.defaultExecutor
-import korolev.blazeServer.configureHttpService
-import korolev.blazeServer.runServer
+import korolev.blazeServer._
 
 import scala.concurrent.Future
 
 /**
   * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
   */
-object GameOfLife extends App {
+object GameOfLife extends KorolevBlazeServer {
 
   import Universe.effects._
 
@@ -23,7 +20,7 @@ object GameOfLife extends App {
   val viewSideS = viewSide.toString
   val cellRadiusS = cellRadius.toString
 
-  val service = configureHttpService[Future, Universe](
+  val service = blazeService[Future, Universe] from KorolevServiceConfig(
     stateStorage = StateStorage.default(Universe(universeSize)),
     serverRouter = ServerRouter.empty,
     render = {
@@ -69,8 +66,6 @@ object GameOfLife extends App {
         )
     }
   )
-
-  runServer(service)
 }
 
 case class Universe(cells: Vector[Universe.Cell], size: Int) {

@@ -4,7 +4,7 @@ import java.net.{InetAddress, InetSocketAddress}
 import java.nio.channels.AsynchronousChannelGroup
 import java.util.concurrent.Executors
 
-import korolev.server.{ServerRouter, StateStorage, Request => KorolevRequest, Response => KorolevResponse}
+import korolev.server.{KorolevServiceConfig, MimeTypes, Request => KorolevRequest, Response => KorolevResponse}
 import org.http4s.blaze.channel._
 import org.http4s.blaze.channel.nio2.NIO2SocketServerGroup
 import org.http4s.blaze.http._
@@ -23,21 +23,23 @@ object blazeServer {
   implicit val defaultExecutor = ExecutionContext.
     fromExecutorService(Executors.newWorkStealingPool())
 
-  def configureHttpService[F[+_]: Async, S](
-    // Without defaults
-    stateStorage: StateStorage[F, S],
-    serverRouter: ServerRouter[F, S],
-    // With defaults
-    render: Korolev.Render[S] = PartialFunction.empty,
-    head: VDom.Node = VDom.Node("head", Nil, Nil, Nil)
+  final class BlazeServiceBuilder[F[+_]: Async, S](mimeTypes: MimeTypes) {
+    def from(config: KorolevServiceConfig[F, S]): HttpService =
+      blazeService(config, mimeTypes)
+  }
+
+  def blazeService[F[+_]: Async, S]: BlazeServiceBuilder[F, S] =
+    new BlazeServiceBuilder(server.mimeTypes)
+
+  def blazeService[F[+_]: Async, S](mimeTypes: MimeTypes): BlazeServiceBuilder[F, S] =
+    new BlazeServiceBuilder(server.mimeTypes)
+
+  def blazeService[F[+_]: Async, S](
+    config: KorolevServiceConfig[F, S],
+    mimeTypes: MimeTypes
   ): HttpService = {
 
-    val korolevServer = korolev.server.configureServer(
-      render,
-      head,
-      stateStorage,
-      serverRouter = serverRouter
-    )
+    val korolevServer = korolev.server.korolevService(config)
 
     (_, uri, headers, _) => {
       val (path, params) = {
@@ -66,13 +68,13 @@ object blazeServer {
       )
 
       val responseF = Async[F].map(korolevServer(korolevRequest)) {
-        case KorolevResponse.HttpResponse(stream, ext, maybeDevice) =>
+        case KorolevResponse.Http(stream, ext, maybeDevice) =>
           val array = new Array[Byte](stream.available)
           stream.read(array)
           HttpResponse.Ok(
             body = array,
             headers = {
-              val contentTypeHeader = server.mimeTypes(ext).map(x => "content-type" -> x)
+              val contentTypeHeader = mimeTypes(ext).map(x => "content-type" -> x)
               val deviceHeader = maybeDevice.map(x => "set-cookie" -> s"device=$x")
               Seq(contentTypeHeader, deviceHeader).flatten
             }
@@ -105,19 +107,37 @@ object blazeServer {
 
   def runServer(
     service: HttpService,
+    config: BlazeServerConfig
+  ): Unit = {
+
+    val f: BufferPipelineBuilder = _ => LeafBuilder(new HttpServerStage(1024*1024, 10*1024)(service))
+    val group = AsynchronousChannelGroup.withThreadPool(config.executionContext)
+    val factory = NIO2SocketServerGroup(config.bufferSize, Some(group))
+
+    factory.
+      bind(new InetSocketAddress(config.port), f).
+      getOrElse(sys.error("Failed to bind server")).
+      join()
+  }
+
+  case class BlazeServerConfig(
     port: Int = 8181,
     host: String = InetAddress.getLoopbackAddress.getHostAddress,
     bufferSize: Int = 8 * 1024
-  )(implicit eces: ExecutionContextExecutorService): Unit = {
+  )(
+    // Trampoline
+    implicit val executionContext: ExecutionContextExecutorService
+  )
 
-    val f: BufferPipelineBuilder = _ => LeafBuilder(new HttpServerStage(1024*1024, 10*1024)(service))
-    val group = AsynchronousChannelGroup.withThreadPool(eces)
-    val factory = NIO2SocketServerGroup(bufferSize, Some(group))
+  object BlazeServerConfig {
+    val default = BlazeServerConfig()
+  }
 
-    factory.
-      bind(new InetSocketAddress(port), f).
-      getOrElse(sys.error("Failed to bind server")).
-      join()
+  abstract class KorolevBlazeServer(config: BlazeServerConfig = BlazeServerConfig.default) {
+    def service: HttpService
+    def main(args: Array[String]): Unit = {
+      runServer(service, config)
+    }
   }
 
   private object cookieExtractor {
