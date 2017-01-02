@@ -42,7 +42,7 @@ object RoutingExample extends App {
                 },
                 'style /= "margin-left: 10px",
                 if (name == state.selectedTab) 'strong(name)
-                else 'span(name)
+                else name
               )
             }
           ),

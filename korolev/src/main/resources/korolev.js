@@ -29,7 +29,7 @@
       },
       RegisterRoot: function(rootNode) {
         function aux(prefix, node) {
-          var children = node.children;
+          var children = node.childNodes;
           for (var i = 0; i < children.length; i++) {
             var child = children[i];
             var id = prefix + '_' + i;
