@@ -18,15 +18,10 @@ import scala.language.higherKinds
 /**
   * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
   */
-object blazeServer {
+package object blazeServer {
 
   implicit val defaultExecutor = ExecutionContext.
     fromExecutorService(Executors.newWorkStealingPool())
-
-  final class BlazeServiceBuilder[F[+_]: Async, S](mimeTypes: MimeTypes) {
-    def from(config: KorolevServiceConfig[F, S]): HttpService =
-      blazeService(config, mimeTypes)
-  }
 
   def blazeService[F[+_]: Async, S]: BlazeServiceBuilder[F, S] =
     new BlazeServiceBuilder(server.mimeTypes)
@@ -118,26 +113,6 @@ object blazeServer {
       bind(new InetSocketAddress(config.port), f).
       getOrElse(sys.error("Failed to bind server")).
       join()
-  }
-
-  case class BlazeServerConfig(
-    port: Int = 8181,
-    host: String = InetAddress.getLoopbackAddress.getHostAddress,
-    bufferSize: Int = 8 * 1024
-  )(
-    // Trampoline
-    implicit val executionContext: ExecutionContextExecutorService
-  )
-
-  object BlazeServerConfig {
-    val default = BlazeServerConfig()
-  }
-
-  abstract class KorolevBlazeServer(config: BlazeServerConfig = BlazeServerConfig.default) {
-    def service: HttpService
-    def main(args: Array[String]): Unit = {
-      runServer(service, config)
-    }
   }
 
   private object cookieExtractor {
