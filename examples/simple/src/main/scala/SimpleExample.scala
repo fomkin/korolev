@@ -1,6 +1,5 @@
-import korolev.server.{ServerRouter, StateStorage}
-import korolev.BrowserEffects
-import korolev.Shtml._
+import korolev.server._
+import korolev._
 
 import korolev.blazeServer.defaultExecutor
 import korolev.blazeServer.configureHttpService
@@ -14,18 +13,15 @@ import scala.concurrent.Future
 object SimpleExample extends App {
 
   import State.effects._
-  import korolev.EventResult._
+
+  // Handler to input
+  val inputId = elementId
 
   val service = configureHttpService[Future, State](
     serverRouter = ServerRouter.empty[Future, State],
     stateStorage = StateStorage.default(State()),
     render = {
-
-      // Handler to input
-      val inputId = elementId
-
-      // Create a DOM using state
-      { case state =>
+      case state =>
         'body(
           'div("Super TODO tracker"),
           'div('style /= "height: 250px; overflow-y: scroll",
@@ -68,7 +64,6 @@ object SimpleExample extends App {
             'button("Add todo")
           )
         )
-      }
     }
   )
 

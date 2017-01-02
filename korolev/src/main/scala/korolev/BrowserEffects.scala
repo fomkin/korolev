@@ -1,5 +1,7 @@
 package korolev
 
+import korolev.Dux.Transition
+
 import scala.language.higherKinds
 
 class BrowserEffects[F[+_]: Async, S] {
@@ -16,6 +18,21 @@ class BrowserEffects[F[+_]: Async, S] {
   def eventWithAccess(name: Symbol, phase: EventPhase = Bubbling)(
       effect: BrowserAccess[F] => EventResult[F, S]): EventWithAccess[F, S] =
     EventWithAccess(name, phase, effect)
+
+  def immediateTransition(transition: Dux.Transition[S]): EventResult[F, S] =
+    EventResult[F, S](Some(transition), None, sp = false)
+
+  def deferredTransition(transition: F[Dux.Transition[S]]): EventResult[F, S] =
+    EventResult[F, S](None, Some(transition), sp = false)
+
+  /**
+    * This is an immediateTransition return same state
+    */
+  def noTransition: EventResult[F, S] = immediateTransition {
+    case anyState => anyState
+  }
+
+  def transition(t: Transition[S]): Transition[S] = t
 }
 
 object BrowserEffects {

@@ -1,6 +1,5 @@
 import korolev._
-import korolev.Shtml._
-import korolev.server.{ServerRouter, StateStorage}
+import korolev.server._
 
 import korolev.blazeServer.defaultExecutor
 import korolev.blazeServer.configureHttpService
@@ -14,7 +13,6 @@ import scala.concurrent.Future
 object RoutingExample extends App {
 
   import State.effects._
-  import korolev.EventResult._
 
   val storage = StateStorage.default[Future, State](State())
   val inputId = elementId
@@ -91,7 +89,6 @@ object RoutingExample extends App {
         )
     },
     serverRouter = {
-      import korolev.Router._
       ServerRouter(
         dynamic = (_, _) => Router(
           fromState = {

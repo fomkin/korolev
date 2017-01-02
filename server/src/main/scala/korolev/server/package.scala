@@ -23,8 +23,6 @@ package object server {
       serverRouter: ServerRouter[F, S]
   ): PartialFunction[Request, F[Response]] = {
 
-    import korolev.Shtml._
-    import korolev.Router._
     import misc._
 
     def renderStatic(request: Request): F[Response] = {
