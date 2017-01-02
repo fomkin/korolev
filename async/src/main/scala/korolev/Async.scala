@@ -1,9 +1,12 @@
 package korolev
 
+import scala.annotation.implicitNotFound
 import scala.concurrent.{ExecutionContext, Future}
 import scala.language.higherKinds
 import scala.util.Try
 
+@implicitNotFound("""Instance of Async for `${F}` is not found. If you want Future,
+ ensure that execution context is passed to a scope (import korolev.blazeServer.defaultExecutor)""")
 trait Async[F[+_]] {
   def pure[A](value: => A): F[A]
   def unit: F[Unit]

@@ -1,3 +1,4 @@
+import korolev.VDom.{Change, Node}
 import korolev.{Shtml, VDom}
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -17,7 +18,7 @@ object VDomSpec extends Shtml {
 
   import VDom.Change._
 
-  def example1 = {
+  def example1: (Node, Node, List[Change]) = {
 
     val a = 'div (
       'class /= "container",

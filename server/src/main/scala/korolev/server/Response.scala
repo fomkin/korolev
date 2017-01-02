@@ -9,12 +9,14 @@ sealed trait Response
 
 object Response {
 
-  case class HttpResponse(body: InputStream,
-                          fileExtension: String,
-                          deviceId: Option[String]) extends Response
-
+  case class Http(body: InputStream,
+                  fileExtension: String,
+                  deviceId: Option[String])
+      extends Response
 
   case class WebSocket(publish: String => Unit,
                        subscribe: (String => Unit) => Unit,
-                       destroyHandler: () => Unit) extends Response
+                       destroyHandler: () => Unit)
+      extends Response
+
 }

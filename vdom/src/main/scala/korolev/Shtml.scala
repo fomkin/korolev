@@ -25,8 +25,6 @@ trait Shtml {
   val <> = VDom.Empty
 }
 
-object Shtml extends Shtml
-
 private[korolev] object ShtmlMisc {
 
   // Should be concurrent

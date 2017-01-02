@@ -1,18 +1,14 @@
 import korolev._
-import korolev.Shtml._
-import korolev.server.{ServerRouter, StateStorage}
-import korolev.blazeServer.defaultExecutor
-import korolev.blazeServer.configureHttpService
-import korolev.blazeServer.runServer
+import korolev.server._
+import korolev.blazeServer._
 
 import scala.concurrent.Future
 
 /**
   * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
   */
-object GameOfLife extends App {
+object GameOfLife extends KorolevBlazeServer {
 
-  import korolev.EventResult._
   import Universe.effects._
 
   val universeSize = 20
@@ -24,12 +20,11 @@ object GameOfLife extends App {
   val viewSideS = viewSide.toString
   val cellRadiusS = cellRadius.toString
 
-  val service = configureHttpService[Future, Universe](
+  val service = blazeService[Future, Universe] from KorolevServiceConfig(
     stateStorage = StateStorage.default(Universe(universeSize)),
     serverRouter = ServerRouter.empty,
     render = {
-      // Create a DOM using state
-      { case universe =>
+      case universe =>
         'body(
           'div(
             'input(
@@ -69,11 +64,8 @@ object GameOfLife extends App {
             }
           )
         )
-      }
     }
   )
-
-  runServer(service)
 }
 
 case class Universe(cells: Vector[Universe.Cell], size: Int) {

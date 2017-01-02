@@ -1,6 +1,5 @@
 import bridge.JSAccess
 import korolev.BrowserEffects.Event
-import korolev.EventResult._
 import korolev.{BrowserEffects, Korolev, Router, Shtml}
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -35,13 +34,13 @@ class Issue14Spec extends FlatSpec with Matchers {
       router = Router.empty[Future, String, String],
       render = Issue14Spec.render(
         firstEvent = event('mousedown) {
-          immediateTransition[Future, String] { case _ =>
+          immediateTransition { case _ =>
             counter += 1
             "secondState"
           }
         },
         secondEvent = event('click) {
-          immediateTransition[Future, String] { case _ =>
+          immediateTransition { case _ =>
             counter += 1
             "firstState"
           }
