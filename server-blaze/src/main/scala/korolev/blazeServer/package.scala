@@ -22,14 +22,14 @@ package object blazeServer {
   implicit val defaultExecutor = ExecutionContext.
     fromExecutorService(Executors.newWorkStealingPool())
 
-  def blazeService[F[+_]: Async, S]: BlazeServiceBuilder[F, S] =
+  def blazeService[F[+_]: Async, S, M]: BlazeServiceBuilder[F, S, M] =
     new BlazeServiceBuilder(server.mimeTypes)
 
-  def blazeService[F[+_]: Async, S](mimeTypes: MimeTypes): BlazeServiceBuilder[F, S] =
+  def blazeService[F[+_]: Async, S, M](mimeTypes: MimeTypes): BlazeServiceBuilder[F, S, M] =
     new BlazeServiceBuilder(server.mimeTypes)
 
-  def blazeService[F[+_]: Async, S](
-    config: KorolevServiceConfig[F, S],
+  def blazeService[F[+_]: Async, S, M](
+    config: KorolevServiceConfig[F, S, M],
     mimeTypes: MimeTypes
   ): HttpService = {
 

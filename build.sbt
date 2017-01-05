@@ -135,8 +135,9 @@ lazy val root = project.in(file(".")).
     bridgeJS, bridgeJVM,
     vdomJS, vdomJVM,
     asyncJS, asyncJVM,
-    server, simpleExample,
-    routingExample, gameOfLifeExample
+    server, `server-blaze`,
+    simpleExample, routingExample,
+    gameOfLifeExample
   )
 
 publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))

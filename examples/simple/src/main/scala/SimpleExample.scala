@@ -14,7 +14,7 @@ object SimpleExample extends KorolevBlazeServer {
   // Handler to input
   val inputId = elementId
 
-  val service = blazeService[Future, State] from KorolevServiceConfig(
+  val service = blazeService[Future, State, Any] from KorolevServiceConfig(
     serverRouter = ServerRouter.empty[Future, State],
     stateStorage = StateStorage.default(State()),
     render = {
@@ -70,7 +70,7 @@ case class State(todos: Vector[State.Todo] = (0 to 2).toVector map {
 })
 
 object State {
-  val effects = BrowserEffects[Future, State]
+  val effects = Effects[Future, State, Any]
   case class Todo(text: String, done: Boolean)
 }
 

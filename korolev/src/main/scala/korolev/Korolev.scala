@@ -3,7 +3,7 @@ package korolev
 import java.util.concurrent.atomic.AtomicInteger
 
 import bridge.JSAccess
-import korolev.BrowserEffects.{BrowserAccess, ElementId}
+import korolev.Effects.{Access, ElementId}
 
 import scala.language.higherKinds
 import scala.util.{Failure, Success}
@@ -18,23 +18,25 @@ object Korolev extends EventPropagation {
   import VDom._
   import Change._
 
-  def apply[F[+_]: Async, S](jsAccess: JSAccess[F],
+  def apply[F[+_]: Async, S, M](
+                           localDux: Dux[F, S],
+                           jsAccess: JSAccess[F],
                            initialState: S,
                            render: Render[S],
                            router: Router[F, S, S],
+                           messageHandler: PartialFunction[M, Unit],
                            fromScratch: Boolean): Dux[F, S] = {
 
     // This event type should be listen on client side
     @volatile var enabledEvents = Set('submit)
-    @volatile var elementIds = Map.empty[BrowserEffects.ElementId, String]
-    @volatile var events = Map.empty[String, BrowserEffects.Event[F, S]]
+    @volatile var elementIds = Map.empty[Effects.ElementId, String]
+    @volatile var events = Map.empty[String, Effects.Event[F, S, M]]
 
     val currentRenderNum = new AtomicInteger(0)
 
     // Prepare frontend
     jsAccess.global.getAndSaveAs("Korolev", "@Korolev")
     val client = jsAccess.obj("@Korolev")
-    val localDux = Dux[F, S](initialState)
 
     def updateMisc(renderResult: VDom.Node) = {
 
@@ -42,8 +44,8 @@ object Korolev extends EventPropagation {
 
       events = {
         val xs = misc.collect {
-          case (id, event: BrowserEffects.Event[_, _]) =>
-            val typedEvent = event.asInstanceOf[BrowserEffects.Event[F, S]]
+          case (id, event: Effects.Event[_, _, _]) =>
+            val typedEvent = event.asInstanceOf[Effects.Event[F, S, M]]
             s"$id:${event.`type`.name}:${event.phase}" -> typedEvent
         }
         xs.toMap
@@ -62,13 +64,13 @@ object Korolev extends EventPropagation {
 
       elementIds = {
         val xs = misc.collect {
-          case (id, eId: BrowserEffects.ElementId) => eId -> id.toString
+          case (id, eId: Effects.ElementId) => eId -> id.toString
         }
         xs.toMap
       }
     }
 
-    val browserAccess = new BrowserAccess {
+    val browserAccess = new Access[F, M] {
       def property[T](eId: ElementId, propName: Symbol): F[T] = elementIds.get(eId) match {
         case Some(id) =>
           val future = client.call[T]("ExtractProperty", id, propName.name)
@@ -76,6 +78,10 @@ object Korolev extends EventPropagation {
           future
         case None =>
           Async[F].fromTry(Failure(new Exception("No element matched for accessor")))
+      }
+
+      def publish(message: M): F[Unit] = {
+        Async[F].pure(messageHandler(message))
       }
     }
 

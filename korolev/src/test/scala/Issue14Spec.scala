@@ -1,6 +1,6 @@
 import bridge.JSAccess
-import korolev.BrowserEffects.Event
-import korolev.{BrowserEffects, Korolev, Render, Router, Shtml}
+import korolev.Effects.Event
+import korolev._
 import org.scalatest.{FlatSpec, Matchers}
 
 import scala.concurrent.Future
@@ -12,7 +12,7 @@ class Issue14Spec extends FlatSpec with Matchers {
 
   val ba = {
     import RunNowExecutionContext.instance
-    new BrowserEffects[Future, Issue14Spec.S] {}
+    new Effects[Future, Issue14Spec.S, Any] {}
   }
   import ba._
 
@@ -29,9 +29,11 @@ class Issue14Spec extends FlatSpec with Matchers {
 
     Korolev(
       jsAccess = jSAccess,
+      localDux = Dux[Future, String]("firstState"),
       initialState = "firstState",
       fromScratch = true,
       router = Router.empty[Future, String, String],
+      messageHandler = PartialFunction.empty,
       render = Issue14Spec.render(
         firstEvent = event('mousedown) {
           immediateTransition { case _ =>
@@ -60,11 +62,11 @@ class Issue14Spec extends FlatSpec with Matchers {
   }
 }
 
-object Issue14Spec extends Shtml {
+object Issue14Spec {
 
   type S = String
 
-  def render(firstEvent: Event[Future, S], secondEvent: Event[Future, S]): Render[S] = {
+  def render(firstEvent: Event[Future, S, Any], secondEvent: Event[Future, S, Any]): Render[S] = {
     case "firstState" =>
       'div(
         'div("Hello"),
