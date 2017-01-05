@@ -12,8 +12,6 @@ Korolev runs a single-page application on the server side, keeping in the browse
 
 Our project supports static page rendering, so that search engines can index pages and view them immediately.
 
-**Warning!** Korolev is under heavy development and isn't ready to use until 0.1.0 release. API is unstable.
-
 ## Principles
 
 1. **Thin client.** Let's be honest, modern JavaScript applications are too greedy. Every JavaScript developer thinks that his page is special. But the user has a different opinion. He opens dozens of tabs. Each tab contains a ton of code, and this works very slowly. So we make our JavaScript bridge as lightweight as possible.
@@ -27,10 +25,10 @@ Our project supports static page rendering, so that search engines can index pag
 Add `korolev-server` to your `build.sbt`
 
 ```scala
-libraryDependencies += "com.github.fomkin" %% "korolev-server" % "0.0.7"
+libraryDependencies += "com.github.fomkin" %% "korolev-server-blaze" % "0.1.0"
 ```
 
-Look at [examples](https://github.com/fomkin/korolev/tree/v0.0.7/examples). It updates very frequently, so we don't paste the code here, sorry guys.
+Look at [examples](https://github.com/fomkin/korolev/tree/v0.1.0/examples). It updates very frequently, so we don't paste the code here, sorry guys.
 
 ## Architecture
 
