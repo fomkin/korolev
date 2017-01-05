@@ -2,23 +2,23 @@ package korolev
 
 import scala.language.higherKinds
 
-class BrowserEffects[F[+_]: Async, S] {
+class Effects[F[+_]: Async, S, M] {
 
-  import BrowserEffects._
+  import Effects._
   import EventPhase._
 
-  type Event = BrowserEffects.Event[F, S]
+  type Event = Effects.Event[F, S, M]
   type EventFactory[T] = T => Event
   type Transition = Dux.Transition[S]
 
   def elementId = new ElementId()
 
   def event(name: Symbol, phase: EventPhase = Bubbling)(
-      effect: => EventResult[F, S]): SimpleEvent[F, S] =
-    SimpleEvent[F, S](name, phase, () => effect)
+      effect: => EventResult[F, S]): SimpleEvent[F, S, M] =
+    SimpleEvent[F, S, M](name, phase, () => effect)
 
   def eventWithAccess(name: Symbol, phase: EventPhase = Bubbling)(
-      effect: BrowserAccess[F] => EventResult[F, S]): EventWithAccess[F, S] =
+      effect: Access[F, M] => EventResult[F, S]): EventWithAccess[F, S, M] =
     EventWithAccess(name, phase, effect)
 
   def immediateTransition(transition: Dux.Transition[S]): EventResult[F, S] =
@@ -37,29 +37,35 @@ class BrowserEffects[F[+_]: Async, S] {
   def transition(t: Transition): Transition = t
 }
 
-object BrowserEffects {
+object Effects {
 
-  def apply[F[+_]: Async, S] = new BrowserEffects[F, S]()
+  /**
+    * @tparam F Monad
+    * @tparam S State
+    * @tparam M Message
+    */
+  def apply[F[+_]: Async, S, M] = new Effects[F, S, M]()
 
-  abstract class BrowserAccess[F[+_]: Async] {
+  abstract class Access[F[+_]: Async, M] {
     def property[T](id: ElementId, propName: Symbol): F[T]
+    def publish(message: M): F[Unit]
   }
 
-  sealed abstract class Event[F[+_]: Async, S] extends VDom.Misc {
+  sealed abstract class Event[F[+_]: Async, S, M] extends VDom.Misc {
     def `type`: Symbol
     def phase: EventPhase
   }
 
-  case class EventWithAccess[F[+_]: Async, S](
+  case class EventWithAccess[F[+_]: Async, S, M](
       `type`: Symbol,
       phase: EventPhase,
-      effect: BrowserAccess[F] => EventResult[F, S])
-      extends Event[F, S]
+      effect: Access[F, M] => EventResult[F, S])
+      extends Event[F, S, M]
 
-  case class SimpleEvent[F[+_]: Async,S](`type`: Symbol,
+  case class SimpleEvent[F[+_]: Async, S, M](`type`: Symbol,
                                       phase: EventPhase,
                                       effect: () => EventResult[F, S])
-    extends Event[F, S]
+    extends Event[F, S, M]
 
   class ElementId extends VDom.Misc
 

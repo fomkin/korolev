@@ -14,7 +14,7 @@ object RoutingExample extends KorolevBlazeServer {
   val storage = StateStorage.default[Future, State](State())
   val inputId = elementId
 
-  val service = blazeService[Future, State] from KorolevServiceConfig(
+  val service = blazeService[Future, State, Any] from KorolevServiceConfig(
     stateStorage = storage,
     head = 'head(
       'link(
@@ -127,7 +127,7 @@ case class State(
 )
 
 object State {
-  val effects = BrowserEffects[Future, State]
+  val effects = Effects[Future, State, Any]
   case class Todo(text: String, done: Boolean)
   object Todo {
     def apply(n: Int): Vector[Todo] = (0 to n).toVector map {

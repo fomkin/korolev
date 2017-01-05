@@ -1,5 +1,5 @@
 import RunNowExecutionContext.instance
-import korolev.BrowserEffects.{BrowserAccess, ElementId}
+import korolev.Effects.{Access, ElementId}
 import korolev.VDom.Id
 import korolev._
 import org.scalatest.{FlatSpec, Matchers}
@@ -85,7 +85,7 @@ class EventPropagationSpec
 trait EventTesting extends FlatSpec {
 
   type S = String
-  type R = (String, BrowserEffects.Event[Future, S])
+  type R = (String, Effects.Event[Future, S, Any])
 
   type ShouldFire = Boolean
   type Comment = String
@@ -101,8 +101,12 @@ trait EventTesting extends FlatSpec {
     Future.successful(())
   }
 
-  val BE = BrowserEffects[Future, String]
-  object BA extends BrowserAccess[Future] {
+  val BE = Effects[Future, String, Any]
+
+  object BA extends Access[Future, Any] {
+
+    def publish(message: Any): Future[Unit] = Future.successful(())
+
     def property[T](id: ElementId, propName: Symbol): Future[T] =
       Future.failed(new Exception())
   }
@@ -120,7 +124,7 @@ trait EventTesting extends FlatSpec {
     (implicit context: Context): R = {
     val key = s"$id:$tpe:$inPhase"
     context.put(key, (false, s"Event $key should not be fired in $inPhase"))
-    key -> BrowserEffects.SimpleEvent(Symbol(tpe), inPhase, () =>
+    key -> Effects.SimpleEvent(Symbol(tpe), inPhase, () =>
       BE.immediateTransition { case _ => key })
   }
 
@@ -134,7 +138,7 @@ trait EventTesting extends FlatSpec {
       if (stop) t.stopPropagation else t
     }
     context.put(key, (true, s"Event $key should be fired in $inPhase"))
-    key -> BrowserEffects.SimpleEvent(Symbol(tpe), inPhase, f)
+    key -> Effects.SimpleEvent(Symbol(tpe), inPhase, f)
   }
 
 }

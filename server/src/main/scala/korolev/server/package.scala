@@ -18,14 +18,14 @@ package object server {
 
   type MimeTypes = String => Option[String]
 
-  def korolevService[F[+_]: Async, S](
-    config: KorolevServiceConfig[F, S]
+  def korolevService[F[+_]: Async, S, M](
+    config: KorolevServiceConfig[F, S, M]
   ): PartialFunction[Request, F[Response]] = {
 
     import misc._
 
     def renderStatic(request: Request): F[Response] = {
-      val (isNewDevice, deviceId) = deviceFromRequest(request)
+      val (_, deviceId) = deviceFromRequest(request)
       val sessionId = Random.alphanumeric.take(16).mkString
       val stateF = config.serverRouter
         .static(deviceId)
@@ -103,10 +103,13 @@ package object server {
         // Session storage access
         Async[F].map(config.stateStorage.read(deviceId, sessionId)) { state =>
           // Create Korolev with dynamic router
+          val dux = Dux[F, S](state)
           val router = config.serverRouter.dynamic(deviceId, sessionId)
-          val korolev = Korolev(jsAccess, state, config.render, router, fromScratch = false)
+          val env = config.envConfigurator(deviceId, sessionId, dux.apply)
+          val korolev = Korolev(dux, jsAccess, state, config.render, router, env.onMessage, fromScratch = false)
           // Subscribe on state updates an push them to storage
           korolev.subscribe(state => config.stateStorage.write(deviceId, sessionId, state))
+          korolev.onDestroy(env.onDestroy)
           // Initialize websocket
           Response.WebSocket(
             destroyHandler = () => korolev.destroy(),

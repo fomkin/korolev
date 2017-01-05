@@ -11,16 +11,16 @@ import scala.util.{Failure, Success}
   */
 trait EventPropagation {
 
-  import BrowserEffects._
+  import Effects._
   import EventPhase._
 
-  def propagateEvent[F[+_]: Async, S](events: collection.Map[String, Event[F, S]],
+  def propagateEvent[F[+_]: Async, S, M](events: collection.Map[String, Event[F, S, M]],
                                      dux: Dux.Transition[S] => F[Unit],
-                                     browserAccess: BrowserAccess[F],
+                                     browserAccess: Access[F, M],
                                      target: Id,
                                      tpe: String): Unit = {
 
-    def fire(event: Event[F, S]): Boolean = {
+    def fire(event: Event[F, S, M]): Boolean = {
       val EventResult(it, dt, haveToStop) = event match {
         case EventWithAccess(_, _, effect) => effect(browserAccess)
         case SimpleEvent(_, _, effect) => effect()

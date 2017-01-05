@@ -20,7 +20,7 @@ object GameOfLife extends KorolevBlazeServer {
   val viewSideS = viewSide.toString
   val cellRadiusS = cellRadius.toString
 
-  val service = blazeService[Future, Universe] from KorolevServiceConfig(
+  val service = blazeService[Future, Universe, Any] from KorolevServiceConfig(
     stateStorage = StateStorage.default(Universe(universeSize)),
     serverRouter = ServerRouter.empty,
     render = {
@@ -130,7 +130,7 @@ case class Universe(cells: Vector[Universe.Cell], size: Int) {
 
 object Universe {
 
-  val effects = BrowserEffects[Future, Universe]
+  val effects = Effects[Future, Universe, Any]
 
   case class Cell(x: Int, y: Int, alive: Boolean)
 
