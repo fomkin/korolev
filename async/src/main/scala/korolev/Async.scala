@@ -26,7 +26,9 @@ object Async {
   implicit def futureAsync(implicit ec: ExecutionContext): Async[Future] = {
     new Async[Future] {
       val unit: Future[Unit] = Future.successful(())
-      def pure[A](value: => A): Future[A] = Future.successful(value)
+      def pure[A](value: => A): Future[A] =
+        try Future.successful(value)
+        catch { case e: Throwable => Future.failed(e) }
       def fromTry[A](value: => Try[A]): Future[A] = Future.fromTry(value)
       def flatMap[A, B](m: Future[A])(f: (A) => Future[B]): Future[B] = m.flatMap(f)
       def map[A, B](m: Future[A])(f: (A) => B): Future[B] = m.map(f)

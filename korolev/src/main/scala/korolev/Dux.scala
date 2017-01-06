@@ -44,7 +44,8 @@ object Dux {
                 promise.complete(Failure(new Exception("Transition don't fit this state")))
             }
           } catch {
-            case e: Throwable => promise.complete(Failure(e))
+            case e: Throwable =>
+              promise.complete(Failure(e))
           } finally {
             if (queue.isEmpty) inProgress = false
             else executeNext()

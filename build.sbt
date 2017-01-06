@@ -50,7 +50,7 @@ val commonSettings = publishSettings ++ Seq(
 )
 
 val exampleSettings = commonSettings ++ Seq(
-  libraryDependencies += "org.slf4j" % "slf4j-simple" % "1.7.21",
+  libraryDependencies += "org.slf4j" % "slf4j-simple" % "1.7.+",
   publish := {}
 )
 
@@ -63,7 +63,10 @@ lazy val vdomJVM = vdom.jvm
 
 lazy val server = project.
   settings(commonSettings: _*).
-  settings(normalizedName := "korolev-server").
+  settings(
+    normalizedName := "korolev-server",
+    libraryDependencies += "biz.enef" %% "slogging-slf4j" % "0.5.2"
+  ).
   dependsOn(korolevJVM)
 
 lazy val `server-blaze` = project.
@@ -100,6 +103,7 @@ lazy val korolev = crossProject.crossType(CrossType.Pure).
   settings(commonSettings: _*).
   settings(
     normalizedName := "korolev",
+    libraryDependencies += "biz.enef" %%% "slogging" % "0.5.2",
     unmanagedResourceDirectories in Compile += file("korolev") / "src" / "main" / "resources"
   ).
   dependsOn(vdom, bridge)

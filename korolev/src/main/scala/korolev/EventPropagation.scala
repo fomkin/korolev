@@ -1,15 +1,17 @@
 package korolev
 
+import korolev.Dux.Transition
 import korolev.VDom.Id
 
 import scala.annotation.tailrec
 import scala.language.higherKinds
 import scala.util.{Failure, Success}
+import slogging.LazyLogging
 
 /**
   * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
   */
-trait EventPropagation {
+trait EventPropagation extends LazyLogging {
 
   import Effects._
   import EventPhase._
@@ -21,16 +23,20 @@ trait EventPropagation {
                                      tpe: String): Unit = {
 
     def fire(event: Event[F, S, M]): Boolean = {
+      def applyTransitions(transitionsFs: List[F[Transition[S]]]): Unit = transitionsFs match {
+        case f :: fs =>
+          Async[F].run(Async[F].flatMap(f)(t => dux(t))) {
+            case Success(_) => applyTransitions(fs)
+            case Failure(e) => logger.error("Error occurred during browser event handling", e)
+          }
+        case Nil =>
+      }
       val EventResult(it, dt, haveToStop) = event match {
         case EventWithAccess(_, _, effect) => effect(browserAccess)
         case SimpleEvent(_, _, effect) => effect()
       }
-      Seq(it.map(Async[F].pure[Dux.Transition[S]](_)), dt).flatten foreach { m =>
-        Async[F].run(m) {
-          case Success(t) => dux(t)
-          case Failure(e) => e.printStackTrace()
-        }
-      }
+      val transitionFs = List(it.map(Async[F].pure[Dux.Transition[S]](_)), dt).flatten
+      applyTransitions(transitionFs)
       !haveToStop
     }
 
