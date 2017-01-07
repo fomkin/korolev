@@ -19,7 +19,13 @@ abstract class JSObj[F[+_]: Async] extends JSLink {
 
   def call[A](name: String, args: Any*): F[A] = {
     val req = Seq("call", this, name) ++ args
-    jsAccess.request(req: _*)
+    jsAccess.request[A](req: _*)
+  }
+
+  def callAndFlush[A](name: String, args: Any*): F[A] = {
+    val result = call(name, args:_*)
+    jsAccess.flush()
+    result
   }
 
   /**

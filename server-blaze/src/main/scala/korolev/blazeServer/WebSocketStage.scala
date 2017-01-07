@@ -35,7 +35,7 @@ trait WebSocketStage extends TailStage[WebSocketFrame] {
         }
 
       case Failure(t) =>
-        logger.error(t)("error on Websocket read loop")
+        logger.debug(t)("error on Websocket read loop")
         onDirtyDisconnect(t)
         sendOutboundCommand(Command.Disconnect)
     }(trampoline)
