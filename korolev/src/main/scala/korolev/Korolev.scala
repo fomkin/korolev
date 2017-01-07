@@ -4,6 +4,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 import bridge.JSAccess
 import korolev.Effects.{Access, ElementId}
+import slogging.LazyLogging
 
 import scala.language.higherKinds
 import scala.util.{Failure, Success}
@@ -13,7 +14,7 @@ trait Korolev
 /**
   * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
   */
-object Korolev extends EventPropagation {
+object Korolev extends EventPropagation with LazyLogging {
 
   import VDom._
   import Change._
@@ -57,7 +58,7 @@ object Korolev extends EventPropagation {
           enabledEvents = enabledEvents + `type`
           Async[F].run(client.call("ListenEvent", `type`.name, false)) {
             case Success(_) => // do nothing
-            case Failure(e) => e.printStackTrace()
+            case Failure(e) => logger.error("Error occurred when invoking ListenEvent", e)
           }
         }
       }
@@ -92,7 +93,7 @@ object Korolev extends EventPropagation {
         val unit = Async[F].flatMap(asyncState)(localDux.update)
         Async[F].run(unit) {
           case Success(_) => // do nothing
-          case Failure(e) => e.printStackTrace()
+          case Failure(e) => logger.error("Error occurred when updating state", e)
         }
       }
     }
@@ -102,7 +103,7 @@ object Korolev extends EventPropagation {
         client.call("RegisterHistoryHandler", callback)
         jsAccess.flush()
       case Failure(e) =>
-        e.printStackTrace()
+        logger.error("Error occurred on history callback registration", e)
     }
 
     val eventCallbackF = jsAccess.registerCallback[String] { targetAndType =>
@@ -155,17 +156,16 @@ object Korolev extends EventPropagation {
               }
               jsAccess.flush()
             case None =>
-              println(s"Render is nod defined for ${state.getClass.getSimpleName}")
+              logger.warn(s"Render is nod defined for ${state.getClass.getSimpleName}")
           }
           val t = (System.nanoTime() - startRenderTime) / 1000000000d
-          println(s"Render time: $t")
+          //println(s"Render time: $t")
         }
 
         localDux.subscribe(onState)
         if (fromScratch) onState(initialState)
         else jsAccess.flush()
-      case Failure(e) =>
-        e.printStackTrace()
+      case Failure(e) => logger.error("Error occurred on event callback registration", e)
     }
 
     if (fromScratch)
