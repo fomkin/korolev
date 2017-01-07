@@ -160,6 +160,13 @@ abstract class JSAccess[F[+_]: Async] { self ⇒
     request("registerCallback", callbackId)
   }
 
+  def registerCallbackAndFlush[T](f: T ⇒ Unit): F[JSObj[F]] = {
+    val result = registerCallback(f)
+    flush()
+    result
+  }
+
+
   def flush(): Unit = {
     // Do nothing by default
   }

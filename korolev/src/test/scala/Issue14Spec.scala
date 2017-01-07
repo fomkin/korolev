@@ -3,6 +3,7 @@ import korolev.Effects.Event
 import korolev._
 import org.scalatest.{FlatSpec, Matchers}
 
+import RunNowExecutionContext.instance
 import scala.concurrent.Future
 
 /**
@@ -10,21 +11,16 @@ import scala.concurrent.Future
   */
 class Issue14Spec extends FlatSpec with Matchers {
 
-  val ba = {
-    import RunNowExecutionContext.instance
-    new Effects[Future, Issue14Spec.S, Any] {}
-  }
+  val ba = Effects[Future, Issue14Spec.S, Any]
   import ba._
-
 
   "Korolev" should "ignore events from outdated DOM" in {
 
-    implicit val ec = RunNowExecutionContext.instance
     var counter = 0
 
     val jSAccess = new JSAccess {
       def send(args: Seq[Any]): Unit = {}
-      implicit val executionContext = ec
+      implicit val executionContext = RunNowExecutionContext.instance
     }
 
     Korolev(
@@ -53,6 +49,10 @@ class Issue14Spec extends FlatSpec with Matchers {
     jSAccess.resolvePromise(0, isSuccess = true, "@obj:@Korolev")
     jSAccess.resolvePromise(1, isSuccess = true, "@obj:^cb0") // pop state handler
     jSAccess.resolvePromise(2, isSuccess = true, "@obj:^cb1") // event handler
+    jSAccess.resolvePromise(3, isSuccess = true, "@unit")
+    jSAccess.resolvePromise(4, isSuccess = true, "@unit")
+    jSAccess.resolvePromise(5, isSuccess = true, "@unit")
+    jSAccess.resolvePromise(6, isSuccess = true, "@unit")
 
     jSAccess.fireCallback("^cb1", "1:0_1_0:mousedown")
     jSAccess.fireCallback("^cb1", "1:0_1_0:mouseup")

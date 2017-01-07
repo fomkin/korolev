@@ -14,6 +14,7 @@ trait Async[F[+_]] {
   def promise[A]: Async.Promise[F, A]
   def flatMap[A, B](m: F[A])(f: A => F[B]): F[B]
   def map[A, B](m: F[A])(f: A => B): F[B]
+  def sequence[A](xs: Seq[F[A]]): F[Seq[A]]
   def run[A, U](m: F[A])(f: Try[A] => U): Unit
 }
 
@@ -33,10 +34,16 @@ object Async {
       def flatMap[A, B](m: Future[A])(f: (A) => Future[B]): Future[B] = m.flatMap(f)
       def map[A, B](m: Future[A])(f: (A) => B): Future[B] = m.map(f)
       def run[A, U](m: Future[A])(f: (Try[A]) => U): Unit = m.onComplete(f)
+      def sequence[A](xs: Seq[Future[A]]): Future[Seq[A]] = Future.sequence(xs)
       def promise[A]: Promise[Future, A] = {
         val promise = scala.concurrent.Promise[A]()
         Promise(promise.future, promise.complete)
       }
     }
+  }
+
+  implicit final class AsyncOps[F[+_]: Async, +A](async: => F[A]) {
+    def map[B](f: A => B): F[B] = Async[F].map(async)(f)
+    def flatMap[B](f: A => F[B]): F[B] = Async[F].flatMap(async)(f)
   }
 }

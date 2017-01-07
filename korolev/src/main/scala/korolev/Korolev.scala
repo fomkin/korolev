@@ -4,6 +4,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 import bridge.JSAccess
 import korolev.Effects.{Access, ElementId}
+import korolev.Async.AsyncOps
 import slogging.LazyLogging
 
 import scala.language.higherKinds
@@ -86,37 +87,36 @@ object Korolev extends EventPropagation with LazyLogging {
       }
     }
 
-    val historyCallbackF = jsAccess.registerCallback[String] { pathString =>
-      val path = Router.Path.fromString(pathString)
-      val maybeState = router.toState.lift(localDux.state, path)
-      maybeState foreach { asyncState =>
-        val unit = Async[F].flatMap(asyncState)(localDux.update)
-        Async[F].run(unit) {
-          case Success(_) => // do nothing
-          case Failure(e) => logger.error("Error occurred when updating state", e)
-        }
-      }
+    val initialization = Async[F] sequence {
+      Seq(
+        jsAccess.registerCallbackAndFlush[String] { pathString =>
+          val path = Router.Path.fromString(pathString)
+          val maybeState = router.toState.lift(localDux.state, path)
+          maybeState foreach { asyncState =>
+            val unit = Async[F].flatMap(asyncState)(localDux.update)
+            Async[F].run(unit) {
+              case Success(_) => // do nothing
+              case Failure(e) => logger.error("Error occurred when updating state", e)
+            }
+          }
+        } flatMap { historyCallback =>
+          client.callAndFlush[Unit]("RegisterHistoryHandler", historyCallback)
+        },
+        jsAccess.registerCallbackAndFlush[String] { targetAndType =>
+          val Array(renderNum, target, tpe) = targetAndType.split(':')
+          if (currentRenderNum.get == renderNum.toInt)
+            propagateEvent(events, localDux.apply, browserAccess, Id(target), tpe)
+        } flatMap { eventCallback =>
+          client.callAndFlush[Unit]("RegisterGlobalEventHandler", eventCallback)
+        },
+        client.callAndFlush[Unit]("SetRenderNum", 0),
+        if (fromScratch) client.callAndFlush("CleanRoot") else Async[F].unit
+      )
     }
 
-    Async[F].run(historyCallbackF) {
-      case Success(callback) =>
-        client.call("RegisterHistoryHandler", callback)
-        jsAccess.flush()
-      case Failure(e) =>
-        logger.error("Error occurred on history callback registration", e)
-    }
-
-    val eventCallbackF = jsAccess.registerCallback[String] { targetAndType =>
-      val Array(renderNum, target, tpe) = targetAndType.split(':')
-      if (currentRenderNum.get == renderNum.toInt)
-        propagateEvent(events, localDux.apply, browserAccess, Id(target), tpe)
-    }
-
-    Async[F].run(eventCallbackF) {
-      case Success(eventCallback) =>
-        client.call("RegisterGlobalEventHandler", eventCallback)
-        client.call("SetRenderNum", 0)
-
+    Async[F].run(initialization) {
+      case Success(_) =>
+        logger.trace("Korolev initialization complete")
         val renderOpt = render.lift
 
         @volatile var lastRender =
@@ -132,7 +132,6 @@ object Korolev extends EventPropagation with LazyLogging {
             fromState.lift(state).
             foreach(path => client.call("ChangePageUrl", path.toString))
 
-          val startRenderTime = System.nanoTime()
           client.call("SetRenderNum", currentRenderNum.incrementAndGet())
 
           renderOpt(state) match {
@@ -158,8 +157,6 @@ object Korolev extends EventPropagation with LazyLogging {
             case None =>
               logger.warn(s"Render is nod defined for ${state.getClass.getSimpleName}")
           }
-          val t = (System.nanoTime() - startRenderTime) / 1000000000d
-          //println(s"Render time: $t")
         }
 
         localDux.subscribe(onState)
@@ -168,10 +165,6 @@ object Korolev extends EventPropagation with LazyLogging {
       case Failure(e) => logger.error("Error occurred on event callback registration", e)
     }
 
-    if (fromScratch)
-      client.call("CleanRoot")
-
-    jsAccess.flush()
     localDux
   }
 }

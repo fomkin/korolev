@@ -156,6 +156,7 @@
           }
         } catch (exception) {
           err = obj + '.' + name + '(' + callArgs + ') call failure: ' + exception;
+          console.error(err);
           cb([reqId, false, err]);
         }
       }
