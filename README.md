@@ -49,24 +49,19 @@ A function that takes the current *State* and transforms it into a new *State*. 
 
 You can subscribe to client-side DOM events. Event flow is similar to the [W3 standard](http://www.w3.org/TR/uievents/#event-flow). Event handlers produce *Transitions*.
 
-### Getting Started
+## Running Examples
 
-Just clone sources and call this at project directory:
+Just call this at shell:
 
 ```
-% sbt
-% project simpleExample
-% reStart
+git clone https://github.com/fomkin/korolev.git && \
+cd korolev && \
+chmod +x sbt && \
+./sbt simpleExample/run
 ```
 
 After you will able to reach example app at `http://localhost:8181`
 (you may do same for others samples like `routingExample`, `gameOfLifeExample`).
-
-For your project based on Korolev you can use:
-
-```
-libraryDependencies += "com.github.fomkin" %% "korolev-server-blaze" % "0.1.0"
-```
 
 ## Future plans
 
