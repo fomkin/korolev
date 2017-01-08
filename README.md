@@ -54,9 +54,7 @@ You can subscribe to client-side DOM events. Event flow is similar to the [W3 st
 Just call this at shell:
 
 ```
-git clone https://github.com/fomkin/korolev.git && \
-cd korolev && \
-chmod +x sbt && \
+git clone https://github.com/fomkin/korolev.git && cd korolev
 ./sbt simpleExample/run
 ```
 
