@@ -49,6 +49,18 @@ A function that takes the current *State* and transforms it into a new *State*. 
 
 You can subscribe to client-side DOM events. Event flow is similar to the [W3 standard](http://www.w3.org/TR/uievents/#event-flow). Event handlers produce *Transitions*.
 
+## Running Examples
+
+Just call this at shell:
+
+```
+git clone https://github.com/fomkin/korolev.git && cd korolev
+./sbt simpleExample/run
+```
+
+After you will able to reach example app at `http://localhost:8181`
+(you may do same for others samples like `routingExample`, `gameOfLifeExample`).
+
 ## Future plans
 
 All features and changes are registered in the [issues](https://github.com/fomkin/korolev/issues). Our first goal is to ship a ready-to-use version with a semi-stable API.
