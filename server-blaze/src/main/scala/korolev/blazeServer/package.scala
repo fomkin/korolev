@@ -8,6 +8,7 @@ import korolev.server.{KorolevServiceConfig, MimeTypes, Request => KorolevReques
 import org.http4s.blaze.channel._
 import org.http4s.blaze.channel.nio2.NIO2SocketServerGroup
 import org.http4s.blaze.http._
+import org.http4s.blaze.pipeline.stages.SSLStage
 import org.http4s.blaze.pipeline.{Command, LeafBuilder}
 import org.http4s.websocket.WebsocketBits._
 
@@ -105,7 +106,17 @@ package object blazeServer {
     config: BlazeServerConfig
   ): Unit = {
 
-    val f: BufferPipelineBuilder = _ => LeafBuilder(new HttpServerStage(1024*1024, 10*1024)(service))
+    val f: BufferPipelineBuilder = _ => {
+      def serviceStage = LeafBuilder(new HttpServerStage(1024*1024, 10*1024)(service))
+      config.sslContext match {
+        case Some(sslContext) =>
+          val eng = sslContext.createSSLEngine()
+          eng.setUseClientMode(false)
+          serviceStage.prepend(new SSLStage(eng))
+        case None => serviceStage
+      }
+    }
+
     val group = AsynchronousChannelGroup.withThreadPool(config.executionContext)
     val factory = NIO2SocketServerGroup(config.bufferSize, Some(group))
 
