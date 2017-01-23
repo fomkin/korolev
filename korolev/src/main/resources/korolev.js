@@ -165,7 +165,8 @@
     global.Korolev.RegisterRoot(root);
 
     function initializeBridge() {
-      var ws = new WebSocket(wsUri)
+      console.log('Try to open connection to ' + wsUri);
+      var ws = new WebSocket(wsUri);
       ws.addEventListener('open', onOpen);
       Bridge.webSocket(ws).catch(function(errorEvent) {
         // Try to reconnect after 2s
