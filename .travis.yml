@@ -1,8 +1,16 @@
 sudo: false
 language: scala
 jdk:
-  - oraclejdk8
+- oraclejdk8
 scala:
-   - 2.11.8
-   - 2.12.1
+- 2.11.8
+- 2.12.1
+cache:
+  directories:
+    - $HOME/.coursier
 script: sbt ++$TRAVIS_SCALA_VERSION -Dfile.encoding=UTF8 -J-XX:MaxPermSize=1024M test
+addons:
+  sauce_connect:
+    username: "yelbota"
+  jwt:
+    secure: XbakpecbCZA2CCGKd5F5Fe0kduVmUEBReE+uZQJk85Tofsj8qP4xCXVjKDHW2I5BqR+LNKQP9mN4ZrjPAgP03h/l7YGYIpqXQmBaftiYuhSJEI+TLXpNUybrBsz4XoV0YloQHKqZpzcACR3hteOXV4XJZvUY0IRTuZe1nVyrJ6BHhpCOL2Opu/SemWtUd/617BNsgscCb3QdBHqack3rg8g3WqIAKXbY1okgH+m79hQK0T8iK4u/x6AV+DGhLXWMn1INJQ+sLyeM4iFUbbdul74okY1OGgGnXq4IusgroebX9hoQ39uYYY25iZoMG5U08xn707nnInw7yxk2tnYM9k8Uq0vWx7pINwjgCrrIHgvRs6dI+uDEoHBFbyzYdFhHrL3SS95GvN5VaicJ5WnGpi/ae7lQSI3/nHuNPlFTKVjgLeUoRgYZZ9SVVR9ZYlD7/PP6TEi/QYYNEFh8aq057FzuuwDrMDJtMIY29Sk/UefvV+S4GCDVcOdTUfB/GCfYpLvWj/SjLg5jH7TfAoQ58coS4iqDGn7V5yk2BiJkt8DAxRVHDa+4+iZ1t5TKIFl/84k3T5gs3k2aP3IBkNL6400pILfCH2VNZYx5VjMRFrIn2cxgx1bmg+CLwwUzn1WylU8sqR6nNtTSINua1tpgP/6Xrlyl2uK8Yuj4i8uJ6ho=

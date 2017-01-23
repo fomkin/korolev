@@ -61,6 +61,10 @@ git clone https://github.com/fomkin/korolev.git && cd korolev
 After you will able to reach example app at `http://localhost:8181`
 (you may do same for others samples like `routingExample`, `gameOfLifeExample`).
 
+## Browser support
+
+[![Browser support results](https://saucelabs.com/browser-matrix/yelbota.svg)](https://saucelabs.com/u/yelbota)
+
 ## Future plans
 
 All features and changes are registered in the [issues](https://github.com/fomkin/korolev/issues). Our first goal is to ship a ready-to-use version with a semi-stable API.
