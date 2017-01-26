@@ -116,7 +116,7 @@ package object blazeServer {
   def runServer(
     service: HttpService,
     config: BlazeServerConfig
-  ): Unit = {
+  ): ServerChannel = {
 
     val f: BufferPipelineBuilder = _ => {
       def serviceStage = LeafBuilder(new HttpServerStage(1024*1024, 10*1024)(service))
@@ -132,10 +132,14 @@ package object blazeServer {
     val group = AsynchronousChannelGroup.withThreadPool(config.executionContext)
     val factory = NIO2SocketServerGroup(config.bufferSize, Some(group))
 
-    factory.
+    val serverChannel = factory.
       bind(new InetSocketAddress(config.port), f).
-      getOrElse(sys.error("Failed to bind server")).
-      join()
+      getOrElse(sys.error("Failed to bind server"))
+
+    if (!config.doNotBlockCurrentThread)
+      serverChannel.join()
+
+    serverChannel
   }
 
   private object cookieExtractor {

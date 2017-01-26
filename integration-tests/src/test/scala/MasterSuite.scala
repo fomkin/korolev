@@ -16,19 +16,16 @@ class MasterSuite extends FunSuite with BeforeAndAfterAll {
 
   override def beforeAll(): Unit = {
     val service = testApp.TestApp.service
-    val config = BlazeServerConfig(port = 8000)
-    val f: BufferPipelineBuilder = _ => LeafBuilder(new HttpServerStage(1024*1024, 10*1024)(service))
-    val group = AsynchronousChannelGroup.withThreadPool(defaultExecutor)
-    val factory = NIO2SocketServerGroup(config.bufferSize, Some(group))
-
-    server = Some(factory.
-      bind(new InetSocketAddress(config.port), f).
-      getOrElse(sys.error("Failed to bind server")))
+    val config = BlazeServerConfig(
+      port = 8000,
+      doNotBlockCurrentThread = true
+    )
+    server = Some(korolev.blazeServer.runServer(service, config))
   }
 
   override def nestedSuites = Vector(
-    new AddTodoSuite(Caps(Caps.Edge, "14.14393", "Windows 10")),
-    new AddTodoSuite(Caps(Caps.Chrome, "49.0", "Windows 10"))
+    new AddTodoSuite(Caps(Caps.Edge, "14.14393", "Windows 10"))//,
+    //new AddTodoSuite(Caps(Caps.Chrome, "49.0", "Windows 10"))
   )
 
   override def afterAll(): Unit = {

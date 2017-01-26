@@ -4,11 +4,12 @@ import java.net.URL
 import com.google.common.collect.{ImmutableList, ImmutableMap}
 import org.openqa.selenium.WebDriver
 import org.openqa.selenium.chrome.{ChromeDriver, ChromeDriverService}
+import org.openqa.selenium.logging.LogType
 import org.openqa.selenium.remote.{DesiredCapabilities, RemoteWebDriver}
 import org.scalatest.concurrent.Eventually
 import org.scalatest.selenium.WebBrowser
 import org.scalatest.{BeforeAndAfter, DoNotDiscover, FunSuite, Matchers}
-
+import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 
 /**
@@ -22,24 +23,31 @@ class AddTodoSuite(caps: Caps) extends FunSuite with Matchers with BeforeAndAfte
     val accessKey = System.getenv("SAUCE_ACCESS_KEY")
     val url = new URL(s"http://$username:$accessKey@ondemand.saucelabs.com:80/wd/hub")
     new RemoteWebDriver(url, caps.desiredCapabilities)
-//    new ChromeDriver(new ChromeDriverService(
-//      new File("/Users/fomkin/Downloads/chromedriver"), 9515,
-//      ImmutableList.of(), ImmutableMap.of()
-//    ))
   }
 
-  test("Todo should be added on 'Add todo' click") {
+  test(s"$caps: Todo should be added on 'Add todo' click") {
     val newTodoText = "Hello world"
     go to "http://localhost:8000/"
     pageTitle should be ("The Test App")
     textField(id("todo-input")).value = newTodoText
     click on id("todo-submit-button")
-    eventually(timeout(3.seconds)) {
-      val newTodoExists = name("todo-list-item")
-        .findAllElements
-        .exists(_.text == newTodoText)
-      newTodoExists should be (true)
+    Thread.sleep(1000)
+    val newTodoExists = name("todo-list-item")
+      .findAllElements.toSeq
+      .exists(_.text == newTodoText)
+
+    if (!newTodoExists) {
+      printBrowserLog()
+      fail("Added todo entry is not found in todos list")
     }
+    newTodoExists should be (true)
+  }
+
+  def printBrowserLog(): Unit = {
+//    val log = webDriver.manage().logs().get(LogType.BROWSER)
+//    println("Browser log:")
+//    for (logEntry <- log.asScala)
+//      println(s"- [${logEntry.getLevel}] ${logEntry.getMessage}")
   }
 
   after {
