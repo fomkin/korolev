@@ -51,12 +51,17 @@ package object blazeServer {
           (uri, Map.empty[String, String])
         }
       }
+
+
       val korolevRequest = KorolevRequest(
         path = Router.Path.fromString(path),
         params,
         cookie = { key =>
           headers collectFirst {
-            case ("cookie", cookieExtractor(map))
+            /* Different browsers can send http-headers with upper-case first literal,
+             * or whole word in lower-case
+             * */
+            case ("Cookie" | "сookie", cookieExtractor(map))
               if map.contains(key) => map(key)
           }
         }
@@ -129,7 +134,7 @@ package object blazeServer {
   private object cookieExtractor {
     def unapply(arg: String): Option[Map[String, String]] = Some {
       arg.split(';') map { part =>
-        val Array(name, content) = part.split("=", 1)
+        val Array(name, content) = part.split("=", 2)
         name.trim -> content.trim
       } toMap
     }
