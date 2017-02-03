@@ -14,9 +14,10 @@ object RoutingExample extends KorolevBlazeServer {
   val storage = StateStorage.default[Future, State](State())
   val inputId = elementId
 
-  val service = blazeService[Future, State, Any] from KorolevServiceConfig(
+  val service = blazeService[Future, State, Any] from KorolevServiceConfig [Future, State, Any] (
     stateStorage = storage,
     head = 'head(
+      'title("Main Routing Page"),
       'link(
         'href /= "/main.css",
         'rel /= "stylesheet",
