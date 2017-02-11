@@ -1,13 +1,15 @@
 package korolev
 
 import java.net.InetSocketAddress
+import java.nio.ByteBuffer
 import java.nio.channels.AsynchronousChannelGroup
+import java.nio.charset.StandardCharsets
 import java.util.concurrent.Executors
 
 import korolev.server.{KorolevServiceConfig, MimeTypes, Request => KorolevRequest, Response => KorolevResponse}
 import org.http4s.blaze.channel._
 import org.http4s.blaze.channel.nio2.NIO2SocketServerGroup
-import org.http4s.blaze.http._
+import org.http4s.blaze.http.{HttpResponse, HttpService, Response, WSResponse}
 import org.http4s.blaze.pipeline.stages.SSLStage
 import org.http4s.blaze.pipeline.{Command, LeafBuilder}
 import org.http4s.websocket.WebsocketBits._
@@ -34,9 +36,9 @@ package object blazeServer {
     mimeTypes: MimeTypes
   ): HttpService = {
 
-    val korolevServer = korolev.server.korolevService(config)
+    val korolevServer = korolev.server.korolevService(mimeTypes, config)
 
-    (_, uri, headers, _) => {
+    (_, uri, headers, body) => {
       val (path, params) = {
         val pi = uri.indexOf('?')
         if (pi > -1) {
@@ -64,21 +66,26 @@ package object blazeServer {
             case ("Cookie" | "сookie", cookieExtractor(map))
               if map.contains(key) => map(key)
           }
+        },
+        body = {
+          val l = body.remaining()
+          val bytes = new Array[Byte](l)
+          if (l > 0) body.get(bytes)
+          new String(bytes, StandardCharsets.UTF_8)
         }
       )
 
       val responseF = Async[F].map(korolevServer(korolevRequest)) {
-        case KorolevResponse.Http(stream, ext, maybeDevice) =>
-          val array = new Array[Byte](stream.available)
-          stream.read(array)
-          HttpResponse.Ok(
-            body = array,
-            headers = {
-              val contentTypeHeader = mimeTypes(ext).map(x => "content-type" -> x)
-              val deviceHeader = maybeDevice.map(x => "set-cookie" -> s"device=$x")
-              Seq(contentTypeHeader, deviceHeader).flatten
-            }
-          )
+        case KorolevResponse.Http(status, streamOpt, responseHeaders) =>
+          val array = streamOpt match {
+            case Some(stream) =>
+              val array = new Array[Byte](stream.available)
+              stream.read(array)
+              array
+            case None =>
+              Array.empty[Byte]
+          }
+          HttpResponse(status.code, status.phrase, responseHeaders, ByteBuffer.wrap(array))
         case KorolevResponse.WebSocket(publish, subscribe, destroy) =>
           // TODO handle disconnect on failure
           val stage = new WebSocketStage {
