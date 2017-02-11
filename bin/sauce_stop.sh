@@ -1,3 +1,5 @@
+#!/bin/bash
+
 cd target
 
 PID=`cat sauce_connect_pid`

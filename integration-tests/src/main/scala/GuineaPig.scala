@@ -1,15 +1,10 @@
-package testApp
-
 import korolev._
-import korolev.server._
 import korolev.blazeServer._
+import korolev.server._
 
 import scala.concurrent.Future
 
-/**
-  * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
-  */
-object TestApp {
+object GuineaPig {
 
   import State.effects._
 

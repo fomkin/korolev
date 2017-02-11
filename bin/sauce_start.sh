@@ -1,3 +1,5 @@
+#!/bin/bash
+
 cd target
 rm sauce_tunnel_ready 2> /dev/null
 rm sauce_connect_pid 2> /dev/null

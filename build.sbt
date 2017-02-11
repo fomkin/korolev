@@ -144,9 +144,8 @@ val `integration-tests` = project.
   settings(dontPublishSettings:_*).
   settings(
     libraryDependencies ++= Seq(
-      "org.slf4j" % "slf4j-simple" % "1.7.+" % "test",
-      "org.seleniumhq.selenium" % "selenium-java" % "3.0.1" % "test",
-      "org.scalatest" %% "scalatest" % "3.0.1" % "test"
+      "org.slf4j" % "slf4j-simple" % "1.7.+",
+      "org.seleniumhq.selenium" % "selenium-java" % "2.53.1"
     )
   ).
   dependsOn(`server-blaze`)

@@ -2,6 +2,9 @@ sudo: false
 language: scala
 jdk:
   - oraclejdk8
+branches:
+  only:
+  - master
 scala:
   - 2.11.8
   - 2.12.1
@@ -11,7 +14,4 @@ cache:
     - $HOME/.sbt
     - $HOME/.ivy2
 script:
-  - ./bin/sauce_setup.sh
-  - ./bin/sauce_start.sh
-  - sbt ++$TRAVIS_SCALA_VERSION -Dfile.encoding=UTF8 -J-XX:MaxPermSize=1024M test
-  - ./bin/sauce_stop.sh
+  - ./bin/travis_build.sh
