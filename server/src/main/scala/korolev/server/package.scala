@@ -4,7 +4,7 @@ import java.io.{ByteArrayInputStream, InputStream}
 import java.nio.charset.StandardCharsets
 import java.util.UUID
 import java.util.concurrent.ConcurrentLinkedQueue
-import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 
 import bridge.JSAccess
 import korolev.Async._
@@ -21,6 +21,8 @@ import scala.util.{Failure, Random, Success}
 package object server extends LazyLogging {
 
   type MimeTypes = String => Option[String]
+
+  private[server] class SessionDestroyedException(s: String) extends Exception(s)
 
   private[server] abstract class KorolevSession[F[+_]: Async] {
     def publish(message: String): F[Unit]
@@ -64,8 +66,8 @@ package object server extends LazyLogging {
         Response.Http(
           status = Response.Status.Ok,
           headers = Seq(
-            "set-cookie" -> s"device=$deviceId",
-            "content-type" -> htmlContentType
+            "content-type" -> htmlContentType,
+            "set-cookie" -> s"device=$deviceId"
           ),
           body = Some {
             val html = "<!DOCTYPE html>" + dom.html
@@ -135,6 +137,7 @@ package object server extends LazyLogging {
 
         new KorolevSession[F] {
 
+          val aliveRef = new AtomicBoolean(true)
           val currentPromise = new AtomicReference(Option.empty[Async.Promise[F, String]])
 
           // Put the session to registry
@@ -158,11 +161,13 @@ package object server extends LazyLogging {
           }
 
           def destroy(): F[Unit] = {
-            currentPromise.get() foreach { promise =>
-              promise.complete(Failure(new InterruptedException("Session has been closed")))
+            if (aliveRef.getAndSet(false)) {
+              currentPromise.get() foreach { promise =>
+                promise.complete(Failure(new SessionDestroyedException("Session has been closed")))
+              }
+              korolev.destroy()
+              sessions.remove(sessionKey)
             }
-            korolev.destroy()
-            sessions.remove(sessionKey)
             Async[F].unit
           }
         }
@@ -191,7 +196,10 @@ package object server extends LazyLogging {
           case Some(x) => Async[F].pure(x)
           case None => createSession(deviceId, sessionId)
         }
-        sessionAsync.flatMap(_.nextMessage.map(Response.Http(Response.Status.Ok, _)))
+        sessionAsync.flatMap(_.nextMessage.map(Response.Http(Response.Status.Ok, _))) recover {
+          case _: SessionDestroyedException =>
+            Response.Http(Response.Status.Gone, "Session has been destroyed")
+        }
       case Request(Root / "bridge" / "web-socket" / deviceId / sessionId, _, _, _) =>
         val sessionAsync = sessions.get(makeSessionKey(deviceId, sessionId)) match {
           case Some(x) => Async[F].pure(x)
@@ -212,6 +220,7 @@ package object server extends LazyLogging {
                 case Success(message) =>
                   newSubscriber(message)
                   aux()
+                case Failure(e: SessionDestroyedException) => // Do nothing
                 case Failure(e) =>
                   logger.error("An error occurred during polling message from session", e)
               }

@@ -1,6 +1,7 @@
 package korolev
 
 import java.net.InetSocketAddress
+import java.nio.ByteBuffer
 import java.nio.channels.AsynchronousChannelGroup
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.Executors
@@ -8,7 +9,7 @@ import java.util.concurrent.Executors
 import korolev.server.{KorolevServiceConfig, MimeTypes, Request => KorolevRequest, Response => KorolevResponse}
 import org.http4s.blaze.channel._
 import org.http4s.blaze.channel.nio2.NIO2SocketServerGroup
-import org.http4s.blaze.http._
+import org.http4s.blaze.http.{HttpResponse, HttpService, Response, WSResponse}
 import org.http4s.blaze.pipeline.stages.SSLStage
 import org.http4s.blaze.pipeline.{Command, LeafBuilder}
 import org.http4s.websocket.WebsocketBits._
@@ -37,7 +38,7 @@ package object blazeServer {
 
     val korolevServer = korolev.server.korolevService(mimeTypes, config)
 
-    (method, uri, headers, body) => {
+    (_, uri, headers, body) => {
       val (path, params) = {
         val pi = uri.indexOf('?')
         if (pi > -1) {
@@ -84,7 +85,7 @@ package object blazeServer {
             case None =>
               Array.empty[Byte]
           }
-          HttpResponse(status.code, status.phrase, responseHeaders, new String(array))
+          HttpResponse(status.code, status.phrase, responseHeaders, ByteBuffer.wrap(array))
         case KorolevResponse.WebSocket(publish, subscribe, destroy) =>
           // TODO handle disconnect on failure
           val stage = new WebSocketStage {

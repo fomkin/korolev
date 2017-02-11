@@ -170,7 +170,7 @@
       ws.addEventListener('open', onOpen);
       Bridge.webSocket(ws).catch(function(errorEvent) {
         // Try to reconnect after 2s
-        setTimeout(initializeBridgeLongPolling, 2000);
+        setTimeout(initializeBridgeLongPolling, 1);
       });
     }
 
@@ -221,7 +221,6 @@
         var request = new XMLHttpRequest();
         request.addEventListener('readystatechange', function() {
           if (request.readyState === 4) {
-            console.log(request.readyState);
             switch (request.status) {
               case 400:
                 var event = new ErrorEvent('error', {
@@ -235,7 +234,6 @@
         });
         request.open('POST', uriPrefix + 'publish', true);
         request.setRequestHeader("Content-Type", "application/json");
-        console.log("send json to the server")
         request.send(message);
       }
 
@@ -263,7 +261,7 @@
       initializeBridgeWs();
     }
 
-    initializeBridgeLongPolling()
+    initializeBridgeWs();
   });
 
   function getCookie(name) {

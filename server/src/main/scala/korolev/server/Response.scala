@@ -42,5 +42,9 @@ object Response {
       val code = 400
       val phrase = "Bad Request"
     }
+    case object Gone extends Status {
+      val code = 410
+      val phrase = "Gone"
+    }
   }
 }

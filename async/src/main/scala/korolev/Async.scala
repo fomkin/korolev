@@ -14,6 +14,7 @@ trait Async[F[+_]] {
   def promise[A]: Async.Promise[F, A]
   def flatMap[A, B](m: F[A])(f: A => F[B]): F[B]
   def map[A, B](m: F[A])(f: A => B): F[B]
+  def recover[A, U >: A](m: F[A])(f: PartialFunction[Throwable, U]): F[U]
   def sequence[A](xs: Seq[F[A]]): F[Seq[A]]
   def run[A, U](m: F[A])(f: Try[A] => U): Unit
 }
@@ -34,6 +35,7 @@ object Async {
       def flatMap[A, B](m: Future[A])(f: (A) => Future[B]): Future[B] = m.flatMap(f)
       def map[A, B](m: Future[A])(f: (A) => B): Future[B] = m.map(f)
       def run[A, U](m: Future[A])(f: (Try[A]) => U): Unit = m.onComplete(f)
+      def recover[A, U >: A](m: Future[A])(f: PartialFunction[Throwable, U]): Future[U] = m.recover(f)
       def sequence[A](xs: Seq[Future[A]]): Future[Seq[A]] = Future.sequence(xs)
       def promise[A]: Promise[Future, A] = {
         val promise = scala.concurrent.Promise[A]()
@@ -45,6 +47,7 @@ object Async {
   implicit final class AsyncOps[F[+_]: Async, +A](async: => F[A]) {
     def map[B](f: A => B): F[B] = Async[F].map(async)(f)
     def flatMap[B](f: A => F[B]): F[B] = Async[F].flatMap(async)(f)
+    def recover[U >: A](f: PartialFunction[Throwable, U]): F[U] = Async[F].recover[A, U](async)(f)
     def run[U](f: Try[A] => U): Unit = Async[F].run(async)(f)
     def run(): Unit = Async[F].run(async)(_ => ())
   }
