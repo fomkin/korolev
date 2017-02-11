@@ -45,5 +45,7 @@ object Async {
   implicit final class AsyncOps[F[+_]: Async, +A](async: => F[A]) {
     def map[B](f: A => B): F[B] = Async[F].map(async)(f)
     def flatMap[B](f: A => F[B]): F[B] = Async[F].flatMap(async)(f)
+    def run[U](f: Try[A] => U): Unit = Async[F].run(async)(f)
+    def run(): Unit = Async[F].run(async)(_ => ())
   }
 }

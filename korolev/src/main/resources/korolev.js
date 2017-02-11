@@ -149,29 +149,106 @@
     }
   })();
 
-  document.addEventListener("DOMContentLoaded", function() {
+  global.document.addEventListener("DOMContentLoaded", function() {
 
     var deviceId = getCookie('device');
-    var root = document.body;
-    var loc = window.location;
-    var wsUri;
-    if (loc.protocol === "https:") wsUri = "wss://";
-    else wsUri = "ws://";
+    var root = global.document.body;
+    var loc = global.location;
 
-    wsUri += loc.host + KorolevServerRootPath +
-      '/bridge' +
-      '/' + deviceId +
-      '/' + KorolevSessionId;
     global.Korolev.RegisterRoot(root);
 
-    function initializeBridge() {
-      console.log('Try to open connection to ' + wsUri);
-      var ws = new WebSocket(wsUri);
+    function initializeBridgeWs() {    
+      var uri, ws;
+      if (loc.protocol === "https:") uri = "wss://";
+      else uri = "ws://";
+      uri += loc.host + KorolevServerRootPath +
+        'bridge/web-socket' +
+        '/' + deviceId +
+        '/' + KorolevSessionId;
+      console.log('Try to open connection to ' + uri + ' using WebSocket');
+      ws = new WebSocket(uri);
       ws.addEventListener('open', onOpen);
       Bridge.webSocket(ws).catch(function(errorEvent) {
         // Try to reconnect after 2s
-        setTimeout(initializeBridge, 2000);
+        setTimeout(initializeBridgeLongPolling, 2000);
       });
+    }
+
+    function initializeBridgeLongPolling() {
+      var uriPrefix = loc.protocol + "//" + loc.host + KorolevServerRootPath +
+        'bridge/long-polling' +
+        '/' + deviceId +
+        '/' + KorolevSessionId +
+        '/';
+
+      console.log('Try to open connection to ' + uriPrefix + ' using long polling');
+
+      function lpSubscribe(target, firstTime) {
+        var request = new XMLHttpRequest();
+        request.addEventListener('readystatechange', function() {
+          if (request.readyState === 4) {
+            switch (request.status) {
+              case 200:
+                if (firstTime) {
+                  var event = new Event('open');
+                  target.dispatchEvent(event);
+                }
+                var event = new MessageEvent('message', {
+                  'data': request.responseText
+                });
+                target.dispatchEvent(event);
+                break;
+              case 410:
+                var event = new Close('close');
+                target.dispatchEvent(event);
+                break;
+              case 400:
+                var event = new ErrorEvent('error', {
+                  error: new Error(request.responseText),
+                  message: request.responseText
+                });
+                target.dispatchEvent(event);
+                break;
+            }
+            lpSubscribe(target);
+          }
+        });
+        request.open('GET', uriPrefix + 'subscribe', true);
+        request.send(null);
+      }
+
+      function lpPublish(target, message) {
+        var request = new XMLHttpRequest();
+        request.addEventListener('readystatechange', function() {
+          if (request.readyState === 4) {
+            console.log(request.readyState);
+            switch (request.status) {
+              case 400:
+                var event = new ErrorEvent('error', {
+                  error: new Error(request.responseText),
+                  message: request.responseText,
+                });
+                target.dispatchEvent(event);
+                break;
+            }
+          }
+        });
+        request.open('POST', uriPrefix + 'publish', true);
+        request.setRequestHeader("Content-Type", "application/json");
+        console.log("send json to the server")
+        request.send(message);
+      }
+
+      var fakeWs = global.document.createDocumentFragment()
+      fakeWs.send = function(message) {
+        lpPublish(fakeWs, message);
+      }
+      fakeWs.addEventListener('open', onOpen);
+      Bridge.webSocket(fakeWs).catch(function(errorEvent) {
+        // Try to reconnect after 2s
+        setTimeout(initializeBridgeWs, 2000);
+      });
+      lpSubscribe(fakeWs, true);
     }
 
     function onOpen(event) {
@@ -183,10 +260,10 @@
       Korolev.UnregisterGlobalEventHandler();
       Korolev.UnregisterHistoryHandler();
       console.log("Connection closed. Global event handler us unregistered. Try to reconnect.");
-      initializeBridge();
+      initializeBridgeWs();
     }
 
-    initializeBridge()
+    initializeBridgeLongPolling()
   });
 
   function getCookie(name) {

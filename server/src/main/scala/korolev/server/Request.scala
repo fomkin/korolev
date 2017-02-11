@@ -8,5 +8,6 @@ import korolev.Router
 case class Request(
   path: Router.Path,
   params: Map[String, String],
-  cookie: String => Option[String]
+  cookie: String => Option[String],
+  body: String
 )

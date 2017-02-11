@@ -3,26 +3,39 @@ package korolev
 import java.io.{ByteArrayInputStream, InputStream}
 import java.nio.charset.StandardCharsets
 import java.util.UUID
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.atomic.AtomicReference
 
 import bridge.JSAccess
+import korolev.Async._
+import slogging.LazyLogging
 
-import scala.collection.mutable
+import scala.collection.concurrent.TrieMap
 import scala.io.Source
 import scala.language.higherKinds
-import scala.util.Random
+import scala.util.{Failure, Random, Success}
 
 /**
   * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
   */
-package object server {
+package object server extends LazyLogging {
 
   type MimeTypes = String => Option[String]
 
+  private[server] abstract class KorolevSession[F[+_]: Async] {
+    def publish(message: String): F[Unit]
+    def nextMessage: F[String]
+    def destroy(): F[Unit]
+  }
+
   def korolevService[F[+_]: Async, S, M](
+    mimeTypes: MimeTypes,
     config: KorolevServiceConfig[F, S, M]
   ): PartialFunction[Request, F[Response]] = {
 
     import misc._
+
+    val sessions = TrieMap.empty[String, KorolevSession[F]]
 
     def renderStatic(request: Request): F[Response] = {
       val (_, deviceId) = deviceFromRequest(request)
@@ -49,13 +62,16 @@ package object server {
           body
         )
         Response.Http(
-          body = {
+          status = Response.Status.Ok,
+          headers = Seq(
+            "set-cookie" -> s"device=$deviceId",
+            "content-type" -> htmlContentType
+          ),
+          body = Some {
             val html = "<!DOCTYPE html>" + dom.html
             val bytes = html.getBytes(StandardCharsets.UTF_8)
             new ByteArrayInputStream(bytes)
-          },
-          fileExtension = htmlContentType,
-          deviceId = Some(deviceId)
+          }
         )
       }
     }
@@ -72,11 +88,11 @@ package object server {
             val fsPath = s"/static${path.toString}"
             val stream = getClass.getResourceAsStream(fsPath)
             Option(stream) map { stream =>
-              val contentType = fileName.lastIndexOf('.') match {
+              val fileExtension = fileName.lastIndexOf('.') match {
                 case -1 => binaryContentType
                 case index => fileName.substring(index + 1)
               }
-              (stream, contentType)
+              (stream, fileExtension)
             }
         }
     }
@@ -88,36 +104,118 @@ package object server {
       }
     }
 
-    val service: PartialFunction[Request, F[Response]] = {
-      case matchStatic(stream, contentType) =>
-        val response = Response.Http(stream, contentType, None)
-        Async[F].pure(response)
-      case Request(Root / "bridge" / deviceId / sessionId, _, _) =>
-        // Queue
-        val sendingQueue = mutable.Buffer.empty[String]
-        var subscriber = Option.empty[String => Unit]
-        val jsAccess = {
-          val appendQueue = (message: String) => sendingQueue.append(message)
-          JsonQueuedJsAccess(subscriber.fold(appendQueue)(identity)(_))
+    def makeSessionKey(deviceId: String, sessionId: String): String =
+      s"${deviceId}_$sessionId"
+
+    def createSession(deviceId: String, sessionId: String): F[KorolevSession[F]] = {
+
+      val sendingQueue = new ConcurrentLinkedQueue[String]()
+      val subscriber = new AtomicReference(Option.empty[String => Unit])
+      val jsAccess = {
+        val addToQueue: String => Unit = { message =>
+          sendingQueue.add(message)
         }
-        // Session storage access
-        Async[F].map(config.stateStorage.read(deviceId, sessionId)) { state =>
-          // Create Korolev with dynamic router
-          val dux = Dux[F, S](state)
-          val router = config.serverRouter.dynamic(deviceId, sessionId)
-          val env = config.envConfigurator(deviceId, sessionId, dux.apply)
-          val korolev = Korolev(dux, jsAccess, state, config.render, router, env.onMessage, fromScratch = false)
-          // Subscribe on state updates an push them to storage
-          korolev.subscribe(state => config.stateStorage.write(deviceId, sessionId, state))
-          korolev.onDestroy(env.onDestroy)
-          // Initialize websocket
+        JsonQueuedJsAccess { message =>
+          val fOpt = subscriber.getAndSet(None)
+          fOpt.fold(addToQueue)(identity)(message)
+        }
+      }
+
+      // Session storage access
+      Async[F].map(config.stateStorage.read(deviceId, sessionId)) { state =>
+
+        // Create Korolev with dynamic router
+        val dux = Dux[F, S](state)
+        val router = config.serverRouter.dynamic(deviceId, sessionId)
+        val env = config.envConfigurator(deviceId, sessionId, dux.apply)
+        val korolev = Korolev(dux, jsAccess, state, config.render, router, env.onMessage, fromScratch = false)
+        // Subscribe on state updates an push them to storage
+        korolev.subscribe(state => config.stateStorage.write(deviceId, sessionId, state))
+        korolev.onDestroy(env.onDestroy)
+
+        new KorolevSession[F] {
+
+          val currentPromise = new AtomicReference(Option.empty[Async.Promise[F, String]])
+
+          // Put the session to registry
+          val sessionKey = makeSessionKey(deviceId, sessionId)
+          sessions.put(sessionKey, this)
+
+          def publish(message: String): F[Unit] = {
+            Async[F].pure(jsAccess.receive(message))
+          }
+
+          def nextMessage: F[String] = {
+            if (sendingQueue.isEmpty) {
+              val promise = Async[F].promise[String]
+              currentPromise.set(Some(promise))
+              subscriber.set(Some(m => promise.complete(Success(m))))
+              promise.future
+            } else {
+              val message = sendingQueue.poll()
+              Async[F].pure(message)
+            }
+          }
+
+          def destroy(): F[Unit] = {
+            currentPromise.get() foreach { promise =>
+              promise.complete(Failure(new InterruptedException("Session has been closed")))
+            }
+            korolev.destroy()
+            sessions.remove(sessionKey)
+            Async[F].unit
+          }
+        }
+      }
+    }
+
+    val service: PartialFunction[Request, F[Response]] = {
+      case matchStatic(stream, fileExtensionOpt) =>
+        val headers = mimeTypes(fileExtensionOpt).fold(Seq.empty[(String, String)]) {
+          fileExtension =>
+            Seq("content-type" -> fileExtension)
+        }
+        val response = Response.Http(Response.Status.Ok, Some(stream), headers)
+        Async[F].pure(response)
+      case Request(Root / "bridge" / "long-polling" / deviceId / sessionId / "publish", _, _, message) =>
+        sessions.get(makeSessionKey(deviceId, sessionId)) match {
+          case Some(session) =>
+            session
+              .publish(message)
+              .map(_ => Response.Http(Response.Status.Ok))
+          case None =>
+            Async[F].pure(Response.Http(Response.Status.BadRequest, "Session isn't exist"))
+        }
+      case Request(Root / "bridge" / "long-polling" / deviceId / sessionId / "subscribe", _, _, _) =>
+        val sessionAsync = sessions.get(makeSessionKey(deviceId, sessionId)) match {
+          case Some(x) => Async[F].pure(x)
+          case None => createSession(deviceId, sessionId)
+        }
+        sessionAsync.flatMap(_.nextMessage.map(Response.Http(Response.Status.Ok, _)))
+      case Request(Root / "bridge" / "web-socket" / deviceId / sessionId, _, _, _) =>
+        val sessionAsync = sessions.get(makeSessionKey(deviceId, sessionId)) match {
+          case Some(x) => Async[F].pure(x)
+          case None => createSession(deviceId, sessionId)
+        }
+        sessionAsync map { session =>
           Response.WebSocket(
-            destroyHandler = () => korolev.destroy(),
-            publish = jsAccess.receive,
+            destroyHandler = () => session.destroy() run {
+              case Success(_) => // do nothing
+              case Failure(e) => logger.error("An error occurred during destroying the session", e)
+            },
+            publish = message => session.publish(message) run {
+              case Success(_) => // do nothing
+              case Failure(e) => logger.error("An error occurred during publishing message to session", e)
+            },
             subscribe = { newSubscriber =>
-              sendingQueue.foreach(newSubscriber)
-              sendingQueue.clear()
-              subscriber = Some(newSubscriber)
+              def aux(): Unit = session.nextMessage run {
+                case Success(message) =>
+                  newSubscriber(message)
+                  aux()
+                case Failure(e) =>
+                  logger.error("An error occurred during polling message from session", e)
+              }
+              aux()
             }
           )
         }
@@ -128,8 +226,8 @@ package object server {
   }
 
   private[server] object misc {
-    val htmlContentType = "html"
-    val binaryContentType = "bin"
+    val htmlContentType = "text/html"
+    val binaryContentType = "application/octet-stream"
     val korolevJs = {
       val stream =
         classOf[Korolev].getClassLoader.getResourceAsStream("korolev.js")
