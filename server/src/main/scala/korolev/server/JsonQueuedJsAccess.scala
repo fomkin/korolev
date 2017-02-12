@@ -1,18 +1,23 @@
 package korolev.server
 
+import java.util.concurrent.ConcurrentLinkedQueue
+
 import bridge.JSAccess
 import korolev.Async
+import korolev.Async.Promise
 
 import scala.annotation.switch
-import scala.collection.immutable.Queue
+import scala.collection.concurrent.TrieMap
+import scala.collection.mutable
 import scala.language.higherKinds
-
 /**
   * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
   */
 case class JsonQueuedJsAccess[F[+_]: Async](sendJson: String => Unit) extends JSAccess[F] {
 
-  @volatile var queue = Queue.empty[String]
+  protected val promises = TrieMap.empty[Int, Promise[F, Any]]
+  protected val callbacks = TrieMap.empty[String, (Any) => Unit]
+  val queue = new ConcurrentLinkedQueue[String]()
 
   def escape(sb: StringBuilder, s: String, unicode: Boolean): Unit = {
     sb.append('"')
@@ -58,18 +63,20 @@ case class JsonQueuedJsAccess[F[+_]: Async](sendJson: String => Unit) extends JS
     */
   def send(args: Seq[Any]): Unit = {
     val message = seqToJSON(args)
-    queue = queue.enqueue(message)
+    queue.add(message)
   }
 
 
   override def flush(): Unit = {
-    val rawRequests = synchronized {
-      val items = queue
-      queue = Queue.empty
-      items
+    val buffer = mutable.Buffer.empty[String]
+    while (!queue.isEmpty) {
+      buffer += queue.poll()
     }
-    if (rawRequests.nonEmpty) {
-      val requests = rawRequests.mkString(",")
+    if (buffer.size == 1) {
+      sendJson(buffer.head)
+    }
+    else if (buffer.nonEmpty) {
+      val requests = buffer.mkString(",")
       sendJson(s"""["batch",$requests]""")
     }
   }

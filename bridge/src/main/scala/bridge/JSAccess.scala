@@ -4,6 +4,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 import korolev.Async
 
+import scala.collection.mutable
 import scala.language.higherKinds
 import scala.util.{Failure, Success}
 
@@ -45,9 +46,9 @@ abstract class JSAccess[F[+_]: Async] { self ⇒
    * List of promises of requests. Resolves by
    * income messages
    */
-  @volatile protected var promises = Map.empty[Int, Async.Promise[F, Any]]
+  protected def promises: mutable.Map[Int, Async.Promise[F, Any]]
 
-  @volatile protected var callbacks = Map.empty[String, Any ⇒ Unit]
+  protected def callbacks: mutable.Map[String, Any ⇒ Unit]
 
   /**
    * Abstract method sends message to remote page
@@ -65,8 +66,7 @@ abstract class JSAccess[F[+_]: Async] { self ⇒
   def request[A](args: Any*): F[A] = {
     val promise = Async[F].promise[Any]
     val requestId = lastReqId.getAndIncrement()
-    val pair = (requestId, promise)
-    promises += pair
+    promises.put(requestId, promise)
 
     sendRequest(Request(requestId, Seq(requestId) ++ args, promise))
 
@@ -146,6 +146,7 @@ abstract class JSAccess[F[+_]: Async] { self ⇒
         }
         promises -= reqId
       case None ⇒
+        println(s"Promise for $reqId not found")
     }
   }
 
@@ -155,8 +156,7 @@ abstract class JSAccess[F[+_]: Async] { self ⇒
 
   def registerCallback[T](f: T ⇒ Unit): F[JSObj[F]] = {
     val callbackId = s"^cb${lastCallbackId.getAndIncrement()}"
-    val pair = (callbackId, f.asInstanceOf[Any ⇒ Unit])
-    callbacks += pair
+    callbacks.put(callbackId, f.asInstanceOf[Any ⇒ Unit])
     request("registerCallback", callbackId)
   }
 

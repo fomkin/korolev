@@ -1,7 +1,10 @@
 package bridge
 
+import korolev.Async.Promise
 import utest._
 
+import scala.collection.concurrent.TrieMap
+import scala.collection.mutable
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
@@ -15,6 +18,8 @@ object JSAccessSuite extends TestSuite {
   class TestJSAccess extends JSAccess[Future] {
 
     var outgoing = List.empty[Seq[Any]]
+    protected val promises = mutable.Map.empty[Int, Promise[Future, Any]]
+    protected val callbacks = mutable.Map.empty[String, (Any) => Unit]
 
     def receive(msg: Any*): Unit = {
       val reqId = msg(0).asInstanceOf[Int]

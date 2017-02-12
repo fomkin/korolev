@@ -2,12 +2,15 @@ package gp
 
 import korolev.blazeServer._
 import org.openqa.selenium.By
+import slogging.{LoggerConfig, SLF4JLoggerFactory}
 import tools._
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 
 object GuineaPigTests extends App {
+
+  LoggerConfig.factory = SLF4JLoggerFactory()
 
   val server = {
 
