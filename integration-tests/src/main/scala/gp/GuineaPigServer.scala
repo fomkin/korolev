@@ -46,7 +46,8 @@ object GuineaPigServer {
         'href /= "/main.css",
         'rel /= "stylesheet",
         'type /= "text/css"
-      )
+      ),
+      'script('src /= "/debug-console.js")
     ),
     render = {
       case state =>
