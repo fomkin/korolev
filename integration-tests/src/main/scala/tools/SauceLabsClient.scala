@@ -43,7 +43,7 @@ class SauceLabsClient(userName: String, accessKey: String, jobId: String) extend
       body = ByteBuffer.wrap(data.getBytes),
       5 seconds
     )
-    Await.result(response, 5 seconds)
+    Await.result(response, 10 seconds)
   }
 
   // Cause blaze client doesn't support anything else GET!

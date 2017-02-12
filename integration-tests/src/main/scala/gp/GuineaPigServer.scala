@@ -1,13 +1,40 @@
+package gp
+
 import korolev._
-import korolev.blazeServer._
 import korolev.server._
+import korolev.blazeServer._
+import org.slf4j.LoggerFactory
 
 import scala.concurrent.Future
 
-object GuineaPig {
+/**
+  * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
+  */
+object GuineaPigServer {
+
+  case class State(
+    selectedTab: String = "tab1",
+    todos: Map[String, Vector[State.Todo]] = Map(
+      "tab1" -> State.Todo(5),
+      "tab2" -> State.Todo(7),
+      "tab3" -> State.Todo(2)
+    ),
+    log: Seq[String] = Vector.empty
+  )
+
+  object State {
+    val effects = Effects[Future, State, Any]
+    case class Todo(text: String, done: Boolean)
+    object Todo {
+      def apply(n: Int): Vector[Todo] = (0 to n).toVector map {
+        i => Todo(s"This is TODO #$i", done = false)
+      }
+    }
+  }
 
   import State.effects._
 
+  val logger = LoggerFactory.getLogger("GuineaPig")
   val storage = StateStorage.default[Future, State](State())
   val inputId = elementId
 
@@ -28,9 +55,13 @@ object GuineaPig {
           'div(
             state.todos.keys map { name =>
               'span(
+                'id /= name,
                 event('click) {
                   immediateTransition { case s =>
-                    s.copy(selectedTab = name)
+                    s.copy(
+                      selectedTab = name,
+                      log = s.log :+ s"Change selected tab to $name"
+                    )
                   }
                 },
                 'style /= "margin-left: 10px",
@@ -45,10 +76,9 @@ object GuineaPig {
             (state.todos(state.selectedTab) zipWithIndex) map {
               case (todo, i) =>
                 'div(
-                  'name /= "todo-list-item",
                   'class /= {
-                    if (todo.done) "todo__finished"
-                    else ""
+                    if (todo.done) "todo todo__finished"
+                    else "todo"
                   },
                   'div(
                     'class /= {
@@ -60,7 +90,10 @@ object GuineaPig {
                       immediateTransition { case s =>
                         val todos = s.todos(s.selectedTab)
                         val updated = todos.updated(i, todos(i).copy(done = !todo.done))
-                        s.copy(todos = s.todos + (s.selectedTab -> updated))
+                        s.copy(
+                          todos = s.todos + (s.selectedTab -> updated),
+                          log = s.log :+ s"Todo checkbox clicked"
+                        )
                       }
                     }
                   ),
@@ -71,11 +104,18 @@ object GuineaPig {
           'form(
             // Generate AddTodo action when 'Add' button clicked
             eventWithAccess('submit) { access =>
-              deferredTransition {
+              logger.info("Submit clicked")
+              immediateTransition { case s =>
+                s.copy(log = s.log :+ s"Submit clicked")
+              } deferredTransition {
                 access.property[String](inputId, 'value) map { value =>
+                  logger.info("Value received")
                   val todo = State.Todo(value, done = false)
                   transition { case s =>
-                    s.copy(todos = s.todos + (s.selectedTab -> (s.todos(s.selectedTab) :+ todo)))
+                    s.copy(
+                      todos = s.todos + (s.selectedTab -> (s.todos(s.selectedTab) :+ todo)),
+                      log = s.log :+ s"New Todo added"
+                    )
                   }
                 }
               }
@@ -90,6 +130,10 @@ object GuineaPig {
               'id /= "todo-submit-button",
               "Add todo"
             )
+          ),
+          'pre(
+            'div('strong("Server log:")),
+            state.log.map(s => 'div(s))
           )
         )
     },
@@ -97,7 +141,7 @@ object GuineaPig {
       ServerRouter(
         dynamic = (_, _) => Router(
           fromState = {
-            case State(tab, _) =>
+            case State(tab, _, _) =>
               Root / tab.toLowerCase
           },
           toState = {
@@ -124,23 +168,3 @@ object GuineaPig {
     }
   )
 }
-
-case class State(
-  selectedTab: String = "Tab1",
-  todos: Map[String, Vector[State.Todo]] = Map(
-    "Tab1" -> State.Todo(5),
-    "Tab2" -> State.Todo(7),
-    "Tab3" -> State.Todo(2)
-  )
-)
-
-object State {
-  val effects = Effects[Future, State, Any]
-  case class Todo(text: String, done: Boolean)
-  object Todo {
-    def apply(n: Int): Vector[Todo] = (0 to n).toVector map {
-      i => Todo(s"This is TODO #$i", done = false)
-    }
-  }
-}
-
