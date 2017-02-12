@@ -19,7 +19,8 @@ case class BlazeServerConfig(
     * Use [[BlazeServerConfig.bogusSslContext]] for tests
     */
   sslContext: Option[SSLContext] = None,
-  bufferSize: Int = 8 * 1024
+  bufferSize: Int = 8 * 1024,
+  doNotBlockCurrentThread: Boolean = false
 )(
   // Trampoline
   implicit val executionContext: ExecutionContextExecutorService

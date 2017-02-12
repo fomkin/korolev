@@ -1,6 +1,14 @@
 import com.typesafe.sbt.packager.archetypes.JavaAppPackaging
 import com.typesafe.sbt.packager.universal.UniversalPlugin
 
+val unusedRepo = Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
+
+val dontPublishSettings = Seq(
+  publish := {},
+  publishTo := unusedRepo,
+  publishArtifact := false
+)
+
 val publishSettings = Seq(
   publishMavenStyle := true,
   publishArtifact in Test := false,
@@ -34,7 +42,7 @@ val publishSettings = Seq(
 )
 
 val commonSettings = publishSettings ++ Seq(
-  scalaVersion := "2.11.8",
+  scalaVersion := "2.11.8", // Need by IntelliJ
   organization := "com.github.fomkin",
   version := "0.2.0-SNAPSHOT",
   libraryDependencies ++= Seq(
@@ -49,9 +57,8 @@ val commonSettings = publishSettings ++ Seq(
   )
 )
 
-val exampleSettings = commonSettings ++ Seq(
-  libraryDependencies += "org.slf4j" % "slf4j-simple" % "1.7.+",
-  publish := {}
+val exampleSettings = commonSettings ++ dontPublishSettings ++ Seq(
+  libraryDependencies += "org.slf4j" % "slf4j-simple" % "1.7.+"
 )
 
 lazy val vdom = crossProject.crossType(CrossType.Pure).
@@ -132,19 +139,30 @@ lazy val gameOfLifeExample = (project in examples / "game-of-life").
   settings(exampleSettings: _*).
   dependsOn(`server-blaze`)
 
+val `integration-tests` = project.
+  settings(commonSettings).
+  settings(dontPublishSettings:_*).
+  settings(
+    libraryDependencies ++= Seq(
+      "org.slf4j" % "slf4j-simple" % "1.7.+",
+      "org.seleniumhq.selenium" % "selenium-java" % "2.53.1"
+    )
+  ).
+  dependsOn(`server-blaze`)
+
 lazy val root = project.in(file(".")).
-  settings(publish := {}).
+  settings(dontPublishSettings:_*).
   aggregate(
     korolevJS, korolevJVM,
     bridgeJS, bridgeJVM,
     vdomJS, vdomJVM,
     asyncJS, asyncJVM,
     server, `server-blaze`,
-    simpleExample, routingExample,
-    gameOfLifeExample
+    simpleExample, routingExample, gameOfLifeExample,
+    `integration-tests`
   )
 
-publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
+publishTo := unusedRepo
 
 crossScalaVersions := Seq("2.11.8", "2.12.1")
 

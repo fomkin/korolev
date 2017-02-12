@@ -2,7 +2,16 @@ sudo: false
 language: scala
 jdk:
   - oraclejdk8
+branches:
+  only:
+  - master
 scala:
-   - 2.11.8
-   - 2.12.1
-script: sbt ++$TRAVIS_SCALA_VERSION -Dfile.encoding=UTF8 -J-XX:MaxPermSize=1024M test
+  - 2.11.8
+  - 2.12.1
+cache:
+  directories:
+    - $HOME/.coursier
+    - $HOME/.sbt
+    - $HOME/.ivy2
+script:
+  - ./bin/travis_build.sh
