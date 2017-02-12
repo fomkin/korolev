@@ -12,6 +12,10 @@ Korolev runs a single-page application on the server side, keeping in the browse
 
 Our project supports static page rendering, so that search engines can index pages and view them immediately.
 
+## Browser support
+
+[![Browser support results](http://185.143.172.173/browser-support.svg)](https://saucelabs.com/u/yelbota)
+
 ## Principles
 
 1. **Thin client.** Let's be honest, modern JavaScript applications are too greedy. Every JavaScript developer thinks that his page is special. But the user has a different opinion. He opens dozens of tabs. Each tab contains a ton of code, and this works very slowly. So we make our JavaScript bridge as lightweight as possible.
@@ -60,10 +64,6 @@ git clone https://github.com/fomkin/korolev.git && cd korolev
 
 After you will able to reach example app at `http://localhost:8181`
 (you may do same for others samples like `routingExample`, `gameOfLifeExample`).
-
-## Browser support
-
-[![Browser support results](https://saucelabs.com/browser-matrix/yelbota.svg)](https://saucelabs.com/u/yelbota)
 
 ## Future plans
 
