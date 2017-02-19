@@ -44,7 +44,7 @@ val publishSettings = Seq(
 val commonSettings = publishSettings ++ Seq(
   scalaVersion := "2.11.8", // Need by IntelliJ
   organization := "com.github.fomkin",
-  version := "0.2.1",
+  version := "0.3.0-SNAPSHOT",
   libraryDependencies ++= Seq(
     "org.scalatest" %%% "scalatest" % "3.0.1" % "test"
   ),
