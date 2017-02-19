@@ -47,7 +47,33 @@ object Effects {
   def apply[F[+_]: Async, S, M] = new Effects[F, S, M]()
 
   abstract class Access[F[+_]: Async, M] {
+
+    /**
+      * Extract property of element from client-side DOM.
+      * @param propName Name of property. 'value for example
+      * @see [[Effects.elementId]]
+      * @example
+      * {{{
+      * eventWithAccess('click) { access =>
+      *   deferredTransition {
+      *     for {
+      *       request <- access.property[String]('value, searchField)
+      *       result <- searchModel.search(request)
+      *     } yield {
+      *       transition {
+      *         case state: State.Awesome =>
+      *           state.copy(list = searchResult)
+      *       }
+      *     }
+      *   }
+      * }
+      * }}}
+      */
     def property[T](id: ElementId, propName: Symbol): F[T]
+
+    /**
+      * Publish message to environment
+      */
     def publish(message: M): F[Unit]
   }
 
