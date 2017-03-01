@@ -44,7 +44,7 @@ val publishSettings = Seq(
 val commonSettings = publishSettings ++ Seq(
   scalaVersion := "2.11.8", // Need by IntelliJ
   organization := "com.github.fomkin",
-  version := "0.2.1",
+  version := "0.2.0",
   libraryDependencies ++= Seq(
     "org.scalatest" %%% "scalatest" % "3.0.1" % "test"
   ),
@@ -81,7 +81,7 @@ lazy val server = project.
   settings(commonSettings: _*).
   settings(
     normalizedName := "korolev-server",
-    libraryDependencies += "biz.enef" %% "slogging-slf4j" % "0.5.3"
+    libraryDependencies += "biz.enef" %% "slogging-slf4j" % "0.5.2"
   ).
   dependsOn(korolevJVM).
   enablePlugins(SbtOsgi).settings(serverOsgiSettings:_*)
@@ -139,7 +139,7 @@ lazy val korolev = crossProject.crossType(CrossType.Pure).
   settings(commonSettings: _*).
   settings(
     normalizedName := "korolev",
-    libraryDependencies += "biz.enef" %%% "slogging" % "0.5.3",
+    libraryDependencies += "biz.enef" %%% "slogging" % "0.5.2",
     unmanagedResourceDirectories in Compile += file("korolev") / "src" / "main" / "resources"
   ).
   dependsOn(vdom, bridge).
