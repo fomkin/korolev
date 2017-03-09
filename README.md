@@ -1,6 +1,6 @@
 # Korolev
 
-<img src="http://185.143.172.173/korolev-face-margin.svg" align="right" width="280" />
+<img src="https://fomkin.org/korolev/korolev-face-margin.svg" align="right" width="280" />
 
 [![Build Status](https://travis-ci.org/fomkin/korolev.svg?branch=master)](https://travis-ci.org/fomkin/korolev)
 [![Gitter](https://badges.gitter.im/fomkin/korolev.svg)](https://gitter.im/fomkin/korolev?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
@@ -14,7 +14,7 @@ Our project supports static page rendering, so that search engines can index pag
 
 ## Browser support
 
-[![Browser support results](http://185.143.172.173/browser-support.svg)](https://saucelabs.com/u/yelbota)
+[![Browser support results](https://fomkin.org/korolev/browser-support.svg)](https://saucelabs.com/u/yelbota)
 
 ## Principles
 
