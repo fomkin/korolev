@@ -4,7 +4,9 @@ jdk:
   - oraclejdk8
 branches:
   only:
-  - master
+    - master
+    - develop
+    - /.*-fixes/
 scala:
   - 2.11.8
   - 2.12.1
