@@ -6,6 +6,7 @@ import java.nio.channels.AsynchronousChannelGroup
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.Executors
 
+import korolev.blazeServer.util.ExecutionContextScheduler
 import korolev.server.{KorolevServiceConfig, MimeTypes, Request => KorolevRequest, Response => KorolevResponse}
 import org.http4s.blaze.channel._
 import org.http4s.blaze.channel.nio2.NIO2SocketServerGroup
@@ -14,6 +15,7 @@ import org.http4s.blaze.pipeline.stages.SSLStage
 import org.http4s.blaze.pipeline.{Command, LeafBuilder}
 import org.http4s.websocket.WebsocketBits._
 
+import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Promise}
 import scala.language.higherKinds
 
@@ -54,7 +56,6 @@ package object blazeServer {
         }
       }
 
-
       val korolevRequest = KorolevRequest(
         path = Router.Path.fromString(path),
         params,
@@ -87,15 +88,22 @@ package object blazeServer {
           }
           HttpResponse(status.code, status.phrase, responseHeaders, ByteBuffer.wrap(array))
         case KorolevResponse.WebSocket(publish, subscribe, destroy) =>
-          // TODO handle disconnect on failure
           val stage = new WebSocketStage {
-            def onDirtyDisconnect(e: Throwable): Unit = destroy()
+            val stopHeartbeat = ExecutionContextScheduler.schedule(5.seconds) {
+              println("Ping!")
+              channelWrite(Ping())
+            }
+            def destroyAndStopTimer(): Unit = {
+              stopHeartbeat()
+              destroy()
+            }
+            def onDirtyDisconnect(e: Throwable): Unit = destroyAndStopTimer()
             def onMessage(msg: WebSocketFrame): Unit = msg match {
               case Text(incomingMessage, _) => publish(incomingMessage)
-              case Binary(_, _) => // ignore
               case Close(_) =>
-                destroy()
+                destroyAndStopTimer()
                 sendOutboundCommand(Command.Disconnect)
+              case _ => // ignore
             }
             override protected def stageStartup(): Unit = {
               super.stageStartup()
