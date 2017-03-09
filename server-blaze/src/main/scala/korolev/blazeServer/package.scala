@@ -81,7 +81,10 @@ package object blazeServer {
           val array = streamOpt match {
             case Some(stream) =>
               val array = new Array[Byte](stream.available)
-              stream.read(array)
+              var offset = 0
+              while (stream.available > 0) {
+                offset += stream.read(array, offset, stream.available)
+              }
               array
             case None =>
               Array.empty[Byte]
@@ -90,7 +93,6 @@ package object blazeServer {
         case KorolevResponse.WebSocket(publish, subscribe, destroy) =>
           val stage = new WebSocketStage {
             val stopHeartbeat = ExecutionContextScheduler.schedule(5.seconds) {
-              println("Ping!")
               channelWrite(Ping())
             }
             def destroyAndStopTimer(): Unit = {
