@@ -111,6 +111,27 @@ lazy val async = crossProject.crossType(CrossType.Pure).
 lazy val asyncJS = async.js
 lazy val asyncJVM = async.jvm
 
+lazy val `async-monix` = crossProject.crossType(CrossType.Pure).
+  settings(commonSettings: _*).
+  settings(normalizedName := "korolev-async-monix").
+  enablePlugins(SbtOsgi).settings(asyncOsgiSettings:_*)
+
+lazy val asyncMonixJs = `async-monix`.js.
+  dependsOn(asyncJS).
+  settings(
+    libraryDependencies ++= Seq(
+      "io.monix" %%% "monix" % "2.2.3"
+    )
+  )
+
+lazy val asyncMonixJvm = `async-monix`.jvm.
+  dependsOn(asyncJVM).
+  settings(
+    libraryDependencies ++= Seq(
+      "io.monix" %% "monix" % "2.2.3"
+    )
+  )
+
 lazy val bridgeOsgiSettings = osgiSettings ++ Seq(
   OsgiKeys.exportPackage := Seq("bridge.*;version=${Bundle-Version}")
 )
@@ -187,6 +208,7 @@ lazy val root = project.in(file(".")).
     bridgeJS, bridgeJVM,
     vdomJS, vdomJVM,
     asyncJS, asyncJVM,
+    asyncMonixJs, asyncMonixJvm,
     server, `server-blaze`,
     simpleExample, routingExample, gameOfLifeExample,
     `integration-tests`
