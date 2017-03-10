@@ -3,7 +3,7 @@ package korolev.server
 import java.util.concurrent.ConcurrentLinkedQueue
 
 import bridge.JSAccess
-import korolev.Async.Promise
+import korolev.async.Async.Promise
 import korolev.async.Async
 
 import scala.annotation.switch
