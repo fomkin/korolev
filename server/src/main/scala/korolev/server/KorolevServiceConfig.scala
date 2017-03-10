@@ -1,8 +1,9 @@
 package korolev.server
 
+import korolev.async.Async
 import korolev.server.KorolevServiceConfig.{ApplyTransition, Env, EnvConfigurator}
 import korolev.server.StateStorage.{DeviceId, SessionId}
-import korolev.{Async, Render, VDom}
+import korolev.{Render, VDom}
 
 import scala.language.higherKinds
 

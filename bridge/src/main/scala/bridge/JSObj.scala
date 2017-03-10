@@ -1,7 +1,8 @@
 package bridge
 
+import korolev.async.Async
+
 import scala.language.higherKinds
-import korolev.Async
 
 /**
  * JavaScript Object presentation. 

@@ -1,7 +1,8 @@
 package korolev.server
 
 import korolev.server.StateStorage.{DeviceId, SessionId}
-import korolev.{Async, Router}
+import korolev.Router
+import korolev.async.Async
 
 import scala.language.higherKinds
 

@@ -2,6 +2,7 @@ package korolev
 
 import korolev.Dux.Transition
 import korolev.VDom.Id
+import korolev.async.Async
 
 import scala.annotation.tailrec
 import scala.language.higherKinds

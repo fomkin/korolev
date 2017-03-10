@@ -3,7 +3,7 @@ import korolev.Effects.Event
 import korolev._
 import org.scalatest.{FlatSpec, Matchers}
 import RunNowExecutionContext.instance
-import korolev.Async.Promise
+import korolev.async.Async.Promise
 
 import scala.collection.mutable
 import scala.concurrent.Future

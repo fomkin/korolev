@@ -4,7 +4,8 @@ import java.util.concurrent.atomic.AtomicInteger
 
 import bridge.JSAccess
 import korolev.Effects.{Access, ElementId}
-import korolev.Async.AsyncOps
+import korolev.async.Async
+import korolev.async.Async.AsyncOps
 import slogging.LazyLogging
 
 import scala.language.higherKinds

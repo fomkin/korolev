@@ -2,6 +2,8 @@ package korolev
 
 import java.util.concurrent.ConcurrentLinkedQueue
 
+import korolev.async.Async
+
 import scala.language.higherKinds
 import scala.util.{Failure, Success}
 

@@ -2,7 +2,7 @@ package bridge
 
 import java.util.concurrent.atomic.AtomicInteger
 
-import korolev.Async
+import korolev.async.Async
 
 import scala.collection.mutable
 import scala.language.higherKinds
