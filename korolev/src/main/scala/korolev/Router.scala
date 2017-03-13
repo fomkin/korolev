@@ -1,5 +1,7 @@
 package korolev
 
+import korolev.async.Async
+
 import scala.annotation.tailrec
 import scala.language.higherKinds
 

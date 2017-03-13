@@ -1,6 +1,6 @@
 package bridge
 
-import korolev.Async.Promise
+import korolev.async.Async.Promise
 import utest._
 
 import scala.collection.concurrent.TrieMap

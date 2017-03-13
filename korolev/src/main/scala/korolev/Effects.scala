@@ -1,5 +1,7 @@
 package korolev
 
+import korolev.async.Async
+
 import scala.language.higherKinds
 
 class Effects[F[+_]: Async, S, M] {

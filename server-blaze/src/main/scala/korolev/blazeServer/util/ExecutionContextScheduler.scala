@@ -2,7 +2,7 @@ package korolev.blazeServer.util
 
 import java.util.{Timer, TimerTask}
 
-import korolev.Async
+import korolev.async.Async
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration

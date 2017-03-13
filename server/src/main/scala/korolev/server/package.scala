@@ -7,7 +7,8 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 
 import bridge.JSAccess
-import korolev.Async._
+import korolev.async.Async
+import korolev.async.Async._
 import slogging.LazyLogging
 
 import scala.collection.concurrent.TrieMap

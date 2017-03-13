@@ -1,4 +1,4 @@
-package korolev
+package korolev.async
 
 import scala.annotation.implicitNotFound
 import scala.concurrent.{ExecutionContext, Future}

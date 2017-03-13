@@ -17,7 +17,7 @@ class EventPropagationSpec
     with EventTesting {
 
   import EventPhase._
-  import korolev.Async._
+  import korolev.async.Async._
 
   "propagateEvent" should "fire events climb the hierarchy" in {
     assertEvent { implicit context =>

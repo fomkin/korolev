@@ -1,6 +1,6 @@
 package korolev.blazeServer
 
-import korolev.Async
+import korolev.async.Async
 import korolev.server.{KorolevServiceConfig, MimeTypes}
 import org.http4s.blaze.http.HttpService
 

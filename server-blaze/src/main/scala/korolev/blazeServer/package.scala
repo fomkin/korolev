@@ -6,6 +6,7 @@ import java.nio.channels.AsynchronousChannelGroup
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.Executors
 
+import korolev.async.Async
 import korolev.blazeServer.util.ExecutionContextScheduler
 import korolev.server.{KorolevServiceConfig, MimeTypes, Request => KorolevRequest, Response => KorolevResponse}
 import org.http4s.blaze.channel._

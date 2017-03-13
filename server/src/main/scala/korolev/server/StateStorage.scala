@@ -1,6 +1,6 @@
 package korolev.server
 
-import korolev.Async
+import korolev.async.Async
 
 import scala.collection.concurrent.TrieMap
 import scala.language.higherKinds
