@@ -40,7 +40,9 @@ object StateStorage {
   type SessionId = String
 
   /**
-    * Initialize simple in-memory storage (based on TrieMap).
+    * Initializes a simple in-memory storage (based on TrieMap)
+    * with equal initial state for all sessions.
+    *
     * @param initialState State factory
     * @tparam T Type of state
     * @return The state storage
@@ -61,4 +63,41 @@ object StateStorage {
 
     def initial(deviceId: String): F[T] = Async[F].pure(initialState)
   }
+
+  /**
+    * Initializes a simple in-memory storage (based on TrieMap)
+    * with initial state based on deviceId
+    *
+    * {{{
+    * case class MyState(deviceId: String, ...)
+    *
+    * StateStorage forDeviceId { deviceId =>
+    *   MyStorage.getStateByDeviceId(deviceId) map {
+    *     case Some(state) => state
+    *     case None => MyState(deviceId, ...)
+    *   }
+    * }
+    * }}}
+    *
+    * @param initialState State factory
+    * @tparam T Type of state
+    * @return The state storage
+    */
+  def forDeviceId[F[+_]: Async, T](initialState: DeviceId => F[T]): StateStorage[F, T] = new StateStorage[F, T] {
+
+    val storage = TrieMap.empty[String, F[T]]
+
+    def read(deviceId: DeviceId, sessionId: SessionId): F[T] = {
+      storage.getOrElseUpdate(deviceId + sessionId, initialState(deviceId))
+    }
+
+    def write(deviceId: String, sessionId: String, value: T): F[T] = {
+      val valueF = Async[F].pure(value)
+      storage.put(deviceId + sessionId, valueF)
+      valueF
+    }
+
+    def initial(deviceId: String): F[T] = initialState(deviceId)
+  }
+
 }
