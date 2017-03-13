@@ -148,10 +148,22 @@ lazy val korolev = crossProject.crossType(CrossType.Pure).
 lazy val korolevJS = korolev.js
 lazy val korolevJVM = korolev.jvm
 
+val `cache-api-support` = project.
+  settings(commonSettings: _*).
+  settings(osgiSettings: _*).
+  settings(
+    normalizedName := "korolev-cache-api-support",
+    libraryDependencies += "javax.cache" % "cache-api" % "1.0.0",
+    OsgiKeys.exportPackage := Seq("korolev.server.cacheApiSupport;version=${Bundle-Version}")
+  ).
+  dependsOn(server).
+  settings(serverOsgiSettings:_*).
+  enablePlugins(SbtOsgi)
+
 // Examples
 val examples = file("examples")
 
-lazy val simpleExample = (project in  examples / "simple").
+lazy val simpleExample = (project in examples / "simple").
   enablePlugins(JavaAppPackaging).
   enablePlugins(UniversalPlugin).
   settings(exampleSettings: _*).
@@ -188,6 +200,7 @@ lazy val root = project.in(file(".")).
     vdomJS, vdomJVM,
     asyncJS, asyncJVM,
     server, `server-blaze`,
+    `cache-api-support`,
     simpleExample, routingExample, gameOfLifeExample,
     `integration-tests`
   )
