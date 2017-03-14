@@ -33,8 +33,8 @@ import scala.language.higherKinds
   * }
   * }}}
   *
-  * Note that creating instance of [[Cache]] for different data grids
-  * can differ greatly. See examples in Korolev repository.
+  * Note that creating instance of javax.cache.Cache for different
+  * data grids can differ greatly. See examples in Korolev repository.
   *
   * @see <a href="https://jcp.org/aboutJava/communityprocess/final/jsr107/index.html">JSR-107 Specification</a>
   * @see <a href="https://jcp.org/aboutJava/communityprocess/implementations/jsr107/index.html">List of JSR-107 implementations</a>
