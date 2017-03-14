@@ -10,7 +10,10 @@ import korolev.server.StateStorage.{DeviceId, SessionId}
 import scala.language.higherKinds
 
 /**
-  * State storage based on Java Caching API (JSR-107).
+  * State storage based on
+  * <a href="https://jcp.org/aboutJava/communityprocess/final/jsr107/index.html">
+  *   Java Temporary Caching API (JSR-107)
+  * </a>.
   *
   * In production we work with huge number of session which cannot be
   * served by single node. When servers number is more than one our
@@ -25,20 +28,30 @@ import scala.language.higherKinds
   * val cacheManager = cachingProvider.getCacheManager()
   * val cache = cacheManager.getCache("default", classOf[String], classOf[MyState])
   *
-  * CachedStateStorage(cache) { deviceId =>
+  * CachedStateStorage[Future, MyState] (cache) { deviceId =>
   *  ...
   * }
   * }}}
   *
+  * Note that creating instance of [[Cache]] for different data grids
+  * can differ greatly. See examples in Korolev repository.
+  *
+  * @see <a href="https://jcp.org/aboutJava/communityprocess/final/jsr107/index.html">JSR-107 Specification</a>
+  * @see <a href="https://jcp.org/aboutJava/communityprocess/implementations/jsr107/index.html">List of JSR-107 implementations</a>
   * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
   */
-class CachedStateStorage[F[+_]: Async, T](cache: Cache[String, T], initialState: DeviceId => F[T]) extends StateStorage[F, T] {
+final class CachedStateStorage[F[+_]: Async, T](cache: Cache[String, T], initialState: DeviceId => F[T])
+  extends StateStorage[F, T] {
+
+  if (cache == null)
+    throw new NullPointerException("cache shouldn't be null")
 
   def initial(deviceId: DeviceId): F[T] =
     initialState(deviceId)
 
   def read(deviceId: DeviceId, sessionId: SessionId): F[T] = {
     val valueOpt = Async[F] fork {
+      println("Resolving cache")
       val key = deviceId + sessionId
       Option(cache.get(key))
     }
@@ -49,6 +62,7 @@ class CachedStateStorage[F[+_]: Async, T](cache: Cache[String, T], initialState:
   }
 
   def write(deviceId: DeviceId, sessionId: SessionId, value: T): F[T] = Async[F] fork {
+    println("Updating cache")
     val key = deviceId + sessionId
     cache.put(key, value)
     value
@@ -56,6 +70,6 @@ class CachedStateStorage[F[+_]: Async, T](cache: Cache[String, T], initialState:
 }
 
 object CachedStateStorage {
-  def apply[F[_]: Async, T](cache: Cache[String, T])(initialState: DeviceId => F[T]): CachedStateStorage[F, T] =
+  def apply[F[+_]: Async, T](cache: Cache[String, T])(initialState: DeviceId => F[T]): CachedStateStorage[F, T] =
     new CachedStateStorage(cache, initialState)
 }

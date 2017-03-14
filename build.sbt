@@ -167,19 +167,32 @@ lazy val simpleExample = (project in examples / "simple").
   enablePlugins(JavaAppPackaging).
   enablePlugins(UniversalPlugin).
   settings(exampleSettings: _*).
+  settings(mainClass := Some("SimpleExample")).
   dependsOn(`server-blaze`)
 
 lazy val routingExample = (project in examples / "routing").
   enablePlugins(JavaAppPackaging).
   enablePlugins(UniversalPlugin).
   settings(exampleSettings: _*).
+  settings(mainClass := Some("RoutingExample")).
   dependsOn(`server-blaze`)
 
 lazy val gameOfLifeExample = (project in examples / "game-of-life").
   enablePlugins(JavaAppPackaging).
   enablePlugins(UniversalPlugin).
   settings(exampleSettings: _*).
+  settings(mainClass := Some("GameOfLife")).
   dependsOn(`server-blaze`)
+
+lazy val cacheApiExample = (project in examples / "jcache").
+  enablePlugins(JavaAppPackaging).
+  enablePlugins(UniversalPlugin).
+  settings(exampleSettings: _*).
+  settings(
+    mainClass := Some("CacheApiExample"),
+    libraryDependencies += "com.hazelcast" % "hazelcast" % "3.8"
+  ).
+  dependsOn(`server-blaze`, `cache-api-support`)
 
 val `integration-tests` = project.
   settings(commonSettings).
@@ -202,6 +215,7 @@ lazy val root = project.in(file(".")).
     server, `server-blaze`,
     `cache-api-support`,
     simpleExample, routingExample, gameOfLifeExample,
+    cacheApiExample,
     `integration-tests`
   )
 
