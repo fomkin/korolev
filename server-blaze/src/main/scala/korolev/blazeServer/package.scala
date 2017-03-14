@@ -3,7 +3,6 @@ package korolev
 import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 import java.nio.channels.AsynchronousChannelGroup
-import java.nio.charset.StandardCharsets
 import java.util.concurrent.Executors
 
 import korolev.blazeServer.util.ExecutionContextScheduler
@@ -72,8 +71,9 @@ package object blazeServer {
           val l = body.remaining()
           val bytes = new Array[Byte](l)
           if (l > 0) body.get(bytes)
-          new String(bytes, StandardCharsets.UTF_8)
-        }
+          ByteBuffer.wrap(bytes)
+        },
+        headers = headers
       )
 
       val responseF = Async[F].map(korolevServer(korolevRequest)) {

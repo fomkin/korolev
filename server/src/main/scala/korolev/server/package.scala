@@ -182,16 +182,17 @@ package object server extends LazyLogging {
         }
         val response = Response.Http(Response.Status.Ok, Some(stream), headers)
         Async[F].pure(response)
-      case Request(Root / "bridge" / "long-polling" / deviceId / sessionId / "publish", _, _, message) =>
+      case Request(Root / "bridge" / "long-polling" / deviceId / sessionId / "publish", _, _, _, body) =>
         sessions.get(makeSessionKey(deviceId, sessionId)) match {
           case Some(session) =>
+            val message = new String(body.array(), StandardCharsets.UTF_8)
             session
               .publish(message)
               .map(_ => Response.Http(Response.Status.Ok))
           case None =>
             Async[F].pure(Response.Http(Response.Status.BadRequest, "Session isn't exist"))
         }
-      case Request(Root / "bridge" / "long-polling" / deviceId / sessionId / "subscribe", _, _, _) =>
+      case Request(Root / "bridge" / "long-polling" / deviceId / sessionId / "subscribe", _, _, _, _) =>
         val sessionAsync = sessions.get(makeSessionKey(deviceId, sessionId)) match {
           case Some(x) => Async[F].pure(x)
           case None => createSession(deviceId, sessionId)
@@ -200,7 +201,7 @@ package object server extends LazyLogging {
           case _: SessionDestroyedException =>
             Response.Http(Response.Status.Gone, "Session has been destroyed")
         }
-      case Request(Root / "bridge" / "web-socket" / deviceId / sessionId, _, _, _) =>
+      case Request(Root / "bridge" / "web-socket" / deviceId / sessionId, _, _, _, _) =>
         val sessionAsync = sessions.get(makeSessionKey(deviceId, sessionId)) match {
           case Some(x) => Async[F].pure(x)
           case None => createSession(deviceId, sessionId)
