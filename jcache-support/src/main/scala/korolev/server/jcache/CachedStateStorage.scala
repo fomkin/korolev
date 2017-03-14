@@ -51,7 +51,6 @@ final class CachedStateStorage[F[+_]: Async, T](cache: Cache[String, T], initial
 
   def read(deviceId: DeviceId, sessionId: SessionId): F[T] = {
     val valueOpt = Async[F] fork {
-      println("Resolving cache")
       val key = deviceId + sessionId
       Option(cache.get(key))
     }
@@ -62,7 +61,6 @@ final class CachedStateStorage[F[+_]: Async, T](cache: Cache[String, T], initial
   }
 
   def write(deviceId: DeviceId, sessionId: SessionId, value: T): F[T] = Async[F] fork {
-    println("Updating cache")
     val key = deviceId + sessionId
     cache.put(key, value)
     value

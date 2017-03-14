@@ -1,4 +1,3 @@
-import javax.cache.Caching
 import javax.cache.configuration.MutableConfiguration
 
 import com.hazelcast.cache.HazelcastCachingProvider
@@ -8,12 +7,11 @@ import korolev.blazeServer._
 import korolev.server.cacheApiSupport.CachedStateStorage
 
 import scala.concurrent.Future
-import slogging.LazyLogging
 
 /**
   * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
   */
-object CacheApiExample extends KorolevBlazeServer with LazyLogging {
+object JCacheExample extends KorolevBlazeServer {
 
   import State.effects._
 
