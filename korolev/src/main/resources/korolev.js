@@ -168,6 +168,7 @@
       console.log('Try to open connection to ' + uri + ' using WebSocket');
       ws = new WebSocket(uri);
       ws.addEventListener('open', onOpen);
+      global.Korolev.connection = ws;
       Bridge.webSocket(ws).catch(function(errorEvent) {
         // Try to reconnect after 2s
         setTimeout(initializeBridgeLongPolling, 1);
@@ -238,6 +239,7 @@
       }
 
       var fakeWs = global.document.createDocumentFragment()
+      global.Korolev.connection = fakeWs;
       fakeWs.send = function(message) {
         lpPublish(fakeWs, message);
       }

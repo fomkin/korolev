@@ -148,26 +148,50 @@ lazy val korolev = crossProject.crossType(CrossType.Pure).
 lazy val korolevJS = korolev.js
 lazy val korolevJVM = korolev.jvm
 
+val `jcache-support` = project.
+  enablePlugins(SbtOsgi).
+  settings(commonSettings: _*).
+  settings(osgiSettings: _*).
+  settings(
+    normalizedName := "korolev-jcache-support",
+    libraryDependencies += "javax.cache" % "cache-api" % "1.0.0",
+    OsgiKeys.exportPackage := Seq("korolev.server.jcache.*;version=${Bundle-Version}")
+  ).
+  dependsOn(server)
+
 // Examples
 val examples = file("examples")
 
-lazy val simpleExample = (project in  examples / "simple").
+lazy val simpleExample = (project in examples / "simple").
   enablePlugins(JavaAppPackaging).
   enablePlugins(UniversalPlugin).
   settings(exampleSettings: _*).
+  settings(mainClass := Some("SimpleExample")).
   dependsOn(`server-blaze`)
 
 lazy val routingExample = (project in examples / "routing").
   enablePlugins(JavaAppPackaging).
   enablePlugins(UniversalPlugin).
   settings(exampleSettings: _*).
+  settings(mainClass := Some("RoutingExample")).
   dependsOn(`server-blaze`)
 
 lazy val gameOfLifeExample = (project in examples / "game-of-life").
   enablePlugins(JavaAppPackaging).
   enablePlugins(UniversalPlugin).
   settings(exampleSettings: _*).
+  settings(mainClass := Some("GameOfLife")).
   dependsOn(`server-blaze`)
+
+lazy val jcacheExample = (project in examples / "jcache").
+  enablePlugins(JavaAppPackaging).
+  enablePlugins(UniversalPlugin).
+  settings(exampleSettings: _*).
+  settings(
+    mainClass := Some("JCacheExample"),
+    libraryDependencies += "com.hazelcast" % "hazelcast" % "3.8"
+  ).
+  dependsOn(`server-blaze`, `jcache-support`)
 
 val `integration-tests` = project.
   settings(commonSettings).
@@ -188,7 +212,9 @@ lazy val root = project.in(file(".")).
     vdomJS, vdomJVM,
     asyncJS, asyncJVM,
     server, `server-blaze`,
+    `jcache-support`,
     simpleExample, routingExample, gameOfLifeExample,
+    jcacheExample,
     `integration-tests`
   )
 

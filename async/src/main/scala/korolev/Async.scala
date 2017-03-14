@@ -9,6 +9,7 @@ import scala.util.Try
  ensure that execution context is passed to a scope (import korolev.blazeServer.defaultExecutor)""")
 trait Async[F[+_]] {
   def pure[A](value: => A): F[A]
+  def fork[A](value: => A): F[A]
   def unit: F[Unit]
   def fromTry[A](value: => Try[A]): F[A]
   def promise[A]: Async.Promise[F, A]
@@ -31,6 +32,7 @@ object Async {
       def pure[A](value: => A): Future[A] =
         try Future.successful(value)
         catch { case e: Throwable => Future.failed(e) }
+      def fork[A](value: => A): Future[A] = Future(value)
       def fromTry[A](value: => Try[A]): Future[A] = Future.fromTry(value)
       def flatMap[A, B](m: Future[A])(f: (A) => Future[B]): Future[B] = m.flatMap(f)
       def map[A, B](m: Future[A])(f: (A) => B): Future[B] = m.map(f)
