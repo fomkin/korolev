@@ -6,6 +6,7 @@
       addHandler = null,
       removeHandler = null,
       scheduledAddHandlerItems = [],
+      formDataProgressHandler = null,
       renderNum = 0,
       rootListeners = [],
       listenFun = null,
@@ -48,6 +49,9 @@
       },
       RegisterGlobalAddHandler: function(f) {
         addHandler = f;
+      },
+      RegisterFormDataProgressHandler: function(f) {
+        formDataProgressHandler = f;
       },
       RegisterGlobalRemoveHandler: function(f) {
         removeHandler = f;
@@ -158,6 +162,10 @@
           '/form-data' +
           '/' + descriptor;
         request.open("POST", uri, true);
+        request.upload.onprogress = function(event) {
+          var arg = [descriptor, event.loaded, event.total].join(':');
+          formDataProgressHandler(arg);
+        }
         request.send(formData);
         return;
       }

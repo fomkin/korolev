@@ -181,8 +181,7 @@ package object server extends LazyLogging {
       }
     }
 
-    // TODO move size to config
-    val formDataCodec = new FormDataCodec(1024 * 1000 * 8)
+    val formDataCodec = new FormDataCodec(config.maxFormDataEntrySize)
     val service: PartialFunction[Request, F[Response]] = {
       case matchStatic(stream, fileExtensionOpt) =>
         val headers = mimeTypes(fileExtensionOpt).fold(Seq.empty[(String, String)]) {
@@ -192,8 +191,6 @@ package object server extends LazyLogging {
         val response = Response.Http(Response.Status.Ok, Some(stream), headers)
         Async[F].pure(response)
       case Request(Root / "bridge" / deviceId / sessionId / "form-data" / descriptor, _, _, headers, body) =>
-        println(headers)
-        println(body)
         sessions.get(makeSessionKey(deviceId, sessionId)) match {
           case Some(session) =>
             val boundaryOpt = headers collectFirst {

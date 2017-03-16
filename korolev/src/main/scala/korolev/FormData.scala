@@ -21,6 +21,14 @@ final case class FormData(content: Seq[Entry]) {
     apply(name).map(_.content)
   }
 
+  def contentType(name: String): Option[String] = {
+    apply(name) flatMap { entry =>
+      entry.headers collectFirst {
+        case (k, v) if k.toLowerCase == "content-type" => v
+      }
+    }
+  }
+
   def apply(name: String): Option[Entry] =
     content.find(_.name == name)
 }

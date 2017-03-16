@@ -54,6 +54,10 @@ object Korolev {
         formDataPromises.get(descriptor) foreach { promise =>
           promise.complete(formData)
         }
+        // Remove promise and onProgress handler
+        // when formData loading is complete
+        formDataProgressTransitions.remove(descriptor)
+        formDataPromises.remove(descriptor)
       }
 
       def updateMisc(renderResult: VDom.Node): Unit = {
@@ -89,6 +93,7 @@ object Korolev {
       val events = AtomicReference(Map.empty[String, Effects.Event[F, S, M]])
       val currentRenderNum = new AtomicInteger(0)
       val formDataPromises = createMutableMap[String, Promise[F, FormData]]
+      val formDataProgressTransitions = createMutableMap[String, (Int, Int) => Transition[S]]
 
       val client = {
         // Prepare frontend
@@ -124,7 +129,10 @@ object Korolev {
               Async[F].fromTry(
                 Failure(new Exception("No element matched for accessor")))
           }
-          def onProgress(f: (Int, Int) => Transition[S]): this.type = ???
+          def onProgress(f: (Int, Int) => Transition[S]): this.type = {
+            formDataProgressTransitions.put(descriptor, f)
+            this
+          }
         }
 
         def publish(message: M): F[Unit] = {
@@ -134,6 +142,7 @@ object Korolev {
 
       val initialization = Async[F] sequence {
         Seq(
+          // History callback
           jsAccess.registerCallbackAndFlush[String] { pathString =>
             val path = Router.Path.fromString(pathString)
             val maybeState = router.toState.lift(stateManager.state, path)
@@ -146,15 +155,24 @@ object Korolev {
               }
             }
           } flatMap { historyCallback =>
-            client.callAndFlush[Unit]("RegisterHistoryHandler",
-                                      historyCallback)
+            client.callAndFlush[Unit]("RegisterHistoryHandler", historyCallback)
           },
+          // Event callback
           jsAccess.registerCallbackAndFlush[String] { targetAndType =>
             val Array(renderNum, target, tpe) = targetAndType.split(':')
             if (currentRenderNum.get == renderNum.toInt)
               propagateEvent(events(), stateManager.apply, browserAccess, Id(target), tpe)
           } flatMap { eventCallback =>
             client.callAndFlush[Unit]("RegisterGlobalEventHandler", eventCallback)
+          },
+          // FormData progress callback
+          jsAccess.registerCallbackAndFlush[String] { descriptorLoadedTotal =>
+            val Array(descriptor, loaded, total) = descriptorLoadedTotal.split(':')
+            formDataProgressTransitions.get(descriptor) foreach { f =>
+              stateManager(f(loaded.toInt, total.toInt))
+            }
+          } flatMap { callback =>
+            client.callAndFlush[Unit]("RegisterFormDataProgressHandler", callback)
           },
           client.callAndFlush[Unit]("SetRenderNum", 0),
           if (fromScratch) client.callAndFlush("CleanRoot") else Async[F].unit
