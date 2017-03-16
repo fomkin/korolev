@@ -29,7 +29,7 @@ class Issue14Spec extends FlatSpec with Matchers {
 
     Korolev(
       jsAccess = jSAccess,
-      localDux = Dux[Future, String]("firstState"),
+      localDux = StateManager[Future, String]("firstState"),
       initialState = "firstState",
       fromScratch = true,
       router = Router.empty[Future, String, String],

@@ -1,5 +1,7 @@
 package korolev
 
+import korolev.StateManager.Transition
+
 import scala.language.higherKinds
 
 class Effects[F[+_]: Async, S, M] {
@@ -9,7 +11,7 @@ class Effects[F[+_]: Async, S, M] {
 
   type Event = Effects.Event[F, S, M]
   type EventFactory[T] = T => Event
-  type Transition = Dux.Transition[S]
+  type Transition = StateManager.Transition[S]
 
   def elementId = new ElementId()
 
@@ -18,13 +20,13 @@ class Effects[F[+_]: Async, S, M] {
     SimpleEvent[F, S, M](name, phase, () => effect)
 
   def eventWithAccess(name: Symbol, phase: EventPhase = Bubbling)(
-      effect: Access[F, M] => EventResult[F, S]): EventWithAccess[F, S, M] =
+      effect: Access[F, S, M] => EventResult[F, S]): EventWithAccess[F, S, M] =
     EventWithAccess(name, phase, effect)
 
-  def immediateTransition(transition: Dux.Transition[S]): EventResult[F, S] =
+  def immediateTransition(transition: StateManager.Transition[S]): EventResult[F, S] =
     EventResult[F, S](Some(transition), None, sp = false)
 
-  def deferredTransition(transition: F[Dux.Transition[S]]): EventResult[F, S] =
+  def deferredTransition(transition: F[StateManager.Transition[S]]): EventResult[F, S] =
     EventResult[F, S](None, Some(transition), sp = false)
 
   /**
@@ -46,7 +48,7 @@ object Effects {
     */
   def apply[F[+_]: Async, S, M] = new Effects[F, S, M]()
 
-  abstract class Access[F[+_]: Async, M] {
+  abstract class Access[F[+_]: Async, S, M] {
 
     /**
       * Extract property of element from client-side DOM.
@@ -75,6 +77,32 @@ object Effects {
       * Publish message to environment
       */
     def publish(message: M): F[Unit]
+
+    /** Downloads form from client
+      * {{{
+      * eventWithAccess('submit) { access => 
+      *   access
+      *     .downloadFormData(myForm)
+      *     .onProgress { (loaded, total) =>
+      *       // transition …
+      *     }
+      *     .start
+      *     .map { formData =>
+      *       val picture = data.file("picture") // Array[Byte]
+      *       val title = data.text("title") // String
+      *       // transition ...
+      *     }
+      * }
+      * }}}
+      * @param id form elementId
+      * @return
+      */
+    def downloadFormData(id: ElementId): FormDataDownloader[F, S]
+  }
+
+  abstract class FormDataDownloader[F[+_]: Async, S] {
+    def onProgress(f: (Int, Int) => Transition[S]): this.type
+    def start(): F[FormData]
   }
 
   sealed abstract class Event[F[+_]: Async, S, M] extends VDom.Misc {
@@ -85,7 +113,7 @@ object Effects {
   case class EventWithAccess[F[+_]: Async, S, M](
       `type`: Symbol,
       phase: EventPhase,
-      effect: Access[F, M] => EventResult[F, S])
+      effect: Access[F, S, M] => EventResult[F, S])
       extends Event[F, S, M]
 
   case class SimpleEvent[F[+_]: Async, S, M](`type`: Symbol,

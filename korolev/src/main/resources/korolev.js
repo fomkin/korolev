@@ -145,6 +145,21 @@
         console.log(path);
         if (path !== global.location.pathname)
           global.history.pushState(path, '', path);
+      },
+      UploadForm: function(id, descriptor) {
+        var form = els[id];
+        var formData = new FormData(form);
+        var request = new XMLHttpRequest();
+        var deviceId = getCookie('device');
+        var uri = KorolevServerRootPath +
+          'bridge' +
+          '/' + deviceId +
+          '/' + KorolevSessionId +
+          '/form-data' +
+          '/' + descriptor;
+        request.open("POST", uri, true);
+        request.send(formData);
+        return;
       }
     }
   })();

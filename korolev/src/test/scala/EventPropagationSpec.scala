@@ -92,7 +92,7 @@ trait EventTesting extends FlatSpec {
   type EventAssertion = (ShouldFire, Comment)
   type Context = mutable.Map[String, EventAssertion]
 
-  def duxApply(implicit context: Context): Dux.Transition[S] => Future[Unit] = { t =>
+  def duxApply(implicit context: Context): StateManager.Transition[S] => Future[Unit] = { t =>
     val key = t("")
     context(key) match {
       case (false, comment) => fail(comment)

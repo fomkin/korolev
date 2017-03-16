@@ -5,22 +5,22 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import scala.language.higherKinds
 import scala.util.{Failure, Success}
 
-abstract class Dux[F[+_]: Async, State] {
+abstract class StateManager[F[+_]: Async, State] {
   def state: State
-  def subscribe[U](f: State => U): Dux.Unsubscribe
-  def onDestroy[U](f: () => U): Dux.Unsubscribe
+  def subscribe[U](f: State => U): StateManager.Unsubscribe
+  def onDestroy[U](f: () => U): StateManager.Unsubscribe
   def destroy(): Unit
-  def apply(transition: Dux.Transition[State]): F[Unit]
+  def apply(transition: StateManager.Transition[State]): F[Unit]
   def update(state: State): F[Unit]
 }
 
-object Dux {
+object StateManager {
 
   type Unsubscribe = () => Unit
   type Transition[State] = PartialFunction[State, State]
 
-  def apply[F[+_]: Async, S](initialState: S): Dux[F, S] = {
-    new Dux[F, S] {
+  def apply[F[+_]: Async, S](initialState: S): StateManager[F, S] = {
+    new StateManager[F, S] {
 
       val queue = new ConcurrentLinkedQueue[(Async.Promise[F, Unit], Transition[S])]
 
@@ -72,7 +72,7 @@ object Dux {
         () => onDestroyListeners = onDestroyListeners.filter(_ != f)
       }
 
-      def subscribe[U](f: S => U): Dux.Unsubscribe = {
+      def subscribe[U](f: S => U): StateManager.Unsubscribe = {
         subscribers = f :: subscribers
         () => subscribers = subscribers.filter(_ != f)
       }

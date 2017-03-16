@@ -10,30 +10,32 @@ import scala.annotation.tailrec
 /**
   * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
   */
-object FormDataCodec {
+final class FormDataCodec(maxPartSize: Int) {
 
-  private sealed trait DecoderState
-  private case object Buffering extends DecoderState
-  private case object Headers extends DecoderState
+  import FormDataCodec._
 
-  def decode(source: ByteBuffer,
-             boundary: String,
-             maxPartSize: Int): FormData = {
+  private val threadLocalBuffer = new ThreadLocal[ByteBuffer] {
+    override def initialValue(): ByteBuffer = {
+      ByteBuffer.allocate(maxPartSize)
+    }
+  }
+
+  def decode(source: ByteBuffer, boundary: String): FormData = {
 
     val boundaryWithBreaks = s"\n--$boundary\n"
     val end = s"\n--$boundary--\n"
-    val buffer = ByteBuffer.allocate(maxPartSize)
+    val buffer = threadLocalBuffer.get()
 
-    // Check the boundary is reached
+    buffer.clear()
+
+    // Check the delimiter is reached
     def checkDelimiter(delimiter: String): Boolean = {
       val d = delimiter.getBytes
       @tailrec def aux(pos: Int, startPos: Int): Boolean = {
-        if (source.remaining == 0) {
-          source.position(startPos)
-          false
-        } else if (pos < d.length) {
+        if (pos < d.length) {
           val b = source.get()
-          if (b == d(pos)) aux(pos + 1, startPos)
+          if (b == '\r') aux(pos, startPos)
+          else if (b == d(pos)) aux(pos + 1, startPos)
           else {
             source.position(startPos)
             false
@@ -75,8 +77,7 @@ object FormDataCodec {
       }
 
       state match {
-        case Buffering if checkDelimiter(end) =>
-          updateEntries()
+        case Buffering if checkDelimiter(end) => updateEntries()
         case Buffering if checkDelimiter(boundaryWithBreaks) =>
           val ue = updateEntries()
           loop(ue, Nil, Headers)
@@ -92,13 +93,18 @@ object FormDataCodec {
           buffer.clear()
           loop(entries, headers, Buffering)
         case Buffering | Headers =>
-          val x = source.get()
-          buffer.put(x)
+          buffer.put(source.get())
           loop(entries, headers, state)
       }
     }
 
-    source.position(s"--$boundary\n".length)
+    checkDelimiter(s"--$boundary\n")
     FormData(loop(Nil, Nil, Headers))
   }
+}
+
+object FormDataCodec {
+  private sealed trait DecoderState
+  private case object Buffering extends DecoderState
+  private case object Headers extends DecoderState
 }
