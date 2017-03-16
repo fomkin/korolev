@@ -140,7 +140,7 @@ lazy val korolev = crossProject.crossType(CrossType.Full).
   settings(
     normalizedName := "korolev",
     libraryDependencies += "biz.enef" %%% "slogging" % "0.5.2",
-    unmanagedResourceDirectories in Compile += file("korolev") / "src" / "main" / "resources"
+    unmanagedResourceDirectories in Compile += file("korolev") / "shared" / "src" / "main" / "resources"
   ).
   dependsOn(vdom, bridge).
   enablePlugins(SbtOsgi).settings(korolevOsgiSettings:_*)

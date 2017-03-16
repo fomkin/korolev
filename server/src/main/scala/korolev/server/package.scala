@@ -279,13 +279,14 @@ package object server extends LazyLogging {
     val htmlContentType = "text/html"
     val binaryContentType = "application/octet-stream"
     val korolevJs = {
-      val stream =
-        classOf[EventPropagation].getClassLoader.getResourceAsStream("korolev.js")
+      val classLoader = classOf[EventPropagation].getClassLoader
+      val stream = classLoader.getResourceAsStream("korolev.js")
       Source.fromInputStream(stream).mkString
     }
     val bridgeJs = {
-      val stream =
-        classOf[JSAccess[List]].getClassLoader.getResourceAsStream("bridge.js")
+      import scala.concurrent.Future
+      val classLoader = classOf[JSAccess[Future]].getClassLoader
+      val stream = classLoader.getResourceAsStream("bridge.js")
       Source.fromInputStream(stream).mkString
     }
   }
