@@ -135,7 +135,7 @@ lazy val korolevOsgiSettings = osgiSettings ++ Seq(
   OsgiKeys.exportPackage := Seq("korolev.*;version=${Bundle-Version}")
 )
 
-lazy val korolev = crossProject.crossType(CrossType.Pure).
+lazy val korolev = crossProject.crossType(CrossType.Full).
   settings(commonSettings: _*).
   settings(
     normalizedName := "korolev",
