@@ -37,7 +37,8 @@ class FormDataCodecSpec extends FlatSpec with Matchers {
     """.stripMargin
 
     val bodyBuffer = ByteBuffer.wrap(body.getBytes(StandardCharsets.US_ASCII))
-    val formData = FormDataCodec.decode(bodyBuffer, "Asrf456BGe4h", 1024)
+    val codec = new FormDataCodec(100500)
+    val formData = codec.decode(bodyBuffer, "Asrf456BGe4h")
 
     formData.text("DestAddress") should be ("brutal-vasya@example.com")
     formData.text("MessageTitle") should be ("I'm indignant")
