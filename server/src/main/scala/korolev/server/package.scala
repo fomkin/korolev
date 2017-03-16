@@ -8,9 +8,11 @@ import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 
 import bridge.JSAccess
 import korolev.Async._
+import korolev.Korolev.MutableMapFactory
 import slogging.LazyLogging
 
 import scala.collection.concurrent.TrieMap
+import scala.collection.mutable
 import scala.io.Source
 import scala.language.higherKinds
 import scala.util.{Failure, Random, Success, Try}
@@ -131,8 +133,13 @@ package object server extends LazyLogging {
         val dux = StateManager[F, S](state)
         val router = config.serverRouter.dynamic(deviceId, sessionId)
         val env = config.envConfigurator(deviceId, sessionId, dux.apply)
-        val korolev = Korolev(dux, jsAccess, state, config.render, router, env.onMessage, fromScratch = false)
-
+        val trieMapFactory = new MutableMapFactory {
+          def apply[K, V]: mutable.Map[K, V] = TrieMap.empty[K, V]
+        }
+        val korolev = Korolev(
+          dux, jsAccess, state, config.render, router, env.onMessage, fromScratch = false,
+          createMutableMap = trieMapFactory
+        )
         // Subscribe on state updates an push them to storage
         korolev.stateManager.subscribe(state => config.stateStorage.write(deviceId, sessionId, state))
         korolev.stateManager.onDestroy(env.onDestroy)
@@ -182,6 +189,7 @@ package object server extends LazyLogging {
     }
 
     val formDataCodec = new FormDataCodec(config.maxFormDataEntrySize)
+
     val service: PartialFunction[Request, F[Response]] = {
       case matchStatic(stream, fileExtensionOpt) =>
         val headers = mimeTypes(fileExtensionOpt).fold(Seq.empty[(String, String)]) {
