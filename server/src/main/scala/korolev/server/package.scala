@@ -8,12 +8,14 @@ import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 
 import bridge.JSAccess
 import korolev.Async._
+import korolev.Korolev.MutableMapFactory
 import slogging.LazyLogging
 
 import scala.collection.concurrent.TrieMap
+import scala.collection.mutable
 import scala.io.Source
 import scala.language.higherKinds
-import scala.util.{Failure, Random, Success}
+import scala.util.{Failure, Random, Success, Try}
 
 /**
   * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
@@ -28,6 +30,7 @@ package object server extends LazyLogging {
     def publish(message: String): F[Unit]
     def nextMessage: F[String]
     def destroy(): F[Unit]
+    def resolveFormData(descriptor: String, formData: Try[FormData]): Unit
   }
 
   def korolevService[F[+_]: Async, S, M](
@@ -127,13 +130,19 @@ package object server extends LazyLogging {
       Async[F].map(config.stateStorage.read(deviceId, sessionId)) { state =>
 
         // Create Korolev with dynamic router
-        val dux = Dux[F, S](state)
+        val dux = StateManager[F, S](state)
         val router = config.serverRouter.dynamic(deviceId, sessionId)
         val env = config.envConfigurator(deviceId, sessionId, dux.apply)
-        val korolev = Korolev(dux, jsAccess, state, config.render, router, env.onMessage, fromScratch = false)
+        val trieMapFactory = new MutableMapFactory {
+          def apply[K, V]: mutable.Map[K, V] = TrieMap.empty[K, V]
+        }
+        val korolev = Korolev(
+          dux, jsAccess, state, config.render, router, env.onMessage, fromScratch = false,
+          createMutableMap = trieMapFactory
+        )
         // Subscribe on state updates an push them to storage
-        korolev.subscribe(state => config.stateStorage.write(deviceId, sessionId, state))
-        korolev.onDestroy(env.onDestroy)
+        korolev.stateManager.subscribe(state => config.stateStorage.write(deviceId, sessionId, state))
+        korolev.stateManager.onDestroy(env.onDestroy)
 
         new KorolevSession[F] {
 
@@ -160,12 +169,17 @@ package object server extends LazyLogging {
             }
           }
 
+
+          def resolveFormData(descriptor: String, formData: Try[FormData]): Unit = {
+            korolev.resolveFormData(descriptor, formData)
+          }
+
           def destroy(): F[Unit] = {
             if (aliveRef.getAndSet(false)) {
               currentPromise.get() foreach { promise =>
                 promise.complete(Failure(new SessionDestroyedException("Session has been closed")))
               }
-              korolev.destroy()
+              korolev.stateManager.destroy()
               sessions.remove(sessionKey)
             }
             Async[F].unit
@@ -173,6 +187,8 @@ package object server extends LazyLogging {
         }
       }
     }
+
+    val formDataCodec = new FormDataCodec(config.maxFormDataEntrySize)
 
     val service: PartialFunction[Request, F[Response]] = {
       case matchStatic(stream, fileExtensionOpt) =>
@@ -182,16 +198,41 @@ package object server extends LazyLogging {
         }
         val response = Response.Http(Response.Status.Ok, Some(stream), headers)
         Async[F].pure(response)
-      case Request(Root / "bridge" / "long-polling" / deviceId / sessionId / "publish", _, _, message) =>
+      case Request(Root / "bridge" / deviceId / sessionId / "form-data" / descriptor, _, _, headers, body) =>
         sessions.get(makeSessionKey(deviceId, sessionId)) match {
           case Some(session) =>
+            val boundaryOpt = headers collectFirst {
+              case (k, v) if k.toLowerCase == "content-type" && v.contains("multipart/form-data") => v
+            } flatMap {
+              _.split(';')
+                .toList
+                .filter(_.contains('='))
+                .map(_.split('=').map(_.trim))
+                .collectFirst { case Array("boundary", s) => s }
+            }
+            boundaryOpt match {
+              case None =>
+                val error = "Content-Type should be `multipart/form-data`"
+                val res = Response.Http(Response.Status.BadRequest, error)
+                Async[F].pure(res)
+              case Some(boundary) =>
+                val formData = Try(formDataCodec.decode(body, boundary))
+                session.resolveFormData(descriptor, formData)
+                Async[F].pure(Response.Http(Response.Status.Ok, None))
+            }
+          case None => Async[F].pure(Response.Http(Response.Status.BadRequest, "Session isn't exist"))
+        }
+      case Request(Root / "bridge" / "long-polling" / deviceId / sessionId / "publish", _, _, _, body) =>
+        sessions.get(makeSessionKey(deviceId, sessionId)) match {
+          case Some(session) =>
+            val message = new String(body.array(), StandardCharsets.UTF_8)
             session
               .publish(message)
               .map(_ => Response.Http(Response.Status.Ok))
           case None =>
             Async[F].pure(Response.Http(Response.Status.BadRequest, "Session isn't exist"))
         }
-      case Request(Root / "bridge" / "long-polling" / deviceId / sessionId / "subscribe", _, _, _) =>
+      case Request(Root / "bridge" / "long-polling" / deviceId / sessionId / "subscribe", _, _, _, _) =>
         val sessionAsync = sessions.get(makeSessionKey(deviceId, sessionId)) match {
           case Some(x) => Async[F].pure(x)
           case None => createSession(deviceId, sessionId)
@@ -200,7 +241,7 @@ package object server extends LazyLogging {
           case _: SessionDestroyedException =>
             Response.Http(Response.Status.Gone, "Session has been destroyed")
         }
-      case Request(Root / "bridge" / "web-socket" / deviceId / sessionId, _, _, _) =>
+      case Request(Root / "bridge" / "web-socket" / deviceId / sessionId, _, _, _, _) =>
         val sessionAsync = sessions.get(makeSessionKey(deviceId, sessionId)) match {
           case Some(x) => Async[F].pure(x)
           case None => createSession(deviceId, sessionId)
@@ -238,13 +279,14 @@ package object server extends LazyLogging {
     val htmlContentType = "text/html"
     val binaryContentType = "application/octet-stream"
     val korolevJs = {
-      val stream =
-        classOf[Korolev].getClassLoader.getResourceAsStream("korolev.js")
+      val classLoader = classOf[EventPropagation].getClassLoader
+      val stream = classLoader.getResourceAsStream("korolev.js")
       Source.fromInputStream(stream).mkString
     }
     val bridgeJs = {
-      val stream =
-        classOf[JSAccess[List]].getClassLoader.getResourceAsStream("bridge.js")
+      import scala.concurrent.Future
+      val classLoader = classOf[JSAccess[Future]].getClassLoader
+      val stream = classLoader.getResourceAsStream("bridge.js")
       Source.fromInputStream(stream).mkString
     }
   }

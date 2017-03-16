@@ -1,5 +1,5 @@
 import RunNowExecutionContext.instance
-import korolev.Effects.{Access, ElementId}
+import korolev.Effects.{Access, ElementId, FormDataDownloader}
 import korolev.VDom.Id
 import korolev._
 import org.scalatest.{FlatSpec, Matchers}
@@ -92,7 +92,7 @@ trait EventTesting extends FlatSpec {
   type EventAssertion = (ShouldFire, Comment)
   type Context = mutable.Map[String, EventAssertion]
 
-  def duxApply(implicit context: Context): Dux.Transition[S] => Future[Unit] = { t =>
+  def duxApply(implicit context: Context): StateManager.Transition[S] => Future[Unit] = { t =>
     val key = t("")
     context(key) match {
       case (false, comment) => fail(comment)
@@ -103,12 +103,14 @@ trait EventTesting extends FlatSpec {
 
   val BE = Effects[Future, String, Any]
 
-  object BA extends Access[Future, Any] {
+  object BA extends Access[Future, String, Any] {
 
     def publish(message: Any): Future[Unit] = Future.successful(())
 
     def property[T](id: ElementId, propName: Symbol): Future[T] =
       Future.failed(new Exception())
+
+    def downloadFormData(id: ElementId): FormDataDownloader[Future, String] = ???
   }
 
   def assertEvent[U](fillContext: Context => U): Unit = {

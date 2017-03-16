@@ -28,8 +28,8 @@ class Issue14Spec extends FlatSpec with Matchers {
     }
 
     Korolev(
-      jsAccess = jSAccess,
-      localDux = Dux[Future, String]("firstState"),
+      ja = jSAccess,
+      sm = StateManager[Future, Issue14Spec.S]("firstState"),
       initialState = "firstState",
       fromScratch = true,
       router = Router.empty[Future, String, String],
@@ -53,10 +53,12 @@ class Issue14Spec extends FlatSpec with Matchers {
     jSAccess.resolvePromise(0, isSuccess = true, "@obj:@Korolev")
     jSAccess.resolvePromise(1, isSuccess = true, "@obj:^cb0") // pop state handler
     jSAccess.resolvePromise(2, isSuccess = true, "@obj:^cb1") // event handler
-    jSAccess.resolvePromise(3, isSuccess = true, "@unit")
+    jSAccess.resolvePromise(3, isSuccess = true, "@obj:^cb2") // FormData progress handler
     jSAccess.resolvePromise(4, isSuccess = true, "@unit")
     jSAccess.resolvePromise(5, isSuccess = true, "@unit")
     jSAccess.resolvePromise(6, isSuccess = true, "@unit")
+    jSAccess.resolvePromise(7, isSuccess = true, "@unit")
+    jSAccess.resolvePromise(8, isSuccess = true, "@unit")
 
     jSAccess.fireCallback("^cb1", "1:0_1_0:mousedown")
     jSAccess.fireCallback("^cb1", "1:0_1_0:mouseup")

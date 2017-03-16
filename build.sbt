@@ -135,12 +135,12 @@ lazy val korolevOsgiSettings = osgiSettings ++ Seq(
   OsgiKeys.exportPackage := Seq("korolev.*;version=${Bundle-Version}")
 )
 
-lazy val korolev = crossProject.crossType(CrossType.Pure).
+lazy val korolev = crossProject.crossType(CrossType.Full).
   settings(commonSettings: _*).
   settings(
     normalizedName := "korolev",
     libraryDependencies += "biz.enef" %%% "slogging" % "0.5.2",
-    unmanagedResourceDirectories in Compile += file("korolev") / "src" / "main" / "resources"
+    unmanagedResourceDirectories in Compile += file("korolev") / "shared" / "src" / "main" / "resources"
   ).
   dependsOn(vdom, bridge).
   enablePlugins(SbtOsgi).settings(korolevOsgiSettings:_*)
@@ -193,6 +193,13 @@ lazy val jcacheExample = (project in examples / "jcache").
   ).
   dependsOn(`server-blaze`, `jcache-support`)
 
+lazy val formDataExample = (project in examples / "form-data").
+  enablePlugins(JavaAppPackaging).
+  enablePlugins(UniversalPlugin).
+  settings(exampleSettings: _*).
+  settings(mainClass := Some("FormDataExample")).
+  dependsOn(`server-blaze`)
+
 val `integration-tests` = project.
   settings(commonSettings).
   settings(dontPublishSettings:_*).
@@ -214,7 +221,7 @@ lazy val root = project.in(file(".")).
     server, `server-blaze`,
     `jcache-support`,
     simpleExample, routingExample, gameOfLifeExample,
-    jcacheExample,
+    jcacheExample, formDataExample,
     `integration-tests`
   )
 
