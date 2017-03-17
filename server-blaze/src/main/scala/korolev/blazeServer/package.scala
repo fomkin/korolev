@@ -3,10 +3,9 @@ package korolev
 import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 import java.nio.channels.AsynchronousChannelGroup
-import java.util.concurrent.Executors
 
-import korolev.blazeServer.util.ExecutionContextScheduler
 import korolev.server.{KorolevServiceConfig, MimeTypes, Request => KorolevRequest, Response => KorolevResponse}
+import korolev.util.Scheduler
 import org.http4s.blaze.channel._
 import org.http4s.blaze.channel.nio2.NIO2SocketServerGroup
 import org.http4s.blaze.http.{HttpResponse, HttpService, Response, WSResponse}
@@ -14,8 +13,8 @@ import org.http4s.blaze.pipeline.stages.SSLStage
 import org.http4s.blaze.pipeline.{Command, LeafBuilder}
 import org.http4s.websocket.WebsocketBits._
 
+import scala.concurrent.Promise
 import scala.concurrent.duration._
-import scala.concurrent.{ExecutionContext, Promise}
 import scala.language.higherKinds
 
 /**
@@ -23,19 +22,16 @@ import scala.language.higherKinds
   */
 package object blazeServer {
 
-  implicit val defaultExecutor = ExecutionContext.
-    fromExecutorService(Executors.newWorkStealingPool())
-
   def blazeService[F[+_]: Async, S, M]: BlazeServiceBuilder[F, S, M] =
     new BlazeServiceBuilder(server.mimeTypes)
 
   def blazeService[F[+_]: Async, S, M](mimeTypes: MimeTypes): BlazeServiceBuilder[F, S, M] =
-    new BlazeServiceBuilder(server.mimeTypes)
+    new BlazeServiceBuilder(mimeTypes)
 
   def blazeService[F[+_]: Async, S, M](
     config: KorolevServiceConfig[F, S, M],
     mimeTypes: MimeTypes
-  ): HttpService = {
+  )(implicit scheduler: Scheduler[F]): HttpService = {
 
     val korolevServer = korolev.server.korolevService(mimeTypes, config)
 
@@ -92,7 +88,7 @@ package object blazeServer {
           HttpResponse(status.code, status.phrase, responseHeaders, ByteBuffer.wrap(array))
         case KorolevResponse.WebSocket(publish, subscribe, destroy) =>
           val stage = new WebSocketStage {
-            val stopHeartbeat = ExecutionContextScheduler.schedule(5.seconds) {
+            val stopHeartbeat = scheduler.schedule(5.seconds) {
               channelWrite(Ping())
             }
             def destroyAndStopTimer(): Unit = {

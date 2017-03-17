@@ -28,8 +28,6 @@ case class BlazeServerConfig(
 
 object BlazeServerConfig {
 
-  val default = BlazeServerConfig()
-
   def bogusSslContext: SSLContext = {
     val ksStream = BogusKeystore.asInputStream()
     assert(ksStream != null)

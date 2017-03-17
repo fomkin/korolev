@@ -69,6 +69,35 @@ object Korolev {
             s"$id:${event.`type`.name}:${event.phase}" -> typedEvent
         } toMap
 
+        delays() = {
+          // Remove finished delays
+          val actualDelays = delays() filter {
+            case (_, delay) => !delay.finished
+          } toMap
+          val updatedDelays = misc collect {
+            case (id, delay: Effects.Delay[_, _]) =>
+              actualDelays.get(id) match {
+                case None =>
+                  // This is new delays. Stat it
+                  val typedDelay = delay.asInstanceOf[Effects.Delay[F, S]]
+                  typedDelay.start(stateManager.apply)
+                  id -> typedDelay
+                case Some(typedDelay) =>
+                  // Return old delay
+                  id -> typedDelay
+              }
+          }
+          val updatedDelaysMap = updatedDelays.toMap
+          // Stop all non-finished delays
+          // which was removed from tree
+          actualDelays foreach {
+            case (id, delay) =>
+              if (!updatedDelaysMap.contains(id))
+                delay.cancel()
+          }
+          updatedDelays
+        }
+
         events().values foreach { event =>
           val `type` = event.`type`
           if (!enabledEvents().contains(`type`)) {
@@ -91,6 +120,7 @@ object Korolev {
       val enabledEvents = AtomicReference(Set('submit))
       val elementIds = AtomicReference(Map.empty[Effects.ElementId, String])
       val events = AtomicReference(Map.empty[String, Effects.Event[F, S, M]])
+      val delays = AtomicReference(Seq.empty[(Id, Effects.Delay[F, S])])
       val currentRenderNum = new AtomicInteger(0)
       val formDataPromises = createMutableMap[String, Promise[F, FormData]]
       val formDataProgressTransitions = createMutableMap[String, (Int, Int) => Transition[S]]
