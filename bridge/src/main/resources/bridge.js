@@ -42,32 +42,32 @@
       var self = this,
           initialize = null,
           lastLinkId = 0,
-          tmpLinks = new Map(),
-          tmpLinksIndex = new Map(),
-          tmpLinksTime = new Map(),
-          links = new Map(),
-          linksIndex = new Map();
+          tmpLinks = {},
+          tmpLinksIndex = {},
+          tmpLinksTime = {},
+          links = {},
+          linksIndex = {};
 
-      links.set('global', global);
-      links.set('testEnv', testEnv);
-      linksIndex.set(global, 'global')
-      linksIndex.set(testEnv, 'testEnv');
+        links['global'] = global;
+        links['testEnv'] = testEnv;
+        linksIndex[global] = 'global';
+        linksIndex[testEnv] = 'testEnv';
 
       function createTmpLink(obj) {
         var id = lastLinkId.toString();
         lastLinkId++;
-        tmpLinks.set(id, obj);
-        tmpLinksIndex.set(obj, id);
-        tmpLinksTime.set(id, Date.now());
+        tmpLinks[id] = obj;
+        tmpLinks[obj] = id;
+        tmpLinksTime[id] = Date.now();
         return id;
       }
 
       function getLink(id) {
-        var tmpLink = tmpLinks.get(id);
+        var tmpLink = tmpLinks[id];
         if (tmpLink !== undefined) {
           return tmpLink;
         }
-        return links.get(id);
+        return links[id];
       }
 
       function unpackArgs(args) {
@@ -101,7 +101,7 @@
           return arg
         }
         if (typeof arg === 'object') {
-          var id = linksIndex.get(arg) || tmpLinksIndex.get(arg);
+          var id = linksIndex[arg] || tmpLinksIndex[arg];
           if (id === undefined) {
             id = createTmpLink(arg);
           }
@@ -165,8 +165,8 @@
         var obj = args[0],
             newId = args[1];
         if (obj) {
-          links.set(newId, obj);
-          linksIndex.set(obj, newId);
+          links[newId] = obj;
+          linksIndex[obj] = newId;
           cb([reqId, true, packResult(obj)]);
         } else {
           cb([reqId, false, LinkNotFound]);
@@ -227,7 +227,7 @@
       };
 
       this.checkLinkSaved = function (id) {
-        return links.has(id);
+        return links[id] !== null;
       };
 
       this.initialized = new Promise(function (resolve) {
@@ -258,16 +258,16 @@
             postMessage([reqId, true, UnitResult]);
             setInterval(function () {
               var result = 0;
-              tmpLinksIndex.forEach(function (id) {
-                var dt = Date.now() - tmpLinksTime.get(id), obj;
+              for(var id in tmpLinksIndex) {
+                var dt = Date.now() - tmpLinksTime[id], obj;
                 if (dt > tmpLinkLifetime) {
-                  obj = tmpLinks.get(id);
-                  tmpLinks.delete(id);
-                  tmpLinksTime.delete(id);
-                  tmpLinksIndex.delete(obj);
+                  obj = tmpLinks[id];
+                  tmpLinks[id] = null;
+                  tmpLinksTime[id] = null;
+                  tmpLinksIndex[obj] = null;
                   result++;
                 }
-              });
+              }
             }, tmpLinkLifetime);
             break;
           case 'registerCallback':
@@ -276,8 +276,8 @@
               function callback(arg) {
                 postMessage([-1, callbackId, packResult(arg)]);
               }
-              links.set(callbackId, callback);
-              linksIndex.set(callback, callbackId);
+              links[callbackId] = callback;
+              linksIndex[callback] = callbackId;
               postMessage([reqId, true, ObjPrefix + callbackId]);
             })();
             break;
@@ -290,8 +290,8 @@
               var obj = args[0],
                   id = rawArgs[0].replace(LinkPrefix, '');
               if (obj) {
-                links.delete(id);
-                tmpLinks.delete(id);
+                links[id] = null;
+                tmpLinks[id] = null;
                 postMessage([reqId, true, UnitResult]);
               } else {
                 postMessage([reqId, false, LinkNotFound]);
