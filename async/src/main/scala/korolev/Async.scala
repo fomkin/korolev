@@ -1,12 +1,12 @@
 package korolev
 
 import scala.annotation.implicitNotFound
+import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future}
 import scala.language.higherKinds
 import scala.util.Try
 
-@implicitNotFound("""Instance of Async for `${F}` is not found. If you want Future,
- ensure that execution context is passed to a scope (import korolev.blazeServer.defaultExecutor)""")
+@implicitNotFound("Instance of Async for ${F} is not found. If you want Future, ensure that execution context is passed to the scope (import korolev.execution.defaultExecutor)")
 trait Async[F[+_]] {
   def pure[A](value: => A): F[A]
   def fork[A](value: => A): F[A]
@@ -22,27 +22,38 @@ trait Async[F[+_]] {
 
 object Async {
 
+  private val futureInstanceCache =
+    mutable.Map.empty[ExecutionContext, Async[Future]]
+
   case class Promise[F[+_], A](future: F[A], complete: Try[A] => Unit)
 
   def apply[F[+_]: Async]: Async[F] = implicitly[Async[F]]
 
+  private final class FutureAsync(implicit ec: ExecutionContext) extends Async[Future] {
+    val unit: Future[Unit] = Future.successful(())
+    def pure[A](value: => A): Future[A] =
+      try Future.successful(value)
+      catch { case e: Throwable => Future.failed(e) }
+    def fork[A](value: => A): Future[A] = Future(value)
+    def fromTry[A](value: => Try[A]): Future[A] = Future.fromTry(value)
+    def flatMap[A, B](m: Future[A])(f: (A) => Future[B]): Future[B] = m.flatMap(f)
+    def map[A, B](m: Future[A])(f: (A) => B): Future[B] = m.map(f)
+    def run[A, U](m: Future[A])(f: (Try[A]) => U): Unit = m.onComplete(f)
+    def recover[A, U >: A](m: Future[A])(f: PartialFunction[Throwable, U]): Future[U] = m.recover(f)
+    def sequence[A](xs: Seq[Future[A]]): Future[Seq[A]] = Future.sequence(xs)
+    def promise[A]: Promise[Future, A] = {
+      val promise = scala.concurrent.Promise[A]()
+      Promise(promise.future, promise.complete)
+    }
+  }
+
+  /**
+    * Gives an instance of Async for Future type.
+    * Physically one instance for every execution context
+    */
   implicit def futureAsync(implicit ec: ExecutionContext): Async[Future] = {
-    new Async[Future] {
-      val unit: Future[Unit] = Future.successful(())
-      def pure[A](value: => A): Future[A] =
-        try Future.successful(value)
-        catch { case e: Throwable => Future.failed(e) }
-      def fork[A](value: => A): Future[A] = Future(value)
-      def fromTry[A](value: => Try[A]): Future[A] = Future.fromTry(value)
-      def flatMap[A, B](m: Future[A])(f: (A) => Future[B]): Future[B] = m.flatMap(f)
-      def map[A, B](m: Future[A])(f: (A) => B): Future[B] = m.map(f)
-      def run[A, U](m: Future[A])(f: (Try[A]) => U): Unit = m.onComplete(f)
-      def recover[A, U >: A](m: Future[A])(f: PartialFunction[Throwable, U]): Future[U] = m.recover(f)
-      def sequence[A](xs: Seq[Future[A]]): Future[Seq[A]] = Future.sequence(xs)
-      def promise[A]: Promise[Future, A] = {
-        val promise = scala.concurrent.Promise[A]()
-        Promise(promise.future, promise.complete)
-      }
+    futureInstanceCache.synchronized {
+      futureInstanceCache.getOrElseUpdate(ec, new FutureAsync())
     }
   }
 

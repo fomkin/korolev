@@ -4,6 +4,7 @@ import com.hazelcast.cache.HazelcastCachingProvider
 import korolev._
 import korolev.server._
 import korolev.blazeServer._
+import korolev.execution._
 import korolev.server.cacheApiSupport.CachedStateStorage
 
 import scala.concurrent.Future

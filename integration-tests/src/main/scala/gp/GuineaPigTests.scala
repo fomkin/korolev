@@ -14,7 +14,7 @@ object GuineaPigTests extends App {
 
   val server = {
 
-    import korolev.blazeServer.defaultExecutor
+    import korolev.execution.defaultExecutor
 
     val service = GuineaPigServer.service
     val config = BlazeServerConfig(

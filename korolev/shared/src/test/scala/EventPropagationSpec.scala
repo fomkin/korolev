@@ -1,4 +1,4 @@
-import RunNowExecutionContext.instance
+import korolev.testExecution._
 import korolev.Effects.{Access, ElementId, FormDataDownloader}
 import korolev.VDom.Id
 import korolev._

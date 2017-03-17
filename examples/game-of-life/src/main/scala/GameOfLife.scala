@@ -1,6 +1,7 @@
 import korolev._
 import korolev.server._
 import korolev.blazeServer._
+import korolev.execution._
 
 import scala.concurrent.Future
 

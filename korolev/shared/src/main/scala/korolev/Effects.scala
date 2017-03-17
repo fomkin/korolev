@@ -1,10 +1,13 @@
 package korolev
 
 import korolev.StateManager.Transition
+import korolev.util.Scheduler
+import korolev.Async.AsyncOps
 
+import scala.concurrent.duration.FiniteDuration
 import scala.language.higherKinds
 
-class Effects[F[+_]: Async, S, M] {
+class Effects[F[+_]: Async, S, M](implicit scheduler: Scheduler[F]) {
 
   import Effects._
   import EventPhase._
@@ -14,6 +17,29 @@ class Effects[F[+_]: Async, S, M] {
   type Transition = StateManager.Transition[S]
 
   def elementId = new ElementId()
+
+  /**
+    * Schedules the [[transition]] with [[delay]]. For example it can be useful
+    * when you want to hide something after timeout.
+    */
+  def delay(delay: FiniteDuration)(transition: Transition): Delay[F, S] = new Delay[F, S] {
+
+    @volatile var _jobHandler = Option.empty[Scheduler.JobHandler[F, _]]
+    @volatile var _finished = false
+
+    def finished: Boolean = _finished
+
+    def cancel(): Unit = _jobHandler.foreach(_.cancel())
+
+    def start(applyTransition: Transition => F[Unit]): Unit = {
+      _jobHandler = Some {
+        scheduler.scheduleOnce(delay) {
+          _finished = true
+          applyTransition(transition).run()
+        }
+      }
+    }
+  }
 
   def event(name: Symbol, phase: EventPhase = Bubbling)(
       effect: => EventResult[F, S]): SimpleEvent[F, S, M] =
@@ -46,7 +72,8 @@ object Effects {
     * @tparam S State
     * @tparam M Message
     */
-  def apply[F[+_]: Async, S, M] = new Effects[F, S, M]()
+  def apply[F[+_]: Async, S, M](implicit scheduler: Scheduler[F]) =
+    new Effects[F, S, M]()
 
   abstract class Access[F[+_]: Async, S, M] {
 
@@ -103,6 +130,12 @@ object Effects {
   abstract class FormDataDownloader[F[+_]: Async, S] {
     def onProgress(f: (Int, Int) => Transition[S]): this.type
     def start(): F[FormData]
+  }
+
+  sealed abstract class Delay[F[+_]: Async, S] extends VDom.Misc {
+    def start(applyTransition: Transition[S] => F[Unit]): Unit
+    def finished: Boolean
+    def cancel(): Unit
   }
 
   sealed abstract class Event[F[+_]: Async, S, M] extends VDom.Misc {

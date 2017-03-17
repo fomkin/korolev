@@ -200,10 +200,18 @@ lazy val formDataExample = (project in examples / "form-data").
   settings(mainClass := Some("FormDataExample")).
   dependsOn(`server-blaze`)
 
+lazy val delayExample = (project in examples / "delay").
+  enablePlugins(JavaAppPackaging).
+  enablePlugins(UniversalPlugin).
+  settings(exampleSettings: _*).
+  settings(mainClass := Some("DelayExample")).
+  dependsOn(`server-blaze`)
+
 val `integration-tests` = project.
   settings(commonSettings).
   settings(dontPublishSettings:_*).
   settings(
+    fork in run := true,
     libraryDependencies ++= Seq(
       "org.slf4j" % "slf4j-simple" % "1.7.+",
       "org.seleniumhq.selenium" % "selenium-java" % "2.53.1"
@@ -221,7 +229,7 @@ lazy val root = project.in(file(".")).
     server, `server-blaze`,
     `jcache-support`,
     simpleExample, routingExample, gameOfLifeExample,
-    jcacheExample, formDataExample,
+    jcacheExample, formDataExample, delayExample,
     `integration-tests`
   )
 
