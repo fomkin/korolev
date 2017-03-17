@@ -211,6 +211,7 @@ val `integration-tests` = project.
   settings(commonSettings).
   settings(dontPublishSettings:_*).
   settings(
+    fork in run := true,
     libraryDependencies ++= Seq(
       "org.slf4j" % "slf4j-simple" % "1.7.+",
       "org.seleniumhq.selenium" % "selenium-java" % "2.53.1"

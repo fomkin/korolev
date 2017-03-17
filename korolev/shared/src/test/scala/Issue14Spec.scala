@@ -2,11 +2,11 @@ import bridge.JSAccess
 import korolev.Effects.Event
 import korolev._
 import org.scalatest.{FlatSpec, Matchers}
-import RunNowExecutionContext.instance
 import korolev.Async.Promise
 
 import scala.collection.mutable
 import scala.concurrent.Future
+import korolev.testExecution._
 
 /**
   * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
@@ -24,7 +24,7 @@ class Issue14Spec extends FlatSpec with Matchers {
       def send(args: Seq[Any]): Unit = {}
       protected val promises = mutable.Map.empty[Int, Promise[Future, Any]]
       protected val callbacks = mutable.Map.empty[String, (Any) => Unit]
-      implicit val executionContext = RunNowExecutionContext.instance
+      implicit val executionContext = korolev.testExecution.defaultExecutor
     }
 
     Korolev(

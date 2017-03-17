@@ -5,6 +5,7 @@ import javax.imageio.ImageIO
 import korolev._
 import korolev.blazeServer._
 import korolev.server._
+import korolev.execution._
 
 import scala.concurrent.Future
 

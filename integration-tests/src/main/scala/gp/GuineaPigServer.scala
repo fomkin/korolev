@@ -3,6 +3,8 @@ package gp
 import korolev._
 import korolev.server._
 import korolev.blazeServer._
+import korolev.execution._
+
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.Future
