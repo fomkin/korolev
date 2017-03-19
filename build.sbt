@@ -207,7 +207,7 @@ lazy val delayExample = (project in examples / "delay").
   settings(mainClass := Some("DelayExample")).
   dependsOn(`server-blaze`)
 
-val `integration-tests` = project.
+lazy val `integration-tests` = project.
   settings(commonSettings).
   settings(dontPublishSettings:_*).
   settings(
@@ -218,6 +218,18 @@ val `integration-tests` = project.
     )
   ).
   dependsOn(`server-blaze`)
+
+lazy val `performance-benchmark` = project.
+  settings(commonSettings).
+  settings(dontPublishSettings:_*).
+  settings(
+    addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full),
+    fork in run := true,
+    libraryDependencies ++= Seq(
+      "com.spinoco" %% "fs2-http" % "0.1.7",
+      "com.github.fomkin" %% "pushka-json" % "0.8.0"
+    )
+  )
 
 lazy val root = project.in(file(".")).
   settings(dontPublishSettings:_*).
@@ -230,7 +242,7 @@ lazy val root = project.in(file(".")).
     `jcache-support`,
     simpleExample, routingExample, gameOfLifeExample,
     jcacheExample, formDataExample, delayExample,
-    `integration-tests`
+    `integration-tests`, `performance-benchmark`
   )
 
 publishTo := unusedRepo
