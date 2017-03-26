@@ -12,6 +12,10 @@ package object gp {
       "platform" -> "Windows 10",
       "version" -> "14.14393"
     ),
+    Caps(DesiredCapabilities.internetExplorer _)(
+      "platform" -> "Windows 7",
+      "version" -> "11"
+    ),
     Caps(DesiredCapabilities.firefox _)(
       "platform" -> "Linux",
       "version" -> "45.0",

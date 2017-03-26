@@ -26,7 +26,7 @@ package object tools {
 
     // Sauce labs give us 5 parallel sessions
     implicit val defaultExecutor = ExecutionContext.
-      fromExecutorService(Executors.newWorkStealingPool(5))
+      fromExecutorService(Executors.newWorkStealingPool(2))
 
     val username = System.getenv("SAUCE_USERNAME")
     val accessKey = System.getenv("SAUCE_ACCESS_KEY")

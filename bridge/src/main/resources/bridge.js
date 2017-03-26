@@ -177,7 +177,7 @@
         var newId = args[2],
             id = null,
             err = null;
-        args = args.slice(0,2).concat(args.slice(3))
+        args = args.slice(0,2).concat(args.slice(3));
         receiveCall(reqId, args, function (callRes) {
           callRes = callRes[2]
           if (callRes.indexOf(ObjPrefix) !== -1) {
@@ -211,7 +211,7 @@
         var newId = args[2];
         receiveGet(reqId, args, function (callRes) {
           var id = null, err;
-          callRes = callRes[2]
+          callRes = callRes[2];
           if (callRes.indexOf(ObjPrefix) !== -1) {
             id = callRes.substring(ObjPrefix.length);
             receiveSave(reqId, [getLink(id), newId], cb);
@@ -230,14 +230,27 @@
         return links[id] !== null;
       };
 
-      this.initialized = new Promise(function (resolve) {
-        initialize = resolve;
-      });
+      var initializationCallbacks = [];
+      var initialized = false;
+
+      function notifyInitialized() {
+        for (var i = 0; i < i.length; i++)
+          initializationCallbacks[i](self);
+        initializationCallbacks = null;
+      }
+
+      this.onInitialize = function(cb) {
+        if (initialized) {
+          cb(self);
+          return;
+        }
+        initializationCallbacks.push(cb);
+      };
 
       this.receive = function (data) {
         if (protocolDebugEnabled) console.log('->', data);
 
-        // requests batch processing
+        // requests batch processing)
         if (data[0] === "batch") {
           var requests = data.slice(1);
           requests.forEach(function (request) {
@@ -254,7 +267,9 @@
         switch (method) {
           // Misc
           case 'init':
-            initialize(self);
+            initialized = true;
+            notifyInitialized();
+
             postMessage([reqId, true, UnitResult]);
             setInterval(function () {
               var result = 0;
@@ -269,6 +284,8 @@
                 }
               }
             }, tmpLinkLifetime);
+
+
             break;
           case 'registerCallback':
             (function BridgeRegisterCallback() {
@@ -298,7 +315,7 @@
               }
             })();
             break;
-          // Object methods
+            // Object methods
           case 'getAndSaveAs':
             receiveGetAndSaveAs(reqId, args, postMessage);
             break;
@@ -328,7 +345,7 @@
             break;
         }
       };
-    };
+    }
 
     return {
 
@@ -336,29 +353,28 @@
        * Run Scala.js compiled application in the
        * same thread as DOM runs
        */
-      basic: function (mainClass, scriptUrl) {
-        return new Promise(function (resolve, reject) {
-          var tag = document.createElement('script');
-          tag.setAttribute('src', scriptUrl);
 
-          tag.addEventListener('load', function () {
-            var scope = {},
-                jsAccess = new bridge.NativeJSAccess(scope),
-                bridgeObj = new Bridge(function (data) {
-                  scope.onmessage({data : data});
-                });
+      basic: function (mainClass, scriptUrl, cb) {
+        var tag = document.createElement('script');
+        tag.setAttribute('src', scriptUrl);
 
-            scope.postMessage = function (data) {
-              bridgeObj.receive(data);
-            };
+        tag.addEventListener('load', function () {
+          var scope = {},
+            jsAccess = new bridge.NativeJSAccess(scope),
+            bridgeObj = new Bridge(function (data) {
+              scope.onmessage({data : data});
+            });
 
-            eval(mainClass)().main(jsAccess);
-            resolve(bridgeObj);
-          });
+          scope.postMessage = function (data) {
+            bridgeObj.receive(data);
+          };
 
-          document.addEventListener('DOMContentLoaded', function() {
-            document.head.appendChild(tag);
-          });
+          eval(mainClass)().main(jsAccess);
+          cb(bridgeObj);
+        });
+
+        document.addEventListener('DOMContentLoaded', function() {
+          document.head.appendChild(tag);
         });
       },
 
@@ -366,7 +382,7 @@
        * Run Scala.js compiled application in the
        * same thread as DOM runs
        */
-      worker: function (mainClass, scriptUrl, dependencies) {
+      worker: function (mainClass, scriptUrl, dependencies, cb) {
         var toAbsoluteUrl = function (url) {
           var parser = document.createElement('a');
           parser.href = url;
@@ -378,9 +394,7 @@
 
         var scripts = dependencies.map(toAbsoluteUrl);
         scripts.push(toAbsoluteUrl(scriptUrl));
-
-        return new Promise(function (resolve, reject) {
-          var injectedJS = ('if (typeof console === "undefined") {\n' +
+        var injectedJS = ('if (typeof console === "undefined") {\n' +
           'var noop = function() {};\n' +
           'console = { log: noop, error: noop }\n' +
           '};\n' +
@@ -392,50 +406,43 @@
               .replace('{0}', scripts.join('\", \"'))
               .replace('{1}', mainClass);
 
-          var launcherBlob = new Blob([injectedJS], JSMimeType);
+        var launcherBlob = new Blob([injectedJS], JSMimeType);
 
-          // Run launcher in WebWorker
-          var worker = new Worker(URL.createObjectURL(launcherBlob));
+        // Run launcher in WebWorker
+        var worker = new Worker(URL.createObjectURL(launcherBlob));
 
-          var bridge = new Bridge(function(data, transferable) {
-            if (protocolDebugEnabled) {
-              console.log('<-', data, transferable);
-            }
-            worker.postMessage(data, transferable);
-          });
-
-          worker.addEventListener('message', function(event) {
-            bridge.receive(event.data);
-          });
-
-          bridge.initialized.then(function () {
-            resolve(bridge);
-          });
+        var bridge = new Bridge(function(data, transferable) {
+          if (protocolDebugEnabled) {
+            console.log('<-', data, transferable);
+          }
+          worker.postMessage(data, transferable);
         });
+
+        worker.addEventListener('message', function(event) {
+          bridge.receive(event.data);
+        });
+
+        bridge.onInitialize(cb);
       },
 
       /**
        * Connect to remote server via WebSocket
        */
-      webSocket: function (urlOrWs) {
-        return new Promise(function (resolve, reject) {
-          var ws = null;
-          if (typeof urlOrWs === 'object') ws = urlOrWs;
-          else ws = new WebSocket(urlOrWs);
-          var bridge = new Bridge(function (data) {
-            if (protocolDebugEnabled) {
-              console.log('<-', data);
-            }
-            ws.send(JSON.stringify(data));
-          });
-          ws.addEventListener('message', function (event) {
-            bridge.receive(JSON.parse(event.data));
-          });
-          ws.addEventListener('error', reject);
-          bridge.initialized.then(function () {
-            resolve(bridge);
-          });
+      webSocket: function (urlOrWs, cb) {
+        var ws = null;
+        if (typeof urlOrWs === 'object') ws = urlOrWs;
+        else ws = new WebSocket(urlOrWs);
+        var bridge = new Bridge(function (data) {
+          if (protocolDebugEnabled) {
+            console.log('<-', data);
+          }
+          ws.send(JSON.stringify(data));
         });
+        ws.addEventListener('message', function (event) {
+          bridge.receive(JSON.parse(event.data));
+        });
+        ws.addEventListener('error', function(error) { cb(null, error) });
+        bridge.onInitialize(cb);
       },
 
       create: function (postMessage, testEnv) {
@@ -455,4 +462,3 @@
     };
   }(global));
 })(this);
-
