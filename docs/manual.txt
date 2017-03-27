@@ -1,0 +1,244 @@
+Korolev single page applications framework
+==========================================
+Aleksey Fomkin <aleksey.fomkin@gmail.com>
+:source-highlighter: pygments
+:numbered:
+:toc:
+
+Introduction
+------------
+Not long ago we have entered the era of single-page applications. Some people say that we no longer need a server. They say that JavaScript applications can connect to DBMS directly. Fat clients. We disagree with this. This project is an attempt to solve the problems of modern fat web.
+
+Korolev runs a single-page application on the server side, keeping in the browser only a bridge to receive commands and send events. The page loads instantly and works fast, because it does a minimal amount of computation. It's important that Korolev provides a unified environment for full stack development. Client and server are now combined into a single app without any REST protocol or something else in the middle.
+
+Our project supports static page rendering, so that search engines can index pages and users can view them immediately.
+
+Principles
+~~~~~~~~~~
+
+1. Thin client. Let's be honest, modern JavaScript applications are too greedy. Every JavaScript developer thinks that his page is special. But the user has a different opinion. He opens dozens of tabs. Each tab contains a ton of code, and this works very slowly. So we make our JavaScript bridge as lightweight as possible.
+
+2. Immutable and pure. Really, we don't need mutability even on the frontend. Especially on the frontend. The majority of modern JavaScript frameworks are trying to be functional. And so are we.
+
+3. Lack of dependencies. Korolev do not impose to use cats, scalaz, akka or futures from standard library. Use what you want. Korolev tries to give a way integrate itself to any environment.
+
+Understanding Korolev
+---------------------
+
+Device and Session
+~~~~~~~~~~~~~~~~~~
+
+When user opens your application first time, Korolev sets a cookie named `device` with the unique identifier. After that you can identify the user by deviceId. Note that every new browser will receive a new `deviceId`.
+
+Session is created when user opens a page. Every session has unique indentifer. Korolev creates a State for every session.
+
+State
+~~~~~
+
+The only source of data to render a page. If you have something you want to display, it should be stored in state. State is always immutable.
+
+[source,scala]
+-----------------------------------
+sealed trait MyState
+
+case class Anonymous(
+  deviceId: String) extends MyState
+
+case class Authorized(
+  deviceId: String,
+  user: User) extends MyState
+
+case class User(
+  id: String,
+  name: String,
+  friends: Seq[String])
+-----------------------------------
+
+State is stored in `StateStorage`.
+
+[source,scala]
+-----------------------------------
+StateStorage[Future, MyState].forDeviceId { deviceId =>
+  // This hypothetical service method returns Future[User]
+  authorizationService.getUserByDeviceId(deviceId) map { user =>
+    Authorized(deviceId, user)
+  }
+}
+-----------------------------------
+
+The only way to modify State is apply a transition (see below).
+
+Render
+~~~~~~
+
+Render is a view of the state. Render is function which is takes state as argument and returns Document Object Model. Korolev has it's own DSL to define templates inside Scala code. Do not be afraid, you will quickly get used to it.
+
+[source,scala]
+-----------------------------------
+val render: Render = {
+  case Anonymous(_) =>
+    'body(
+      'form(
+        'input('placeholder /= "Login"),
+        'input('placeholder /= "Password"),
+        'button("Submit")
+      )
+    )
+  case Authorized(_, User(name, friends)) =>
+    'body(
+      'div(s"Your name is $name. This is your frinds"),
+      'ul(
+        // Look at that. You just map data to view
+        friends map { friend =>
+          'li(friend)
+        }
+      )
+    )
+}
+-----------------------------------
+
+Render is called for each new state. Important to understand that render produces a full DOM for every call. It does not mean that client receives a new page every time. Korolev makes a diff between current and lastest DOM. Only changes will be sended to the client.
+
+`Render[S]` is a type alias to `PartialFunction[S, VDom]` where `S` is a type of your state.
+
+Transitions
+~~~~~~~~~~~
+
+Transition is function that applies to current state and produces a new state. Consider a transition which is add new friend to the friends list.
+
+[source,scala]
+--------------------------------------------------------------
+val newFriend = "Karl Heinrich Marx"
+// This hypothetical service method adds friend
+// to the user friend list and returns Future[Unit]
+userService.addFriend(user.id, newFriend) map { _ =>
+  transition { case state @ Authorized(_, user) =>
+    state.copy(user = user.copy(user.friends :+ newFriend))
+  }
+}
+--------------------------------------------------------------
+
+`Transition[S]` is a type alias to `PartialFunction[S, S]` where `S` is type of your state.
+
+Events
+~~~~~~
+
+Every DOM event which had been emitted by browser's `document` object, can be handled by Korolev. Let's consider click event.
+
+[source,scala]
+--------------------------------------------------------------
+case class MyState(i: String)
+
+val renderAnonymous: Render[MyState] = {
+  case MyState(i) =>
+    'body(
+      i.toString,
+      'button("Increment",
+        event('click) {
+          immediateTransition {
+            case MyState(i) =>
+              state.copy(i = i + 1)
+          }
+        }
+      )
+    )
+}
+--------------------------------------------------------------
+
+When "Increment" button will be clicked `i` will be incremented by 1. Let's consider more difficult situation. Do you remember render example? Did you have a feeling that something was missed? Lets complement it with the events!
+
+[source,scala]
+-----------------------------------
+val loginField = elementId()
+val passwordField = elementId()
+
+val renderAnonymous: Render[MyState] = {
+  case Anonymous(_) =>
+    'body(
+      'form(
+        'input('placeholder /= "Login", loginField),
+        'input('placeholder /= "Password", passwordField),
+        'button("Submit"),
+        eventWithAccess('submit) { access =>
+          deferredTransition {
+            for {
+              login <- access.property[String](loginField)
+              password <- access.property[String](passwordField)
+              user <- authService.authorize(login, password)
+            } yield {
+              transition {
+                case Anonymous(deviceId) =>
+                  Authorized(deviceId, user)
+              }
+            }
+          }
+        }
+      )
+    )
+}
+
+val renderAuthorized: Render[MyState] = ???
+val render = renderAnonymous orElse renderAuthorized
+-----------------------------------
+
+Event with access gives you literally access to information from the client side. In this case it is a values of the input fields.
+
+Event handlers should return `EventResult`.
+
+EventResult
+~~~~~~~~~~~
+
+(TODO)
+immediateTransition, deferredTransition
+
+FormData
+~~~~~~~~
+(TODO)
+
+Delays
+~~~~~~
+(TODO)
+
+External Binding
+~~~~~~~~~~~~~~~
+
+(TODO)
+Now envConfigurator. Another name?
+
+Routing
+~~~~~~~
+(TODO)
+
+Design patterns
+---------------
+
+MST Pattern
+~~~~~~~~~~~
+(TODO)
+
+Extensible state
+~~~~~~~~~~~~~~~~
+(TODO)
+
+Web Components
+~~~~~~~~~~~~~~
+(TODO)
+
+
+Integrations
+------------
+
+JCache
+~~~~~~
+
+Application servers
+~~~~~~~~~~~~~~~~~~~
+
+Internals
+---------
+
+Networking
+~~~~~~~~~~
+
+Templates
+~~~~~~~~~
