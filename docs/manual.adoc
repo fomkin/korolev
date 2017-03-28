@@ -162,8 +162,8 @@ val renderAnonymous: Render[MyState] = {
         eventWithAccess('submit) { access =>
           deferredTransition {
             for {
-              login <- access.property[String](loginField)
-              password <- access.property[String](passwordField)
+              login <- access.property[String](loginField, 'value)
+              password <- access.property[String](passwordField, 'value)
               user <- authService.authorize(login, password)
             } yield {
               transition {
@@ -198,9 +198,77 @@ Korolev expects `EventResult` as return-type of event handlers. There are three 
 
 Also you can combine `immediateTransition` and `deferredTransition`.
 
+Access element properties
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In the scope of event you can access to the element properties if element was bound with `elementId`. You can get value (limited by simple types like `String` and `Double`).
+
+[source,scala]
+-----------------------------------
+val loginField = elementId()
+
+...
+
+eventWithAccess('submit) { access =>
+  deferredTransition {
+    access.property[String](loginField, 'value) map {
+      transition { ... }
+    }
+}
+-----------------------------------
+
+Or you can set the value
+
+[source,scala]
+-----------------------------------
+access.property.update[String](loginField, 'value, "John Doe") map {
+  transition { ... }
+}
+-----------------------------------
+
 FormData
 ~~~~~~~~
-(TODO)
+
+Above, we considered a method allowing to read values and update from inputs. The flaw of this is a need of read input one-by-one and disability of files loading. FormData attended to solve this disadvantages.
+
+In the difference of `property`, FormData works with form tag, not with input tag.
+
+[source,scala]
+-----------------------------------
+val myForm = elementId
+val pictureFieldName = "picture"
+
+'form(
+  myForm,
+  'div(
+    'legend("FormData Example"),
+    'p(
+      'label("Picture"),
+      'input('type /= "file", 'name /= pictureFieldName)
+    ),
+    'p(
+      'button("Submit")
+    )
+  ),
+  eventWithAccess('submit) { access =>
+    deferredTransition {
+      access
+        .downloadFormData(myForm)
+        .onProgress { (loaded, total) =>
+          transition { ... }
+        }
+        .start()
+        .map { formData =>
+          transition { ... }
+        }
+    }
+  }
+)
+-----------------------------------
+
+Use `onProgress` callback to handle progress of form downloading. Function `start` return a `FormData`. Look API documentation for more details.
+
+https://github.com/fomkin/korolev/blob/v1.0.0/examples/form-data/src/main/scala/FormDataExample.scala[Full Example]
 
 Delays
 ~~~~~~
