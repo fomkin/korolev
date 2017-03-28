@@ -188,8 +188,15 @@ Event handlers should return `EventResult`.
 EventResult
 ~~~~~~~~~~~
 
-(TODO)
-immediateTransition, deferredTransition
+Korolev expects `EventResult` as return-type of event handlers. There are three type of event results.
+
+1. `immediateTransition` - Is a transition which be applied to current state right now. It's useful to making lightweight synchronous transitions. For example you have a page with the "Query" field and the "Search" button. When the button was clicked, your application requests database or micro-service to execute the query. But user want to see reaction be before you receive the data. So you update the state with "Loading" flag in `immediateTransition` and user see reaction immediately. Signature of `immediateTransition` is `Transition[S]` which are type alias to `PartialFunction[S, S]` where `S` is your state type.
+
+2. `deferredTransition` - In previous example your application does request to some sort of backend. Such request in Scala usually is asynchronous. So `deferredTransition` is a way to make your application await for response. `deferredTransition` will be applied to the state when the `Future` will be completed. Signature of `deferredTransition` is `Future[Transition[S]]`.
+
+3. `noTransition` - It means you don't want to make any reaction.
+
+Also you can combine `immediateTransition` and `deferredTransition`.
 
 FormData
 ~~~~~~~~
