@@ -268,11 +268,37 @@ val pictureFieldName = "picture"
 
 Use `onProgress` callback to handle progress of form downloading. Function `start` return a `FormData`. Look API documentation for more details.
 
-https://github.com/fomkin/korolev/blob/v1.0.0/examples/form-data/src/main/scala/FormDataExample.scala[Full Example]
+https://github.com/fomkin/korolev/blob/v1.0.0/examples/form-data/src/main/scala/FormDataExample.scala[See full Example]
 
 Delays
 ~~~~~~
-(TODO)
+Sometimes you want to update page after timeout. For example it useful when you show some sort of notification and have to close it after few seconds. Delays applies transition after given `FiniteDuration`
+
+[source,scala]
+-----------------------------------
+type MyState = Boolean
+
+val render: Render[MyState] = {
+  case true => 'body(
+    delay(3.seconds) {
+      case true => false
+    },
+    "Wait 3 seconds!"
+  )
+  case false => 'body(
+    'button(
+      event('click) {
+        immediateTransition {
+          case _ => true
+        }
+      },
+      "Push the button"
+    )
+  )
+}
+-----------------------------------
+
+https://github.com/fomkin/korolev/blob/v1.0.0/examples/delay/src/main/scala/DelayExample.scala[See full Example]
 
 External Binding
 ~~~~~~~~~~~~~~~
