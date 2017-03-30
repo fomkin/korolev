@@ -3,7 +3,7 @@ package korolev
 import java.util.concurrent.atomic.AtomicInteger
 
 import bridge.JSAccess
-import korolev.Effects.{Access, ElementId, FormDataDownloader}
+import korolev.Effects.{Access, ElementId, FormDataDownloader, PropertyHandler}
 import korolev.Async.{AsyncOps, Promise}
 import korolev.StateManager.Transition
 import korolev.util.AtomicReference
@@ -133,16 +133,27 @@ object Korolev {
 
       val browserAccess = new Access[F, S, M] {
 
-        def property[T](eId: ElementId, propName: Symbol): F[T] =
-          elementIds().get(eId) match {
-            case Some(id) =>
-              val future = client.call[T]("ExtractProperty", id, propName.name)
-              jsAccess.flush()
-              future
-            case None =>
-              Async[F].fromTry(
-                Failure(new Exception("No element matched for accessor")))
+        private def noElementException[T]: F[T] = {
+          val exception = new Exception("No element matched for accessor")
+          Async[F].fromTry(Failure(exception))
+        }
+
+        def property[T](elementId: ElementId): PropertyHandler[F, T] = {
+          val idF = elementIds()
+            .get(elementId)
+            .fold(noElementException[String])(id => Async[F].pure(id))
+          new PropertyHandler[F, T] {
+            def get(propName: Symbol): F[T] = idF flatMap { id =>
+              client.callAndFlush("ExtractProperty", id, propName.name)
+            }
+            def set(propName: Symbol, value: T): F[Unit] = idF flatMap { id =>
+              client.callAndFlush("SetAttr", id, propName.name, value, true)
+            }
           }
+        }
+
+        def property[T](id: ElementId, propName: Symbol): F[T] =
+          property[T](id).get(propName)
 
         def downloadFormData(eId: ElementId): FormDataDownloader[F, S] = new FormDataDownloader[F, S] {
 

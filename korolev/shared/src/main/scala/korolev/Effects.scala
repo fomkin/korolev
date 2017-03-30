@@ -78,7 +78,7 @@ object Effects {
   abstract class Access[F[+_]: Async, S, M] {
 
     /**
-      * Extract property of element from client-side DOM.
+      * Extracts property of element from client-side DOM.
       * @param propName Name of property. 'value for example
       * @see [[Effects.elementId]]
       * @example
@@ -99,6 +99,8 @@ object Effects {
       * }}}
       */
     def property[T](id: ElementId, propName: Symbol): F[T]
+
+    def property[T](id: ElementId): PropertyHandler[F, T]
 
     /**
       * Publish message to environment
@@ -125,6 +127,11 @@ object Effects {
       * @return
       */
     def downloadFormData(id: ElementId): FormDataDownloader[F, S]
+  }
+
+  abstract class PropertyHandler[F[+_]: Async, T] {
+    def get(propName: Symbol): F[T]
+    def set(propName: Symbol, value: T): F[Unit]
   }
 
   abstract class FormDataDownloader[F[+_]: Async, S] {
