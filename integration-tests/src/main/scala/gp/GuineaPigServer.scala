@@ -44,11 +44,8 @@ object GuineaPigServer {
     stateStorage = storage,
     head = 'head(
       'title("The Test App"),
-      'link(
-        'href /= "/main.css",
-        'rel /= "stylesheet",
-        'type /= "text/css"
-      ),
+      'link('href /= "/main.css", 'rel /= "stylesheet", 'type /= "text/css"),
+      'meta('content/="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0", 'name /= "viewport"),
       'script('src /= "/debug-console.js")
     ),
     render = {
@@ -111,14 +108,17 @@ object GuineaPigServer {
               immediateTransition { case s =>
                 s.copy(log = s.log :+ s"Submit clicked")
               } deferredTransition {
-                access.property[String](inputId, 'value) map { value =>
+                val property = access.property[String](inputId)
+                property.get('value) flatMap { value =>
                   logger.info("Value received")
-                  val todo = State.Todo(value, done = false)
-                  transition { case s =>
-                    s.copy(
-                      todos = s.todos + (s.selectedTab -> (s.todos(s.selectedTab) :+ todo)),
-                      log = s.log :+ s"New Todo added"
-                    )
+                  property.set('value, "") map { _ =>
+                    val todo = State.Todo(value, done = false)
+                    transition { case s =>
+                      s.copy(
+                        todos = s.todos + (s.selectedTab -> (s.todos(s.selectedTab) :+ todo)),
+                        log = s.log :+ s"New Todo added"
+                      )
+                    }
                   }
                 }
               }

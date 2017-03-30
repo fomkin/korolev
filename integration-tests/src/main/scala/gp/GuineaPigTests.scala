@@ -67,6 +67,10 @@ object GuineaPigTests extends App {
       if (!newTodoExists) {
         fail("Added todo entry is not found in todos list")
       }
+    },
+    step("Field should be empty after todo was added") { wd =>
+      val value = wd.findElement(By.id("todo-input")).getAttribute("value")
+      assert(value == "", "Field should be empty")
     }
   )
 
