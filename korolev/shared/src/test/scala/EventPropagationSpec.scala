@@ -1,5 +1,5 @@
 import korolev.testExecution._
-import korolev.Effects.{Access, ElementId, FormDataDownloader}
+import korolev.Effects.{Access, ElementId, FormDataDownloader, PropertyHandler}
 import korolev.VDom.Id
 import korolev._
 import org.scalatest.{FlatSpec, Matchers}
@@ -104,8 +104,11 @@ trait EventTesting extends FlatSpec {
   val BE = Effects[Future, String, Any]
 
   object BA extends Access[Future, String, Any] {
-
+    Seq()
     def publish(message: Any): Future[Unit] = Future.successful(())
+
+    def property[T](id: ElementId): PropertyHandler[Future, T] =
+      throw new Exception()
 
     def property[T](id: ElementId, propName: Symbol): Future[T] =
       Future.failed(new Exception())
