@@ -192,10 +192,11 @@
       ws = new WebSocket(uri);
       ws.addEventListener('open', onOpen);
       global.Korolev.connection = ws;
-      Bridge.webSocket(ws).catch(function(errorEvent) {
-        // Try to reconnect after 2s
-        setTimeout(initializeBridgeLongPolling, 1);
-      });
+        Bridge.webSocket(ws, function(res, err) {
+          if (err) {
+            setTimeout(initializeBridgeLongPolling, 1);
+          }
+        });
     }
 
     function initializeBridgeLongPolling() {
@@ -267,9 +268,10 @@
         lpPublish(fakeWs, message);
       }
       fakeWs.addEventListener('open', onOpen);
-      Bridge.webSocket(fakeWs).catch(function(errorEvent) {
-        // Try to reconnect after 2s
-        setTimeout(initializeBridgeWs, 2000);
+      Bridge.webSocket(fakeWs, function(resolve, err) {
+        if (err) {
+          setTimeout(initializeBridgeWs, 2000);
+        }
       });
       lpSubscribe(fakeWs, true);
     }

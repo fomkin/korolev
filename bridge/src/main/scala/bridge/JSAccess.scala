@@ -1,5 +1,6 @@
 package bridge
 
+import java.util.concurrent.FutureTask
 import java.util.concurrent.atomic.AtomicInteger
 
 import korolev.Async
