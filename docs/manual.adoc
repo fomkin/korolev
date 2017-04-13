@@ -7,11 +7,11 @@ Aleksey Fomkin <aleksey.fomkin@gmail.com>
 
 Introduction
 ------------
-Not long ago we have entered the era of single-page applications. Some people say that we no longer need a server. They say that JavaScript applications can connect to DBMS directly. Fat clients. We disagree with this. This project is an attempt to solve the problems of modern fat web.
+Not long ago we have entered the era of single-page applications. Some people say that we no longer need a server. They say that JavaScript applications can connect to DBMS directly. Fat clients. We disagree with this. This project is an attempt to solve the problems of the modern fat web.
 
-Korolev runs a single-page application on the server side, keeping in the browser only a bridge to receive commands and send events. The page loads instantly and works fast, because it does a minimal amount of computation. It's important that Korolev provides a unified environment for full stack development. Client and server are now combined into a single app without any REST protocol or something else in the middle.
+Korolev runs a single-page application on the server side, keeping in the browser only a bridge to receive commands and send events. The page loads instantly and works fast because it does a minimal amount of computation. It's important that Korolev provides a unified environment for full stack development. Client and server are now combined into a single app without any REST protocol or something else in the middle.
 
-Our project supports static page rendering, so that search engines can index pages and users can view them immediately.
+Our project supports static page rendering so that search engines can index pages and users can view them immediately.
 
 Principles
 ~~~~~~~~~~
@@ -20,7 +20,7 @@ Principles
 
 2. Immutable and pure. Really, we don't need mutability even on the frontend. Especially on the frontend. The majority of modern JavaScript frameworks are trying to be functional. And so are we.
 
-3. Lack of dependencies. Korolev do not impose to use cats, scalaz, akka or futures from standard library. Use what you want. Korolev tries to give a way integrate itself to any environment.
+3. Lack of dependencies. Korolev does not impose to use cats, scalaz, Akka or futures from the standard library. Use what you want. Korolev tries to give a way to integrate itself into any environment.
 
 Understanding Korolev
 ---------------------
@@ -28,9 +28,9 @@ Understanding Korolev
 Device and Session
 ~~~~~~~~~~~~~~~~~~
 
-When user opens your application first time, Korolev sets a cookie named `device` with the unique identifier. After that you can identify the user by deviceId. Note that every new browser will receive a new `deviceId`.
+When a user opens your application first time, Korolev sets a cookie named `device` with the unique identifier. After that, you can identify the user by deviceId. Note that every new browser will receive a new `deviceId`.
 
-Session is created when user opens a page. Every session has unique indentifer. Korolev creates a State for every session.
+A session is created when the user opens a page. Every session has the unique identifier. Korolev creates a State for every session.
 
 State
 ~~~~~
@@ -66,16 +66,16 @@ StateStorage[Future, MyState].forDeviceId { deviceId =>
 }
 -----------------------------------
 
-The only way to modify State is apply a transition (see below).
+The only way to modify the State is an applying a transition (see below).
 
 Render
 ~~~~~~
 
-Render is a view of the state. Render is function which is takes state as argument and returns Document Object Model. Korolev has it's own DSL to define templates inside Scala code. Do not be afraid, you will quickly get used to it.
+Render is a view of the state. Render is a function which takes state as the argument and returns Document Object Model. Korolev has its own DSL to define templates inside Scala code. Do not be afraid, you will quickly get used to it.
 
 [source,scala]
 -----------------------------------
-val render: Render = {
+val render: Render[MyState] = {
   case Anonymous(_) =>
     'body(
       'form(
@@ -97,14 +97,14 @@ val render: Render = {
 }
 -----------------------------------
 
-Render is called for each new state. Important to understand that render produces a full DOM for every call. It does not mean that client receives a new page every time. Korolev makes a diff between current and lastest DOM. Only changes will be sended to the client.
+Render is called for each new state. Important to understand that render produces a full DOM for every call. It does not mean that client receives a new page every time. Korolev makes a diff between current and latest DOM. Only changes will be sent to the client.
 
 `Render[S]` is a type alias to `PartialFunction[S, VDom]` where `S` is a type of your state.
 
 Transitions
 ~~~~~~~~~~~
 
-Transition is function that applies to current state and produces a new state. Consider a transition which is add new friend to the friends list.
+Transition is a function that applies to current state and produces a new state. Consider a transition which adds new friend to the friends list.
 
 [source,scala]
 --------------------------------------------------------------
@@ -118,7 +118,7 @@ userService.addFriend(user.id, newFriend) map { _ =>
 }
 --------------------------------------------------------------
 
-`Transition[S]` is a type alias to `PartialFunction[S, S]` where `S` is type of your state.
+`Transition[S]` is a type alias to `PartialFunction[S, S]` where `S` is the type of your state.
 
 Events
 ~~~~~~
@@ -145,7 +145,7 @@ val renderAnonymous: Render[MyState] = {
 }
 --------------------------------------------------------------
 
-When "Increment" button will be clicked `i` will be incremented by 1. Let's consider more difficult situation. Do you remember render example? Did you have a feeling that something was missed? Lets complement it with the events!
+When "Increment" button will be clicked `i` will be incremented by 1. Let's consider the more difficult situation. Do you remember render example? Did you have a feeling that something was missed? Let's complement it with the events!
 
 [source,scala]
 -----------------------------------
@@ -181,27 +181,28 @@ val renderAuthorized: Render[MyState] = ???
 val render = renderAnonymous orElse renderAuthorized
 -----------------------------------
 
-Event with access gives you literally access to information from the client side. In this case it is a values of the input fields.
+Event with access gives you literally access to information from the client side. In this case, it is a value of the input fields.
 
 Event handlers should return `EventResult`.
 
 EventResult
 ~~~~~~~~~~~
 
-Korolev expects `EventResult` as return-type of event handlers. There are three type of event results.
+Korolev expects `EventResult` as a return type of event handlers. There are three types of event results.
 
-1. `immediateTransition` - Is a transition which be applied to current state right now. It's useful to making lightweight synchronous transitions. For example you have a page with the "Query" field and the "Search" button. When the button was clicked, your application requests database or micro-service to execute the query. But user want to see reaction be before you receive the data. So you update the state with "Loading" flag in `immediateTransition` and user see reaction immediately. Signature of `immediateTransition` is `Transition[S]` which are type alias to `PartialFunction[S, S]` where `S` is your state type.
 
-2. `deferredTransition` - In previous example your application does request to some sort of backend. Such request in Scala usually is asynchronous. So `deferredTransition` is a way to make your application await for response. `deferredTransition` will be applied to the state when the `Future` will be completed. Signature of `deferredTransition` is `Future[Transition[S]]`.
+1. `immediateTransition` - Is a transition which is applied to current state right now. It's useful to making lightweight synchronous transitions. For example, you have a page with the "Query" field and the "Search" button. When the button was clicked, your application requests database or micro-service to execute the query. But user wants to see reaction be before you receive the data. So you update the state with "Loading" flag in `immediateTransition` and user see reaction immediately. Signature of `immediateTransition` is `Transition[S]` which are type alias to `PartialFunction[S, S]` where `S` is your state type.
+
+2. `deferredTransition` - In the previous example, your application does request to some sort of backend. Such request in Scala usually is asynchronous. So `deferredTransition` is a way to make your application waits for the response. `deferredTransition` will be applied to the state when the `Future` will be completed. Signature of `deferredTransition` is `Future[Transition[S]]`.
 
 3. `noTransition` - It means you don't want to make any reaction.
 
-Also you can combine `immediateTransition` and `deferredTransition`.
+Also, you can combine `immediateTransition` and `deferredTransition`.
 
 Access element properties
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-In the scope of event you can access to the element properties if element was bound with `elementId`. You can get value (limited by simple types like `String` and `Double`).
+In the scope of event, you can access the element properties if an element was bound with `elementId`. You can get value (limited by simple types like `String` and `Double`).
 
 [source,scala]
 -----------------------------------
@@ -229,7 +230,7 @@ access.property.update[String](loginField, 'value, "John Doe") map {
 FormData
 ~~~~~~~~
 
-Above, we considered a method allowing to read values and update from inputs. The flaw of this is a need of read input one-by-one and disability of files loading. FormData attended to solve this disadvantages.
+Above, we considered a method allowing to read values and update from inputs. The flaw of this is a need of reading input one-by-one and disability of files loading. FormData attended to solve this disadvantages.
 
 In the difference of `property`, FormData works with form tag, not with input tag.
 
@@ -266,13 +267,13 @@ val pictureFieldName = "picture"
 )
 -----------------------------------
 
-Use `onProgress` callback to handle progress of form downloading. Function `start` return a `FormData`. Look API documentation for more details.
+Use `onProgress` callback to handle progress of the form downloading. Function `start` return a `FormData`. Look API documentation for more details.
 
-https://github.com/fomkin/korolev/blob/v1.0.0/examples/form-data/src/main/scala/FormDataExample.scala[See full Example]
+https://github.com/fomkin/korolev/blob/v1.0.0/examples/form-data/src/main/scala/FormDataExample.scala[See full example]
 
 Delays
 ~~~~~~
-Sometimes you want to update page after timeout. For example it useful when you show some sort of notification and have to close it after few seconds. Delays applies transition after given `FiniteDuration`
+Sometimes you want to update a page after a timeout. For example it useful when you show some sort of notification and have to close it after few seconds. Delays applies transition after given `FiniteDuration`
 
 [source,scala]
 -----------------------------------
@@ -298,7 +299,7 @@ val render: Render[MyState] = {
 }
 -----------------------------------
 
-https://github.com/fomkin/korolev/blob/v1.0.0/examples/delay/src/main/scala/DelayExample.scala[See full Example]
+https://github.com/fomkin/korolev/blob/v1.0.0/examples/delay/src/main/scala/DelayExample.scala[See full example]
 
 External Binding
 ~~~~~~~~~~~~~~~
@@ -308,7 +309,51 @@ Now envConfigurator. Another name?
 
 Routing
 ~~~~~~~
-(TODO)
+Router allow to use integrate browser navigation in you app. In the router you define bidirectional mapping between the state and url.
+
+Let's our application is a blog platform
+[source,scala]
+-------------------------------------------------------------------------------
+case class MyState(author: String, title: String, text: String)
+
+// Converts "The Cow: Saga" to "the-cow-saga"
+def captionToUrl(s: String) = ???
+
+KorolevServiceConfig(
+  ...
+  // Render the article
+  render = {
+    case MyState(author, title, text) => 'body(
+      'div(s"$author: $title"),
+      'div(text)
+    )
+  },
+  serverRouter = ServerRouter(
+    // Static router works when user enters
+    // with any url but "/".
+    static = (deviceId) => Router(
+      toState = {
+        case (_, Root / author / article) => articleServrice.load(author, article)
+        case _ => articleServrice.defaultArticle
+      }
+    ),
+    dynamic = (device, session) => Router(
+      fromState = {
+        case MyState(tab, _) =>
+          Root / tab.toLowerCase
+      },
+      toState = {
+        case (s, Root) =>
+          val u = s.copy(selectedTab = s.todos.keys.head)
+          Future.successful(u)
+        case (s, Root / name) =>
+          val key = s.todos.keys.find(_.toLowerCase == name)
+          Future.successful(key.fold(s)(k => s.copy(selectedTab = k)))
+      }
+    )
+  )
+)
+-------------------------------------------------------------------------------
 
 Design patterns
 ---------------
@@ -325,21 +370,35 @@ Web Components
 ~~~~~~~~~~~~~~
 (TODO)
 
+Korolev standalone server
+-------------------------
+
+Setup
+~~~~~
+(TODO)
+
+Serve files from resource directory
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+(TODO)
 
 Integrations
 ------------
 
 JCache
 ~~~~~~
+(TODO)
 
 Application servers
 ~~~~~~~~~~~~~~~~~~~
+(TODO)
 
 Internals
 ---------
 
 Networking
 ~~~~~~~~~~
+(TODO)
 
 Templates
 ~~~~~~~~~
+(TODO)
