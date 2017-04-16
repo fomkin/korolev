@@ -237,8 +237,6 @@ object Korolev {
               .lift(state)
               .foreach(path => client.call("ChangePageUrl", path.toString))
 
-            client.call("SetRenderNum", currentRenderNum.incrementAndGet())
-
             renderOpt(state) match {
               case Some(newRender) =>
                 val changes = VDom.changes(lastRender, newRender)
@@ -258,11 +256,12 @@ object Korolev {
                     client.call("RemoveAttr", id.toString, name, isProperty)
                   case _ =>
                 }
-                jsAccess.flush()
               case None =>
                 logger.warn(
                   s"Render is nod defined for ${state.getClass.getSimpleName}")
             }
+            client.call("SetRenderNum", currentRenderNum.incrementAndGet())
+            jsAccess.flush()
           }
 
           stateManager.subscribe(onState)
