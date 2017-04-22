@@ -192,11 +192,13 @@
       ws = new WebSocket(uri);
       ws.addEventListener('open', onOpen);
       global.Korolev.connection = ws;
-        Bridge.webSocket(ws, function(res, err) {
-          if (err) {
-            setTimeout(initializeBridgeLongPolling, 1);
-          }
-        });
+
+      Bridge.webSocket(ws, function(res, err) {
+        if (err) {
+          setTimeout(initializeBridgeLongPolling, 1);
+        }
+      });
+
     }
 
     function initializeBridgeLongPolling() {
@@ -215,20 +217,23 @@
             switch (request.status) {
               case 200:
                 if (firstTime) {
-                  var event = new Event('open');
+                  var event = document.createEvent('HTMLEvents');
+                  event.initEvent('open');
                   target.dispatchEvent(event);
                 }
-                var event = new MessageEvent('message', {
-                  'data': request.responseText
-                });
+
+                var event = document.createEvent('MessageEvent');
+                event.initMessageEvent('message', true, false, request.responseText);
                 target.dispatchEvent(event);
                 break;
               case 410:
-                var event = new Close('close');
+                var event = document.createEvent('HTMLEvents');
+                event.initEvent('close');
                 target.dispatchEvent(event);
                 break;
               case 400:
-                var event = new ErrorEvent('error', {
+                var event = document.createEvent('HTMLEvents');
+                event.initErrorEvent('error', {
                   error: new Error(request.responseText),
                   message: request.responseText
                 });
@@ -248,9 +253,10 @@
           if (request.readyState === 4) {
             switch (request.status) {
               case 400:
-                var event = new ErrorEvent('error', {
+                var event = document.createEvent('HTMLEvents');
+                event.initErrorEvent('error', {
                   error: new Error(request.responseText),
-                  message: request.responseText,
+                  message: request.responseText
                 });
                 target.dispatchEvent(event);
                 break;
@@ -288,7 +294,9 @@
       initializeBridgeWs();
     }
 
-    initializeBridgeWs();
+    if (window.WebSocket === undefined)
+      initializeBridgeLongPolling();
+    else initializeBridgeWs();
   });
 
   function getCookie(name) {
