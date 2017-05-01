@@ -207,6 +207,13 @@ lazy val delayExample = (project in examples / "delay").
   settings(mainClass := Some("DelayExample")).
   dependsOn(`server-blaze`)
 
+lazy val webComponentExample = (project in examples / "web-component").
+  enablePlugins(JavaAppPackaging).
+  enablePlugins(UniversalPlugin).
+  settings(exampleSettings: _*).
+  settings(mainClass := Some("WebComponentExample")).
+  dependsOn(`server-blaze`)
+
 lazy val `integration-tests` = project.
   settings(commonSettings).
   settings(dontPublishSettings:_*).
@@ -242,6 +249,7 @@ lazy val root = project.in(file(".")).
     `jcache-support`,
     simpleExample, routingExample, gameOfLifeExample,
     jcacheExample, formDataExample, delayExample,
+    webComponentExample,
     `integration-tests`, `performance-benchmark`
   )
 
