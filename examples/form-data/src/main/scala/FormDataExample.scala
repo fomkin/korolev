@@ -9,7 +9,7 @@ import korolev.execution._
 
 import scala.concurrent.Future
 
-object FormDataExample extends KorolevBlazeServer {
+object FormDataExample extends KorolevBlazeServer(BlazeServerConfig(maxRequestBodySize = 20 * 1024 * 1024)) {
   import State.effects._
 
   val myForm = elementId
@@ -119,7 +119,8 @@ object FormDataExample extends KorolevBlazeServer {
                s"height: ${height}px"
           )
         )
-    }
+    },
+    maxFormDataEntrySize = 1024 * 1024 * 20
   )
 }
 

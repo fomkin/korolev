@@ -20,6 +20,8 @@ case class BlazeServerConfig(
     */
   sslContext: Option[SSLContext] = None,
   bufferSize: Int = 8 * 1024,
+  maxRequestBodySize: Int = 8 * 1024 * 1024,
+  maxRequestHeaderSize: Int = 10 * 1024,
   doNotBlockCurrentThread: Boolean = false
 )(
   // Trampoline

@@ -125,7 +125,7 @@ package object blazeServer {
   ): ServerChannel = {
 
     val f: BufferPipelineBuilder = _ => {
-      def serviceStage = LeafBuilder(new HttpServerStage(1024*1024, 10*1024)(service))
+      def serviceStage = LeafBuilder(new HttpServerStage(config.maxRequestBodySize, config.maxRequestHeaderSize)(service))
       config.sslContext match {
         case Some(sslContext) =>
           val eng = sslContext.createSSLEngine()
