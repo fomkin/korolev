@@ -5,7 +5,7 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import scala.language.higherKinds
 import scala.util.{Failure, Success}
 
-abstract class StateManager[F[+_]: Async, State] {
+abstract class StateManager[F[+_]: Async, State] extends (StateManager.Transition[State] => F[Unit]) {
   def state: State
   def subscribe[U](f: State => U): StateManager.Unsubscribe
   def onDestroy[U](f: () => U): StateManager.Unsubscribe

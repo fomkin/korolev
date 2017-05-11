@@ -3,6 +3,8 @@ package korolev
 import korolev.StateManager.Transition
 import korolev.util.Scheduler
 import korolev.Async.AsyncOps
+import levsha.TemplateDsl
+import levsha.events.EventPhase
 
 import scala.concurrent.duration.FiniteDuration
 import scala.language.higherKinds
@@ -12,17 +14,20 @@ class Effects[F[+_]: Async, S, M](implicit scheduler: Scheduler[F]) {
   import Effects._
   import EventPhase._
 
+  type Effect = Effects.Effect[F, S, M]
   type Event = Effects.Event[F, S, M]
   type EventFactory[T] = T => Event
   type Transition = StateManager.Transition[S]
 
-  def elementId = new ElementId()
+  val dsl = new TemplateDsl[Effects.Effect[F, S, M]]()
+
+  def elementId = new ElementId[F, S, M]()
 
   /**
     * Schedules the [[transition]] with [[delay]]. For example it can be useful
     * when you want to hide something after timeout.
     */
-  def delay(delay: FiniteDuration)(transition: Transition): Delay[F, S] = new Delay[F, S] {
+  def delay(delay: FiniteDuration)(transition: Transition): Delay[F, S, M] = new Delay[F, S, M] {
 
     @volatile var _jobHandler = Option.empty[Scheduler.JobHandler[F, _]]
     @volatile var _finished = false
@@ -35,7 +40,7 @@ class Effects[F[+_]: Async, S, M](implicit scheduler: Scheduler[F]) {
       _jobHandler = Some {
         scheduler.scheduleOnce(delay) {
           _finished = true
-          applyTransition(transition).run()
+          applyTransition(transition).runIgnoreResult()
         }
       }
     }
@@ -66,6 +71,8 @@ class Effects[F[+_]: Async, S, M](implicit scheduler: Scheduler[F]) {
 }
 
 object Effects {
+
+  sealed abstract class Effect[F[+_]: Async, S, M]
 
   /**
     * @tparam F Monad
@@ -98,9 +105,9 @@ object Effects {
       * }
       * }}}
       */
-    def property[T](id: ElementId, propName: Symbol): F[T]
+    def property[T](id: ElementId[F, S, M], propName: Symbol): F[T]
 
-    def property[T](id: ElementId): PropertyHandler[F, T]
+    def property[T](id: ElementId[F, S, M]): PropertyHandler[F, T]
 
     /**
       * Publish message to environment
@@ -126,7 +133,7 @@ object Effects {
       * @param id form elementId
       * @return
       */
-    def downloadFormData(id: ElementId): FormDataDownloader[F, S]
+    def downloadFormData(id: ElementId[F, S, M]): FormDataDownloader[F, S]
   }
 
   abstract class PropertyHandler[F[+_]: Async, T] {
@@ -139,13 +146,13 @@ object Effects {
     def start(): F[FormData]
   }
 
-  sealed abstract class Delay[F[+_]: Async, S] extends VDom.Misc {
+  sealed abstract class Delay[F[+_]: Async, S, M] extends Effect[F, S, M] {
     def start(applyTransition: Transition[S] => F[Unit]): Unit
     def finished: Boolean
     def cancel(): Unit
   }
 
-  sealed abstract class Event[F[+_]: Async, S, M] extends VDom.Misc {
+  sealed abstract class Event[F[+_]: Async, S, M] extends Effect[F, S, M] {
     def `type`: Symbol
     def phase: EventPhase
   }
@@ -161,6 +168,6 @@ object Effects {
                                       effect: () => EventResult[F, S])
     extends Event[F, S, M]
 
-  class ElementId extends VDom.Misc
+  class ElementId[F[+_]: Async, S, M] extends Effect[F, S, M]
 
 }

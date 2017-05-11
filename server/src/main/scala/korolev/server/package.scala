@@ -9,6 +9,9 @@ import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 import bridge.JSAccess
 import korolev.Async._
 import korolev.Korolev.MutableMapFactory
+import levsha.RenderContext
+import levsha.RenderUnit.{Attr, Misc, Node, Text}
+import levsha.impl.DiffRenderContext
 import slogging.LazyLogging
 
 import scala.collection.concurrent.TrieMap
@@ -38,6 +41,53 @@ package object server extends LazyLogging {
     config: KorolevServiceConfig[F, S, M]
   ): PartialFunction[Request, F[Response]] = {
 
+    class TextRenderContext extends RenderContext[Effects.Effect[F, S, M]] {
+
+      private val builder = StringBuilder.newBuilder
+      private var lastAction = DiffRenderContext.OpClose
+
+      builder.append("<!DOCTYPE html>")
+
+      def openNode(name: String): Unit = {
+        if (lastAction != DiffRenderContext.OpClose) builder.append('>')
+        builder.append('<')
+        builder.append(name)
+        lastAction = DiffRenderContext.OpOpen
+      }
+
+      def closeNode(name: String): Node.type = {
+        if (lastAction == DiffRenderContext.OpAttr) builder.append('>')
+        builder.append('<')
+        builder.append('/')
+        builder.append(name)
+        builder.append('>')
+        lastAction = DiffRenderContext.OpClose
+      }
+
+      def setAttr(name: String, value: String): Attr.type = {
+        builder.append(' ')
+        builder.append(name)
+        builder.append('=')
+        builder.append('"')
+        builder.append(value)
+        builder.append('"')
+        lastAction = DiffRenderContext.OpAttr
+        Attr
+      }
+
+      def addTextNode(text: String): Text.type = {
+        if (lastAction != DiffRenderContext.OpClose) builder.append('>')
+        builder.append(text)
+        lastAction = DiffRenderContext.OpText
+        Text
+      }
+
+      def addMisc(misc: Effects.Effect[F, S, M]): Misc.type = Misc
+
+      /** Creates string from buffer */
+      def mkString: String = builder.mkString
+    }
+
     import misc._
 
     val sessions = TrieMap.empty[String, KorolevSession[F]]
@@ -54,17 +104,20 @@ package object server extends LazyLogging {
       val writeResultF = Async[F].flatMap(stateF)(config.stateStorage.write(deviceId, sessionId, _))
 
       Async[F].map(writeResultF) { state =>
-        val body = config.render(state)
-        val dom = 'html(
-          config.head.copy(children =
-            'script(bridgeJs) ::
-              'script(
-                s"var KorolevSessionId = '$sessionId';\n" +
-                s"var KorolevServerRootPath = '${config.serverRouter.rootPath}';\n" +
-                  korolevJs
-              ) ::
-            config.head.children),
-          body
+        import levsha.default.dsl._
+        implicit val textRenderContext = new TextRenderContext()
+        val renderer = config.render(textRenderContext)
+        'html(
+          'head(
+            'script(bridgeJs),
+            'script(
+              s"var KorolevSessionId = '$sessionId';\n" +
+              s"var KorolevServerRootPath = '${config.serverRouter.rootPath}';\n" +
+              korolevJs
+            ),
+            config.head(textRenderContext)
+          ),
+          renderer(state)
         )
         Response.Http(
           status = Response.Status.Ok,
@@ -73,7 +126,7 @@ package object server extends LazyLogging {
             "set-cookie" -> s"device=$deviceId"
           ),
           body = Some {
-            val html = "<!DOCTYPE html>" + dom.html
+            val html = textRenderContext.mkString
             val bytes = html.getBytes(StandardCharsets.UTF_8)
             new ByteArrayInputStream(bytes)
           }
@@ -279,7 +332,8 @@ package object server extends LazyLogging {
     val htmlContentType = "text/html"
     val binaryContentType = "application/octet-stream"
     val korolevJs = {
-      val classLoader = classOf[EventPropagation].getClassLoader
+      import scala.concurrent.Future
+      val classLoader = classOf[Korolev[Future, Any, Any]].getClassLoader
       val stream = classLoader.getResourceAsStream("korolev.js")
       Source.fromInputStream(stream).mkString
     }

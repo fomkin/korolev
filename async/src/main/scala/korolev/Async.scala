@@ -4,7 +4,7 @@ import scala.annotation.implicitNotFound
 import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future}
 import scala.language.higherKinds
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 @implicitNotFound("Instance of Async for ${F} is not found. If you want Future, ensure that execution context is passed to the scope (import korolev.execution.defaultExecutor)")
 trait Async[F[+_]] {
@@ -62,6 +62,25 @@ object Async {
     def flatMap[B](f: A => F[B]): F[B] = Async[F].flatMap(async)(f)
     def recover[U >: A](f: PartialFunction[Throwable, U]): F[U] = Async[F].recover[A, U](async)(f)
     def run[U](f: Try[A] => U): Unit = Async[F].run(async)(f)
-    def run(): Unit = Async[F].run(async)(_ => ())
+    def runIgnoreResult(implicit er: ErrorReporter = ErrorReporter.default): Unit =
+      Async[F].run(async) {
+        case Success(_) => // do nothing
+        case Failure(e) => er.reportError(e)
+      }
+  }
+
+  trait ErrorReporter {
+    def reportError(error: Throwable): Unit
+  }
+
+  object ErrorReporter {
+    def apply(f: Throwable => Unit): ErrorReporter = new ErrorReporter {
+      def reportError(error: Throwable): Unit = f(error)
+    }
+    val default = new ErrorReporter {
+      def reportError(error: Throwable): Unit = {
+        error.printStackTrace()
+      }
+    }
   }
 }

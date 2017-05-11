@@ -1,6 +1,8 @@
 import com.typesafe.sbt.packager.archetypes.JavaAppPackaging
 import com.typesafe.sbt.packager.universal.UniversalPlugin
 
+val levshaVersion = "0.1.1"
+
 val unusedRepo = Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
 
 val dontPublishSettings = Seq(
@@ -60,18 +62,6 @@ val commonSettings = publishSettings ++ Seq(
 val exampleSettings = commonSettings ++ dontPublishSettings ++ Seq(
   libraryDependencies += "org.slf4j" % "slf4j-simple" % "1.7.+"
 )
-
-lazy val vdomOsgiSettings = osgiSettings ++ Seq(
-  OsgiKeys.exportPackage := Seq("korolev.*;version=${Bundle-Version}")
-)
-
-lazy val vdom = crossProject.crossType(CrossType.Pure).
-  settings(commonSettings: _*).
-  settings(normalizedName := "korolev-vdom").
-  enablePlugins(SbtOsgi).settings(vdomOsgiSettings:_*)
-
-lazy val vdomJS = vdom.js
-lazy val vdomJVM = vdom.jvm
 
 lazy val serverOsgiSettings = osgiSettings ++ Seq(
   OsgiKeys.exportPackage := Seq("korolev.server.*;version=${Bundle-Version}")
@@ -139,10 +129,14 @@ lazy val korolev = crossProject.crossType(CrossType.Full).
   settings(commonSettings: _*).
   settings(
     normalizedName := "korolev",
-    libraryDependencies += "biz.enef" %%% "slogging" % "0.5.2",
+    libraryDependencies ++= Seq(
+      "biz.enef" %%% "slogging" % "0.5.2",
+      "com.github.fomkin" %%% "levsha-core" % levshaVersion,
+      "com.github.fomkin" %%% "levsha-events" % levshaVersion
+    ),
     unmanagedResourceDirectories in Compile += file("korolev") / "shared" / "src" / "main" / "resources"
   ).
-  dependsOn(vdom, bridge).
+  dependsOn(bridge).
   enablePlugins(SbtOsgi).settings(korolevOsgiSettings:_*)
 
 lazy val korolevJS = korolev.js
@@ -243,7 +237,6 @@ lazy val root = project.in(file(".")).
   aggregate(
     korolevJS, korolevJVM,
     bridgeJS, bridgeJVM,
-    vdomJS, vdomJVM,
     asyncJS, asyncJVM,
     server, `server-blaze`,
     `jcache-support`,

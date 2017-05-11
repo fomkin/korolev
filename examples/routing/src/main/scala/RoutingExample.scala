@@ -11,43 +11,46 @@ import scala.concurrent.Future
 object RoutingExample extends KorolevBlazeServer {
 
   import State.effects._
+  import dsl._
 
   val storage = StateStorage.default[Future, State](State())
   val inputId = elementId
 
   val service = blazeService[Future, State, Any] from KorolevServiceConfig [Future, State, Any] (
     stateStorage = storage,
-    head = 'head(
-      'title("Main Routing Page"),
-      'link(
-        'href /= "/main.css",
-        'rel /= "stylesheet",
-        'type /= "text/css"
+    head = { implicit rc =>
+      Seq(
+        'title("Main Routing Page"),
+        'link(
+          'href /= "/main.css",
+          'rel /= "stylesheet",
+          'type /= "text/css"
+        )
       )
-    ),
-    render = {
+    },
+    render = { implicit rc => {
       case state =>
-        'body(
-          'div("Super TODO tracker"),
-          'div(
+        'body (
+          'div ("Super TODO tracker"),
+          'div (
             state.todos.keys map { name =>
-              'span(
+              'span (
                 event('click) {
                   immediateTransition { case s =>
                     s.copy(selectedTab = name)
                   }
                 },
                 'style /= "margin-left: 10px",
-                if (name == state.selectedTab) 'strong(name)
+                if (name == state.selectedTab) 'strong (name)
                 else name
               )
             }
           ),
-          'div('class /= "todos",
+          'div ('class /= "todos",
             (state.todos(state.selectedTab) zipWithIndex) map {
               case (todo, i) =>
-                'div(
-                  'div(
+                'div (
+                  'div (
                     'class /= {
                       if (!todo.done) "checkbox"
                       else "checkbox checkbox__checked"
@@ -61,12 +64,12 @@ object RoutingExample extends KorolevBlazeServer {
                       }
                     }
                   ),
-                  if (!todo.done) 'span(todo.text)
-                  else 'strike(todo.text)
+                  if (!todo.done) 'span (todo.text)
+                  else 'strike (todo.text)
                 )
             }
           ),
-          'form(
+          'form (
             // Generate AddTodo action when 'Add' button clicked
             eventWithAccess('submit) { access =>
               deferredTransition {
@@ -78,15 +81,15 @@ object RoutingExample extends KorolevBlazeServer {
                 }
               }
             },
-            'input(
+            'input (
               inputId,
               'type /= "text",
               'placeholder /= "What should be done?"
             ),
-            'button("Add todo")
+            'button ("Add todo")
           )
         )
-    },
+    }},
     serverRouter = {
       ServerRouter(
         dynamic = (_, _) => Router(
