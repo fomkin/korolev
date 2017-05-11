@@ -14,7 +14,7 @@ case class KorolevServiceConfig[F[+_]: Async, S, M](
   serverRouter: ServerRouter[F, S],
   render: Render[S] = PartialFunction.empty,
   head: VDom.Node = VDom.Node("head", Nil, Nil, Nil),
-  maxFormDataEntrySize: Int = 1024 * 1000 * 8,
+  maxFormDataEntrySize: Int = 1024 * 1024 * 8,
   envConfigurator: EnvConfigurator[F, S, M] =
     (_: DeviceId, _: SessionId, _: ApplyTransition[F, S]) =>
       Env(onDestroy = () => (), PartialFunction.empty)
