@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <link rel="import" href="../src/multiselect2.html">
+    <title></title>
+    <script src="../bower_components/webcomponentsjs/webcomponents.js"></script>
+</head>
+<body>
+    <div id="container">
+        <x-multiselect placeholder="Select Value">
+            <li value="1" selected>Item 111</li>
+            <li value="2">Item 2</li>
+            <li value="3" selected>Item 3</li>
+            <li value="4">Item 2</li>
+            <li value="5" selected>Item 3</li>
+            <li value="6">Long Item</li>
+            <li value="7" selected>Long Long Items</li>
+        </x-multiselect>
+    </div>
+    <script>
+
+        var multiselect = document.querySelector('x-multiselect');
+        multiselect.addEventListener('change', function() {
+            console.log('Selected items:', this.selectedItems());
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <link rel="import" href="../src/multiselect.html">
+    <title></title>
+    <script src="../bower_components/webcomponentsjs/webcomponents.js"></script>
+</head>
+<style>
+    body {
+        font-family: "Helvetica Neue", SansSerif;
+        font-weight: 200;
+        color: #444;
+    }
+
+    .container {
+        margin-top: 10px;
+    }
+
+    h3 {
+        margin: 0 0 5px;
+    }
+</style>
+<body>
+    <div class="container" style="font-size: 12px;">
+        <h3>font-size: 12px</h3>
+        <x-multiselect placeholder="Select Value">
+            <li value="1" selected>Item 1</li>
+            <li value="2">Item 2</li>
+            <li value="3" selected>Item 3</li>
+            <li value="4">Item 4</li>
+            <li value="5" selected>Item 5</li>
+            <li value="6">Item 6</li>
+            <li value="7">Item 7</li>
+        </x-multiselect>
+    </div>
+    <div class="container" style="font-size: 14px;">
+        <h3>font-size: 14px</h3>
+        <x-multiselect placeholder="Select Value">
+            <li value="1" selected>Item 1</li>
+            <li value="2">Item 2</li>
+            <li value="3" selected>Item 3</li>
+            <li value="4">Item 4</li>
+            <li value="5" selected>Item 5</li>
+            <li value="6">Item 6</li>
+            <li value="7">Item 7</li>
+        </x-multiselect>
+    </div>
+    <div class="container" style="font-size: 16px;">
+        <h3>font-size: 16px</h3>
+        <x-multiselect placeholder="Select Value">
+            <li value="1" selected>Item 1</li>
+            <li value="2">Item 2</li>
+            <li value="3" selected>Item 3</li>
+            <li value="4">Item 4</li>
+            <li value="5" selected>Item 5</li>
+            <li value="6">Item 6</li>
+            <li value="7">Item 7</li>
+        </x-multiselect>
+    </div>
+
+    <script>
+        var multiselect = document.querySelector('x-multiselect');
+        multiselect.addEventListener('change', function() {
+            console.log('Selected items:', this.selectedItems());
+        });
+    </script>
+</body>
+</html>
