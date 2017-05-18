@@ -1,0 +1,19 @@
+{
+  "name": "multiselect-web-component",
+  "version": "0.1.0",
+  "description": "Multiselect Web Component ",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tabalinas/multiselect-web-component.git"
+  },
+  "keywords": [
+    "webcomponents",
+    "multiselect"
+  ],
+  "author": "Artem Tabalin <tabalinas@gmail.com> (http://tabalin.net/)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/tabalinas/multiselect-web-component/issues"
+  },
+  "homepage": "https://github.com/tabalinas/multiselect-web-component#readme"
+}
