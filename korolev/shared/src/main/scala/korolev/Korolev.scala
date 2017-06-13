@@ -3,17 +3,14 @@ package korolev
 import java.util.concurrent.atomic.AtomicInteger
 
 import bridge.JSAccess
-import korolev.Effects.{Access, ElementId, FormDataDownloader, PropertyHandler}
+import korolev.ApplicationContext._
 import korolev.Async.{AsyncOps, Promise}
 import korolev.StateManager.Transition
-import korolev.util.AtomicReference
+import levsha.events.{EventId, calculateEventPropagation}
 import levsha.impl.DiffRenderContext
-import slogging.LazyLogging
-import Effects.Effect
-import levsha.{Id, RenderContext, RenderUnit}
-import levsha.events.EventId
-import levsha.events.calculateEventPropagation
 import levsha.impl.DiffRenderContext.ChangesPerformer
+import levsha.{Id, RenderContext, RenderUnit}
+import slogging.LazyLogging
 
 import scala.collection.mutable
 import scala.language.{higherKinds, postfixOps}
@@ -42,7 +39,7 @@ object Korolev {
   def apply[F[+ _]: Async, S, M](sm: StateManager[F, S],
                                  ja: JSAccess[F],
                                  initialState: S,
-                                 render: RenderContext[Effects.Effect[F, S, M]] => PartialFunction[S, RenderUnit],
+                                 render: RenderContext[ApplicationContext.Effect[F, S, M]] => PartialFunction[S, RenderUnit],
                                  router: Router[F, S, S],
                                  messageHandler: PartialFunction[M, Unit],
                                  fromScratch: Boolean,
@@ -75,16 +72,26 @@ object Korolev {
       val renderContext = DiffRenderContext[Effect[F, S, M]](onMisc = effectsReactor.miscCallback)
       val renderer = render(renderContext).lift 
       val changesPerformer = new ChangesPerformer {
+        private def isProp(name: String) = name.charAt(0) == '^'
+        private def escapeName(name: String, isProp: Boolean) =
+          if (isProp) name.substring(1) else name
+
         def remove(id: Id): Unit =
           client.call("Remove", id.parent.get.mkString, id.mkString).runIgnoreResult()
         def createText(id: Id, text: String): Unit =
           client.call("CreateText", id.parent.get.mkString, id.mkString, text).runIgnoreResult()
         def create(id: Id, tag: String): Unit =
           client.call("Create", id.parent.get.mkString, id.mkString, tag).runIgnoreResult()
-        def setAttr(id: Id, name: String, value: String): Unit =
-          client.call("SetAttr", id.mkString, name, value, false).runIgnoreResult()
-        def removeAttr(id: Id, name: String): Unit =
-          client.call("RemoveAttr", id.mkString, name, false).runIgnoreResult()
+        def setAttr(id: Id, name: String, value: String): Unit = {
+          val p = isProp(name)
+          val n = escapeName(name, p)
+          client.call("SetAttr", id.mkString, n, value, p).runIgnoreResult()
+        }
+        def removeAttr(id: Id, name: String): Unit = {
+          val p = isProp(name)
+          val n = escapeName(name, p)
+          client.call("RemoveAttr", id.mkString, n, p).runIgnoreResult()
+        }
       }
 
       def resolveFormData(descriptor: String, formData: Try[FormData]): Unit = {
@@ -174,8 +181,8 @@ object Korolev {
             if (currentRenderNum.get == renderNum.toInt) {
               calculateEventPropagation(Id(target), tpe) forall { eventId =>
                 val eventResultOpt = effectsReactor.events.get(eventId) map {
-                  case event: Effects.EventWithAccess[F, S, M] => event.effect(browserAccess)
-                  case event: Effects.SimpleEvent[F, S, M] => event.effect()
+                  case event: ApplicationContext.EventWithAccess[F, S, M] => event.effect(browserAccess)
+                  case event: ApplicationContext.SimpleEvent[F, S, M] => event.effect()
                 }
                 eventResultOpt.fold(true) { er =>
                   List(er.it.map(async.pure(_)), er.dt).flatten.foreach { transitionF =>
@@ -215,7 +222,7 @@ object Korolev {
             renderContext.closeNode("body")
           } else {
             val renderingResult = renderer(initialState)
-            renderContext.diff(new DiffRenderContext.DummyChangesPerformer())
+            renderContext.diff(DiffRenderContext.DummyChangesPerformer)
             if (renderingResult.isEmpty) {
               logger.error("Rendering function is not defined for initial state")
               // TODO need shutdown hook
@@ -250,30 +257,30 @@ object Korolev {
 
   private class EffectsReactor[F[+ _]: Async, S, M](
     onNewEventType: Symbol => Unit,
-    onStartDelay: Effects.Delay[F, S, M] => Unit,
-    onCancelDelay: Effects.Delay[F, S, M] => Unit) {
+    onStartDelay: ApplicationContext.Delay[F, S, M] => Unit,
+    onCancelDelay: ApplicationContext.Delay[F, S, M] => Unit) {
 
     val knownEventTypes = mutable.Set('submit)
     val markedDelays    = mutable.Set.empty[Id] // Set of the delays which are should survive
-    val elements        = mutable.Map.empty[Effects.ElementId[F, S, M], Id]
-    val events          = mutable.Map.empty[EventId, Effects.Event[F, S, M]]
-    val delays          = mutable.Map.empty[Id, Effects.Delay[F, S, M]]
+    val elements        = mutable.Map.empty[ApplicationContext.ElementId[F, S, M], Id]
+    val events          = mutable.Map.empty[EventId, ApplicationContext.Event[F, S, M]]
+    val delays          = mutable.Map.empty[Id, ApplicationContext.Delay[F, S, M]]
 
     def miscCallback(id: Id, effect: Effect[F, S, M]): Unit = this.synchronized {
       effect match {
-        case event: Effects.Event[F, S, M] =>
+        case event: ApplicationContext.Event[F, S, M] =>
           events.put(EventId(id, event.`type`.name, event.phase), event)
           if (!knownEventTypes.contains(event.`type`)) {
             knownEventTypes += event.`type`
             onNewEventType(event.`type`)
           }
-        case delay: Effects.Delay[F, S, M] =>
+        case delay: ApplicationContext.Delay[F, S, M] =>
           markedDelays += id
           if (!delays.contains(id)) {
             delays.put(id, delay)
             onStartDelay(delay)
           }
-        case element: Effects.ElementId[F, S, M] =>
+        case element: ApplicationContext.ElementId[F, S, M] =>
           elements.put(element, id)
       }
     }

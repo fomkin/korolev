@@ -3,23 +3,32 @@ package korolev
 import korolev.StateManager.Transition
 import korolev.util.Scheduler
 import korolev.Async.AsyncOps
-import levsha.TemplateDsl
+import levsha.RenderUnit.Attr
+import levsha.{RenderUnit, TemplateDsl}
 import levsha.events.EventPhase
 
 import scala.concurrent.duration.FiniteDuration
 import scala.language.higherKinds
 
-class Effects[F[+_]: Async, S, M](implicit scheduler: Scheduler[F]) {
+class ApplicationContext[F[+_]: Async, S, M](implicit scheduler: Scheduler[F]) {
 
-  import Effects._
+  import ApplicationContext._
   import EventPhase._
 
-  type Effect = Effects.Effect[F, S, M]
-  type Event = Effects.Event[F, S, M]
+  type Effect = ApplicationContext.Effect[F, S, M]
+  type Event = ApplicationContext.Event[F, S, M]
   type EventFactory[T] = T => Event
   type Transition = StateManager.Transition[S]
+  type Render = PartialFunction[S, RenderUnit]
 
-  val dsl = new TemplateDsl[Effects.Effect[F, S, M]]()
+  final class ExtendedTemplateDsl extends TemplateDsl[ApplicationContext.Effect[F, S, M]] {
+    implicit final class KorolevSymbolOps(s: Symbol) {
+      def :=(value: String)(implicit rc: RC): Attr.type =
+        rc.setAttr('^' + s.name.replaceAll("([A-Z]+)", "-$1").toLowerCase, value)
+    }
+  }
+
+  val dsl = new ExtendedTemplateDsl()
 
   def elementId = new ElementId[F, S, M]()
 
@@ -70,7 +79,7 @@ class Effects[F[+_]: Async, S, M](implicit scheduler: Scheduler[F]) {
   def transition(t: Transition): Transition = t
 }
 
-object Effects {
+object ApplicationContext {
 
   sealed abstract class Effect[F[+_]: Async, S, M]
 
@@ -80,14 +89,15 @@ object Effects {
     * @tparam M Message
     */
   def apply[F[+_]: Async, S, M](implicit scheduler: Scheduler[F]) =
-    new Effects[F, S, M]()
+    new ApplicationContext[F, S, M]()
 
   abstract class Access[F[+_]: Async, S, M] {
 
     /**
       * Extracts property of element from client-side DOM.
+      *
       * @param propName Name of property. 'value for example
-      * @see [[Effects.elementId]]
+      * @see [[ApplicationContext.elementId]]
       * @example
       * {{{
       * eventWithAccess('click) { access =>

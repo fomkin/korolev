@@ -12,7 +12,7 @@ import scala.concurrent.ExecutionContextExecutorService
   * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
   */
 case class BlazeServerConfig(
-  port: Int = 8181,
+  port: Int = 8080,
   host: String = InetAddress.getLoopbackAddress.getHostAddress,
   /**
     * Standard Java SSL context.

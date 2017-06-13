@@ -10,7 +10,7 @@ import scala.concurrent.Future
   */
 object RoutingExample extends KorolevBlazeServer {
 
-  import State.effects._
+  import State.applicationContext._
   import dsl._
 
   val storage = StateStorage.default[Future, State](State())
@@ -132,7 +132,7 @@ case class State(
 )
 
 object State {
-  val effects = Effects[Future, State, Any]
+  val applicationContext = ApplicationContext[Future, State, Any]
   case class Todo(text: String, done: Boolean)
   object Todo {
     def apply(n: Int): Vector[Todo] = (0 to n).toVector map {

@@ -25,7 +25,7 @@ object GuineaPigServer {
   )
 
   object State {
-    val effects = Effects[Future, State, Any]
+    val applicationContext = ApplicationContext[Future, State, Any]
     case class Todo(text: String, done: Boolean)
     object Todo {
       def apply(n: Int): Vector[Todo] = (0 to n).toVector map {
@@ -34,7 +34,8 @@ object GuineaPigServer {
     }
   }
 
-  import State.effects._
+  import State.applicationContext._
+  import State.applicationContext.dsl._
 
   val logger = LoggerFactory.getLogger("GuineaPig")
   val storage = StateStorage.default[Future, State](State())
@@ -42,13 +43,15 @@ object GuineaPigServer {
 
   val service = blazeService[Future, State, Any] from KorolevServiceConfig[Future, State, Any](
     stateStorage = storage,
-    head = 'head(
-      'title("The Test App"),
-      'link('href /= "/main.css", 'rel /= "stylesheet", 'type /= "text/css"),
-      'meta('content/="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0", 'name /= "viewport"),
-      'script('src /= "/debug-console.js")
-    ),
-    render = {
+    head = { implicit rc =>
+      Seq(
+        'title("The Test App"),
+        'link('href /= "/main.css", 'rel /= "stylesheet", 'type /= "text/css"),
+        'meta('content/="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0", 'name /= "viewport"),
+        'script('src /= "/debug-console.js")
+      )
+    },
+    render = { implicit rc => {
       case state =>
         'body(
           'div("Super TODO tracker"),
@@ -139,7 +142,7 @@ object GuineaPigServer {
             state.log.map(s => 'div(s))
           )
         )
-    },
+    }},
     serverRouter = {
       ServerRouter(
         dynamic = (_, _) => Router(

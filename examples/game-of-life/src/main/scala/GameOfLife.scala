@@ -10,7 +10,8 @@ import scala.concurrent.Future
   */
 object GameOfLife extends KorolevBlazeServer {
 
-  import Universe.effects._
+  import Universe.applicationContext._
+  import Universe.applicationContext.dsl._
 
   val universeSize = 20
   val cellRadius = 10
@@ -24,7 +25,7 @@ object GameOfLife extends KorolevBlazeServer {
   val service = blazeService[Future, Universe, Any] from KorolevServiceConfig(
     stateStorage = StateStorage.default(Universe(universeSize)),
     serverRouter = ServerRouter.empty,
-    render = {
+    render = { implicit rc => {
       case universe =>
         'body(
           'div(
@@ -65,7 +66,7 @@ object GameOfLife extends KorolevBlazeServer {
             }
           )
         )
-    }
+    }}
   )
 }
 
@@ -131,7 +132,7 @@ case class Universe(cells: Vector[Universe.Cell], size: Int) {
 
 object Universe {
 
-  val effects = Effects[Future, Universe, Any]
+  val applicationContext = ApplicationContext[Future, Universe, Any]
 
   case class Cell(x: Int, y: Int, alive: Boolean)
 

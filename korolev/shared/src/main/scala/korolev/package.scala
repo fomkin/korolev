@@ -9,8 +9,4 @@ package object korolev {
   @inline val Root = Router.Root
   @inline val / = Router./
   type / = Router./
-
-  //type Render[F, S, M] = RenderContext[Effects.Effect[F, S, M]] => PartialFunction[S, RenderUnit]
-
-  //val dsl = new TemplateDsl[Effects.Effect]()
 }
