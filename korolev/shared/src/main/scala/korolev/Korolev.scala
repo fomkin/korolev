@@ -80,8 +80,10 @@ object Korolev {
           client.call("Remove", id.parent.get.mkString, id.mkString).runIgnoreResult()
         def createText(id: Id, text: String): Unit =
           client.call("CreateText", id.parent.get.mkString, id.mkString, text).runIgnoreResult()
-        def create(id: Id, tag: String): Unit =
-          client.call("Create", id.parent.get.mkString, id.mkString, tag).runIgnoreResult()
+        def create(id: Id, tag: String): Unit = {
+          val parent = id.parent.fold("0")(_.mkString)
+          client.call("Create", parent, id.mkString, tag).runIgnoreResult()
+        }
         def setAttr(id: Id, name: String, value: String): Unit = {
           val p = isProp(name)
           val n = escapeName(name, p)
@@ -222,12 +224,12 @@ object Korolev {
             renderContext.closeNode("body")
           } else {
             val renderingResult = renderer(initialState)
-            renderContext.diff(DiffRenderContext.DummyChangesPerformer)
             if (renderingResult.isEmpty) {
               logger.error("Rendering function is not defined for initial state")
               // TODO need shutdown hook
             }
           }
+          renderContext.diff(DiffRenderContext.DummyChangesPerformer)
 
           val onState: (S => Unit) = { state =>
             // Set page url if router exists
@@ -241,7 +243,7 @@ object Korolev {
                 // Perform changes only when renderer for state is defined
                 renderContext.diff(changesPerformer)
               case None =>
-                logger.warn(s"Render is nod defined for ${state.getClass.getSimpleName}")
+                logger.warn(s"Render is not defined for ${state.getClass.getSimpleName}")
             }
             client.call("SetRenderNum", currentRenderNum.incrementAndGet()).runIgnoreResult()
             jsAccess.flush()

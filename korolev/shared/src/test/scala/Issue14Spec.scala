@@ -55,15 +55,11 @@ class Issue14Spec extends FlatSpec with Matchers {
     jSAccess.resolvePromise(1, isSuccess = true, "@obj:^cb0") // pop state handler
     jSAccess.resolvePromise(2, isSuccess = true, "@obj:^cb1") // event handler
     jSAccess.resolvePromise(3, isSuccess = true, "@obj:^cb2") // FormData progress handler
-    jSAccess.resolvePromise(4, isSuccess = true, "@unit")
-    jSAccess.resolvePromise(5, isSuccess = true, "@unit")
-    jSAccess.resolvePromise(6, isSuccess = true, "@unit")
-    jSAccess.resolvePromise(7, isSuccess = true, "@unit")
-    jSAccess.resolvePromise(8, isSuccess = true, "@unit")
+    for (i <- 4 to 15) jSAccess.resolvePromise(i, isSuccess = true, "@unit")
 
-    jSAccess.fireCallback("^cb1", "1:1_1_0:mousedown")
-    jSAccess.fireCallback("^cb1", "1:1_1_0:mouseup")
-    jSAccess.fireCallback("^cb1", "1:1_1_0:click")
+    jSAccess.fireCallback("^cb1", "1:1_2_1:mousedown")
+    jSAccess.fireCallback("^cb1", "1:1_2_1:mouseup")
+    jSAccess.fireCallback("^cb1", "1:1_2_1:click")
 
     counter should be (1)
   }
@@ -80,14 +76,14 @@ object Issue14Spec {
 
   def render(firstEvent: Event, secondEvent: Event)(implicit rc: RC): Render = {
     case "firstState" =>
-      'div(
+      'body(
         'div("Hello"),
         'div(
           'button("Click me", firstEvent)
         )
       )
     case "secondState" =>
-      'div(
+      'body(
         'div("Hello"),
         'ul(
           'li("One", secondEvent),
