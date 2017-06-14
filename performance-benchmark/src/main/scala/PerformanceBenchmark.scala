@@ -25,7 +25,7 @@ import scala.util.Random
 object PerformanceBenchmark extends App {
 
   val host = "localhost"
-  val port = 8181
+  val port = 8080
   val concurrentClientsNum = 30
   val actionsNumber = 50
   def actionDelay = (0.5 + Random.nextDouble * 1).seconds
@@ -75,7 +75,7 @@ object PerformanceBenchmark extends App {
                     eventCb.get flatMap { cb =>
                       phase
                         .set(TabClick(1, currentTime))
-                        .flatMap(_ => send(-1, cb, "0:0_1_1:click"))
+                        .flatMap(_ => send(-1, cb, "0:1_2_2:click"))
                         .map(_ => Seq(id, true, "@unit"))
                     }
                 }
@@ -98,7 +98,7 @@ object PerformanceBenchmark extends App {
                       }
                       cb <- eventCb.get
                       _ <- Task.schedule((), actionDelay)
-                      _ <- send(-1, cb, s"$rNum:0_1_$nextTabNum:click")
+                      _ <- send(-1, cb, s"$rNum:1_2_${nextTabNum + 1}:click")
                       _ <- phase.set(TabClick(nextTabNum, currentTime))
                     } yield Seq(id, true, "@unit")
                 }
