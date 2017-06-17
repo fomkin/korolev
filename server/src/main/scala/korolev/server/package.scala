@@ -9,9 +9,7 @@ import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 import bridge.JSAccess
 import korolev.Async._
 import korolev.Korolev.MutableMapFactory
-import levsha.RenderContext
-import levsha.RenderUnit.{Attr, Misc, Node, Text}
-import levsha.impl.{AbstractTextRenderContext, DiffRenderContext, TextRenderContext}
+import levsha.impl.{AbstractTextRenderContext, TextPrettyPrintingConfig}
 import slogging.LazyLogging
 
 import scala.collection.concurrent.TrieMap
@@ -57,21 +55,28 @@ package object server extends LazyLogging {
       val writeResultF = Async[F].flatMap(stateF)(config.stateStorage.write(deviceId, sessionId, _))
 
       Async[F].map(writeResultF) { state =>
-        import levsha.default.dsl._
-        implicit val textRenderContext = new AbstractTextRenderContext[ApplicationContext.Effect[F, S, M]]() {}
-        val renderer = config.render(textRenderContext)
-        'html(
+        val dsl = new levsha.TemplateDsl[ApplicationContext.Effect[F, S, M]]()
+        val textRenderContext = new AbstractTextRenderContext[ApplicationContext.Effect[F, S, M]]() {
+          val prettyPrinting = TextPrettyPrintingConfig.noPrettyPrinting
+        }
+        import dsl._
+
+        val document = 'html(
           'head(
-            'script(bridgeJs),
-            'script(
+            'script('language /= "javascript", bridgeJs),
+            'script('language /= "javascript",
               s"var KorolevSessionId = '$sessionId';\n" +
               s"var KorolevServerRootPath = '${config.serverRouter.rootPath}';\n" +
               korolevJs
             ),
-            config.head(textRenderContext)
+            config.head
           ),
-          renderer(state)
+          config.render(state)
         )
+
+        // Render document to textRenderContext
+        document(textRenderContext)
+
         Response.Http(
           status = Response.Status.Ok,
           headers = Seq(
@@ -79,7 +84,12 @@ package object server extends LazyLogging {
             "set-cookie" -> s"device=$deviceId"
           ),
           body = Some {
-            val html = textRenderContext.mkString
+            val sb = mutable.StringBuilder.newBuilder
+            val html = sb
+              .append("<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.1//EN\" \"http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd\">")
+              .append('\n')
+              .append(textRenderContext.builder)
+              .mkString
             val bytes = html.getBytes(StandardCharsets.UTF_8)
             new ByteArrayInputStream(bytes)
           }

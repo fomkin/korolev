@@ -2,8 +2,9 @@ package korolev.server
 
 import korolev.server.KorolevServiceConfig.{ApplyTransition, Env, EnvConfigurator}
 import korolev.server.StateStorage.{DeviceId, SessionId}
-import korolev.{Async, ApplicationContext}
-import levsha.{RenderContext, RenderUnit}
+import korolev.{ApplicationContext, Async}
+import levsha.Document
+import levsha.impl.TextPrettyPrintingConfig
 
 import scala.language.higherKinds
 
@@ -13,8 +14,8 @@ import scala.language.higherKinds
 case class KorolevServiceConfig[F[+_]: Async, S, M](
   stateStorage: StateStorage[F, S],
   serverRouter: ServerRouter[F, S],
-  render: RenderContext[ApplicationContext.Effect[F, S, M]] => PartialFunction[S, RenderUnit],
-  head: RenderContext[ApplicationContext.Effect[F, S, M]] => Seq[RenderUnit.Node] = (rc: RenderContext[ApplicationContext.Effect[F, S, M]]) => Nil,
+  render: PartialFunction[S, Document.Node[ApplicationContext.Effect[F, S, M]]],
+  head: Seq[Document.Node[ApplicationContext.Effect[F, S, M]]] = Seq.empty,
   maxFormDataEntrySize: Int = 1024 * 1024 * 8,
   envConfigurator: EnvConfigurator[F, S, M] =
     (_: DeviceId, _: SessionId, _: ApplyTransition[F, S]) =>

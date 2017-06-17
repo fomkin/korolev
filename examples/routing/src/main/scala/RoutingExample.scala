@@ -11,14 +11,14 @@ import scala.concurrent.Future
 object RoutingExample extends KorolevBlazeServer {
 
   import State.applicationContext._
-  import dsl._
+  import symbolDsl._
 
   val storage = StateStorage.default[Future, State](State())
   val inputId = elementId
 
   val service = blazeService[Future, State, Any] from KorolevServiceConfig [Future, State, Any] (
     stateStorage = storage,
-    head = { implicit rc =>
+    head = {
       Seq(
         'title("Main Routing Page"),
         'link(
@@ -28,7 +28,7 @@ object RoutingExample extends KorolevBlazeServer {
         )
       )
     },
-    render = { implicit rc => {
+    render = {
       case state =>
         'body (
           'div ("Super TODO tracker"),
@@ -49,8 +49,8 @@ object RoutingExample extends KorolevBlazeServer {
           'div ('class /= "todos",
             (state.todos(state.selectedTab) zipWithIndex) map {
               case (todo, i) =>
-                'div (
-                  'div (
+                'div(
+                  'div(
                     'class /= {
                       if (!todo.done) "checkbox"
                       else "checkbox checkbox__checked"
@@ -64,8 +64,8 @@ object RoutingExample extends KorolevBlazeServer {
                       }
                     }
                   ),
-                  if (!todo.done) 'span (todo.text)
-                  else 'strike (todo.text)
+                  if (!todo.done) 'span(todo.text)
+                  else 'strike(todo.text)
                 )
             }
           ),
@@ -89,7 +89,7 @@ object RoutingExample extends KorolevBlazeServer {
             'button ("Add todo")
           )
         )
-    }},
+    },
     serverRouter = {
       ServerRouter(
         dynamic = (_, _) => Router(

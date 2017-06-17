@@ -15,7 +15,7 @@ import scala.concurrent.Future
 object JCacheExample extends KorolevBlazeServer {
 
   import State.applicationContext._
-  import State.applicationContext.dsl._
+  import State.applicationContext.symbolDsl._
 
   val storage = {
 
@@ -37,7 +37,7 @@ object JCacheExample extends KorolevBlazeServer {
 
   val service = blazeService[Future, State, Any] from KorolevServiceConfig [Future, State, Any] (
     stateStorage = storage,
-    head = { implicit rc =>
+    head = {
       Seq(
         'title("Main Routing Page"),
         'link(
@@ -47,7 +47,7 @@ object JCacheExample extends KorolevBlazeServer {
         )
       )
     },
-    render = { implicit rc => {
+    render = {
       case state =>
         'body(
           'div("Super TODO tracker"),
@@ -108,7 +108,7 @@ object JCacheExample extends KorolevBlazeServer {
             'button("Add todo")
           )
         )
-    }},
+    },
     serverRouter = {
       ServerRouter(
         dynamic = (_, _) => Router(

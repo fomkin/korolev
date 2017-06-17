@@ -8,7 +8,7 @@ import scala.concurrent.Future
 object WebComponentExample extends KorolevBlazeServer {
 
   import State.applicationContext._
-  import dsl._
+  import symbolDsl._
 
   def setLatLon(lat: Double, lon: Double) =
     immediateTransition { case s =>
@@ -18,13 +18,13 @@ object WebComponentExample extends KorolevBlazeServer {
   val service = blazeService[Future, State, Any] from KorolevServiceConfig [Future, State, Any] (
     serverRouter = ServerRouter.empty[Future, State],
     stateStorage = StateStorage.default(State()),
-    head = { implicit rc =>
+    head = {
       Seq(
         'script('src /= "https://cdnjs.cloudflare.com/ajax/libs/webcomponentsjs/0.7.24/webcomponents-lite.min.js"),
         'link('rel /= "import", 'href /= "https://leaflet-extras.github.io/leaflet-map/bower_components/leaflet-map/leaflet-map.html")
       )
     },
-    render = { implicit rc => {
+    render = {
       case state =>
         'body (
           'div (
@@ -41,7 +41,6 @@ object WebComponentExample extends KorolevBlazeServer {
             'zoom /= "10"
           )
         )
-      }
     }
   )
 

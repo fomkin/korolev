@@ -9,7 +9,7 @@ import korolev.StateManager.Transition
 import levsha.events.{EventId, calculateEventPropagation}
 import levsha.impl.DiffRenderContext
 import levsha.impl.DiffRenderContext.ChangesPerformer
-import levsha.{Id, RenderContext, RenderUnit}
+import levsha.{Id, Document}
 import slogging.LazyLogging
 
 import scala.collection.mutable
@@ -39,7 +39,7 @@ object Korolev {
   def apply[F[+ _]: Async, S, M](sm: StateManager[F, S],
                                  ja: JSAccess[F],
                                  initialState: S,
-                                 render: RenderContext[ApplicationContext.Effect[F, S, M]] => PartialFunction[S, RenderUnit],
+                                 render: PartialFunction[S, Document.Node[ApplicationContext.Effect[F, S, M]]],
                                  router: Router[F, S, S],
                                  messageHandler: PartialFunction[M, Unit],
                                  fromScratch: Boolean,
@@ -70,7 +70,7 @@ object Korolev {
         }
       )
       val renderContext = DiffRenderContext[Effect[F, S, M]](onMisc = effectsReactor.miscCallback)
-      val renderer = render(renderContext).lift 
+      val renderer = render.lift
       val changesPerformer = new ChangesPerformer {
         private def isProp(name: String) = name.charAt(0) == '^'
         private def escapeName(name: String, isProp: Boolean) =
@@ -223,9 +223,10 @@ object Korolev {
             renderContext.openNode("body")
             renderContext.closeNode("body")
           } else {
-            val renderingResult = renderer(initialState)
-            if (renderingResult.isEmpty) {
-              logger.error("Rendering function is not defined for initial state")
+            renderer(initialState) match {
+              case Some(node) => node(renderContext)
+              case None =>
+                logger.error("Rendering function is not defined for initial state")
               // TODO need shutdown hook
             }
           }
@@ -239,8 +240,9 @@ object Korolev {
             // Perform rendering
             renderContext.swap()
             renderer(state) match {
-              case Some(_) =>
+              case Some(node) =>
                 // Perform changes only when renderer for state is defined
+                node(renderContext)
                 renderContext.diff(changesPerformer)
               case None =>
                 logger.warn(s"Render is not defined for ${state.getClass.getSimpleName}")

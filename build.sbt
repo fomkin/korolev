@@ -1,7 +1,7 @@
 import com.typesafe.sbt.packager.archetypes.JavaAppPackaging
 import com.typesafe.sbt.packager.universal.UniversalPlugin
 
-val levshaVersion = "0.2.0"
+val levshaVersion = "0.3.0"
 
 val unusedRepo = Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
 
@@ -44,9 +44,9 @@ val publishSettings = Seq(
 )
 
 val commonSettings = publishSettings ++ Seq(
-  scalaVersion := "2.11.8", // Need by IntelliJ
+  scalaVersion := "2.11.11", // Need by IntelliJ
   organization := "com.github.fomkin",
-  version := "0.3.1",
+  version := "0.4.0-SNAPSHOT",
   libraryDependencies ++= Seq(
     "org.scalatest" %%% "scalatest" % "3.0.1" % "test"
   ),
@@ -248,7 +248,7 @@ lazy val root = project.in(file(".")).
 
 publishTo := unusedRepo
 
-crossScalaVersions := Seq("2.11.8", "2.12.1")
+crossScalaVersions := Seq("2.11.11", "2.12.2")
 
 publishArtifact := false
 

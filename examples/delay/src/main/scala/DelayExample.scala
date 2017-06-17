@@ -14,30 +14,28 @@ object DelayExample extends KorolevBlazeServer {
   val applicationContext = ApplicationContext[Future, Boolean, Any]
 
   import applicationContext._
-  import dsl._
+  import symbolDsl._
 
   val service = blazeService[Future, Boolean, Any] from KorolevServiceConfig[Future, Boolean, Any](
     stateStorage = StateStorage.default(false),
     serverRouter = ServerRouter.empty[Future, Boolean],
-    render = { implicit rc =>
-      {
-        case true => 'body(
-          delay(3.seconds) {
-            case true => false
+    render = {
+      case true => 'body(
+        delay(3.seconds) {
+          case true => false
+        },
+        "Wait 3 seconds!"
+      )
+      case false => 'body(
+        'button(
+          event('click) {
+            immediateTransition {
+              case _ => true
+            }
           },
-          "Wait 3 seconds!"
+          "Push the button"
         )
-        case false => 'body(
-          'button(
-            event('click) {
-              immediateTransition {
-                case _ => true
-              }
-            },
-            "Push the button"
-          )
-        )
-      }
+      )
     }
   )
 }

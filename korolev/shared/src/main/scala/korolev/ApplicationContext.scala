@@ -3,8 +3,7 @@ package korolev
 import korolev.StateManager.Transition
 import korolev.util.Scheduler
 import korolev.Async.AsyncOps
-import levsha.RenderUnit.Attr
-import levsha.{RenderUnit, TemplateDsl}
+import levsha.{Document, TemplateDsl}
 import levsha.events.EventPhase
 
 import scala.concurrent.duration.FiniteDuration
@@ -19,18 +18,28 @@ class ApplicationContext[F[+_]: Async, S, M](implicit scheduler: Scheduler[F]) {
   type Event = ApplicationContext.Event[F, S, M]
   type EventFactory[T] = T => Event
   type Transition = StateManager.Transition[S]
-  type Render = PartialFunction[S, RenderUnit]
+  type Render = PartialFunction[S, Document.Node[Effect]]
+  type ElementId = ApplicationContext.ElementId[F, S, M]
 
   final class ExtendedTemplateDsl extends TemplateDsl[ApplicationContext.Effect[F, S, M]] {
+
+    type Document = levsha.Document[Effect]
+    type Node     = levsha.Document.Node[Effect]
+    type Attr     = levsha.Document.Attr[Effect]
+
+    @deprecated("Use Node instead of VDom", "0.4.0")
+    type VDom = Node
+
     implicit final class KorolevSymbolOps(s: Symbol) {
-      def :=(value: String)(implicit rc: RC): Attr.type =
+      def :=(value: String): Document.Attr[Effect] = Document.Attr { rc =>
         rc.setAttr('^' + s.name.replaceAll("([A-Z]+)", "-$1").toLowerCase, value)
+      }
     }
   }
 
-  val dsl = new ExtendedTemplateDsl()
+  val symbolDsl = new ExtendedTemplateDsl()
 
-  def elementId = new ElementId[F, S, M]()
+  def elementId = new ApplicationContext.ElementId[F, S, M]()
 
   /**
     * Schedules the [[transition]] with [[delay]]. For example it can be useful

@@ -12,7 +12,7 @@ import scala.concurrent.Future
 object FormDataExample extends KorolevBlazeServer(BlazeServerConfig(maxRequestBodySize = 20 * 1024 * 1024)) {
 
   import State.applicationContext._
-  import State.applicationContext.dsl._
+  import State.applicationContext.symbolDsl._
 
   val myForm = elementId
   val pictureFieldName = "picture"
@@ -20,7 +20,7 @@ object FormDataExample extends KorolevBlazeServer(BlazeServerConfig(maxRequestBo
   val service = blazeService[Future, State, Any] from KorolevServiceConfig[Future, State, Any](
     stateStorage = StateStorage.default(State.empty),
     serverRouter = ServerRouter.empty,
-    head = { implicit rc =>
+    head = {
       Seq(
         'link(
           'rel /="stylesheet",
@@ -48,7 +48,7 @@ object FormDataExample extends KorolevBlazeServer(BlazeServerConfig(maxRequestBo
         )
       )
     },
-    render = { implicit rc => {
+    render = {
       case Initial =>
         'body (
           'form ('class /= "card",
@@ -123,7 +123,7 @@ object FormDataExample extends KorolevBlazeServer(BlazeServerConfig(maxRequestBo
             s"height: ${height}px"
           )
         )
-    }},
+    },
     maxFormDataEntrySize = 1024 * 1024 * 20
   )
 }

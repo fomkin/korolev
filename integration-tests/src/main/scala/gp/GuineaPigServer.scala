@@ -35,7 +35,7 @@ object GuineaPigServer {
   }
 
   import State.applicationContext._
-  import State.applicationContext.dsl._
+  import State.applicationContext.symbolDsl._
 
   val logger = LoggerFactory.getLogger("GuineaPig")
   val storage = StateStorage.default[Future, State](State())
@@ -43,7 +43,7 @@ object GuineaPigServer {
 
   val service = blazeService[Future, State, Any] from KorolevServiceConfig[Future, State, Any](
     stateStorage = storage,
-    head = { implicit rc =>
+    head = {
       Seq(
         'title("The Test App"),
         'link('href /= "/main.css", 'rel /= "stylesheet", 'type /= "text/css"),
@@ -51,7 +51,7 @@ object GuineaPigServer {
         'script('src /= "/debug-console.js")
       )
     },
-    render = { implicit rc => {
+    render = {
       case state =>
         'body(
           'div("Super TODO tracker"),
@@ -142,7 +142,7 @@ object GuineaPigServer {
             state.log.map(s => 'div(s))
           )
         )
-    }},
+    },
     serverRouter = {
       ServerRouter(
         dynamic = (_, _) => Router(

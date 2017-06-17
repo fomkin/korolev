@@ -10,7 +10,7 @@ import scala.concurrent.Future
 object SimpleExample extends KorolevBlazeServer {
 
   import State.applicationContext._
-  import dsl._
+  import symbolDsl._
 
   // Handler to input
   val inputId = elementId
@@ -19,7 +19,7 @@ object SimpleExample extends KorolevBlazeServer {
   val service = blazeService[Future, State, Any] from KorolevServiceConfig [Future, State, Any] (
     serverRouter = ServerRouter.empty[Future, State],
     stateStorage = StateStorage.default(State()),
-    render = { implicit rc => {
+    render = {
       case state =>
         'body(
           'div("Super TODO tracker"),
@@ -29,8 +29,8 @@ object SimpleExample extends KorolevBlazeServer {
                 'div(
                   'input(
                     'type /= "checkbox",
-                    if (state.edit.nonEmpty) 'disabled else (),
-                    if (todo.done) 'checked else (),
+                    if (state.edit.nonEmpty) 'disabled /= "" else void,
+                    if (todo.done) 'checked /= "" else void,
                     // Generate transition when clicking checkboxes
                     event('click) {
                       immediateTransition { case tState =>
@@ -63,7 +63,7 @@ object SimpleExample extends KorolevBlazeServer {
                     )
                   } else {
                     'span(
-                      if (todo.done) 'style /= "text-decoration: line-through" else (),
+                      if (todo.done) 'style /= "text-decoration: line-through" else void,
                       todo.text,
                       event('dblclick) {
                         immediateTransition {
@@ -91,23 +91,23 @@ object SimpleExample extends KorolevBlazeServer {
               }
             },
             'input(
-              if (state.edit.nonEmpty) 'disabled else (),
+              if (state.edit.nonEmpty) 'disabled /= "" else void,
               inputId,
               'type /= "text",
               'placeholder /= "What should be done?"
             ),
             'button(
-              if (state.edit.nonEmpty) 'disabled else (),
+              if (state.edit.nonEmpty) 'disabled /= "" else void,
               "Add todo"
             )
           )
         )
-    }}
+    }
   )
 }
 
 case class State(
-  todos: Vector[State.Todo] = (0 to 2).toVector.map(i => State.Todo(s"This is TODO #$i", done = false)),
+  todos: Vector[State.Todo] = (0 to 20).toVector.map(i => State.Todo(s"This is TODO #$i", done = false)),
   edit: Option[Int] = None
 )
 
