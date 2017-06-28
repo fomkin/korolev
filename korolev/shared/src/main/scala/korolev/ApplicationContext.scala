@@ -3,26 +3,49 @@ package korolev
 import korolev.StateManager.Transition
 import korolev.util.Scheduler
 import korolev.Async.AsyncOps
+import levsha.{Document, TemplateDsl}
+import levsha.events.EventPhase
 
 import scala.concurrent.duration.FiniteDuration
 import scala.language.higherKinds
 
-class Effects[F[+_]: Async, S, M](implicit scheduler: Scheduler[F]) {
+class ApplicationContext[F[+_]: Async, S, M](implicit scheduler: Scheduler[F]) {
 
-  import Effects._
+  import ApplicationContext._
   import EventPhase._
 
-  type Event = Effects.Event[F, S, M]
+  type Effect = ApplicationContext.Effect[F, S, M]
+  type Event = ApplicationContext.Event[F, S, M]
   type EventFactory[T] = T => Event
   type Transition = StateManager.Transition[S]
+  type Render = PartialFunction[S, Document.Node[Effect]]
+  type ElementId = ApplicationContext.ElementId[F, S, M]
 
-  def elementId = new ElementId()
+  final class ExtendedTemplateDsl extends TemplateDsl[ApplicationContext.Effect[F, S, M]] {
+
+    type Document = levsha.Document[Effect]
+    type Node     = levsha.Document.Node[Effect]
+    type Attr     = levsha.Document.Attr[Effect]
+
+    @deprecated("Use Node instead of VDom", "0.4.0")
+    type VDom = Node
+
+    implicit final class KorolevSymbolOps(s: Symbol) {
+      def :=(value: String): Document.Attr[Effect] = Document.Attr { rc =>
+        rc.setAttr('^' + s.name.replaceAll("([A-Z]+)", "-$1").toLowerCase, value)
+      }
+    }
+  }
+
+  val symbolDsl = new ExtendedTemplateDsl()
+
+  def elementId = new ApplicationContext.ElementId[F, S, M]()
 
   /**
     * Schedules the [[transition]] with [[delay]]. For example it can be useful
     * when you want to hide something after timeout.
     */
-  def delay(delay: FiniteDuration)(transition: Transition): Delay[F, S] = new Delay[F, S] {
+  def delay(delay: FiniteDuration)(transition: Transition): Delay[F, S, M] = new Delay[F, S, M] {
 
     @volatile var _jobHandler = Option.empty[Scheduler.JobHandler[F, _]]
     @volatile var _finished = false
@@ -35,7 +58,7 @@ class Effects[F[+_]: Async, S, M](implicit scheduler: Scheduler[F]) {
       _jobHandler = Some {
         scheduler.scheduleOnce(delay) {
           _finished = true
-          applyTransition(transition).run()
+          applyTransition(transition).runIgnoreResult()
         }
       }
     }
@@ -65,7 +88,9 @@ class Effects[F[+_]: Async, S, M](implicit scheduler: Scheduler[F]) {
   def transition(t: Transition): Transition = t
 }
 
-object Effects {
+object ApplicationContext {
+
+  sealed abstract class Effect[F[+_]: Async, S, M]
 
   /**
     * @tparam F Monad
@@ -73,14 +98,15 @@ object Effects {
     * @tparam M Message
     */
   def apply[F[+_]: Async, S, M](implicit scheduler: Scheduler[F]) =
-    new Effects[F, S, M]()
+    new ApplicationContext[F, S, M]()
 
   abstract class Access[F[+_]: Async, S, M] {
 
     /**
       * Extracts property of element from client-side DOM.
+      *
       * @param propName Name of property. 'value for example
-      * @see [[Effects.elementId]]
+      * @see [[ApplicationContext.elementId]]
       * @example
       * {{{
       * eventWithAccess('click) { access =>
@@ -98,9 +124,9 @@ object Effects {
       * }
       * }}}
       */
-    def property[T](id: ElementId, propName: Symbol): F[T]
+    def property[T](id: ElementId[F, S, M], propName: Symbol): F[T]
 
-    def property[T](id: ElementId): PropertyHandler[F, T]
+    def property[T](id: ElementId[F, S, M]): PropertyHandler[F, T]
 
     /**
       * Publish message to environment
@@ -126,7 +152,7 @@ object Effects {
       * @param id form elementId
       * @return
       */
-    def downloadFormData(id: ElementId): FormDataDownloader[F, S]
+    def downloadFormData(id: ElementId[F, S, M]): FormDataDownloader[F, S]
   }
 
   abstract class PropertyHandler[F[+_]: Async, T] {
@@ -139,13 +165,13 @@ object Effects {
     def start(): F[FormData]
   }
 
-  sealed abstract class Delay[F[+_]: Async, S] extends VDom.Misc {
+  sealed abstract class Delay[F[+_]: Async, S, M] extends Effect[F, S, M] {
     def start(applyTransition: Transition[S] => F[Unit]): Unit
     def finished: Boolean
     def cancel(): Unit
   }
 
-  sealed abstract class Event[F[+_]: Async, S, M] extends VDom.Misc {
+  sealed abstract class Event[F[+_]: Async, S, M] extends Effect[F, S, M] {
     def `type`: Symbol
     def phase: EventPhase
   }
@@ -161,6 +187,6 @@ object Effects {
                                       effect: () => EventResult[F, S])
     extends Event[F, S, M]
 
-  class ElementId extends VDom.Misc
+  class ElementId[F[+_]: Async, S, M] extends Effect[F, S, M]
 
 }

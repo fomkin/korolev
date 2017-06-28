@@ -14,7 +14,8 @@ import scala.concurrent.Future
   */
 object JCacheExample extends KorolevBlazeServer {
 
-  import State.effects._
+  import State.applicationContext._
+  import State.applicationContext.symbolDsl._
 
   val storage = {
 
@@ -36,14 +37,16 @@ object JCacheExample extends KorolevBlazeServer {
 
   val service = blazeService[Future, State, Any] from KorolevServiceConfig [Future, State, Any] (
     stateStorage = storage,
-    head = 'head(
-      'title("Main Routing Page"),
-      'link(
-        'href /= "/main.css",
-        'rel /= "stylesheet",
-        'type /= "text/css"
+    head = {
+      Seq(
+        'title("Main Routing Page"),
+        'link(
+          'href /= "/main.css",
+          'rel /= "stylesheet",
+          'type /= "text/css"
+        )
       )
-    ),
+    },
     render = {
       case state =>
         'body(
@@ -148,7 +151,7 @@ case class State(
 )
 
 object State {
-  val effects = Effects[Future, State, Any]
+  val applicationContext = ApplicationContext[Future, State, Any]
   case class Todo(text: String, done: Boolean)
   object Todo {
     def apply(n: Int): Vector[Todo] = (0 to n).toVector map {

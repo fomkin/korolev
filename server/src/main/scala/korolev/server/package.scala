@@ -9,6 +9,7 @@ import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 import bridge.JSAccess
 import korolev.Async._
 import korolev.Korolev.MutableMapFactory
+import levsha.impl.{AbstractTextRenderContext, TextPrettyPrintingConfig}
 import slogging.LazyLogging
 
 import scala.collection.concurrent.TrieMap
@@ -54,18 +55,28 @@ package object server extends LazyLogging {
       val writeResultF = Async[F].flatMap(stateF)(config.stateStorage.write(deviceId, sessionId, _))
 
       Async[F].map(writeResultF) { state =>
-        val body = config.render(state)
-        val dom = 'html(
-          config.head.copy(children =
-            'script(bridgeJs) ::
-              'script(
-                s"var KorolevSessionId = '$sessionId';\n" +
-                s"var KorolevServerRootPath = '${config.serverRouter.rootPath}';\n" +
-                  korolevJs
-              ) ::
-            config.head.children),
-          body
+        val dsl = new levsha.TemplateDsl[ApplicationContext.Effect[F, S, M]]()
+        val textRenderContext = new AbstractTextRenderContext[ApplicationContext.Effect[F, S, M]]() {
+          val prettyPrinting = TextPrettyPrintingConfig.noPrettyPrinting
+        }
+        import dsl._
+
+        val document = 'html(
+          'head(
+            'script('language /= "javascript", bridgeJs),
+            'script('language /= "javascript",
+              s"var KorolevSessionId = '$sessionId';\n" +
+              s"var KorolevServerRootPath = '${config.serverRouter.rootPath}';\n" +
+              korolevJs
+            ),
+            config.head
+          ),
+          config.render(state)
         )
+
+        // Render document to textRenderContext
+        document(textRenderContext)
+
         Response.Http(
           status = Response.Status.Ok,
           headers = Seq(
@@ -73,7 +84,12 @@ package object server extends LazyLogging {
             "set-cookie" -> s"device=$deviceId"
           ),
           body = Some {
-            val html = "<!DOCTYPE html>" + dom.html
+            val sb = mutable.StringBuilder.newBuilder
+            val html = sb
+              .append("<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.1//EN\" \"http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd\">")
+              .append('\n')
+              .append(textRenderContext.builder)
+              .mkString
             val bytes = html.getBytes(StandardCharsets.UTF_8)
             new ByteArrayInputStream(bytes)
           }
@@ -279,7 +295,8 @@ package object server extends LazyLogging {
     val htmlContentType = "text/html"
     val binaryContentType = "application/octet-stream"
     val korolevJs = {
-      val classLoader = classOf[EventPropagation].getClassLoader
+      import scala.concurrent.Future
+      val classLoader = classOf[Korolev[Future, Any, Any]].getClassLoader
       val stream = classLoader.getResourceAsStream("korolev.js")
       Source.fromInputStream(stream).mkString
     }
@@ -290,4 +307,11 @@ package object server extends LazyLogging {
       Source.fromInputStream(stream).mkString
     }
   }
+
+  private final val OpOpen = 1
+  private final val OpClose = 2
+  private final val OpAttr = 3
+  private final val OpText = 4
+  private final val OpLastAttr = 5
+  private final val OpEnd = 6
 }

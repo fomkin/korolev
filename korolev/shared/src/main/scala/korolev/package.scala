@@ -1,12 +1,13 @@
 /**
   * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
   */
-package object korolev extends Shtml {
+package object korolev {
 
   // Routing API
   @inline val Root = Router.Root
   @inline val / = Router./
   type / = Router./
 
-  type Render[S] = PartialFunction[S, VDom.Node]
+  @deprecated("Use ApplicationContext instead of Effects", "0.4.0")
+  val Effects = ApplicationContext
 }

@@ -3,10 +3,13 @@ package korolev
 import java.util.concurrent.atomic.AtomicInteger
 
 import bridge.JSAccess
-import korolev.Effects.{Access, ElementId, FormDataDownloader, PropertyHandler}
+import korolev.ApplicationContext._
 import korolev.Async.{AsyncOps, Promise}
 import korolev.StateManager.Transition
-import korolev.util.AtomicReference
+import levsha.events.{EventId, calculateEventPropagation}
+import levsha.impl.DiffRenderContext
+import levsha.impl.DiffRenderContext.ChangesPerformer
+import levsha.{Id, Document}
 import slogging.LazyLogging
 
 import scala.collection.mutable
@@ -24,9 +27,6 @@ abstract class Korolev[F[+ _]: Async, S, M] {
   */
 object Korolev {
 
-  import VDom._
-  import Change._
-
   trait MutableMapFactory {
     def apply[K, V]: mutable.Map[K, V]
   }
@@ -39,16 +39,62 @@ object Korolev {
   def apply[F[+ _]: Async, S, M](sm: StateManager[F, S],
                                  ja: JSAccess[F],
                                  initialState: S,
-                                 render: Render[S],
+                                 render: PartialFunction[S, Document.Node[ApplicationContext.Effect[F, S, M]]],
                                  router: Router[F, S, S],
                                  messageHandler: PartialFunction[M, Unit],
                                  fromScratch: Boolean,
                                  createMutableMap: MutableMapFactory = defaultMutableMapFactory): Korolev[F, S, M] =
-    new Korolev[F, S, M] with EventPropagation with LazyLogging {
+    new Korolev[F, S, M] with LazyLogging {
 
-      // Public properties
-      val stateManager = sm
+      val async = Async[F]
+      implicit val er = Async.ErrorReporter(e => logger.error(e.getMessage, e))
+
+      def handleAsyncError(message: Throwable => String): (Try[_] => Unit) = {
+        case Failure(e) => logger.error(message(e), e)
+        case Success(_) => // do nothing
+      }
+
       val jsAccess = ja
+      val stateManager = sm
+      val client = {
+        // Prepare frontend
+        jsAccess.global.getAndSaveAs("Korolev", "@Korolev")
+        jsAccess.obj("@Korolev")
+      }
+      val effectsReactor = new EffectsReactor[F, S, M](
+        onStartDelay = delay => delay.start(stateManager),
+        onCancelDelay = delay => delay.cancel(),
+        onNewEventType = { `type` =>
+          val rpc = client.call("ListenEvent", `type`.name, false)
+          async.run(rpc)(handleAsyncError(_ => "Error occurred when invoking ListenEvent"))
+        }
+      )
+      val renderContext = DiffRenderContext[Effect[F, S, M]](onMisc = effectsReactor.miscCallback)
+      val renderer = render.lift
+      val changesPerformer = new ChangesPerformer {
+        private def isProp(name: String) = name.charAt(0) == '^'
+        private def escapeName(name: String, isProp: Boolean) =
+          if (isProp) name.substring(1) else name
+
+        def remove(id: Id): Unit =
+          client.call("Remove", id.parent.get.mkString, id.mkString).runIgnoreResult()
+        def createText(id: Id, text: String): Unit =
+          client.call("CreateText", id.parent.get.mkString, id.mkString, text).runIgnoreResult()
+        def create(id: Id, tag: String): Unit = {
+          val parent = id.parent.fold("0")(_.mkString)
+          client.call("Create", parent, id.mkString, tag).runIgnoreResult()
+        }
+        def setAttr(id: Id, name: String, value: String): Unit = {
+          val p = isProp(name)
+          val n = escapeName(name, p)
+          client.call("SetAttr", id.mkString, n, value, p).runIgnoreResult()
+        }
+        def removeAttr(id: Id, name: String): Unit = {
+          val p = isProp(name)
+          val n = escapeName(name, p)
+          client.call("RemoveAttr", id.mkString, n, p).runIgnoreResult()
+        }
+      }
 
       def resolveFormData(descriptor: String, formData: Try[FormData]): Unit = {
         formDataPromises.get(descriptor) foreach { promise =>
@@ -60,115 +106,48 @@ object Korolev {
         formDataPromises.remove(descriptor)
       }
 
-      def updateMisc(renderResult: VDom.Node): Unit = {
-        val misc = collectMisc(Id(0), renderResult)
-
-        events() = misc.collect {
-          case (id, event: Effects.Event[_, _, _]) =>
-            val typedEvent = event.asInstanceOf[Effects.Event[F, S, M]]
-            s"$id:${event.`type`.name}:${event.phase}" -> typedEvent
-        } toMap
-
-        delays() = {
-          // Remove finished delays
-          val actualDelays = delays() filter {
-            case (_, delay) => !delay.finished
-          } toMap
-          val updatedDelays = misc collect {
-            case (id, delay: Effects.Delay[_, _]) =>
-              actualDelays.get(id) match {
-                case None =>
-                  // This is new delays. Stat it
-                  val typedDelay = delay.asInstanceOf[Effects.Delay[F, S]]
-                  typedDelay.start(stateManager.apply)
-                  id -> typedDelay
-                case Some(typedDelay) =>
-                  // Return old delay
-                  id -> typedDelay
-              }
-          }
-          val updatedDelaysMap = updatedDelays.toMap
-          // Stop all non-finished delays
-          // which was removed from tree
-          actualDelays foreach {
-            case (id, delay) =>
-              if (!updatedDelaysMap.contains(id))
-                delay.cancel()
-          }
-          updatedDelays
-        }
-
-        events().values foreach { event =>
-          val `type` = event.`type`
-          if (!enabledEvents().contains(`type`)) {
-            enabledEvents.transform(_ + `type`)
-            Async[F].run(client.call("ListenEvent", `type`.name, false)) {
-              case Success(_) => // do nothing
-              case Failure(e) =>
-                logger.error("Error occurred when invoking ListenEvent", e)
-            }
-          }
-        }
-
-        elementIds() = misc.collect {
-          case (id, eId: Effects.ElementId) =>
-            eId -> id.toString
-        } toMap
-      }
-
-      // This event type should be listen on client side
-      val enabledEvents = AtomicReference(Set('submit))
-      val elementIds = AtomicReference(Map.empty[Effects.ElementId, String])
-      val events = AtomicReference(Map.empty[String, Effects.Event[F, S, M]])
-      val delays = AtomicReference(Seq.empty[(Id, Effects.Delay[F, S])])
       val currentRenderNum = new AtomicInteger(0)
       val formDataPromises = createMutableMap[String, Promise[F, FormData]]
       val formDataProgressTransitions = createMutableMap[String, (Int, Int) => Transition[S]]
-
-      val client = {
-        // Prepare frontend
-        jsAccess.global.getAndSaveAs("Korolev", "@Korolev")
-        jsAccess.obj("@Korolev")
-      }
 
       val browserAccess = new Access[F, S, M] {
 
         private def noElementException[T]: F[T] = {
           val exception = new Exception("No element matched for accessor")
-          Async[F].fromTry(Failure(exception))
+          async.fromTry(Failure(exception))
         }
 
-        def property[T](elementId: ElementId): PropertyHandler[F, T] = {
-          val idF = elementIds()
+        def property[T](elementId: ElementId[F, S, M]): PropertyHandler[F, T] = {
+          val idF = effectsReactor
+            .elements
             .get(elementId)
-            .fold(noElementException[String])(id => Async[F].pure(id))
+            .fold(noElementException[Id])(id => async.pure(id))
           new PropertyHandler[F, T] {
             def get(propName: Symbol): F[T] = idF flatMap { id =>
-              client.callAndFlush("ExtractProperty", id, propName.name)
+              client.callAndFlush("ExtractProperty", id.mkString, propName.name)
             }
             def set(propName: Symbol, value: T): F[Unit] = idF flatMap { id =>
-              client.callAndFlush("SetAttr", id, propName.name, value, true)
+              client.callAndFlush("SetAttr", id.mkString, propName.name, value, true)
             }
           }
         }
 
-        def property[T](id: ElementId, propName: Symbol): F[T] =
+        def property[T](id: ElementId[F, S, M], propName: Symbol): F[T] =
           property[T](id).get(propName)
 
-        def downloadFormData(eId: ElementId): FormDataDownloader[F, S] = new FormDataDownloader[F, S] {
+        def downloadFormData(eId: ElementId[F, S, M]): FormDataDownloader[F, S] = new FormDataDownloader[F, S] {
 
           val descriptor = Random.alphanumeric.take(5).mkString
 
-          def start(): F[FormData] = elementIds().get(eId) match {
+          def start(): F[FormData] = effectsReactor.elements.get(eId) match {
             case Some(id) =>
-              val promise = Async[F].promise[FormData]
+              val promise = async.promise[FormData]
               val future = client.call[Unit]("UploadForm", id, descriptor)
               formDataPromises.put(descriptor, promise)
               jsAccess.flush()
               future.flatMap(_ => promise.future)
             case None =>
-              Async[F].fromTry(
-                Failure(new Exception("No element matched for accessor")))
+              async.fromTry(Failure(new Exception("No element matched for accessor")))
           }
           def onProgress(f: (Int, Int) => Transition[S]): this.type = {
             formDataProgressTransitions.put(descriptor, f)
@@ -177,19 +156,19 @@ object Korolev {
         }
 
         def publish(message: M): F[Unit] = {
-          Async[F].pure(messageHandler(message))
+          async.pure(messageHandler(message))
         }
       }
 
-      val initialization = Async[F] sequence {
+      val initialization = async sequence {
         Seq(
           // History callback
           jsAccess.registerCallbackAndFlush[String] { pathString =>
             val path = Router.Path.fromString(pathString)
             val maybeState = router.toState.lift(stateManager.state, path)
             maybeState foreach { asyncState =>
-              val unit = Async[F].flatMap(asyncState)(stateManager.update)
-              Async[F].run(unit) {
+              val unit = async.flatMap(asyncState)(stateManager.update)
+              async.run(unit) {
                 case Success(_) => // do nothing
                 case Failure(e) =>
                   logger.error("Error occurred when updating state", e)
@@ -201,8 +180,24 @@ object Korolev {
           // Event callback
           jsAccess.registerCallbackAndFlush[String] { targetAndType =>
             val Array(renderNum, target, tpe) = targetAndType.split(':')
-            if (currentRenderNum.get == renderNum.toInt)
-              propagateEvent(events(), stateManager.apply, browserAccess, Id(target), tpe)
+            if (currentRenderNum.get == renderNum.toInt) {
+              calculateEventPropagation(Id(target), tpe) forall { eventId =>
+                val eventResultOpt = effectsReactor.events.get(eventId) map {
+                  case event: ApplicationContext.EventWithAccess[F, S, M] => event.effect(browserAccess)
+                  case event: ApplicationContext.SimpleEvent[F, S, M] => event.effect()
+                }
+                eventResultOpt.fold(true) { er =>
+                  List(er.it.map(async.pure(_)), er.dt).flatten.foreach { transitionF =>
+                    async.run(transitionF) {
+                      case Success(transition) => stateManager(transition).runIgnoreResult()
+                      case Failure(e) => logger.error("Exception during applying transition", e)
+                    }
+                  }
+                  !er.sp
+                }
+              }
+            }
+              //propagateEvent(events(), stateManager, browserAccess, Id(target), tpe)
           } flatMap { eventCallback =>
             client.callAndFlush[Unit]("RegisterGlobalEventHandler", eventCallback)
           },
@@ -216,51 +211,43 @@ object Korolev {
             client.callAndFlush[Unit]("RegisterFormDataProgressHandler", callback)
           },
           client.callAndFlush[Unit]("SetRenderNum", 0),
-          if (fromScratch) client.callAndFlush("CleanRoot") else Async[F].unit
+          if (fromScratch) client.callAndFlush("CleanRoot") else async.unit
         )
       }
 
-      Async[F].run(initialization) {
+      async.run(initialization) {
         case Success(_) =>
           logger.trace("Korolev initialization complete")
-          val renderOpt = render.lift
+          // Perform initial rendering 
+          if (fromScratch) {
+            renderContext.openNode("body")
+            renderContext.closeNode("body")
+          } else {
+            renderer(initialState) match {
+              case Some(node) => node(renderContext)
+              case None =>
+                logger.error("Rendering function is not defined for initial state")
+              // TODO need shutdown hook
+            }
+          }
+          renderContext.diff(DiffRenderContext.DummyChangesPerformer)
 
-          @volatile var lastRender =
-            if (fromScratch) VDom.Node("body", Nil, Nil, Nil)
-            else renderOpt(initialState).get
-
-          updateMisc(lastRender)
-
-          val onState: S => Unit = { state =>
+          val onState: (S => Unit) = { state =>
             // Set page url if router exists
             router.fromState
               .lift(state)
               .foreach(path => client.call("ChangePageUrl", path.toString))
-
-            renderOpt(state) match {
-              case Some(newRender) =>
-                val changes = VDom.changes(lastRender, newRender)
-                updateMisc(newRender)
-                lastRender = newRender
-
-                changes foreach {
-                  case Create(id, childId, tag) =>
-                    client.call("Create", id.toString, childId.toString, tag)
-                  case CreateText(id, childId, text) =>
-                    client.call("CreateText", id.toString, childId.toString, text)
-                  case Remove(id, childId) =>
-                    client.call("Remove", id.toString, childId.toString)
-                  case SetAttr(id, name, value, isProperty) =>
-                    client.call("SetAttr", id.toString, name, value, isProperty)
-                  case RemoveAttr(id, name, isProperty) =>
-                    client.call("RemoveAttr", id.toString, name, isProperty)
-                  case _ =>
-                }
+            // Perform rendering
+            renderContext.swap()
+            renderer(state) match {
+              case Some(node) =>
+                // Perform changes only when renderer for state is defined
+                node(renderContext)
+                renderContext.diff(changesPerformer)
               case None =>
-                logger.warn(
-                  s"Render is nod defined for ${state.getClass.getSimpleName}")
+                logger.warn(s"Render is not defined for ${state.getClass.getSimpleName}")
             }
-            client.call("SetRenderNum", currentRenderNum.incrementAndGet())
+            client.call("SetRenderNum", currentRenderNum.incrementAndGet()).runIgnoreResult()
             jsAccess.flush()
           }
 
@@ -271,4 +258,60 @@ object Korolev {
           logger.error("Error occurred on event callback registration", e)
       }
     }
+
+  private class EffectsReactor[F[+ _]: Async, S, M](
+    onNewEventType: Symbol => Unit,
+    onStartDelay: ApplicationContext.Delay[F, S, M] => Unit,
+    onCancelDelay: ApplicationContext.Delay[F, S, M] => Unit) {
+
+    val knownEventTypes = mutable.Set('submit)
+    val markedDelays    = mutable.Set.empty[Id] // Set of the delays which are should survive
+    val elements        = mutable.Map.empty[ApplicationContext.ElementId[F, S, M], Id]
+    val events          = mutable.Map.empty[EventId, ApplicationContext.Event[F, S, M]]
+    val delays          = mutable.Map.empty[Id, ApplicationContext.Delay[F, S, M]]
+
+    def miscCallback(id: Id, effect: Effect[F, S, M]): Unit = this.synchronized {
+      effect match {
+        case event: ApplicationContext.Event[F, S, M] =>
+          events.put(EventId(id, event.`type`.name, event.phase), event)
+          if (!knownEventTypes.contains(event.`type`)) {
+            knownEventTypes += event.`type`
+            onNewEventType(event.`type`)
+          }
+        case delay: ApplicationContext.Delay[F, S, M] =>
+          markedDelays += id
+          if (!delays.contains(id)) {
+            delays.put(id, delay)
+            onStartDelay(delay)
+          }
+        case element: ApplicationContext.ElementId[F, S, M] =>
+          elements.put(element, id)
+      }
+    }
+
+    /** Should be invoked before rendering */
+    def prepare(): Unit = {
+      markedDelays.clear()
+      elements.clear()
+      events.clear()
+      // Remove only finished delays
+      delays foreach {
+        case (id, delay) =>
+          if (delay.finished)
+            delays.remove(id)
+      }
+    }
+
+    /** Remove all delays which was not marked during rendering */
+    def cancelObsoleteDelays(): Unit = {
+      delays foreach {
+        case (id, delay) =>
+          if (!markedDelays.contains(id)) {
+            delays.remove(id)
+            onCancelDelay(delay)
+          }
+      }
+    }
+  }
+
 }

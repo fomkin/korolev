@@ -1,5 +1,4 @@
 import bridge.JSAccess
-import korolev.Effects.Event
 import korolev._
 import org.scalatest.{FlatSpec, Matchers}
 import korolev.Async.Promise
@@ -13,8 +12,8 @@ import korolev.testExecution._
   */
 class Issue14Spec extends FlatSpec with Matchers {
 
-  val ba = Effects[Future, Issue14Spec.S, Any]
-  import ba._
+  import Issue14Spec.applicationContext._
+  import Issue14Spec.applicationContext.symbolDsl._
 
   "Korolev" should "ignore events from outdated DOM" in {
 
@@ -34,35 +33,33 @@ class Issue14Spec extends FlatSpec with Matchers {
       fromScratch = true,
       router = Router.empty[Future, String, String],
       messageHandler = PartialFunction.empty,
-      render = Issue14Spec.render(
-        firstEvent = event('mousedown) {
-          immediateTransition { case _ =>
-            counter += 1
-            "secondState"
+      render = {
+        Issue14Spec.render(
+          firstEvent = event('mousedown) {
+            immediateTransition { case _ =>
+              counter += 1
+              "secondState"
+            }
+          },
+          secondEvent = event('click) {
+            immediateTransition { case _ =>
+              counter += 1
+              "firstState"
+            }
           }
-        },
-        secondEvent = event('click) {
-          immediateTransition { case _ =>
-            counter += 1
-            "firstState"
-          }
-        }
-      )
+        )
+      }
     )
 
     jSAccess.resolvePromise(0, isSuccess = true, "@obj:@Korolev")
     jSAccess.resolvePromise(1, isSuccess = true, "@obj:^cb0") // pop state handler
     jSAccess.resolvePromise(2, isSuccess = true, "@obj:^cb1") // event handler
     jSAccess.resolvePromise(3, isSuccess = true, "@obj:^cb2") // FormData progress handler
-    jSAccess.resolvePromise(4, isSuccess = true, "@unit")
-    jSAccess.resolvePromise(5, isSuccess = true, "@unit")
-    jSAccess.resolvePromise(6, isSuccess = true, "@unit")
-    jSAccess.resolvePromise(7, isSuccess = true, "@unit")
-    jSAccess.resolvePromise(8, isSuccess = true, "@unit")
+    for (i <- 4 to 15) jSAccess.resolvePromise(i, isSuccess = true, "@unit")
 
-    jSAccess.fireCallback("^cb1", "1:0_1_0:mousedown")
-    jSAccess.fireCallback("^cb1", "1:0_1_0:mouseup")
-    jSAccess.fireCallback("^cb1", "1:0_1_0:click")
+    jSAccess.fireCallback("^cb1", "1:1_2_1:mousedown")
+    jSAccess.fireCallback("^cb1", "1:1_2_1:mouseup")
+    jSAccess.fireCallback("^cb1", "1:1_2_1:click")
 
     counter should be (1)
   }
@@ -72,16 +69,21 @@ object Issue14Spec {
 
   type S = String
 
-  def render(firstEvent: Event[Future, S, Any], secondEvent: Event[Future, S, Any]): Render[S] = {
+  val applicationContext = ApplicationContext[Future, Issue14Spec.S, Any]
+
+  import applicationContext._
+  import applicationContext.symbolDsl._
+
+  def render(firstEvent: Event, secondEvent: Event): Render = {
     case "firstState" =>
-      'div(
+      'body(
         'div("Hello"),
         'div(
           'button("Click me", firstEvent)
         )
       )
     case "secondState" =>
-      'div(
+      'body(
         'div("Hello"),
         'ul(
           'li("One", secondEvent),

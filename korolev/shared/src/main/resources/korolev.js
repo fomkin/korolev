@@ -33,15 +33,15 @@
           var children = node.childNodes;
           for (var i = 0; i < children.length; i++) {
             var child = children[i];
-            var id = prefix + '_' + i;
+            var id = prefix + '_' + (i + 1);
             child.vId = id;
             els[id] = child;
             aux(id, child);
           }
         }
         root = rootNode;
-        els = { "0": rootNode };
-        aux("0", rootNode);
+        els = { "1": rootNode };
+        aux("1", rootNode);
       },
       CleanRoot: function() {
         while (root.children.length > 0)

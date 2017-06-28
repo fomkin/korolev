@@ -11,9 +11,10 @@ import scala.concurrent.duration._
   */
 object DelayExample extends KorolevBlazeServer {
 
-  val effects = Effects[Future, Boolean, Any]
+  val applicationContext = ApplicationContext[Future, Boolean, Any]
 
-  import effects._
+  import applicationContext._
+  import symbolDsl._
 
   val service = blazeService[Future, Boolean, Any] from KorolevServiceConfig[Future, Boolean, Any](
     stateStorage = StateStorage.default(false),
