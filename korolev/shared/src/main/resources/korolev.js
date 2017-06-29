@@ -177,10 +177,12 @@
     var deviceId = getCookie('device');
     var root = global.document.body;
     var loc = global.location;
+    var connectionType = null;
 
     global.Korolev.RegisterRoot(root);
 
     function initializeBridgeWs() {    
+      connectionType = "ws";
       var uri, ws;
       if (loc.protocol === "https:") uri = "wss://";
       else uri = "ws://";
@@ -202,6 +204,7 @@
     }
 
     function initializeBridgeLongPolling() {
+      connectionType = "lp";
       var uriPrefix = loc.protocol + "//" + loc.host + KorolevServerRootPath +
         'bridge/long-polling' +
         '/' + deviceId +
@@ -214,50 +217,72 @@
         var request = new XMLHttpRequest();
         request.addEventListener('readystatechange', function() {
           if (request.readyState === 4) {
+            var event = null;
             switch (request.status) {
               case 200:
                 if (firstTime) {
-                  var event = document.createEvent('HTMLEvents');
-                  event.initEvent('open');
+                  if (typeof window.Event === "function") {
+                    event = new Event('open');
+                  } else {
+                    event = document.createEvent('Event');
+                    event.initEvent('open', false, false);
+                  }
                   target.dispatchEvent(event);
                 }
-
-                var event = document.createEvent('MessageEvent');
-                event.initMessageEvent('message', true, false, request.responseText);
+                if (typeof window.MessageEvent === "function") {
+                  event = new MessageEvent('message', { 'data': request.responseText });
+                } else {
+                  event = document.createEvent('MessageEvent');
+                  event.initMessageEvent('message', true, false, request.responseText, uriPrefix, "", window);
+                }
                 target.dispatchEvent(event);
+                lpSubscribe(target, false);
                 break;
               case 410:
-                var event = document.createEvent('HTMLEvents');
-                event.initEvent('close');
+                if (typeof window.Event === "function") {
+                  event = new Event('close');
+                } else {
+                  event = document.createEvent('Event');
+                  event.initEvent('close', false, false);
+                }
                 target.dispatchEvent(event);
                 break;
               case 400:
-                var event = document.createEvent('HTMLEvents');
-                event.initErrorEvent('error', {
-                  error: new Error(request.responseText),
-                  message: request.responseText
-                });
+                if (typeof window.ErrorEvent === "function") {
+                  event = new ErrorEvent('error', {
+                    error: new Error(request.responseText),
+                    message: request.responseText
+                  });
+                } else {
+                  event = document.createEvent('Event');
+                  event.initEvent('error', false, false);
+                }
                 target.dispatchEvent(event);
                 break;
             }
-            lpSubscribe(target);
           }
         });
+//        console.log("Polling from " + uriPrefix + 'subscribe');
         request.open('GET', uriPrefix + 'subscribe', true);
-        request.send(null);
+        request.send('');
       }
 
       function lpPublish(target, message) {
         var request = new XMLHttpRequest();
         request.addEventListener('readystatechange', function() {
           if (request.readyState === 4) {
+            var event = null;
             switch (request.status) {
               case 400:
-                var event = document.createEvent('HTMLEvents');
-                event.initErrorEvent('error', {
-                  error: new Error(request.responseText),
-                  message: request.responseText
-                });
+                if (typeof window.ErrorEvent === "function") {
+                  event = new ErrorEvent('error', {
+                    error: new Error(request.responseText),
+                    message: request.responseText
+                  });
+                } else {
+                  event = document.createEvent('Event');
+                  event.initEvent('error', false, false);
+                }
                 target.dispatchEvent(event);
                 break;
             }
@@ -291,7 +316,8 @@
       Korolev.UnregisterGlobalEventHandler();
       Korolev.UnregisterHistoryHandler();
       console.log("Connection closed. Global event handler us unregistered. Try to reconnect.");
-      initializeBridgeWs();
+      if (connectionType == "ws") setTimeout(initializeBridgeLongPolling, 2000);
+      else setTimeout(initializeBridgeWs, 2000);
     }
 
     if (window.WebSocket === undefined)

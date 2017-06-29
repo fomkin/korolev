@@ -14,7 +14,7 @@ package object gp {
     ),
     Caps(DesiredCapabilities.internetExplorer _)(
       "platform" -> "Windows 7",
-      "version" -> "9.0"
+      "version" -> "10.0"
     ),
     Caps(DesiredCapabilities.internetExplorer _)(
       "platform" -> "Windows 7",
