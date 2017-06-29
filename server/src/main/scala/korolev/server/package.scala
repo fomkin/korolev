@@ -253,7 +253,14 @@ package object server extends LazyLogging {
           case Some(x) => Async[F].pure(x)
           case None => createSession(deviceId, sessionId)
         }
-        sessionAsync.flatMap(_.nextMessage.map(Response.Http(Response.Status.Ok, _))) recover {
+        sessionAsync.flatMap { session =>
+          session.nextMessage.map { message =>
+            Response.Http(Response.Status.Ok,
+              body = Some(new ByteArrayInputStream(message.getBytes(StandardCharsets.UTF_8))),
+              headers = Seq("Cache-Control" -> "no-cache")
+            )
+          }
+        } recover {
           case _: SessionDestroyedException =>
             Response.Http(Response.Status.Gone, "Session has been destroyed")
         }
