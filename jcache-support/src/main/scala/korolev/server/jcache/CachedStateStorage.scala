@@ -49,15 +49,9 @@ final class CachedStateStorage[F[+_]: Async, T](cache: Cache[String, T], initial
   def initial(deviceId: DeviceId): F[T] =
     initialState(deviceId)
 
-  def read(deviceId: DeviceId, sessionId: SessionId): F[T] = {
-    val valueOpt = Async[F] fork {
-      val key = deviceId + sessionId
-      Option(cache.get(key))
-    }
-    valueOpt flatMap {
-      case Some(value) => Async[F].pure(value)
-      case None => initialState(deviceId)
-    }
+  def read(deviceId: DeviceId, sessionId: SessionId): F[Option[T]] = Async[F] fork {
+    val key = deviceId + sessionId
+    Option(cache.get(key))
   }
 
   def write(deviceId: DeviceId, sessionId: SessionId, value: T): F[T] = Async[F] fork {

@@ -21,11 +21,9 @@ abstract class StateStorage[F[+_]: Async, T] {
 
   /**
     * Restore session from storage on initialize a new one
-    * @return Future with result if session
-    *         already exists or future
-    *         with None with if doesn't
+    * @return Future with result if session already exists
     */
-  def read(deviceId: DeviceId, sessionId: SessionId): F[T]
+  def read(deviceId: DeviceId, sessionId: SessionId): F[Option[T]]
 
   /**
     * Save session to storage
@@ -51,8 +49,8 @@ object StateStorage {
 
     val storage = TrieMap.empty[String, T]
 
-    def read(deviceId: DeviceId, sessionId: SessionId): F[T] = {
-      val state = storage.getOrElseUpdate(deviceId + sessionId, initialState)
+    def read(deviceId: DeviceId, sessionId: SessionId): F[Option[T]] = {
+      val state = storage.get(deviceId + sessionId)
       Async[F].pure(state)
     }
 
@@ -85,16 +83,15 @@ object StateStorage {
     */
   def forDeviceId[F[+_]: Async, T](initialState: DeviceId => F[T]): StateStorage[F, T] = new StateStorage[F, T] {
 
-    val storage = TrieMap.empty[String, F[T]]
+    val storage = TrieMap.empty[String, T]
 
-    def read(deviceId: DeviceId, sessionId: SessionId): F[T] = {
-      storage.getOrElseUpdate(deviceId + sessionId, initialState(deviceId))
+    def read(deviceId: DeviceId, sessionId: SessionId): F[Option[T]] = {
+      Async[F].pure(storage.get(deviceId + sessionId))
     }
 
     def write(deviceId: String, sessionId: String, value: T): F[T] = {
-      val valueF = Async[F].pure(value)
-      storage.put(deviceId + sessionId, valueF)
-      valueF
+      storage.put(deviceId + sessionId, value)
+      Async[F].pure(value)
     }
 
     def initial(deviceId: String): F[T] = initialState(deviceId)
