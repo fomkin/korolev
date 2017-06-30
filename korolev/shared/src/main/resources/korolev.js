@@ -1,6 +1,7 @@
 (function(global) {
 
-  var ReconnectTimeout = 2000;
+  var MinReconnectTimeout = 50;
+  var MaxReconnectTimeout = 5000;
 
   global.Korolev = (function() {
     var root = null,
@@ -180,6 +181,8 @@
     var root = global.document.body;
     var loc = global.location;
     var connectionType = null;
+    var selectedConnectionType = null;
+    var reconnectTimeout = MinReconnectTimeout;
 
     global.Korolev.RegisterRoot(root);
 
@@ -203,11 +206,7 @@
       global.Korolev.connection = ws;
 
       Bridge.webSocket(ws, function(res, err) {
-        if (err) {
-          Korolev.UnregisterGlobalEventHandler();
-          Korolev.UnregisterHistoryHandler();
-          setTimeout(initializeBridgeLongPolling, 1);
-        }
+        if (err) reconnect()
       });
 
     }
@@ -327,29 +326,37 @@
       }
       fakeWs.addEventListener('open', onOpen);
       Bridge.webSocket(fakeWs, function(resolve, err) {
-        if (err) {
-          Korolev.UnregisterGlobalEventHandler();
-          Korolev.UnregisterHistoryHandler();
-          setTimeout(initializeBridgeLongPolling, ReconnectTimeout);
-        }
+        if (err) reconnect()
       });
       lpSubscribe(fakeWs, true);
     }
 
+    function reconnect() {
+      Korolev.UnregisterGlobalEventHandler();
+      Korolev.UnregisterHistoryHandler();
+      console.log("Connection closed. Global event handler us unregistered. Try to reconnect.");
+      if (selectedConnectionType == 'ws') {
+        setTimeout(initializeBridgeWs, reconnectTimeout);
+      }
+      else {
+        if (connectionType == 'ws') setTimeout(initializeBridgeLongPolling, reconnectTimeout);
+        else setTimeout(initializeBridgeWs, reconnectTimeout);
+      }
+      reconnectTimeout = Math.min(reconnectTimeout * 2, MaxReconnectTimeout);
+    }
+
     function onOpen(event) {
       console.log("Connection opened.");
+      selectedConnectionType = connectionType;
+      reconnectTimeout = MinReconnectTimeout;
       event.target.addEventListener('close', onClose);
     }
 
     function onClose(event) {
-      Korolev.UnregisterGlobalEventHandler();
-      Korolev.UnregisterHistoryHandler();
-      console.log("Connection closed. Global event handler us unregistered. Try to reconnect.");
-      if (connectionType == "ws") setTimeout(initializeBridgeWs, ReconnectTimeout);
-      else setTimeout(initializeBridgeLongPolling, ReconnectTimeout);
+      reconnect()
     }
 
-    // First attempt is always should be done using WebSocket
+    // First attempt is always should be done using WebSocket    
     initializeBridgeWs();
   });
 
