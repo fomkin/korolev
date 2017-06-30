@@ -143,7 +143,10 @@ package object server extends LazyLogging {
       }
 
       // Session storage access
-      Async[F].map(config.stateStorage.read(deviceId, sessionId)) { state =>
+      config.stateStorage.read(deviceId, sessionId) flatMap {
+        case Some(state) => Async[F].pure((false, state))
+        case None => config.stateStorage.initial(deviceId).map(state => (true, state))
+      } map { case (isNew, state) =>
 
         // Create Korolev with dynamic router
         val dux = StateManager[F, S](state)
@@ -153,7 +156,7 @@ package object server extends LazyLogging {
           def apply[K, V]: mutable.Map[K, V] = TrieMap.empty[K, V]
         }
         val korolev = Korolev(
-          dux, jsAccess, state, config.render, router, env.onMessage, fromScratch = false,
+          dux, jsAccess, state, config.render, router, env.onMessage, fromScratch = isNew,
           createMutableMap = trieMapFactory
         )
         // Subscribe on state updates an push them to storage

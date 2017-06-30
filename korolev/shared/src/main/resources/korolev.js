@@ -1,5 +1,8 @@
 (function(global) {
 
+  var MinReconnectTimeout = 50;
+  var MaxReconnectTimeout = 5000;
+
   global.Korolev = (function() {
     var root = null,
       els = null,
@@ -178,10 +181,17 @@
     var root = global.document.body;
     var loc = global.location;
     var connectionType = null;
+    var selectedConnectionType = null;
+    var reconnectTimeout = MinReconnectTimeout;
 
     global.Korolev.RegisterRoot(root);
 
-    function initializeBridgeWs() {    
+    function initializeBridgeWs() {
+      // When WebSocket is not supported always use Long Polling
+      if (window.WebSocket === undefined) {
+        initializeBridgeLongPolling();
+        return;
+      }
       connectionType = "ws";
       var uri, ws;
       if (loc.protocol === "https:") uri = "wss://";
@@ -196,9 +206,7 @@
       global.Korolev.connection = ws;
 
       Bridge.webSocket(ws, function(res, err) {
-        if (err) {
-          setTimeout(initializeBridgeLongPolling, 1);
-        }
+        if (err) reconnect()
       });
 
     }
@@ -259,6 +267,19 @@
                 }
                 target.dispatchEvent(event);
                 break;
+              default:
+                if (typeof window.ErrorEvent === "function") {
+                var message = "Unknown error"
+                  event = new ErrorEvent('error', {
+                    error: new Error(message),
+                    message: message
+                  });
+                } else {
+                  event = document.createEvent('Event');
+                  event.initEvent('error', false, false);
+                }
+                target.dispatchEvent(event);
+                break;
             }
           }
         });
@@ -273,6 +294,7 @@
           if (request.readyState === 4) {
             var event = null;
             switch (request.status) {
+              case 0:
               case 400:
                 if (typeof window.ErrorEvent === "function") {
                   event = new ErrorEvent('error', {
@@ -295,34 +317,47 @@
 
       var fakeWs = global.document.createDocumentFragment()
       global.Korolev.connection = fakeWs;
+      fakeWs.close = function() {
+        event = new Event('close');
+        fakeWs.dispatchEvent(event);
+      }
       fakeWs.send = function(message) {
         lpPublish(fakeWs, message);
       }
       fakeWs.addEventListener('open', onOpen);
       Bridge.webSocket(fakeWs, function(resolve, err) {
-        if (err) {
-          setTimeout(initializeBridgeWs, 2000);
-        }
+        if (err) reconnect()
       });
       lpSubscribe(fakeWs, true);
     }
 
+    function reconnect() {
+      Korolev.UnregisterGlobalEventHandler();
+      Korolev.UnregisterHistoryHandler();
+      console.log("Connection closed. Global event handler us unregistered. Try to reconnect.");
+      if (selectedConnectionType == 'ws') {
+        setTimeout(initializeBridgeWs, reconnectTimeout);
+      }
+      else {
+        if (connectionType == 'ws') setTimeout(initializeBridgeLongPolling, reconnectTimeout);
+        else setTimeout(initializeBridgeWs, reconnectTimeout);
+      }
+      reconnectTimeout = Math.min(reconnectTimeout * 2, MaxReconnectTimeout);
+    }
+
     function onOpen(event) {
       console.log("Connection opened.");
+      selectedConnectionType = connectionType;
+      reconnectTimeout = MinReconnectTimeout;
       event.target.addEventListener('close', onClose);
     }
 
     function onClose(event) {
-      Korolev.UnregisterGlobalEventHandler();
-      Korolev.UnregisterHistoryHandler();
-      console.log("Connection closed. Global event handler us unregistered. Try to reconnect.");
-      if (connectionType == "ws") setTimeout(initializeBridgeLongPolling, 2000);
-      else setTimeout(initializeBridgeWs, 2000);
+      reconnect()
     }
 
-    if (window.WebSocket === undefined)
-      initializeBridgeLongPolling();
-    else initializeBridgeWs();
+    // First attempt is always should be done using WebSocket    
+    initializeBridgeWs();
   });
 
   function getCookie(name) {
