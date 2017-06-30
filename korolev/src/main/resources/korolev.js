@@ -1,6 +1,6 @@
 (function(global) {
 
-  var MinReconnectTimeout = 50;
+  var MinReconnectTimeout = 200;
   var MaxReconnectTimeout = 5000;
 
   global.Korolev = (function() {
