@@ -10,7 +10,8 @@ import scala.concurrent.Future
   */
 object GameOfLife extends KorolevBlazeServer {
 
-  import Universe.effects._
+  import Universe.applicationContext._
+  import Universe.applicationContext.symbolDsl._
 
   val universeSize = 20
   val cellRadius = 10
@@ -131,7 +132,7 @@ case class Universe(cells: Vector[Universe.Cell], size: Int) {
 
 object Universe {
 
-  val effects = Effects[Future, Universe, Any]
+  val applicationContext = ApplicationContext[Future, Universe, Any]
 
   case class Cell(x: Int, y: Int, alive: Boolean)
 

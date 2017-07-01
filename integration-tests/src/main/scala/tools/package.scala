@@ -2,7 +2,7 @@
 import java.net.URL
 import java.util.concurrent.Executors
 
-import org.openqa.selenium.WebDriver
+import org.openqa.selenium.{JavascriptExecutor, WebDriver, WebElement}
 import org.openqa.selenium.remote.RemoteWebDriver
 import org.slf4j.LoggerFactory
 
@@ -26,7 +26,7 @@ package object tools {
 
     // Sauce labs give us 5 parallel sessions
     implicit val defaultExecutor = ExecutionContext.
-      fromExecutorService(Executors.newWorkStealingPool(5))
+      fromExecutorService(Executors.newWorkStealingPool(2))
 
     val username = System.getenv("SAUCE_USERNAME")
     val accessKey = System.getenv("SAUCE_ACCESS_KEY")
@@ -105,5 +105,13 @@ package object tools {
 
   def sleep(duration: FiniteDuration): Unit = {
     Thread.sleep(duration.toMillis)
+  }
+
+  implicit final class WebElementOps(val el: WebElement) extends AnyVal {
+    def scrollTo()(implicit webDriver: WebDriver): Unit = webDriver match {
+      case executor: JavascriptExecutor =>
+        executor.executeScript("arguments[0].scrollIntoView(true);", el);
+      case _ => throw new UnsupportedOperationException("WebDriver is not javascript executor")
+    }
   }
 }

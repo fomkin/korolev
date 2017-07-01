@@ -10,40 +10,43 @@ import scala.concurrent.Future
   */
 object RoutingExample extends KorolevBlazeServer {
 
-  import State.effects._
+  import State.applicationContext._
+  import symbolDsl._
 
   val storage = StateStorage.default[Future, State](State())
   val inputId = elementId
 
   val service = blazeService[Future, State, Any] from KorolevServiceConfig [Future, State, Any] (
     stateStorage = storage,
-    head = 'head(
-      'title("Main Routing Page"),
-      'link(
-        'href /= "/main.css",
-        'rel /= "stylesheet",
-        'type /= "text/css"
+    head = {
+      Seq(
+        'title("Main Routing Page"),
+        'link(
+          'href /= "/main.css",
+          'rel /= "stylesheet",
+          'type /= "text/css"
+        )
       )
-    ),
+    },
     render = {
       case state =>
-        'body(
-          'div("Super TODO tracker"),
-          'div(
+        'body (
+          'div ("Super TODO tracker"),
+          'div (
             state.todos.keys map { name =>
-              'span(
+              'span (
                 event('click) {
                   immediateTransition { case s =>
                     s.copy(selectedTab = name)
                   }
                 },
                 'style /= "margin-left: 10px",
-                if (name == state.selectedTab) 'strong(name)
+                if (name == state.selectedTab) 'strong (name)
                 else name
               )
             }
           ),
-          'div('class /= "todos",
+          'div ('class /= "todos",
             (state.todos(state.selectedTab) zipWithIndex) map {
               case (todo, i) =>
                 'div(
@@ -66,7 +69,7 @@ object RoutingExample extends KorolevBlazeServer {
                 )
             }
           ),
-          'form(
+          'form (
             // Generate AddTodo action when 'Add' button clicked
             eventWithAccess('submit) { access =>
               deferredTransition {
@@ -78,12 +81,12 @@ object RoutingExample extends KorolevBlazeServer {
                 }
               }
             },
-            'input(
+            'input (
               inputId,
               'type /= "text",
               'placeholder /= "What should be done?"
             ),
-            'button("Add todo")
+            'button ("Add todo")
           )
         )
     },
@@ -129,7 +132,7 @@ case class State(
 )
 
 object State {
-  val effects = Effects[Future, State, Any]
+  val applicationContext = ApplicationContext[Future, State, Any]
   case class Todo(text: String, done: Boolean)
   object Todo {
     def apply(n: Int): Vector[Todo] = (0 to n).toVector map {

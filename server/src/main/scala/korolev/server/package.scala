@@ -9,6 +9,7 @@ import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 import bridge.JSAccess
 import korolev.Async._
 import korolev.Korolev.MutableMapFactory
+import levsha.impl.{AbstractTextRenderContext, TextPrettyPrintingConfig}
 import slogging.LazyLogging
 
 import scala.collection.concurrent.TrieMap
@@ -54,18 +55,35 @@ package object server extends LazyLogging {
       val writeResultF = Async[F].flatMap(stateF)(config.stateStorage.write(deviceId, sessionId, _))
 
       Async[F].map(writeResultF) { state =>
-        val body = config.render(state)
-        val dom = 'html(
-          config.head.copy(children =
-            'script(bridgeJs) ::
-              'script(
-                s"var KorolevSessionId = '$sessionId';\n" +
-                s"var KorolevServerRootPath = '${config.serverRouter.rootPath}';\n" +
-                  korolevJs
-              ) ::
-            config.head.children),
-          body
+        val dsl = new levsha.TemplateDsl[ApplicationContext.Effect[F, S, M]]()
+        def createTextRenderContext() = new AbstractTextRenderContext[ApplicationContext.Effect[F, S, M]]() {
+          val prettyPrinting = TextPrettyPrintingConfig.noPrettyPrinting
+        }
+        val textRenderContext = createTextRenderContext()
+        import dsl._
+
+        val document = 'html(
+          'head(
+            'script('language /= "javascript", bridgeJs),
+            'script('language /= "javascript",
+              s"""var KorolevSessionId = '$sessionId';
+                 |var KorolevServerRootPath = '${config.serverRouter.rootPath}';
+                 |var KorolevConnectionLostWidget = '${
+                   val textRenderContext = createTextRenderContext()
+                   config.connectionLostWidget(textRenderContext)
+                   textRenderContext.mkString
+                 }';
+              """.stripMargin,
+              korolevJs
+            ),
+            config.head
+          ),
+          config.render(state)
         )
+
+        // Render document to textRenderContext
+        document(textRenderContext)
+
         Response.Http(
           status = Response.Status.Ok,
           headers = Seq(
@@ -73,7 +91,12 @@ package object server extends LazyLogging {
             "set-cookie" -> s"device=$deviceId"
           ),
           body = Some {
-            val html = "<!DOCTYPE html>" + dom.html
+            val sb = mutable.StringBuilder.newBuilder
+            val html = sb
+              .append("<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.1//EN\" \"http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd\">")
+              .append('\n')
+              .append(textRenderContext.builder)
+              .mkString
             val bytes = html.getBytes(StandardCharsets.UTF_8)
             new ByteArrayInputStream(bytes)
           }
@@ -104,13 +127,13 @@ package object server extends LazyLogging {
 
     def deviceFromRequest(request: Request): (Boolean, String) = {
       request.cookie("device") match {
-        case None => true -> UUID.randomUUID().toString
+        case None => true -> Random.alphanumeric.take(16).mkString
         case Some(deviceId) => false -> deviceId
       }
     }
 
     def makeSessionKey(deviceId: String, sessionId: String): String =
-      s"${deviceId}_$sessionId"
+      s"$deviceId-$sessionId"
 
     def createSession(deviceId: String, sessionId: String): F[KorolevSession[F]] = {
 
@@ -127,7 +150,10 @@ package object server extends LazyLogging {
       }
 
       // Session storage access
-      Async[F].map(config.stateStorage.read(deviceId, sessionId)) { state =>
+      config.stateStorage.read(deviceId, sessionId) flatMap {
+        case Some(state) => Async[F].pure((false, state))
+        case None => config.stateStorage.initial(deviceId).map(state => (true, state))
+      } map { case (isNew, state) =>
 
         // Create Korolev with dynamic router
         val dux = StateManager[F, S](state)
@@ -137,8 +163,8 @@ package object server extends LazyLogging {
           def apply[K, V]: mutable.Map[K, V] = TrieMap.empty[K, V]
         }
         val korolev = Korolev(
-          dux, jsAccess, state, config.render, router, env.onMessage, fromScratch = false,
-          createMutableMap = trieMapFactory
+          makeSessionKey(deviceId, sessionId), dux, jsAccess, state, config.render, router, env.onMessage,
+          fromScratch = isNew, createMutableMap = trieMapFactory
         )
         // Subscribe on state updates an push them to storage
         korolev.stateManager.subscribe(state => config.stateStorage.write(deviceId, sessionId, state))
@@ -237,7 +263,14 @@ package object server extends LazyLogging {
           case Some(x) => Async[F].pure(x)
           case None => createSession(deviceId, sessionId)
         }
-        sessionAsync.flatMap(_.nextMessage.map(Response.Http(Response.Status.Ok, _))) recover {
+        sessionAsync.flatMap { session =>
+          session.nextMessage.map { message =>
+            Response.Http(Response.Status.Ok,
+              body = Some(new ByteArrayInputStream(message.getBytes(StandardCharsets.UTF_8))),
+              headers = Seq("Cache-Control" -> "no-cache")
+            )
+          }
+        } recover {
           case _: SessionDestroyedException =>
             Response.Http(Response.Status.Gone, "Session has been destroyed")
         }
@@ -276,10 +309,11 @@ package object server extends LazyLogging {
   }
 
   private[server] object misc {
-    val htmlContentType = "text/html"
+    val htmlContentType = "text/html; charset=utf-8"
     val binaryContentType = "application/octet-stream"
     val korolevJs = {
-      val classLoader = classOf[EventPropagation].getClassLoader
+      import scala.concurrent.Future
+      val classLoader = classOf[Korolev[Future, Any, Any]].getClassLoader
       val stream = classLoader.getResourceAsStream("korolev.js")
       Source.fromInputStream(stream).mkString
     }
@@ -290,4 +324,11 @@ package object server extends LazyLogging {
       Source.fromInputStream(stream).mkString
     }
   }
+
+  private final val OpOpen = 1
+  private final val OpClose = 2
+  private final val OpAttr = 3
+  private final val OpText = 4
+  private final val OpLastAttr = 5
+  private final val OpEnd = 6
 }

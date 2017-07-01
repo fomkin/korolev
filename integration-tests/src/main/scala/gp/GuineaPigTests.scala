@@ -51,10 +51,12 @@ object GuineaPigTests extends App {
         .contains("todo_checkbox__checked")
       )
     },
-    step("Todo should be added after 'Add todo' click") { wd =>
+    step("Todo should be added after 'Add todo' click") { implicit wd =>
       // Add new todo
       val newTodoText = "Hello world"
-      wd.findElement(By.id("todo-input")).sendKeys(newTodoText)
+      val input = wd.findElement(By.id("todo-input"))
+      input.scrollTo()
+      input.sendKeys(newTodoText)
       wd.findElement(By.id("todo-submit-button")).click()
       sleep(10.seconds)
 

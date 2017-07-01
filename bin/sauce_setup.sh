@@ -2,7 +2,7 @@
 
 OSNAME=`uname -s`
 OSARCH=`uname -m`
-SC_VERSION="4.4.5"
+SC_VERSION="4.4.7"
 
 mkdir target
 cd target
@@ -25,7 +25,7 @@ then
 else
   if [[ $OSNAME == *"Darwin"* ]];
   then
-    wget https://saucelabs.com/downloads/sc-$SC_VERSION-osx.zip
+    curl -O https://saucelabs.com/downloads/sc-$SC_VERSION-osx.zip
     unzip sc-$SC_VERSION-osx.zip
     mv sc-$SC_VERSION-osx sc-dist
   fi

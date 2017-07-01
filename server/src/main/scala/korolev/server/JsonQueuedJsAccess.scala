@@ -42,15 +42,29 @@ case class JsonQueuedJsAccess[F[+_]: Async](sendJson: String => Unit) extends JS
   }
 
   def seqToJSON(xs: Seq[Any]): String = {
-    val xs2 =
-      xs map {
-        case s: String if !s.startsWith("[") ⇒
-          val sb = new StringBuilder
-          escape(sb, s, unicode = true)
-          sb.mkString
-        case any ⇒ any
-      }
-    "[" + xs2.reduce(_ + ", " + _) + "]"
+    val sb = new StringBuilder()
+    sb.append('[')
+    xs foreach {
+      case s: String if !s.startsWith("[") =>
+        escape(sb, s, unicode = true)
+        sb.append(',')
+      case x =>
+        sb.append(x.toString)
+        sb.append(',')
+    }
+    sb.update(sb.length - 1, ' ') // replace last comma to space
+    sb.append(']')
+    sb.mkString
+
+//    val xs2 =
+//      xs map {
+//        case s: String if !s.startsWith("[") ⇒
+//          val sb = new StringBuilder
+//          escape(sb, s, unicode = true)
+//          sb.mkString
+//        case any ⇒ any
+//      }
+//    "[" + xs2.reduce(_ + ", " + _) + "]"
   }
 
   override def platformDependentPack(value: Any): Any = value match {
@@ -76,21 +90,28 @@ case class JsonQueuedJsAccess[F[+_]: Async](sendJson: String => Unit) extends JS
       sendJson(buffer.head)
     }
     else if (buffer.nonEmpty) {
-      val requests = buffer.mkString(",")
-      sendJson(s"""["batch",$requests]""")
+      val sb = new StringBuilder()
+      sb.append("""["batch",""")
+      buffer foreach { x =>
+        sb.append(x)
+        sb.append(',')
+      }
+      sb.update(sb.length - 1, ' ')
+      sb.append("]")
+      sendJson(sb.mkString)
     }
   }
 
   def receive(message: String): Unit = {
     def prepareString(value: String) = {
       value match {
-        case s: String if s.startsWith("\"") ⇒
+        case s: String if s.charAt(0) == '"' ⇒
           s.substring(1, s.length - 1).trim
         case s ⇒ s.trim
       }
     }
     val args =
-      message.stripPrefix("[").stripSuffix("]").split(",").map(prepareString)
+      message.substring(1, message.length - 1).split(',').map(prepareString)
     val reqId = args(0).toInt
     if (reqId == -1) {
       val callbackId = args(1)
