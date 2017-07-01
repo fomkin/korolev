@@ -220,7 +220,8 @@ object Korolev {
             client.callAndFlush[Unit]("RegisterFormDataProgressHandler", callback)
           },
           client.callAndFlush[Unit]("SetRenderNum", 0),
-          if (fromScratch) client.callAndFlush("CleanRoot") else async.unit
+          if (fromScratch) client.callAndFlush("CleanRoot") else async.unit,
+          if (devMode.isActive) client.callAndFlush("ReloadCss") else async.unit
         )
       }
 
@@ -263,7 +264,7 @@ object Korolev {
                 renderContext.swap()
                 node(renderContext)
                 renderContext.diff(changesPerformer)
-                if (devMode.active)
+                if (devMode.isActive)
                   devMode.saveRenderContext(renderContext)
               case None =>
                 logger.warn(s"Render is not defined for ${state.getClass.getSimpleName}")
@@ -341,7 +342,7 @@ object Korolev {
 
     lazy val hasSavedRenderContext = DevMode.isActive && file.exists && !fromScratch
 
-    def active = DevMode.isActive
+    def isActive = DevMode.isActive
 
     def loadRenderContext() = if (hasSavedRenderContext) {
       val nioFile = new RandomAccessFile(file, "r")
