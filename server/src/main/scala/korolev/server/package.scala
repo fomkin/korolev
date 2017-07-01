@@ -56,17 +56,24 @@ package object server extends LazyLogging {
 
       Async[F].map(writeResultF) { state =>
         val dsl = new levsha.TemplateDsl[ApplicationContext.Effect[F, S, M]]()
-        val textRenderContext = new AbstractTextRenderContext[ApplicationContext.Effect[F, S, M]]() {
+        def createTextRenderContext() = new AbstractTextRenderContext[ApplicationContext.Effect[F, S, M]]() {
           val prettyPrinting = TextPrettyPrintingConfig.noPrettyPrinting
         }
+        val textRenderContext = createTextRenderContext()
         import dsl._
 
         val document = 'html(
           'head(
             'script('language /= "javascript", bridgeJs),
             'script('language /= "javascript",
-              s"var KorolevSessionId = '$sessionId';\n" +
-              s"var KorolevServerRootPath = '${config.serverRouter.rootPath}';\n" +
+              s"""var KorolevSessionId = '$sessionId';
+                 |var KorolevServerRootPath = '${config.serverRouter.rootPath}';
+                 |var KorolevConnectionLostWidget = '${
+                   val textRenderContext = createTextRenderContext()
+                   config.connectionLostWidget(textRenderContext)
+                   textRenderContext.mkString
+                 }';
+              """.stripMargin,
               korolevJs
             ),
             config.head
