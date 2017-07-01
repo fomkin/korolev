@@ -3,6 +3,7 @@ package korolev
 import korolev.StateManager.Transition
 import korolev.util.Scheduler
 import korolev.Async.AsyncOps
+import levsha.Document.Empty
 import levsha.{Document, TemplateDsl}
 import levsha.events.EventPhase
 
@@ -29,6 +30,9 @@ class ApplicationContext[F[+_]: Async, S, M](implicit scheduler: Scheduler[F]) {
 
     @deprecated("Use Node instead of VDom", "0.4.0")
     type VDom = Node
+
+    @deprecated("Use void instead of <>", since = "0.4.0")
+    val <> = Empty
 
     implicit final class KorolevSymbolOps(s: Symbol) {
       def :=(value: String): Document.Attr[Effect] = Document.Attr { rc =>

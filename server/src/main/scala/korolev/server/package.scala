@@ -120,13 +120,13 @@ package object server extends LazyLogging {
 
     def deviceFromRequest(request: Request): (Boolean, String) = {
       request.cookie("device") match {
-        case None => true -> UUID.randomUUID().toString
+        case None => true -> Random.alphanumeric.take(16).mkString
         case Some(deviceId) => false -> deviceId
       }
     }
 
     def makeSessionKey(deviceId: String, sessionId: String): String =
-      s"${deviceId}_$sessionId"
+      s"$deviceId-$sessionId"
 
     def createSession(deviceId: String, sessionId: String): F[KorolevSession[F]] = {
 
@@ -156,8 +156,8 @@ package object server extends LazyLogging {
           def apply[K, V]: mutable.Map[K, V] = TrieMap.empty[K, V]
         }
         val korolev = Korolev(
-          dux, jsAccess, state, config.render, router, env.onMessage, fromScratch = isNew,
-          createMutableMap = trieMapFactory
+          makeSessionKey(deviceId, sessionId), dux, jsAccess, state, config.render, router, env.onMessage,
+          fromScratch = isNew, createMutableMap = trieMapFactory
         )
         // Subscribe on state updates an push them to storage
         korolev.stateManager.subscribe(state => config.stateStorage.write(deviceId, sessionId, state))
@@ -302,7 +302,7 @@ package object server extends LazyLogging {
   }
 
   private[server] object misc {
-    val htmlContentType = "text/html"
+    val htmlContentType = "text/html; charset=utf-8"
     val binaryContentType = "application/octet-stream"
     val korolevJs = {
       import scala.concurrent.Future

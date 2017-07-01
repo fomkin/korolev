@@ -1,9 +1,13 @@
 package korolev.server
 
+import java.io._
+
 import korolev.Async
+import slogging.LazyLogging
 
 import scala.collection.concurrent.TrieMap
 import scala.language.higherKinds
+import korolev.DevMode
 
 /**
   * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
@@ -32,7 +36,7 @@ abstract class StateStorage[F[+_]: Async, T] {
   def write(deviceId: DeviceId, sessionId: SessionId, value: T): F[T]
 }
 
-object StateStorage {
+object StateStorage extends LazyLogging {
 
   type DeviceId = String
   type SessionId = String
@@ -45,20 +49,7 @@ object StateStorage {
     * @tparam T Type of state
     * @return The state storage
     */
-  def default[F[+_]: Async, T](initialState: => T): StateStorage[F, T] = new StateStorage[F, T] {
-
-    val storage = TrieMap.empty[String, T]
-
-    def read(deviceId: DeviceId, sessionId: SessionId): F[Option[T]] = {
-      val state = storage.get(deviceId + sessionId)
-      Async[F].pure(state)
-    }
-
-    def write(deviceId: String, sessionId: String, value: T): F[T] = {
-      storage.put(deviceId + sessionId, value)
-      Async[F].pure(value)
-    }
-
+  def default[F[+_]: Async, T](initialState: => T): StateStorage[F, T] = new DefaultStateStorage[F, T] {
     def initial(deviceId: String): F[T] = Async[F].pure(initialState)
   }
 
@@ -81,20 +72,68 @@ object StateStorage {
     * @tparam T Type of state
     * @return The state storage
     */
-  def forDeviceId[F[+_]: Async, T](initialState: DeviceId => F[T]): StateStorage[F, T] = new StateStorage[F, T] {
+  def forDeviceId[F[+_]: Async, T](initialState: DeviceId => F[T]): StateStorage[F, T] = new DefaultStateStorage[F, T] {
+    def initial(deviceId: String): F[T] = initialState(deviceId)
+  }
+
+  private abstract class DefaultStateStorage[F[+_]: Async, T] extends StateStorage[F, T] {
 
     val storage = TrieMap.empty[String, T]
 
     def read(deviceId: DeviceId, sessionId: SessionId): F[Option[T]] = {
-      Async[F].pure(storage.get(deviceId + sessionId))
+      if (DevMode.isActive) {
+        Async[F].fork {
+          val file = getSessionFile(deviceId, sessionId)
+          if (file.exists) {
+            val fileStream = new FileInputStream(file)
+            val objectStream = new ObjectInputStream(fileStream)
+            try {
+              Some(
+                objectStream
+                  .readObject()
+                  .asInstanceOf[T]
+              )
+            } catch {
+              case _:InvalidClassException =>
+                // That means state type was changed
+                None
+            } finally {
+              objectStream.close()
+              fileStream.close()
+            }
+          } else {
+            None
+          }
+        }
+      } else {
+        Async[F].pure(storage.get(mkKey(deviceId, sessionId)))
+      }
     }
 
-    def write(deviceId: String, sessionId: String, value: T): F[T] = {
-      storage.put(deviceId + sessionId, value)
-      Async[F].pure(value)
+    def write(deviceId: DeviceId, sessionId: SessionId, value: T): F[T] = {
+      if (DevMode.isActive) {
+        Async[F].fork {
+          val file = getSessionFile(deviceId, sessionId)
+          val fileStream = new FileOutputStream(file)
+          val objectStream = new ObjectOutputStream(fileStream)
+          try {
+            objectStream.writeObject(value)
+            value
+          } finally {
+            objectStream.close()
+            fileStream.close()
+          }
+        }
+      } else {
+        storage.put(mkKey(deviceId, sessionId), value)
+        Async[F].pure(value)
+      }
     }
 
-    def initial(deviceId: String): F[T] = initialState(deviceId)
+    def mkKey(deviceId: DeviceId, sessionId: SessionId): String =
+      s"$deviceId-$sessionId"
+
+    def getSessionFile(deviceId: DeviceId, sessionId: SessionId): File =
+      new File(DevMode.sessionsDirectory, mkKey(deviceId, sessionId))
   }
-
 }

@@ -1,6 +1,9 @@
 package korolev
 
+import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
+import java.io.RandomAccessFile
+import java.nio.ByteBuffer
 
 import bridge.JSAccess
 import korolev.ApplicationContext._
@@ -9,7 +12,7 @@ import korolev.StateManager.Transition
 import levsha.events.{EventId, calculateEventPropagation}
 import levsha.impl.DiffRenderContext
 import levsha.impl.DiffRenderContext.ChangesPerformer
-import levsha.{Id, Document}
+import levsha.{Document, Id}
 import slogging.LazyLogging
 
 import scala.collection.mutable
@@ -36,7 +39,8 @@ object Korolev {
       mutable.Map.empty
   }
 
-  def apply[F[+ _]: Async, S, M](sm: StateManager[F, S],
+  def apply[F[+ _]: Async, S, M](identifier: String,
+                                 sm: StateManager[F, S],
                                  ja: JSAccess[F],
                                  initialState: S,
                                  render: PartialFunction[S, Document.Node[ApplicationContext.Effect[F, S, M]]],
@@ -69,7 +73,12 @@ object Korolev {
           async.run(rpc)(handleAsyncError(_ => "Error occurred when invoking ListenEvent"))
         }
       )
-      val renderContext = DiffRenderContext[Effect[F, S, M]](onMisc = effectsReactor.miscCallback)
+      val devMode = new RenderContextDevMode(identifier, fromScratch)
+      val renderContext = DiffRenderContext[Effect[F, S, M]](
+        onMisc = effectsReactor.miscCallback,
+        savedBuffer = devMode.loadRenderContext()
+      )
+
       val renderer = render.lift
       val changesPerformer = new ChangesPerformer {
         private def isProp(name: String) = name.charAt(0) == '^'
@@ -211,26 +220,37 @@ object Korolev {
             client.callAndFlush[Unit]("RegisterFormDataProgressHandler", callback)
           },
           client.callAndFlush[Unit]("SetRenderNum", 0),
-          if (fromScratch) client.callAndFlush("CleanRoot") else async.unit
+          if (fromScratch) client.callAndFlush("CleanRoot") else async.unit,
+          if (devMode.isActive) client.callAndFlush("ReloadCss") else async.unit
         )
       }
 
       async.run(initialization) {
         case Success(_) =>
           logger.trace("Korolev initialization complete")
-          // Perform initial rendering 
+
+          // Perform initial rendering
           if (fromScratch) {
             renderContext.openNode("body")
             renderContext.closeNode("body")
+            renderContext.diff(DiffRenderContext.DummyChangesPerformer)
           } else {
-            renderer(initialState) match {
-              case Some(node) => node(renderContext)
-              case None =>
-                logger.error("Rendering function is not defined for initial state")
-              // TODO need shutdown hook
+            def renderInitialState() = {
+              renderer(initialState) match {
+                case Some(node) => node(renderContext)
+                case None => logger.error("Rendering function is not defined for initial state")
+              }
+            }
+            if (devMode.hasSavedRenderContext) {
+              renderContext.swap()
+              renderInitialState()
+              renderContext.diff(changesPerformer)
+              devMode.saveRenderContext(renderContext)
+            } else {
+              renderInitialState()
+              renderContext.diff(DiffRenderContext.DummyChangesPerformer)
             }
           }
-          renderContext.diff(DiffRenderContext.DummyChangesPerformer)
 
           val onState: (S => Unit) = { state =>
             // Set page url if router exists
@@ -238,12 +258,14 @@ object Korolev {
               .lift(state)
               .foreach(path => client.call("ChangePageUrl", path.toString))
             // Perform rendering
-            renderContext.swap()
             renderer(state) match {
               case Some(node) =>
                 // Perform changes only when renderer for state is defined
+                renderContext.swap()
                 node(renderContext)
                 renderContext.diff(changesPerformer)
+                if (devMode.isActive)
+                  devMode.saveRenderContext(renderContext)
               case None =>
                 logger.warn(s"Render is not defined for ${state.getClass.getSimpleName}")
             }
@@ -314,4 +336,40 @@ object Korolev {
     }
   }
 
+  class RenderContextDevMode(identifier: String, fromScratch: Boolean) {
+
+    lazy val file = new File(DevMode.renderStateDirectory, identifier)
+
+    lazy val hasSavedRenderContext = DevMode.isActive && file.exists && !fromScratch
+
+    def isActive = DevMode.isActive
+
+    def loadRenderContext() = if (hasSavedRenderContext) {
+      val nioFile = new RandomAccessFile(file, "r")
+      val channel = nioFile.getChannel
+      try {
+        val buffer = ByteBuffer.allocate(channel.size.toInt)
+        channel.read(buffer)
+        buffer.position(0)
+        Some(buffer)
+      } finally {
+        nioFile.close()
+        channel.close()
+      }
+    } else {
+      None
+    }
+
+    def saveRenderContext(renderContext: DiffRenderContext[_]) = {
+      val nioFile = new RandomAccessFile(file, "rw")
+      val channel = nioFile.getChannel
+      try {
+        val buffer = renderContext.save()
+        channel.write(buffer)
+      } finally {
+        nioFile.close()
+        channel.close()
+      }
+    }
+  }
 }
