@@ -1,6 +1,10 @@
 package korolev
 
+import java.io.{File, FileInputStream}
 import java.util.concurrent.atomic.AtomicInteger
+import java.io.RandomAccessFile
+import java.nio.{ByteBuffer, ByteOrder}
+import java.nio.channels.FileChannel
 
 import bridge.JSAccess
 import korolev.ApplicationContext._
@@ -9,7 +13,7 @@ import korolev.StateManager.Transition
 import levsha.events.{EventId, calculateEventPropagation}
 import levsha.impl.DiffRenderContext
 import levsha.impl.DiffRenderContext.ChangesPerformer
-import levsha.{Id, Document}
+import levsha.{Document, Id}
 import slogging.LazyLogging
 
 import scala.collection.mutable
@@ -36,7 +40,8 @@ object Korolev {
       mutable.Map.empty
   }
 
-  def apply[F[+ _]: Async, S, M](sm: StateManager[F, S],
+  def apply[F[+ _]: Async, S, M](identifier: String,
+                                 sm: StateManager[F, S],
                                  ja: JSAccess[F],
                                  initialState: S,
                                  render: PartialFunction[S, Document.Node[ApplicationContext.Effect[F, S, M]]],
@@ -69,7 +74,26 @@ object Korolev {
           async.run(rpc)(handleAsyncError(_ => "Error occurred when invoking ListenEvent"))
         }
       )
-      val renderContext = DiffRenderContext[Effect[F, S, M]](onMisc = effectsReactor.miscCallback)
+      val savedRcFile = new File(DevMode.renderStateDirectory, identifier)
+      val renderContext = DiffRenderContext[Effect[F, S, M]](
+        onMisc = effectsReactor.miscCallback,
+        savedBuffer = if (DevMode.isActive) {
+          if (savedRcFile.exists()) {
+            val nioFile = new RandomAccessFile(savedRcFile, "r")
+            val channel = nioFile.getChannel
+            try {
+              val buffer = ByteBuffer.allocate(channel.size.toInt)
+              channel.read(buffer)
+              buffer.position(0)
+              Some(buffer)
+            } finally {
+              nioFile.close()
+              channel.close()
+            }
+          } else None
+        } else None
+      )
+
       val renderer = render.lift
       val changesPerformer = new ChangesPerformer {
         private def isProp(name: String) = name.charAt(0) == '^'
@@ -218,19 +242,36 @@ object Korolev {
       async.run(initialization) {
         case Success(_) =>
           logger.trace("Korolev initialization complete")
+
+          val devMode = DevMode.isActive && savedRcFile.exists && !fromScratch
+
           // Perform initial rendering 
           if (fromScratch) {
             renderContext.openNode("body")
             renderContext.closeNode("body")
+            renderContext.diff(DiffRenderContext.DummyChangesPerformer)
           } else {
+            if (devMode) renderContext.swap()
             renderer(initialState) match {
               case Some(node) => node(renderContext)
               case None =>
                 logger.error("Rendering function is not defined for initial state")
               // TODO need shutdown hook
             }
+            if (devMode) {
+              renderContext.diff(changesPerformer)
+              val file = new RandomAccessFile(savedRcFile, "rw")
+              val channel = file.getChannel
+              try {
+                val buffer = renderContext.save()
+                channel.write(buffer)
+              } finally {
+                file.close()
+                channel.close()
+              }
+            }
+            else renderContext.diff(DiffRenderContext.DummyChangesPerformer)
           }
-          renderContext.diff(DiffRenderContext.DummyChangesPerformer)
 
           val onState: (S => Unit) = { state =>
             // Set page url if router exists
@@ -238,12 +279,23 @@ object Korolev {
               .lift(state)
               .foreach(path => client.call("ChangePageUrl", path.toString))
             // Perform rendering
-            renderContext.swap()
             renderer(state) match {
               case Some(node) =>
                 // Perform changes only when renderer for state is defined
+                renderContext.swap()
                 node(renderContext)
                 renderContext.diff(changesPerformer)
+                if (DevMode.isActive) {
+                  val file = new RandomAccessFile(savedRcFile, "rw")
+                  val channel = file.getChannel
+                  try {
+                    val buffer = renderContext.save()
+                    channel.write(buffer)
+                  } finally {
+                    file.close()
+                    channel.close()
+                  }
+                }
               case None =>
                 logger.warn(s"Render is not defined for ${state.getClass.getSimpleName}")
             }

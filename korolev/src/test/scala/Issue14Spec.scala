@@ -27,6 +27,7 @@ class Issue14Spec extends FlatSpec with Matchers {
     }
 
     Korolev(
+      identifier = "",
       ja = jSAccess,
       sm = StateManager[Future, Issue14Spec.S]("firstState"),
       initialState = "firstState",

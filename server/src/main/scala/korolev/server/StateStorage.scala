@@ -7,6 +7,7 @@ import slogging.LazyLogging
 
 import scala.collection.concurrent.TrieMap
 import scala.language.higherKinds
+import korolev.DevMode
 
 /**
   * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
@@ -75,34 +76,12 @@ object StateStorage extends LazyLogging {
     def initial(deviceId: String): F[T] = initialState(deviceId)
   }
 
-  private val DevModeKey = "korolev.dev"
-  private val DevModeDirectoryKey = "korolev.dev.directory"
-  private val DevModeDefaultDirectory = "target/korolev-sessions"
-
-  private val devMode = sys.env.get(DevModeKey)
-    .orElse(sys.props.get(DevModeKey))
-    .fold(false)(_ == "true")
-
-  private lazy val devDirectory = {
-    val directoryPath = sys.env.get(DevModeDirectoryKey)
-      .orElse(sys.props.get(DevModeDirectoryKey))
-      .getOrElse(DevModeDefaultDirectory)
-    
-    val file = new File(directoryPath)
-    if (!file.exists()) {
-      file.mkdirs()
-    } else if (!file.isDirectory) {
-      throw new ExceptionInInitializerError(s"$directoryPath should be directory")
-    }
-    file
-  }
-
   private abstract class DefaultStateStorage[F[+_]: Async, T] extends StateStorage[F, T] {
 
     val storage = TrieMap.empty[String, T]
 
     def read(deviceId: DeviceId, sessionId: SessionId): F[Option[T]] = {
-      if (devMode) {
+      if (DevMode.isActive) {
         Async[F].fork {
           val file = getSessionFile(deviceId, sessionId)
           if (file.exists) {
@@ -127,12 +106,12 @@ object StateStorage extends LazyLogging {
           }
         }
       } else {
-        Async[F].pure(storage.get(deviceId + sessionId))
+        Async[F].pure(storage.get(mkKey(deviceId, sessionId)))
       }
     }
 
     def write(deviceId: DeviceId, sessionId: SessionId, value: T): F[T] = {
-      if (devMode) {
+      if (DevMode.isActive) {
         Async[F].fork {
           val file = getSessionFile(deviceId, sessionId)
           val fileStream = new FileOutputStream(file)
@@ -146,12 +125,15 @@ object StateStorage extends LazyLogging {
           }
         }
       } else {
-        storage.put(deviceId + sessionId, value)
+        storage.put(mkKey(deviceId, sessionId), value)
         Async[F].pure(value)
       }
     }
 
+    def mkKey(deviceId: DeviceId, sessionId: SessionId): String =
+      s"$deviceId-$sessionId"
+
     def getSessionFile(deviceId: DeviceId, sessionId: SessionId): File =
-      new File(devDirectory, deviceId + sessionId)
+      new File(DevMode.sessionsDirectory, mkKey(deviceId, sessionId))
   }
 }
