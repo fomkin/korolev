@@ -339,7 +339,17 @@
       lpSubscribe(fakeWs, true);
     }
 
+    var connectionLostWidget = null;
+
     function reconnect() {
+      // Create connection lost widget
+      if (connectionLostWidget == null) {
+        connectionLostWidget = document.createElement('div');
+        connectionLostWidget.innerHTML = KorolevConnectionLostWidget;
+        connectionLostWidget = connectionLostWidget.children[0];
+        document.body.appendChild(connectionLostWidget);
+      }
+      // Prepare reconnecting
       Korolev.UnregisterGlobalEventHandler();
       Korolev.UnregisterHistoryHandler();
       console.log("Connection closed. Global event handler us unregistered. Try to reconnect.");
@@ -354,6 +364,10 @@
     }
 
     function onOpen(event) {
+      if (connectionLostWidget !== null) {
+        document.body.removeChild(connectionLostWidget);
+        connectionLostWidget = null;
+      }
       console.log("Connection opened.");
       selectedConnectionType = connectionType;
       reconnectTimeout = MinReconnectTimeout;
