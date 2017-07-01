@@ -48,7 +48,7 @@ val commonSettings = publishSettings ++ Seq(
   organization := "com.github.fomkin",
   version := "0.4.0-SNAPSHOT",
   libraryDependencies ++= Seq(
-    "org.scalatest" %%% "scalatest" % "3.0.1" % "test"
+    "org.scalatest" %% "scalatest" % "3.0.1" % "test"
   ),
   scalacOptions ++= Seq(
     "-deprecation",
@@ -73,7 +73,7 @@ lazy val server = project.
     normalizedName := "korolev-server",
     libraryDependencies += "biz.enef" %% "slogging-slf4j" % "0.5.2"
   ).
-  dependsOn(korolevJVM).
+  dependsOn(korolev).
   enablePlugins(SbtOsgi).settings(serverOsgiSettings:_*)
 
 lazy val serverBlazeOsgiSettings = osgiSettings ++ Seq(
@@ -93,54 +93,45 @@ lazy val asyncOsgiSettings = osgiSettings ++ Seq(
   OsgiKeys.exportPackage := Seq("korolev.*;version=${Bundle-Version}")
 )
 
-lazy val async = crossProject.crossType(CrossType.Pure).
+lazy val async = project.
   settings(commonSettings: _*).
   settings(normalizedName := "korolev-async").
   enablePlugins(SbtOsgi).settings(asyncOsgiSettings:_*)
-
-lazy val asyncJS = async.js
-lazy val asyncJVM = async.jvm
 
 lazy val bridgeOsgiSettings = osgiSettings ++ Seq(
   OsgiKeys.exportPackage := Seq("bridge.*;version=${Bundle-Version}")
 )
 
-lazy val bridge = crossProject.crossType(CrossType.Pure).
+lazy val bridge = project.
   settings(commonSettings: _*).
   settings(
     normalizedName := "korolev-bridge",
     libraryDependencies ++= Seq(
       "com.lihaoyi" %% "utest" % "0.4.4" % "test"
     ),
-    testFrameworks += new TestFramework("utest.runner.Framework"),
-    unmanagedResourceDirectories in Compile += file("bridge") / "src" / "main" / "resources"
+    testFrameworks += new TestFramework("utest.runner.Framework")
+    //unmanagedResourceDirectories in Compile += file("bridge") / "src" / "main" / "resources"
   ).
   dependsOn(async).
   enablePlugins(SbtOsgi).settings(bridgeOsgiSettings:_*)
-
-lazy val bridgeJS = bridge.js
-lazy val bridgeJVM = bridge.jvm
 
 lazy val korolevOsgiSettings = osgiSettings ++ Seq(
   OsgiKeys.exportPackage := Seq("korolev.*;version=${Bundle-Version}")
 )
 
-lazy val korolev = crossProject.crossType(CrossType.Full).
+lazy val korolev = project.
   settings(commonSettings: _*).
   settings(
     normalizedName := "korolev",
     libraryDependencies ++= Seq(
-      "biz.enef" %%% "slogging" % "0.5.2",
-      "com.github.fomkin" %%% "levsha-core" % levshaVersion,
-      "com.github.fomkin" %%% "levsha-events" % levshaVersion
+      "biz.enef" %% "slogging" % "0.5.2",
+      "com.github.fomkin" %% "levsha-core" % levshaVersion,
+      "com.github.fomkin" %% "levsha-events" % levshaVersion
     ),
     unmanagedResourceDirectories in Compile += file("korolev") / "shared" / "src" / "main" / "resources"
   ).
   dependsOn(bridge).
   enablePlugins(SbtOsgi).settings(korolevOsgiSettings:_*)
-
-lazy val korolevJS = korolev.js
-lazy val korolevJVM = korolev.jvm
 
 val `jcache-support` = project.
   enablePlugins(SbtOsgi).
@@ -235,11 +226,8 @@ lazy val `performance-benchmark` = project.
 lazy val root = project.in(file(".")).
   settings(dontPublishSettings:_*).
   aggregate(
-    korolevJS, korolevJVM,
-    bridgeJS, bridgeJVM,
-    asyncJS, asyncJVM,
-    server, `server-blaze`,
-    `jcache-support`,
+    korolev, bridge, async, server,
+    `server-blaze`, `jcache-support`,
     simpleExample, routingExample, gameOfLifeExample,
     jcacheExample, formDataExample, delayExample,
     webComponentExample,
