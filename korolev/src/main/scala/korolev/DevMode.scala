@@ -36,8 +36,8 @@ private[korolev] object DevMode {
   }
 
   lazy val renderStateDirectory = {
-    val f = new File(workDirectory, "render-states")
-    f.mkdir()
-    f
+    val file = new File(workDirectory, "render-contexts")
+    file.mkdir()
+    file
   }
 }

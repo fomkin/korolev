@@ -1,10 +1,9 @@
 package korolev
 
-import java.io.{File, FileInputStream}
+import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
 import java.io.RandomAccessFile
-import java.nio.{ByteBuffer, ByteOrder}
-import java.nio.channels.FileChannel
+import java.nio.ByteBuffer
 
 import bridge.JSAccess
 import korolev.ApplicationContext._
@@ -74,24 +73,10 @@ object Korolev {
           async.run(rpc)(handleAsyncError(_ => "Error occurred when invoking ListenEvent"))
         }
       )
-      val savedRcFile = new File(DevMode.renderStateDirectory, identifier)
+      val devMode = new RenderContextDevMode(identifier, fromScratch)
       val renderContext = DiffRenderContext[Effect[F, S, M]](
         onMisc = effectsReactor.miscCallback,
-        savedBuffer = if (DevMode.isActive) {
-          if (savedRcFile.exists()) {
-            val nioFile = new RandomAccessFile(savedRcFile, "r")
-            val channel = nioFile.getChannel
-            try {
-              val buffer = ByteBuffer.allocate(channel.size.toInt)
-              channel.read(buffer)
-              buffer.position(0)
-              Some(buffer)
-            } finally {
-              nioFile.close()
-              channel.close()
-            }
-          } else None
-        } else None
+        savedBuffer = devMode.loadRenderContext()
       )
 
       val renderer = render.lift
@@ -243,34 +228,27 @@ object Korolev {
         case Success(_) =>
           logger.trace("Korolev initialization complete")
 
-          val devMode = DevMode.isActive && savedRcFile.exists && !fromScratch
-
-          // Perform initial rendering 
+          // Perform initial rendering
           if (fromScratch) {
             renderContext.openNode("body")
             renderContext.closeNode("body")
             renderContext.diff(DiffRenderContext.DummyChangesPerformer)
           } else {
-            if (devMode) renderContext.swap()
-            renderer(initialState) match {
-              case Some(node) => node(renderContext)
-              case None =>
-                logger.error("Rendering function is not defined for initial state")
-              // TODO need shutdown hook
-            }
-            if (devMode) {
-              renderContext.diff(changesPerformer)
-              val file = new RandomAccessFile(savedRcFile, "rw")
-              val channel = file.getChannel
-              try {
-                val buffer = renderContext.save()
-                channel.write(buffer)
-              } finally {
-                file.close()
-                channel.close()
+            def renderInitialState() = {
+              renderer(initialState) match {
+                case Some(node) => node(renderContext)
+                case None => logger.error("Rendering function is not defined for initial state")
               }
             }
-            else renderContext.diff(DiffRenderContext.DummyChangesPerformer)
+            if (devMode.hasSavedRenderContext) {
+              renderContext.swap()
+              renderInitialState()
+              renderContext.diff(changesPerformer)
+              devMode.saveRenderContext(renderContext)
+            } else {
+              renderInitialState()
+              renderContext.diff(DiffRenderContext.DummyChangesPerformer)
+            }
           }
 
           val onState: (S => Unit) = { state =>
@@ -285,17 +263,8 @@ object Korolev {
                 renderContext.swap()
                 node(renderContext)
                 renderContext.diff(changesPerformer)
-                if (DevMode.isActive) {
-                  val file = new RandomAccessFile(savedRcFile, "rw")
-                  val channel = file.getChannel
-                  try {
-                    val buffer = renderContext.save()
-                    channel.write(buffer)
-                  } finally {
-                    file.close()
-                    channel.close()
-                  }
-                }
+                if (devMode.active)
+                  devMode.saveRenderContext(renderContext)
               case None =>
                 logger.warn(s"Render is not defined for ${state.getClass.getSimpleName}")
             }
@@ -366,4 +335,40 @@ object Korolev {
     }
   }
 
+  class RenderContextDevMode(identifier: String, fromScratch: Boolean) {
+
+    lazy val file = new File(DevMode.renderStateDirectory, identifier)
+
+    lazy val hasSavedRenderContext = DevMode.isActive && file.exists && !fromScratch
+
+    def active = DevMode.isActive
+
+    def loadRenderContext() = if (hasSavedRenderContext) {
+      val nioFile = new RandomAccessFile(file, "r")
+      val channel = nioFile.getChannel
+      try {
+        val buffer = ByteBuffer.allocate(channel.size.toInt)
+        channel.read(buffer)
+        buffer.position(0)
+        Some(buffer)
+      } finally {
+        nioFile.close()
+        channel.close()
+      }
+    } else {
+      None
+    }
+
+    def saveRenderContext(renderContext: DiffRenderContext[_]) = {
+      val nioFile = new RandomAccessFile(file, "rw")
+      val channel = nioFile.getChannel
+      try {
+        val buffer = renderContext.save()
+        channel.write(buffer)
+      } finally {
+        nioFile.close()
+        channel.close()
+      }
+    }
+  }
 }
