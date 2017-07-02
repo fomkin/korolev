@@ -411,7 +411,7 @@ Web Components
 
 Usually when we say "components" we mean an UI element with an own state. Korolev doesn't support components by it's design, cause it leads to multi-state and breaks the simplicity which we want to reach. However you still could use WebComponents.
 
-Note Korolev doesn't have any specific code to support webcomponents. WebComponent (Custom Elements+ Shadow DOM) by design should behave as regular HTML tag. There is no difference between, for example, input or textarea, and any custom element.
+Note Korolev doesn't have any specific code to support webcomponents. WebComponent (Custom Elements + Shadow DOM) by design should behave as regular HTML tag. There is no difference between, for example, input or textarea, and any custom element.
 
 Developer mode and "hot reload"
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
