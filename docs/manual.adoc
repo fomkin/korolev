@@ -28,7 +28,7 @@ Understanding Korolev
 Device and Session
 ~~~~~~~~~~~~~~~~~~
 
-When a user opens your application first time, Korolev sets a cookie named `device` with the unique identifier. After that, you can identify the user by deviceId. Note that every new browser will receive a new `deviceId`.
+When a user opens your application first time, Korolev sets a cookie named `device` with the unique identifier. After that, you can identify the user by `deviceId`. Note that every new browser will receive a new `deviceId`.
 
 A session is created when the user opens a page. Every session has the unique identifier. Korolev creates a State for every session.
 
@@ -75,7 +75,7 @@ Render is a view of the state. Render is a function which takes state as the arg
 
 [source,scala]
 -----------------------------------
-val render: Render[MyState] = {
+val render: Render = {
   case Anonymous(_) =>
     'body(
       'form(
@@ -99,7 +99,7 @@ val render: Render[MyState] = {
 
 Render is called for each new state. Important to understand that render produces a full DOM for every call. It does not mean that client receives a new page every time. Korolev makes a diff between current and latest DOM. Only changes will be sent to the client.
 
-`Render[S]` is a type alias to `PartialFunction[S, VDom]` where `S` is a type of your state.
+`Render` is a type alias to `PartialFunction[S, Document.Node]` where `S` is a type of your state.
 
 Transitions
 ~~~~~~~~~~~
@@ -118,7 +118,7 @@ userService.addFriend(user.id, newFriend) map { _ =>
 }
 --------------------------------------------------------------
 
-`Transition[S]` is a type alias to `PartialFunction[S, S]` where `S` is the type of your state.
+`Transition` is a type alias to `PartialFunction[S, S]` where `S` is the type of your state.
 
 Events
 ~~~~~~
@@ -129,7 +129,7 @@ Every DOM event which had been emitted by browser's `document` object, can be ha
 --------------------------------------------------------------
 case class MyState(i: String)
 
-val renderAnonymous: Render[MyState] = {
+val renderAnonymous: Render = {
   case MyState(i) =>
     'body(
       i.toString,
@@ -152,7 +152,7 @@ When "Increment" button will be clicked `i` will be incremented by 1. Let's cons
 val loginField = elementId()
 val passwordField = elementId()
 
-val renderAnonymous: Render[MyState] = {
+val renderAnonymous: Render = {
   case Anonymous(_) =>
     'body(
       'form(
@@ -177,7 +177,7 @@ val renderAnonymous: Render[MyState] = {
     )
 }
 
-val renderAuthorized: Render[MyState] = ???
+val renderAuthorized: Render = ???
 val render = renderAnonymous orElse renderAuthorized
 -----------------------------------
 
@@ -206,7 +206,7 @@ In the scope of event, you can access the element properties if an element was b
 
 [source,scala]
 -----------------------------------
-val loginField = elementId()
+val loginField = elementId
 
 ...
 
@@ -222,7 +222,7 @@ Or you can set the value
 
 [source,scala]
 -----------------------------------
-access.property.update[String](loginField, 'value, "John Doe") map {
+access.property[String](loginField).set('value, "John Doe") map {
   transition { ... }
 }
 -----------------------------------
@@ -269,7 +269,7 @@ val pictureFieldName = "picture"
 
 Use `onProgress` callback to handle progress of the form downloading. Function `start` return a `FormData`. Look API documentation for more details.
 
-https://github.com/fomkin/korolev/blob/v1.0.0/examples/form-data/src/main/scala/FormDataExample.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.4.0/examples/form-data/src/main/scala/FormDataExample.scala[See full example]
 
 Delays
 ~~~~~~
@@ -279,7 +279,7 @@ Sometimes you want to update a page after a timeout. For example it useful when 
 -----------------------------------
 type MyState = Boolean
 
-val render: Render[MyState] = {
+val render: Render = {
   case true => 'body(
     delay(3.seconds) {
       case true => false
@@ -299,19 +299,59 @@ val render: Render[MyState] = {
 }
 -----------------------------------
 
-https://github.com/fomkin/korolev/blob/v1.0.0/examples/delay/src/main/scala/DelayExample.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.4.0/examples/delay/src/main/scala/DelayExample.scala[See full example]
 
-External Binding
-~~~~~~~~~~~~~~~
+Environment configurator
+~~~~~~~~~~~~~~~~~~~~~~~~
 
-(TODO)
-Now envConfigurator. Another name?
+Korolev is not just request-response, but push. One of big advantages of Korolev is ability to display server side events without additional code. Consider example where we have a page with some sort of notification list.
+
+[source,scala]
+-----------------------------------
+case class MyState(notifications: List[String])
+
+var render: Render = {
+  case MyState(notifications) =>
+    'ul(
+      notifications.map(notification =>
+        'li(notification)
+      )
+    )
+}
+-----------------------------------
+
+Also we have a message queue which have a topic with notifications for current user. The topic has identifier based on `deviceId` of a client. Lets try to bind an application state with a messages from the queue.
+
+[source,scala]
+-------------------------------------------------------------------------------
+KorolevServiceConfig(
+  ...
+  envConfigurator = (deviceId, sessionId, applyTransition) => {
+    val subscribtion = messageQueue.subscribe(s"notifications-$deviceId") { notifiation =>
+      applyTransition {
+        case state: MyState =>
+          state.copy(
+            notifiations = notifiation :: state.notifiations
+          )
+      }
+    }
+    KorolevServiceConfig.Env(
+      onDestroy = () => subscribtion.unsubscribe(),
+      onMessage = PartialFunction.empty
+    )
+  }
+)
+-------------------------------------------------------------------------------
+
+That all. Now every invocation of lambda which was passed to `messageQueue.subscribe` will run
+the transition which will prepend new notification to a state. Render will invoked automatically and user will see the notification on his page.
 
 Routing
 ~~~~~~~
 Router allow to use integrate browser navigation in you app. In the router you define bidirectional mapping between the state and url.
 
 Let's our application is a blog platform
+
 [source,scala]
 -------------------------------------------------------------------------------
 case class MyState(author: String, title: String, text: String)
@@ -355,8 +395,8 @@ KorolevServiceConfig(
 )
 -------------------------------------------------------------------------------
 
-Design patterns
----------------
+Productivity
+------------
 
 MST Pattern
 ~~~~~~~~~~~
@@ -368,7 +408,24 @@ Extensible state
 
 Web Components
 ~~~~~~~~~~~~~~
-(TODO)
+
+Usually when we say "components" we mean an UI element with an own state. Korolev doesn't support components by it's design, cause it leads to multi-state and breaks the simplicity which we want to reach. However you still could use WebComponents.
+
+Note Korolev doesn't have any specific code to support webcomponents. WebComponent (Custom Elements+ Shadow DOM) by design should behave as regular HTML tag. There is no difference between, for example, input or textarea, and any custom element.
+
+Developer mode and "hot reload"
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Developer mode provides "hot reload" expirience. Run your application with korolev.dev=true system property (or environment variable) and session will be kept alive after restart. We recommend to use sbt-revolver plugin.
+
+[source,bash]
+-------------------------------------------------------------------------------
+re-start --- -Dkorolev.dev=true
+-------------------------------------------------------------------------------
+
+Make a change in the source code of your app. Save the file. Switch to a browser and wait for changes to deliver.
+
+Also CSS files will be reloaded too.
 
 Korolev standalone server
 -------------------------
@@ -386,19 +443,4 @@ Integrations
 
 JCache
 ~~~~~~
-(TODO)
-
-Application servers
-~~~~~~~~~~~~~~~~~~~
-(TODO)
-
-Internals
----------
-
-Networking
-~~~~~~~~~~
-(TODO)
-
-Templates
-~~~~~~~~~
 (TODO)
