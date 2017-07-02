@@ -74,17 +74,7 @@ package object blazeServer {
 
       val responseF = Async[F].map(korolevServer(korolevRequest)) {
         case KorolevResponse.Http(status, streamOpt, responseHeaders) =>
-          val array = streamOpt match {
-            case Some(stream) =>
-              val array = new Array[Byte](stream.available)
-              var offset = 0
-              while (stream.available > 0) {
-                offset += stream.read(array, offset, stream.available)
-              }
-              array
-            case None =>
-              Array.empty[Byte]
-          }
+          val array = streamOpt.getOrElse(Array.empty)
           HttpResponse(status.code, status.phrase, responseHeaders, ByteBuffer.wrap(array))
         case KorolevResponse.WebSocket(publish, subscribe, destroy) =>
           val stage = new WebSocketStage {
