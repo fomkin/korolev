@@ -11,16 +11,16 @@ Not long ago we have entered the era of single-page applications. Some people sa
 
 Korolev runs a single-page application on the server side, keeping in the browser only a bridge to receive commands and send events. The page loads instantly and works fast because it does a minimal amount of computation. It's important that Korolev provides a unified environment for full stack development. Client and server are now combined into a single app without any REST protocol or something else in the middle.
 
-Our project supports static page rendering so that search engines can index pages and users can view them immediately.
+Our project supports static page rendering so that search engines could index pages and users could view them immediately.
 
 Principles
 ~~~~~~~~~~
 
 1. Thin client. Let's be honest, modern JavaScript applications are too greedy. Every JavaScript developer thinks that his page is special. But the user has a different opinion. He opens dozens of tabs. Each tab contains a ton of code, and this works very slowly. So we make our JavaScript bridge as lightweight as possible.
 
-2. Immutable and pure. Really, we don't need mutability even on the frontend. Especially on the frontend. The majority of modern JavaScript frameworks are trying to be functional. And so are we.
+2. Immutable and pure. Really, we don't need mutability even on the frontend. Especially on the frontend. The majority of modern JavaScript frameworks try to be functional. So we do.
 
-3. Lack of dependencies. Korolev does not impose to use cats, scalaz, Akka or futures from the standard library. Use what you want. Korolev tries to give a way to integrate itself into any environment.
+3. Lack of dependencies. Korolev does not impose to use cats, scalaz, Akka, or futures from the standard library. Use what you want. Korolev tries to give a way to integrate itself into any environment.
 
 Quick start
 ~~~~~~~~~~~
@@ -43,9 +43,9 @@ Understanding Korolev
 Device and Session
 ~~~~~~~~~~~~~~~~~~
 
-When a user opens your application first time, Korolev sets a cookie named `device` with the unique identifier. After that, you can identify the user by `deviceId`. Note that every new browser will receive a new `deviceId`.
+When a user opens your application the first time, Korolev sets a cookie named `device` with the unique identifier. After that, you can identify the user by `deviceId`. Note that every new browser window (or tab) will receive a new `deviceId`.
 
-A session is created when the user opens a page. Every session has the unique identifier. Korolev creates a State for every session.
+A session is created when the user opens a page. Every session has the unique identifier. Korolev has a _State_ for every session.
 
 State
 ~~~~~
@@ -81,12 +81,12 @@ StateStorage[Future, MyState].forDeviceId { deviceId =>
 }
 -----------------------------------
 
-The only way to modify the State is an applying a transition (see below).
+The only way to modify the State is by applying a transition (see below).
 
 Render
 ~~~~~~
 
-Render is a view of the state. Render is a function which takes state as the argument and returns Document Object Model. Korolev has its own DSL to define templates inside Scala code. Do not be afraid, you will quickly get used to it.
+Render is a view of the state. Render is a function which takes state as the argument and returns DOM description. Korolev has its own DSL to define templates using Scala code. Do not be afraid, you will quickly get used to it.
 
 [source,scala]
 -----------------------------------
@@ -112,14 +112,14 @@ val render: Render = {
 }
 -----------------------------------
 
-Render is called for each new state. Important to understand that render produces a full DOM for every call. It does not mean that client receives a new page every time. Korolev makes a diff between current and latest DOM. Only changes will be sent to the client.
+Render is called for each new state. It's important to understand that render produces a full DOM for every call. It does not mean that client receives a new page every time. Korolev makes a diff between current and latest DOM. Only changes between the two are sent to the client.
 
-`Render` is a type alias to `PartialFunction[S, Document.Node]` where `S` is a type of your state.
+`Render` is a type alias for `PartialFunction[S, Document.Node]` where `S` is a type of your state.
 
 Transitions
 ~~~~~~~~~~~
 
-Transition is a function that applies to current state and produces a new state. Consider a transition which adds new friend to the friends list.
+Transition is a function that applies to current state and produces a new state. Consider a transition which adds a new friend to the friends list.
 
 [source,scala]
 --------------------------------------------------------------
@@ -133,12 +133,12 @@ userService.addFriend(user.id, newFriend) map { _ =>
 }
 --------------------------------------------------------------
 
-`Transition` is a type alias to `PartialFunction[S, S]` where `S` is the type of your state.
+`Transition` is a type alias for `PartialFunction[S, S]` where `S` is the type of your state.
 
 Events
 ~~~~~~
 
-Every DOM event which had been emitted by browser's `document` object, can be handled by Korolev. Let's consider click event.
+Every DOM event emitted which had been emitted by browser's `document` object, can be handled by Korolev. Let's consider click event.
 
 [source,scala]
 --------------------------------------------------------------
@@ -160,7 +160,7 @@ val renderAnonymous: Render = {
 }
 --------------------------------------------------------------
 
-When "Increment" button will be clicked `i` will be incremented by 1. Let's consider the more difficult situation. Do you remember render example? Did you have a feeling that something was missed? Let's complement it with the events!
+When "Increment" button will be clicked, `i` will be incremented by 1. Let's consider a more complex situation. Do you remember render example? Did you have a feeling that something was missing? Let's complement it with the events!
 
 [source,scala]
 -----------------------------------
@@ -196,7 +196,7 @@ val renderAuthorized: Render = ???
 val render = renderAnonymous orElse renderAuthorized
 -----------------------------------
 
-Event with access gives you literally access to information from the client side. In this case, it is a value of the input fields.
+Event with access literally gives you an access to information from the client side. In this case, it it is values of the input fields.
 
 Event handlers should return `EventResult`.
 
@@ -206,9 +206,9 @@ EventResult
 Korolev expects `EventResult` as a return type of event handlers. There are three types of event results.
 
 
-1. `immediateTransition` - Is a transition which is applied to current state right now. It's useful to making lightweight synchronous transitions. For example, you have a page with the "Query" field and the "Search" button. When the button was clicked, your application requests database or micro-service to execute the query. But user wants to see reaction be before you receive the data. So you update the state with "Loading" flag in `immediateTransition` and user see reaction immediately. Signature of `immediateTransition` is `Transition[S]` which are type alias to `PartialFunction[S, S]` where `S` is your state type.
+1. `immediateTransition` - Is a transition which is applied to current state right now. It's useful for making lightweight synchronous transitions. For example, you have a page with the "Query" field and the "Search" button. When the button is clicked, your application requests database or micro-service to execute the query. But user wants to see reaction before receiving the data. So you update the state with "Loading" flag in `immediateTransition` and user sees reaction immediately. Signature of `immediateTransition` is `Transition` that is a type alias for `PartialFunction[S, S]` where `S` is your state type.
 
-2. `deferredTransition` - In the previous example, your application does request to some sort of backend. Such request in Scala usually is asynchronous. So `deferredTransition` is a way to make your application waits for the response. `deferredTransition` will be applied to the state when the `Future` will be completed. Signature of `deferredTransition` is `Future[Transition[S]]`.
+2. `deferredTransition` - In the previous example, your application performs a request to some sort of backend. Such request in Scala is usually asynchronous. So `deferredTransition` is a way to make your application to wait for the response. `deferredTransition` will be applied to the state when the `Future` is completed. Signature of `deferredTransition` is `Future[Transition]`.
 
 3. `noTransition` - It means you don't want to make any reaction.
 
@@ -217,7 +217,7 @@ Also, you can combine `immediateTransition` and `deferredTransition`.
 Access element properties
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-In the scope of event, you can access the element properties if an element was bound with `elementId`. You can get value (limited by simple types like `String` and `Double`).
+In the scope of an event, you can access the element properties if an element was bound with `elementId`. You can get the value (limited by simple types like `String` and `Double`).
 
 [source,scala]
 -----------------------------------
@@ -245,9 +245,9 @@ access.property[String](loginField).set('value, "John Doe") map {
 FormData
 ~~~~~~~~
 
-Above, we considered a method allowing to read values and update from inputs. The flaw of this is a need of reading input one-by-one and disability of files loading. FormData attended to solve this disadvantages.
+Above, we considered a method allowing to read values and update from inputs. The flaw of this is a need of reading input one-by-one and lack of files uploading. FormData attended to solve these problems.
 
-In the difference of `property`, FormData works with form tag, not with input tag.
+In contrast to `property`, FormData works with form tag, not with input tag.
 
 [source,scala]
 -----------------------------------
@@ -288,7 +288,7 @@ https://github.com/fomkin/korolev/blob/v0.4.1/examples/form-data/src/main/scala/
 
 Delays
 ~~~~~~
-Sometimes you want to update a page after a timeout. For example it useful when you show some sort of notification and have to close it after few seconds. Delays applies transition after given `FiniteDuration`
+Sometimes you want to update a page after a timeout. For example it is useful when you want to show some sort of notification and have to close it after a few seconds. Delays apply transition after a given `FiniteDuration`
 
 [source,scala]
 -----------------------------------
@@ -335,7 +335,7 @@ var render: Render = {
 }
 -----------------------------------
 
-Also we have a message queue which have a topic with notifications for current user. The topic has identifier based on `deviceId` of a client. Lets try to bind an application state with a messages from the queue.
+Also we have a message queue which has a topic with notifications for current user. The topic has identifier based on `deviceId` of a client. Lets try to bind an application state with messages from the queue.
 
 [source,scala]
 -------------------------------------------------------------------------------
@@ -358,14 +358,14 @@ KorolevServiceConfig(
 )
 -------------------------------------------------------------------------------
 
-That all. Now every invocation of lambda which was passed to `messageQueue.subscribe` will run
-the transition which will prepend new notification to a state. Render will invoked automatically and user will see the notification on his page.
+That's all. Now every invocation of lambda which was passed to `messageQueue.subscribe` will run
+the transition which will prepend new notification to the state. Render will be invoked automatically and user will get the notification on his page.
 
 Routing
 ~~~~~~~
-Router allow to use integrate browser navigation in you app. In the router you define bidirectional mapping between the state and url.
+Router allows to integrate browser navigation to you app. In the router you define bidirectional mapping between the state and the URL.
 
-Let's our application is a blog platform
+Let's pretends that you application is a blogging platform
 
 [source,scala]
 -------------------------------------------------------------------------------
@@ -418,11 +418,11 @@ Productivity
 Web Components
 ~~~~~~~~~~~~~~
 
-Usually when we say "components" we mean an UI element with an own state. Korolev doesn't support components by it's design, cause it leads to multi-state and breaks the simplicity which we want to reach. However you still could use https://www.w3.org/standards/techs/components[WebComponents].
+Usually when we say "components" we mean an UI element with its own state. Korolev doesn't support components by design, cause it leads to multiple states and breaks the simplicity which we want to reach. However you still can use https://www.w3.org/standards/techs/components[WebComponents].
 
 [NOTE]
 ============
-Korolev doesn't have any specific code to support WebComponents. WebComponent (Custom Elements + Shadow DOM) by design should behave as regular HTML tag. There is no difference between, for example, input or textarea, and any custom element.
+Korolev doesn't have any specific code to support WebComponents. WebComponent (Custom Elements + Shadow DOM) by design should behave as regular HTML tags. There is no difference between, for example, input or textarea, and any custom element.
 ============
 
 https://github.com/fomkin/korolev/blob/v0.4.1/examples/web-component/src/main/scala/WebComponentExample.scala[See full example]
@@ -430,7 +430,7 @@ https://github.com/fomkin/korolev/blob/v0.4.1/examples/web-component/src/main/sc
 Developer mode and "hot reload"
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Developer mode provides "hot reload" experience. Run your application with korolev.dev=true system property (or environment variable) and session will be kept alive after restart. We recommend to use https://github.com/spray/sbt-revolver[sbt-revolver] plugin.
+Developer mode provides "hot reload" experience. Run your application with `korolev.dev=true` system property (or environment variable) and session will be kept alive after restart. We recommend to use https://github.com/spray/sbt-revolver[sbt-revolver] plugin.
 
 [source,bash]
 -------------------------------------------------------------------------------
@@ -441,13 +441,13 @@ Make a change in the source code of your app. Save the file. Switch to a browser
 
 [NOTE]
 ============
-Ensure that everything is stateless except Korolev part of the application. For example, if you have a models wich hold state in a hashmaps they will be not saved. It will lead to inconsistency.
+Ensure that everything is stateless except Korolev part of the application. For example, if you have models which hold state in hash maps they will be not saved. It will lead to inconsistency.
 ============
 
 Serve files from resource directory
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Everything that placed in directory named `static` (in classpath of the application) will be served from the root of the application endpoint. It may be useful when you want to distribute some small images or CSS with the app.
+Everything that placed in directory named `static` (in the classpath of the application) will be served from the root of the application endpoint. It may be useful when you want to distribute some small images or CSS with the app.
 
 [WARNING]
 ============
@@ -460,9 +460,9 @@ Integrations
 JCache
 ~~~~~~
 
-In case of large applications, when one node can't serve all clients, you need a way to scale application to multiple nodes. Although Korolev usually use permanent connections, a cases when a client connect to wrong node is possible. First, it may be happened when reconnect. Second, it can happened when client downgrade connection from WebSocket to long polling by the some reason. It means that every node in a cluster should have access to all user states (sessions).
+For large applications, when one node can't serve all clients, you need a way to scale application to multiple nodes. Although Korolev usually use permanent connections, a case when a client connects to a wrong node is possible. First, it may happen when reconnect. Second, it may happen when the client downgrades his connection from WebSocket to long polling for some reason. It means that every node in a cluster should have access to all user states (sessions).
 
-You can apply any in-memory storage compatible with https://github.com/jsr107/jsr107spec[JCache]. Just add dependency to your SBT configuration.
+To fix this, you can apply any in-memory storage compatible with https://github.com/jsr107/jsr107spec[JCache]. Just add a dependency to your SBT configuration.
 
 [source,scala]
 ------------------------------

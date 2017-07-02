@@ -13,10 +13,10 @@ Korolev runs a single-page application on the server side, keeping in the browse
 ## Why?
 
 * Lightning-fast page loading speed
-* Comparable to static HTML client side RAM consumption
-* Indexable pages out of box
-* Routing out of box
-* Build extremely large app without enlarging weight of the page
+* Comparable to static HTML client-side RAM consumption
+* Indexable pages out of the box
+* Routing out of the box
+* Build extremely large app without increasing size of the page
 * No need to make CRUD REST service
 * Connect to infrastructure (DBMS, Message queue) directly from application
 * Data security
