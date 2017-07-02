@@ -41,7 +41,7 @@ object StateManager {
                 subscribers.foreach(f => f(newState))
                 promise.complete(Success(()))
               case None =>
-                promise.complete(Failure(new Exception("Transition don't fit this state")))
+                promise.complete(Failure(new Exception("Transition doesn't fit this state")))
             }
           } catch {
             case e: Throwable =>

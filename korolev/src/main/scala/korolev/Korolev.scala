@@ -195,12 +195,16 @@ object Korolev {
                   case event: ApplicationContext.EventWithAccess[F, S, M] => event.effect(browserAccess)
                   case event: ApplicationContext.SimpleEvent[F, S, M] => event.effect()
                 }
-                eventResultOpt.fold(true) { er =>
-                  List(er.it.map(async.pure(_)), er.dt).flatten.foreach { transitionF =>
-                    async.run(transitionF) {
-                      case Success(transition) => stateManager(transition).runIgnoreResult()
-                      case Failure(e) => logger.error("Exception during applying transition", e)
+                eventResultOpt.fold(true) { er: EventResult[F, S] =>
+                  // Apply immediate transition
+                  er.it.fold(async.unit)(it => stateManager(it)) flatMap { _ =>
+                    // Apply deferred transition
+                    er.dt.fold(async.unit) { transitionF =>
+                      transitionF.map(stateManager.apply)
                     }
+                  } run {
+                    case Success(_) => // ok transitions was applied
+                    case Failure(e) => logger.error("Exception during applying transition", e)
                   }
                   !er.sp
                 }
