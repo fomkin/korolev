@@ -1,6 +1,5 @@
 package korolev.server
 
-import java.io.{ByteArrayInputStream, InputStream}
 import java.nio.charset.StandardCharsets
 
 /**
@@ -11,15 +10,14 @@ sealed trait Response
 object Response {
 
   case class Http(status: Status,
-                  body: Option[InputStream] = None,
+                  body: Option[Array[Byte]] = None,
                   headers: Seq[(String, String)] = Seq.empty)
       extends Response
 
   object Http {
     def apply(status: Status, message: String): Http = {
       val bytes = message.getBytes(StandardCharsets.UTF_8)
-      val body = new ByteArrayInputStream(bytes)
-      Http(status, Some(body))
+      Http(status, Some(bytes))
     }
   }
 

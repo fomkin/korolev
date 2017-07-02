@@ -1,8 +1,7 @@
 package korolev
 
-import java.io.{ByteArrayInputStream, InputStream}
+import java.io.{ByteArrayOutputStream, InputStream}
 import java.nio.charset.StandardCharsets
-import java.util.UUID
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 
@@ -97,8 +96,7 @@ package object server extends LazyLogging {
               .append('\n')
               .append(textRenderContext.builder)
               .mkString
-            val bytes = html.getBytes(StandardCharsets.UTF_8)
-            new ByteArrayInputStream(bytes)
+            html.getBytes(StandardCharsets.UTF_8)
           }
         )
       }
@@ -107,9 +105,9 @@ package object server extends LazyLogging {
     object matchStatic {
 
       /**
-        * @return (InputStream with resource, ContentType)
+        * @return (resource bytes, ContentType)
         */
-      def unapply(req: Request): Option[(InputStream, String)] =
+      def unapply(req: Request): Option[(Array[Byte], String)] =
         req.path match {
           case Root => None
           case path @ _ / fileName =>
@@ -120,9 +118,25 @@ package object server extends LazyLogging {
                 case -1 => binaryContentType
                 case index => fileName.substring(index + 1)
               }
-              (stream, fileExtension)
+              (inputStreamToBytes(stream), fileExtension)
             }
         }
+
+      private def inputStreamToBytes(stream: InputStream): Array[Byte] = {
+        val bufferSize = 32
+        val baos = new ByteArrayOutputStream(Math.max(bufferSize, stream.available()))
+        val buffer = new Array[Byte](bufferSize)
+
+        var lastBytesRead = 0
+        while ({
+          lastBytesRead = stream.read(buffer)
+          lastBytesRead != -1
+        }) {
+          baos.write(buffer, 0, lastBytesRead)
+        }
+
+        baos.toByteArray
+      }
     }
 
     def deviceFromRequest(request: Request): (Boolean, String) = {
@@ -266,7 +280,7 @@ package object server extends LazyLogging {
         sessionAsync.flatMap { session =>
           session.nextMessage.map { message =>
             Response.Http(Response.Status.Ok,
-              body = Some(new ByteArrayInputStream(message.getBytes(StandardCharsets.UTF_8))),
+              body = Some(message.getBytes(StandardCharsets.UTF_8)),
               headers = Seq("Cache-Control" -> "no-cache")
             )
           }
