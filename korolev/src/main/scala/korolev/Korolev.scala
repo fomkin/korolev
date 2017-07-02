@@ -151,7 +151,7 @@ object Korolev {
           def start(): F[FormData] = effectsReactor.elements.get(eId) match {
             case Some(id) =>
               val promise = async.promise[FormData]
-              val future = client.call[Unit]("UploadForm", id, descriptor)
+              val future = client.call[Unit]("UploadForm", id.mkString, descriptor)
               formDataPromises.put(descriptor, promise)
               jsAccess.flush()
               future.flatMap(_ => promise.future)
