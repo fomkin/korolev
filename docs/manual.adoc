@@ -22,6 +22,21 @@ Principles
 
 3. Lack of dependencies. Korolev does not impose to use cats, scalaz, Akka or futures from the standard library. Use what you want. Korolev tries to give a way to integrate itself into any environment.
 
+Quick start
+~~~~~~~~~~~
+
+You need SBT 0.13.15 and JDK 8+ installed. Once installed, run g8 template.
+
+[source,bash]
+-----------------------------------
+$ sbt new fomkin/korolev.g8
+$ cd mykorolevproject
+$ sbt
+> re-start
+-----------------------------------
+
+Ok, now you are ready to start hacking with Korolev.
+
 Understanding Korolev
 ---------------------
 
@@ -269,7 +284,7 @@ val pictureFieldName = "picture"
 
 Use `onProgress` callback to handle progress of the form downloading. Function `start` return a `FormData`. Look API documentation for more details.
 
-https://github.com/fomkin/korolev/blob/v0.4.0/examples/form-data/src/main/scala/FormDataExample.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.4.1/examples/form-data/src/main/scala/FormDataExample.scala[See full example]
 
 Delays
 ~~~~~~
@@ -299,7 +314,7 @@ val render: Render = {
 }
 -----------------------------------
 
-https://github.com/fomkin/korolev/blob/v0.4.0/examples/delay/src/main/scala/DelayExample.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.4.1/examples/delay/src/main/scala/DelayExample.scala[See full example]
 
 Environment configurator
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -395,52 +410,63 @@ KorolevServiceConfig(
 )
 -------------------------------------------------------------------------------
 
+https://github.com/fomkin/korolev/blob/v0.4.1/examples/routing/src/main/scala/RoutingExample.scala#L93[See full example]
+
 Productivity
 ------------
-
-MST Pattern
-~~~~~~~~~~~
-(TODO)
-
-Extensible state
-~~~~~~~~~~~~~~~~
-(TODO)
 
 Web Components
 ~~~~~~~~~~~~~~
 
-Usually when we say "components" we mean an UI element with an own state. Korolev doesn't support components by it's design, cause it leads to multi-state and breaks the simplicity which we want to reach. However you still could use WebComponents.
+Usually when we say "components" we mean an UI element with an own state. Korolev doesn't support components by it's design, cause it leads to multi-state and breaks the simplicity which we want to reach. However you still could use https://www.w3.org/standards/techs/components[WebComponents].
 
-Note Korolev doesn't have any specific code to support webcomponents. WebComponent (Custom Elements + Shadow DOM) by design should behave as regular HTML tag. There is no difference between, for example, input or textarea, and any custom element.
+[NOTE]
+============
+Korolev doesn't have any specific code to support WebComponents. WebComponent (Custom Elements + Shadow DOM) by design should behave as regular HTML tag. There is no difference between, for example, input or textarea, and any custom element.
+============
+
+https://github.com/fomkin/korolev/blob/v0.4.1/examples/web-component/src/main/scala/WebComponentExample.scala[See full example]
 
 Developer mode and "hot reload"
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Developer mode provides "hot reload" expirience. Run your application with korolev.dev=true system property (or environment variable) and session will be kept alive after restart. We recommend to use sbt-revolver plugin.
+Developer mode provides "hot reload" experience. Run your application with korolev.dev=true system property (or environment variable) and session will be kept alive after restart. We recommend to use https://github.com/spray/sbt-revolver[sbt-revolver] plugin.
 
 [source,bash]
 -------------------------------------------------------------------------------
 re-start --- -Dkorolev.dev=true
 -------------------------------------------------------------------------------
 
-Make a change in the source code of your app. Save the file. Switch to a browser and wait for changes to deliver.
+Make a change in the source code of your app. Save the file. Switch to a browser and wait for changes to deliver. Developer mode does not work with custom `StateStorage`.
 
-Also CSS files will be reloaded too.
-
-Korolev standalone server
--------------------------
-
-Setup
-~~~~~
-(TODO)
+[NOTE]
+============
+Ensure that everything is stateless except Korolev part of the application. For example, if you have a models wich hold state in a hashmaps they will be not saved. It will lead to inconsistency.
+============
 
 Serve files from resource directory
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-(TODO)
+
+Everything that placed in directory named `static` (in classpath of the application) will be served from the root of the application endpoint. It may be useful when you want to distribute some small images or CSS with the app.
+
+[WARNING]
+============
+Korolev is not some sort of CDN node. Avoid to serve a lot of large files using this feature.
+============
 
 Integrations
 ------------
 
 JCache
 ~~~~~~
-(TODO)
+
+In case of large applications, when one node can't serve all clients, you need a way to scale application to multiple nodes. Although Korolev usually use permanent connections, a cases when a client connect to wrong node is possible. First, it may be happened when reconnect. Second, it can happened when client downgrade connection from WebSocket to long polling by the some reason. It means that every node in a cluster should have access to all user states (sessions).
+
+You can apply any in-memory storage compatible with https://github.com/jsr107/jsr107spec[JCache]. Just add dependency to your SBT configuration.
+
+[source,scala]
+------------------------------
+libraryDependencies += "com.github.fomkin" %% "korolev-jcache-support" % "0.4.1"
+------------------------------
+
+https://github.com/fomkin/korolev/blob/v0.4.1/examples/jcache/src/main/scala/JCacheExample.scala[See full example]
