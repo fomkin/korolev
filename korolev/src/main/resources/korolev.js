@@ -136,6 +136,10 @@
         if (isProperty) element[name] = undefined;
         else element.removeAttribute(name);
       },
+      Focus: function (id) {
+        var element = els[id];
+        element.focus();
+      },
       RegisterHistoryHandler: function(handler) {
         global.addEventListener('popstate', historyHandler = function(event) {
           if (event.state === null) handler(initialPath);
