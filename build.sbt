@@ -44,11 +44,11 @@ val publishSettings = Seq(
 )
 
 val commonSettings = publishSettings ++ Seq(
-  scalaVersion := "2.11.11", // Need by IntelliJ
+  scalaVersion := "2.11.11", // Needed by IntelliJ
   organization := "com.github.fomkin",
   version := "0.4.2",
   libraryDependencies ++= Seq(
-    "org.scalatest" %% "scalatest" % "3.0.1" % "test"
+    "org.scalatest" %% "scalatest" % "3.0.1" % Test
   ),
   scalacOptions ++= Seq(
     "-deprecation",
@@ -67,20 +67,18 @@ lazy val serverOsgiSettings = osgiSettings ++ Seq(
   OsgiKeys.exportPackage := Seq("korolev.server.*;version=${Bundle-Version}")
 )
 
-lazy val server = project.
+lazy val server = (project in file("server") / "base").
   settings(commonSettings: _*).
   settings(
     normalizedName := "korolev-server",
     libraryDependencies += "biz.enef" %% "slogging-slf4j" % "0.5.2"
   ).
-  dependsOn(korolev).
-  enablePlugins(SbtOsgi).settings(serverOsgiSettings:_*)
+  dependsOn(korolev)
 
 lazy val serverBlazeOsgiSettings = osgiSettings ++ Seq(
   OsgiKeys.exportPackage := Seq("korolev.blazeServer.*;version=${Bundle-Version}")
 )
-
-lazy val `server-blaze` = project.
+lazy val `server-blaze` = (project in file("server") / "blaze").
   settings(commonSettings: _*).
   settings(
     normalizedName := "korolev-server-blaze",
@@ -88,6 +86,18 @@ lazy val `server-blaze` = project.
   ).
   dependsOn(server).
   enablePlugins(SbtOsgi).settings(serverBlazeOsgiSettings:_*)
+
+lazy val serverAkkaHttpOsgiSettings = osgiSettings ++ Seq(
+  OsgiKeys.exportPackage := Seq("korolev.akkahttp.*;version=${Bundle-Version}")
+)
+lazy val `server-akkahttp` = (project in file("server") / "akkahttp").
+  settings(commonSettings: _*).
+  settings(
+    normalizedName := "korolev-server-akkahttp",
+    libraryDependencies ++= Seq("com.typesafe.akka" %% "akka-http" % "10.0.9")
+  ).
+  dependsOn(server).
+  enablePlugins(SbtOsgi).settings(serverAkkaHttpOsgiSettings:_*)
 
 lazy val asyncOsgiSettings = osgiSettings ++ Seq(
   OsgiKeys.exportPackage := Seq("korolev.*;version=${Bundle-Version}")
@@ -107,7 +117,7 @@ lazy val bridge = project.
   settings(
     normalizedName := "korolev-bridge",
     libraryDependencies ++= Seq(
-      "com.lihaoyi" %% "utest" % "0.4.4" % "test"
+      "com.lihaoyi" %% "utest" % "0.4.4" % Test
     ),
     testFrameworks += new TestFramework("utest.runner.Framework")
     //unmanagedResourceDirectories in Compile += file("bridge") / "src" / "main" / "resources"
@@ -133,7 +143,7 @@ lazy val korolev = project.
   dependsOn(bridge).
   enablePlugins(SbtOsgi).settings(korolevOsgiSettings:_*)
 
-val `jcache-support` = project.
+lazy val `jcache-support` = project.
   enablePlugins(SbtOsgi).
   settings(commonSettings: _*).
   settings(osgiSettings: _*).
@@ -199,6 +209,13 @@ lazy val webComponentExample = (project in examples / "web-component").
   settings(mainClass := Some("WebComponentExample")).
   dependsOn(`server-blaze`)
 
+lazy val akkaHttpExample = (project in examples / "akka-http").
+  enablePlugins(JavaAppPackaging).
+  enablePlugins(UniversalPlugin).
+  settings(exampleSettings: _*).
+  settings(mainClass := Some("AkkaHttpExample")).
+  dependsOn(`server-akkahttp`)
+
 lazy val `integration-tests` = project.
   settings(commonSettings).
   settings(dontPublishSettings:_*).
@@ -226,17 +243,15 @@ lazy val `performance-benchmark` = project.
 lazy val root = project.in(file(".")).
   settings(dontPublishSettings:_*).
   aggregate(
-    korolev, bridge, async, server,
-    `server-blaze`, `jcache-support`,
+    korolev, bridge, async,
+    server, `server-blaze`, `server-akkahttp`,
+    `jcache-support`,
     simpleExample, routingExample, gameOfLifeExample,
     jcacheExample, formDataExample, delayExample,
-    webComponentExample,
+    webComponentExample, akkaHttpExample,
     `integration-tests`, `performance-benchmark`
   )
 
-publishTo := unusedRepo
-
 crossScalaVersions := Seq("2.11.11", "2.12.2")
 
-publishArtifact := false
-
+dontPublishSettings

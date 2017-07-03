@@ -470,3 +470,30 @@ libraryDependencies += "com.github.fomkin" %% "korolev-jcache-support" % "0.4.2"
 ------------------------------
 
 https://github.com/fomkin/korolev/blob/v0.4.2/examples/jcache/src/main/scala/JCacheExample.scala[See full example]
+
+Akka HTTP
+~~~~~~~~~
+
+Korolev provides smooth Akka HTTP integration out of the box. To use it, add a dependency:
+
+[source,scala]
+------------------------------
+libraryDependencies += "com.github.fomkin" %% "korolev-server-akkahttp" % "0.5.0"
+------------------------------
+
+And create Korolev route:
+
+[source,scala]
+------------------------------
+val config = KorolevServiceConfig[Future, Boolean, Any](
+  stateStorage = StateStorage.default(false),
+  serverRouter = ServerRouter.empty[Future, Boolean],
+  render = { case _ => 'div("Hello akka-http") }
+)
+
+val korolevRoute = akkaHttpService(config).apply(AkkaHttpServerConfig())
+------------------------------
+
+Then embed the route into your Akka HTTP routes structure.
+
+https://github.com/fomkin/korolev/blob/v0.5.0/examples/akka-http/src/main/scala/AkkaHttpExample.scala[See full example]

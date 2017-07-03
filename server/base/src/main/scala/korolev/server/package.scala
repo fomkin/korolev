@@ -23,6 +23,7 @@ import scala.util.{Failure, Random, Success, Try}
 package object server extends LazyLogging {
 
   type MimeTypes = String => Option[String]
+  type KorolevService[F[+_]] = PartialFunction[Request, F[Response]]
 
   private[server] class SessionDestroyedException(s: String) extends Exception(s)
 
@@ -36,7 +37,7 @@ package object server extends LazyLogging {
   def korolevService[F[+_]: Async, S, M](
     mimeTypes: MimeTypes,
     config: KorolevServiceConfig[F, S, M]
-  ): PartialFunction[Request, F[Response]] = {
+  ): KorolevService[F] = {
 
     import misc._
 
@@ -260,7 +261,8 @@ package object server extends LazyLogging {
                 session.resolveFormData(descriptor, formData)
                 Async[F].pure(Response.Http(Response.Status.Ok, None))
             }
-          case None => Async[F].pure(Response.Http(Response.Status.BadRequest, "Session isn't exist"))
+          case None =>
+            Async[F].pure(Response.Http(Response.Status.BadRequest, "Session doesn't exist"))
         }
       case Request(Root / "bridge" / "long-polling" / deviceId / sessionId / "publish", _, _, _, body) =>
         sessions.get(makeSessionKey(deviceId, sessionId)) match {
@@ -270,7 +272,7 @@ package object server extends LazyLogging {
               .publish(message)
               .map(_ => Response.Http(Response.Status.Ok))
           case None =>
-            Async[F].pure(Response.Http(Response.Status.BadRequest, "Session isn't exist"))
+            Async[F].pure(Response.Http(Response.Status.BadRequest, "Session doesn't exist"))
         }
       case Request(Root / "bridge" / "long-polling" / deviceId / sessionId / "subscribe", _, _, _, _) =>
         val sessionAsync = sessions.get(makeSessionKey(deviceId, sessionId)) match {
