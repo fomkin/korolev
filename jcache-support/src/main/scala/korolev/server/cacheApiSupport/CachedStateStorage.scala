@@ -3,11 +3,9 @@ package korolev.server.cacheApiSupport
 import javax.cache.Cache
 
 import korolev.Async
-import korolev.Async._
 import korolev.server.StateStorage
 import korolev.server.StateStorage.{DeviceId, SessionId}
 
-import scala.language.higherKinds
 
 /**
   * State storage based on
@@ -38,7 +36,6 @@ import scala.language.higherKinds
   *
   * @see <a href="https://jcp.org/aboutJava/communityprocess/final/jsr107/index.html">JSR-107 Specification</a>
   * @see <a href="https://jcp.org/aboutJava/communityprocess/implementations/jsr107/index.html">List of JSR-107 implementations</a>
-  * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
   */
 final class CachedStateStorage[F[+_]: Async, T](cache: Cache[String, T], initialState: DeviceId => F[T])
   extends StateStorage[F, T] {

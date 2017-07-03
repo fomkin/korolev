@@ -6,9 +6,6 @@ import korolev.execution._
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
-/**
-  * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
-  */
 object DelayExample extends KorolevBlazeServer {
 
   val applicationContext = ApplicationContext[Future, Boolean, Any]

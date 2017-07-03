@@ -1,8 +1,5 @@
 package korolev.blazeServer
 
-/**
-  * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
-  */
 import org.http4s.blaze.pipeline._
 import org.http4s.blaze.util.Execution.trampoline
 import org.http4s.blaze.pipeline.stages.SerializingStage

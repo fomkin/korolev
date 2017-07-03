@@ -2,10 +2,6 @@ import pushka.Ast
 import Ast._
 import pushka.json._
 
-
-/**
-  * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
-  */
 sealed trait KorolevIncomingMessage
 
 object KorolevIncomingMessage {

@@ -5,9 +5,6 @@ import slogging._
 
 import scala.concurrent.ExecutionContextExecutorService
 
-/**
-  * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
-  */
 abstract class KorolevBlazeServer(config: BlazeServerConfig = null)(
   implicit executionContext: ExecutionContextExecutorService
 ) {
@@ -17,5 +14,6 @@ abstract class KorolevBlazeServer(config: BlazeServerConfig = null)(
     LoggerConfig.factory = SLF4JLoggerFactory()
     val escapedConfig = Option(config).getOrElse(BlazeServerConfig())
     runServer(service, escapedConfig)
+    ()
   }
 }

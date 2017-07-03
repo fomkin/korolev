@@ -14,25 +14,12 @@ import slogging.LazyLogging
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
 import scala.io.Source
-import scala.language.higherKinds
 import scala.util.{Failure, Random, Success, Try}
 
-/**
-  * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
-  */
 package object server extends LazyLogging {
 
   type MimeTypes = String => Option[String]
   type KorolevService[F[+_]] = PartialFunction[Request, F[Response]]
-
-  private[server] class SessionDestroyedException(s: String) extends Exception(s)
-
-  private[server] abstract class KorolevSession[F[+_]: Async] {
-    def publish(message: String): F[Unit]
-    def nextMessage: F[String]
-    def destroy(): F[Unit]
-    def resolveFormData(descriptor: String, formData: Try[FormData]): Unit
-  }
 
   def korolevService[F[+_]: Async, S, M](
     mimeTypes: MimeTypes,
@@ -157,6 +144,7 @@ package object server extends LazyLogging {
       val jsAccess = {
         val addToQueue: String => Unit = { message =>
           sendingQueue.add(message)
+          ()
         }
         JsonQueuedJsAccess { message =>
           val fOpt = subscriber.getAndSet(None)
@@ -310,7 +298,7 @@ package object server extends LazyLogging {
                 case Success(message) =>
                   newSubscriber(message)
                   aux()
-                case Failure(e: SessionDestroyedException) => // Do nothing
+                case Failure(_: SessionDestroyedException) => // Do nothing
                 case Failure(e) =>
                   logger.error("An error occurred during polling message from session", e)
               }
@@ -341,10 +329,4 @@ package object server extends LazyLogging {
     }
   }
 
-  private final val OpOpen = 1
-  private final val OpClose = 2
-  private final val OpAttr = 3
-  private final val OpText = 4
-  private final val OpLastAttr = 5
-  private final val OpEnd = 6
 }

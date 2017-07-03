@@ -33,7 +33,7 @@
       function postMessage(data) {
         var res = data[2], value;
         if (res instanceof Transferable) {
-          value = res.value
+          value = res.value;
           data[2] = value;
           postMessageFunction(data, [value]);
         }
@@ -179,7 +179,7 @@
             err = null;
         args = args.slice(0,2).concat(args.slice(3));
         receiveCall(reqId, args, function (callRes) {
-          callRes = callRes[2]
+          callRes = callRes[2];
           if (callRes.indexOf(ObjPrefix) !== -1) {
             id = callRes.substring(ObjPrefix.length);
             receiveSave(reqId, [getLink(id), newId], cb);

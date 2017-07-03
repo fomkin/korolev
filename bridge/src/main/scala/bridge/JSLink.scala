@@ -1,6 +1,5 @@
 package bridge
 
-import scala.language.higherKinds
 import korolev.Async
 
 /**
@@ -8,7 +7,6 @@ import korolev.Async
  * will be removed by GC cause its have no references in a page. 
  * PageLink give you ability to `save()` it. When you don't need
  * the link no more you can `free()` it.
- * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
  */
 abstract class JSLink[F[+_]: Async] {
 

@@ -1,10 +1,5 @@
 package korolev
 
-import scala.language.higherKinds
-
-/**
-  * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
-  */
 case class EventResult[F[+_]: Async, S](
     it: Option[StateManager.Transition[S]] = None,
     dt: Option[F[StateManager.Transition[S]]] = None,

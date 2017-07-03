@@ -5,9 +5,6 @@ import korolev.execution._
 
 import scala.concurrent.Future
 
-/**
-  * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
-  */
 object RoutingExample extends KorolevBlazeServer {
 
   import State.applicationContext._

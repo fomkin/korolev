@@ -11,9 +11,6 @@ import org.http4s.blaze.util.{Execution, GenericSSLContext}
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 
-/**
-  * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
-  */
 class SauceLabsClient(userName: String, accessKey: String, jobId: String) extends HttpClient {
 
   import scala.concurrent.ExecutionContext.Implicits.global
@@ -44,6 +41,7 @@ class SauceLabsClient(userName: String, accessKey: String, jobId: String) extend
       5 seconds
     )
     Await.result(response, 10 seconds)
+    ()
   }
 
   // Cause blaze client doesn't support anything else GET!
@@ -51,7 +49,7 @@ class SauceLabsClient(userName: String, accessKey: String, jobId: String) extend
     val r = runReq("PUT", url, headers, body, timeout)
     r.flatMap {
       case r: HttpResponse => Future.successful(r)
-      case r => Future.failed(new Exception(s"Received invalid response type: ${r.getClass}"))
+      case _ => Future.failed(new Exception(s"Received invalid response type: ${r.getClass}"))
     }(Execution.directec)
   }
 }

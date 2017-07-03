@@ -29,8 +29,8 @@ class HttpServerStage(maxReqBody: Long, maxNonbody: Int)(handleRequest: HttpServ
 
   val name = "HTTP/1.1_Stage"
 
-  private var uri: String = null
-  private var method: String = null
+  private var uri: String = _
+  private var method: String = _
   private var minor: Int = -1
   private var major: Int = -1
   private var headers = new ArrayBuffer[(String, String)]
@@ -38,7 +38,7 @@ class HttpServerStage(maxReqBody: Long, maxNonbody: Int)(handleRequest: HttpServ
   /////////////////////////////////////////////////////////////////////////////////////////
 
   // Will act as our loop
-  override def stageStartup() {
+  override def stageStartup(): Unit = {
     logger.info("Starting HttpStage")
     requestLoop()
   }
@@ -70,7 +70,7 @@ class HttpServerStage(maxReqBody: Long, maxNonbody: Int)(handleRequest: HttpServ
     catch { case t: Throwable => shutdownWithCommand(Cmd.Error(t)) }
   }
 
-  private def resetStage() {
+  private def resetStage(): Unit = {
     reset()
     uri = null
     method = null
@@ -81,7 +81,7 @@ class HttpServerStage(maxReqBody: Long, maxNonbody: Int)(handleRequest: HttpServ
 
   private def runRequest(buffer: ByteBuffer, reqHeaders: Headers): Unit = {
     try handleRequest(method, uri, reqHeaders, buffer).flatMap {
-      case r: HttpResponse    => handleHttpResponse(r, reqHeaders, false)
+      case r: HttpResponse    => handleHttpResponse(r, reqHeaders, forceClose = false)
       case WSResponse(stage)        => handleWebSocket(reqHeaders, stage)
     }.onComplete {       // See if we should restart the loop
       case Success(Reload)          => resetStage(); requestLoop()
@@ -96,7 +96,7 @@ class HttpServerStage(maxReqBody: Long, maxNonbody: Int)(handleRequest: HttpServ
         val body = ByteBuffer.wrap("Internal Service Error".getBytes(StandardCharsets.ISO_8859_1))
         val resp = HttpResponse(200, "OK", Nil, body)
 
-        handleHttpResponse(resp, reqHeaders, false).onComplete { _ =>
+        handleHttpResponse(resp, reqHeaders, forceClose = false).onComplete { _ =>
           shutdownWithCommand(Cmd.Error(e))
         }
     }
@@ -158,7 +158,7 @@ class HttpServerStage(maxReqBody: Long, maxNonbody: Int)(handleRequest: HttpServ
       .onComplete(_ => shutdownWithCommand(Cmd.Disconnect))
   }
 
-  private def renderHeaders(sb: StringBuilder, headers: Seq[(String, String)], length: Int) {
+  private def renderHeaders(sb: StringBuilder, headers: Seq[(String, String)], length: Int): Unit = {
     headers.foreach { case (k, v) =>
       // We are not allowing chunked responses at the moment, strip our Chunked-Encoding headers
       if (!k.equalsIgnoreCase("Transfer-Encoding") && !k.equalsIgnoreCase("Content-Length")) {
@@ -169,6 +169,7 @@ class HttpServerStage(maxReqBody: Long, maxNonbody: Int)(handleRequest: HttpServ
     // Add our length header last
     sb.append(s"Content-Length: ").append(length).append('\r').append('\n')
     sb.append('\r').append('\n')
+    ()
   }
 
   // TODO: this will generate a long chain of Futures
@@ -195,7 +196,8 @@ class HttpServerStage(maxReqBody: Long, maxNonbody: Int)(handleRequest: HttpServ
         if (maxReqBody > 0 && totalBodySize > maxReqBody) {
           val hs = headers
           headers = new ArrayBuffer[(String, String)](0)
-          handleHttpResponse(HttpResponse.EntityTooLarge(), hs, false)
+          handleHttpResponse(HttpResponse.EntityTooLarge(), hs, forceClose = false)
+          ()
         }
         else {
           buffers += buff
@@ -219,7 +221,7 @@ class HttpServerStage(maxReqBody: Long, maxNonbody: Int)(handleRequest: HttpServ
     }
 
     h match {
-      case Some((k, v)) =>
+      case Some((_, v)) =>
         if (v.equalsIgnoreCase("Keep-Alive")) true
         else if (v.equalsIgnoreCase("close")) false
         else if (v.equalsIgnoreCase("Upgrade")) true

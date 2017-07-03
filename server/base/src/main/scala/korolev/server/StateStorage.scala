@@ -6,12 +6,8 @@ import korolev.Async
 import slogging.LazyLogging
 
 import scala.collection.concurrent.TrieMap
-import scala.language.higherKinds
 import korolev.DevMode
 
-/**
-  * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
-  */
 abstract class StateStorage[F[+_]: Async, T] {
 
   import StateStorage.{DeviceId, SessionId}

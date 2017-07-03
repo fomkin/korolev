@@ -6,12 +6,7 @@ import korolev.util.{JavaTimerScheduler, Scheduler}
 
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
-import scala.reflect.ClassTag
 
-/**
-  * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
-  */
 object execution {
 
   private val schedulerCache = TrieMap.empty[Any, Any]

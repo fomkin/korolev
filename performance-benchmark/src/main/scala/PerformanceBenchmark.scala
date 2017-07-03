@@ -1,8 +1,8 @@
-import java.nio.channels.AsynchronousChannelGroup
-import java.nio.charset.StandardCharsets
-import java.util.concurrent.Executors
-
+import Execution._
+import KorolevIncomingMessage._
+import Reaction._
 import fs2._
+import fs2.async.mutable.Signal
 import pushka.Ast
 import scodec.bits.ByteVector
 import spinoco.fs2.http
@@ -10,18 +10,10 @@ import spinoco.fs2.http._
 import spinoco.fs2.http.websocket._
 import spinoco.protocol.http._
 import spinoco.protocol.http.header._
-import KorolevIncomingMessage._
-import Reaction._
-import Execution._
-import fs2.async.mutable.Signal
 
-import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.util.Random
 
-/**
-  * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
-  */
 object PerformanceBenchmark extends App {
 
   val host = "localhost"

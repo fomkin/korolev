@@ -4,9 +4,6 @@ import java.util.concurrent.Executors
 
 import scala.concurrent.ExecutionContext
 
-/**
-  * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
-  */
 object Execution {
 
   final val ScheduledThreadPool = Executors.newScheduledThreadPool(16)

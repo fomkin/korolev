@@ -3,9 +3,7 @@ package korolev.util
 import java.util.concurrent.atomic.{AtomicReference => JavaAtomicReference}
 import java.util.function.UnaryOperator
 
-/** Scala wrapper around AtomicReference
-  * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
-  */
+/** Scala wrapper around `AtomicReference`. */
 class AtomicReference[T](initialValue: T) {
 
   private val ref = new JavaAtomicReference[T](initialValue)

@@ -8,9 +8,6 @@ import org.http4s.blaze.util.BogusKeystore
 
 import scala.concurrent.ExecutionContextExecutorService
 
-/**
-  * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
-  */
 case class BlazeServerConfig(
   port: Int = 8080,
   host: String = InetAddress.getLoopbackAddress.getHostAddress,
@@ -35,7 +32,7 @@ object BlazeServerConfig {
     assert(ksStream != null)
     val ks = KeyStore.getInstance("JKS")
     ks.load(ksStream, BogusKeystore.getKeyStorePassword)
-    val kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm())
+    val kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm)
     kmf.init(ks, BogusKeystore.getCertificatePassword)
     val context = SSLContext.getInstance("SSL")
     context.init(kmf.getKeyManagers, null, null)

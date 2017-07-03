@@ -5,11 +5,7 @@ import korolev.util.Scheduler.{Cancel, JobHandler}
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
-import scala.language.higherKinds
 
-/**
-  * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
-  */
 object testExecution {
 
   private class RunNowExecutionContext extends ExecutionContext {

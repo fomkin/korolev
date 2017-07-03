@@ -2,21 +2,16 @@
 import java.net.URL
 import java.util.concurrent.Executors
 
-import org.openqa.selenium.{JavascriptExecutor, WebDriver, WebElement}
 import org.openqa.selenium.remote.RemoteWebDriver
+import org.openqa.selenium.{JavascriptExecutor, WebDriver, WebElement}
 import org.slf4j.LoggerFactory
 
-import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration._
+import scala.concurrent.{Await, ExecutionContext, Future}
 
-/**
-  * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
-  */
 package object tools {
 
   val logger = LoggerFactory.getLogger("tools")
-
-  case class Step(caption: String, lambda: WebDriver => Unit)
 
   def step(caption: String)(lambda: WebDriver => Unit) =
     Step(caption, lambda)
@@ -110,8 +105,10 @@ package object tools {
   implicit final class WebElementOps(val el: WebElement) extends AnyVal {
     def scrollTo()(implicit webDriver: WebDriver): Unit = webDriver match {
       case executor: JavascriptExecutor =>
-        executor.executeScript("arguments[0].scrollIntoView(true);", el);
-      case _ => throw new UnsupportedOperationException("WebDriver is not javascript executor")
+        executor.executeScript("arguments[0].scrollIntoView(true);", el)
+        ()
+      case _ =>
+        throw new UnsupportedOperationException("WebDriver is not javascript executor")
     }
   }
 }

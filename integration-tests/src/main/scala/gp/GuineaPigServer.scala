@@ -9,9 +9,6 @@ import org.slf4j.LoggerFactory
 
 import scala.concurrent.Future
 
-/**
-  * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
-  */
 object GuineaPigServer {
 
   case class State(

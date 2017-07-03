@@ -5,9 +5,6 @@ import java.nio.charset.StandardCharsets
 
 import korolev.FormData.Entry
 
-/**
-  * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
-  */
 final case class FormData(content: Seq[Entry]) {
 
   def text(name: String): String = {

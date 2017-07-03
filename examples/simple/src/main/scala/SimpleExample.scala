@@ -4,9 +4,7 @@ import korolev.blazeServer._
 import korolev.execution._
 
 import scala.concurrent.Future
-/**
-  * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
-  */
+
 object SimpleExample extends KorolevBlazeServer {
 
   import State.applicationContext._

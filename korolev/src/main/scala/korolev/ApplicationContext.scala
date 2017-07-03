@@ -8,7 +8,6 @@ import levsha.{Document, TemplateDsl}
 import levsha.events.EventPhase
 
 import scala.concurrent.duration.FiniteDuration
-import scala.language.higherKinds
 
 class ApplicationContext[F[+_]: Async, S, M](implicit scheduler: Scheduler[F]) {
 

@@ -1,8 +1,5 @@
 package korolev.server
 
-/**
-  * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
-  */
 object mimeTypes extends (String => Option[String]) {
 
   def apply(key: String): Option[String] = default.get(key)

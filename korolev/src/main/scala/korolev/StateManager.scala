@@ -2,7 +2,6 @@ package korolev
 
 import java.util.concurrent.ConcurrentLinkedQueue
 
-import scala.language.higherKinds
 import scala.util.{Failure, Success}
 
 abstract class StateManager[F[+_]: Async, State] extends (StateManager.Transition[State] => F[Unit]) {

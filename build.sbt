@@ -55,7 +55,14 @@ val commonSettings = publishSettings ++ Seq(
     "-feature",
     "-Xfatal-warnings",
     "-language:postfixOps",
-    "-language:implicitConversions"
+    "-language:implicitConversions",
+    "-language:higherKinds",
+    "-Xlint",
+    "-Yno-adapted-args",
+    "-Ywarn-numeric-widen",
+    "-Ywarn-value-discard",
+    "-Xfuture",
+    "-Ywarn-unused-import"
   )
 )
 

@@ -9,9 +9,6 @@ import korolev.server.cacheApiSupport.CachedStateStorage
 
 import scala.concurrent.Future
 
-/**
-  * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
-  */
 object JCacheExample extends KorolevBlazeServer {
 
   import State.applicationContext._
