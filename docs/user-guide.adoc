@@ -1,0 +1,472 @@
+Korolev single page applications framework
+==========================================
+Aleksey Fomkin <aleksey.fomkin@gmail.com>
+:source-highlighter: pygments
+:numbered:
+:toc:
+
+Introduction
+------------
+Not long ago we have entered the era of single-page applications. Some people say that we no longer need a server. They say that JavaScript applications can connect to DBMS directly. Fat clients. We disagree with this. This project is an attempt to solve the problems of the modern fat web.
+
+Korolev runs a single-page application on the server side, keeping in the browser only a bridge to receive commands and send events. The page loads instantly and works fast because it does a minimal amount of computation. It's important that Korolev provides a unified environment for full stack development. Client and server are now combined into a single app without any REST protocol or something else in the middle.
+
+Our project supports static page rendering so that search engines could index pages and users could view them immediately.
+
+Principles
+~~~~~~~~~~
+
+1. Thin client. Let's be honest, modern JavaScript applications are too greedy. Every JavaScript developer thinks that his page is special. But the user has a different opinion. He opens dozens of tabs. Each tab contains a ton of code, and this works very slowly. So we make our JavaScript bridge as lightweight as possible.
+
+2. Immutable and pure. Really, we don't need mutability even on the frontend. Especially on the frontend. The majority of modern JavaScript frameworks try to be functional. So we do.
+
+3. Lack of dependencies. Korolev does not impose to use cats, scalaz, Akka, or futures from the standard library. Use what you want. Korolev tries to give a way to integrate itself into any environment.
+
+Quick start
+~~~~~~~~~~~
+
+You need SBT 0.13.15 and JDK 8+ installed. Once installed, run g8 template.
+
+[source,bash]
+-----------------------------------
+$ sbt new fomkin/korolev.g8
+$ cd mykorolevproject
+$ sbt
+> re-start
+-----------------------------------
+
+Ok, now you are ready to start hacking with Korolev.
+
+Understanding Korolev
+---------------------
+
+Device and Session
+~~~~~~~~~~~~~~~~~~
+
+When a user opens your application the first time, Korolev sets a cookie named `device` with the unique identifier. After that, you can identify the user by `deviceId`. Note that every new browser window (or tab) will receive a new `deviceId`.
+
+A session is created when the user opens a page. Every session has the unique identifier. Korolev has a _State_ for every session.
+
+State
+~~~~~
+
+The only source of data to render a page. If you have something you want to display, it should be stored in state. State is always immutable.
+
+[source,scala]
+-----------------------------------
+sealed trait MyState
+
+case class Anonymous(
+  deviceId: String) extends MyState
+
+case class Authorized(
+  deviceId: String,
+  user: User) extends MyState
+
+case class User(
+  id: String,
+  name: String,
+  friends: Seq[String])
+-----------------------------------
+
+State is stored in `StateStorage`.
+
+[source,scala]
+-----------------------------------
+StateStorage[Future, MyState].forDeviceId { deviceId =>
+  // This hypothetical service method returns Future[User]
+  authorizationService.getUserByDeviceId(deviceId) map { user =>
+    Authorized(deviceId, user)
+  }
+}
+-----------------------------------
+
+The only way to modify the State is by applying a transition (see below).
+
+Render
+~~~~~~
+
+Render is a view of the state. Render is a function which takes state as the argument and returns DOM description. Korolev has its own DSL to define templates using Scala code. Do not be afraid, you will quickly get used to it.
+
+[source,scala]
+-----------------------------------
+val render: Render = {
+  case Anonymous(_) =>
+    'body(
+      'form(
+        'input('placeholder /= "Login"),
+        'input('placeholder /= "Password"),
+        'button("Submit")
+      )
+    )
+  case Authorized(_, User(name, friends)) =>
+    'body(
+      'div(s"Your name is $name. This is your frinds"),
+      'ul(
+        // Look at that. You just map data to view
+        friends map { friend =>
+          'li(friend)
+        }
+      )
+    )
+}
+-----------------------------------
+
+Render is called for each new state. It's important to understand that render produces a full DOM for every call. It does not mean that client receives a new page every time. Korolev makes a diff between current and latest DOM. Only changes between the two are sent to the client.
+
+`Render` is a type alias for `PartialFunction[S, Document.Node]` where `S` is a type of your state.
+
+Transitions
+~~~~~~~~~~~
+
+Transition is a function that applies to current state and produces a new state. Consider a transition which adds a new friend to the friends list.
+
+[source,scala]
+--------------------------------------------------------------
+val newFriend = "Karl Heinrich Marx"
+// This hypothetical service method adds friend
+// to the user friend list and returns Future[Unit]
+userService.addFriend(user.id, newFriend) map { _ =>
+  transition { case state @ Authorized(_, user) =>
+    state.copy(user = user.copy(user.friends :+ newFriend))
+  }
+}
+--------------------------------------------------------------
+
+`Transition` is a type alias for `PartialFunction[S, S]` where `S` is the type of your state.
+
+Events
+~~~~~~
+
+Every DOM event emitted which had been emitted by browser's `document` object, can be handled by Korolev. Let's consider click event.
+
+[source,scala]
+--------------------------------------------------------------
+case class MyState(i: String)
+
+val renderAnonymous: Render = {
+  case MyState(i) =>
+    'body(
+      i.toString,
+      'button("Increment",
+        event('click) {
+          immediateTransition {
+            case MyState(i) =>
+              state.copy(i = i + 1)
+          }
+        }
+      )
+    )
+}
+--------------------------------------------------------------
+
+When "Increment" button will be clicked, `i` will be incremented by 1. Let's consider a more complex situation. Do you remember render example? Did you have a feeling that something was missing? Let's complement it with the events!
+
+[source,scala]
+-----------------------------------
+val loginField = elementId()
+val passwordField = elementId()
+
+val renderAnonymous: Render = {
+  case Anonymous(_) =>
+    'body(
+      'form(
+        'input('placeholder /= "Login", loginField),
+        'input('placeholder /= "Password", passwordField),
+        'button("Submit"),
+        eventWithAccess('submit) { access =>
+          deferredTransition {
+            for {
+              login <- access.property[String](loginField, 'value)
+              password <- access.property[String](passwordField, 'value)
+              user <- authService.authorize(login, password)
+            } yield {
+              transition {
+                case Anonymous(deviceId) =>
+                  Authorized(deviceId, user)
+              }
+            }
+          }
+        }
+      )
+    )
+}
+
+val renderAuthorized: Render = ???
+val render = renderAnonymous orElse renderAuthorized
+-----------------------------------
+
+Event with access literally gives you an access to information from the client side. In this case, it it is values of the input fields.
+
+Event handlers should return `EventResult`.
+
+EventResult
+~~~~~~~~~~~
+
+Korolev expects `EventResult` as a return type of event handlers. There are three types of event results.
+
+
+1. `immediateTransition` - Is a transition which is applied to current state right now. It's useful for making lightweight synchronous transitions. For example, you have a page with the "Query" field and the "Search" button. When the button is clicked, your application requests database or micro-service to execute the query. But user wants to see reaction before receiving the data. So you update the state with "Loading" flag in `immediateTransition` and user sees reaction immediately. Signature of `immediateTransition` is `Transition` that is a type alias for `PartialFunction[S, S]` where `S` is your state type.
+
+2. `deferredTransition` - In the previous example, your application performs a request to some sort of backend. Such request in Scala is usually asynchronous. So `deferredTransition` is a way to make your application to wait for the response. `deferredTransition` will be applied to the state when the `Future` is completed. Signature of `deferredTransition` is `Future[Transition]`.
+
+3. `noTransition` - It means you don't want to make any reaction.
+
+Also, you can combine `immediateTransition` and `deferredTransition`.
+
+Access element properties
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In the scope of an event, you can access the element properties if an element was bound with `elementId`. You can get the value (limited by simple types like `String` and `Double`).
+
+[source,scala]
+-----------------------------------
+val loginField = elementId
+
+...
+
+eventWithAccess('submit) { access =>
+  deferredTransition {
+    access.property[String](loginField, 'value) map {
+      transition { ... }
+    }
+}
+-----------------------------------
+
+Or you can set the value
+
+[source,scala]
+-----------------------------------
+access.property[String](loginField).set('value, "John Doe") map {
+  transition { ... }
+}
+-----------------------------------
+
+FormData
+~~~~~~~~
+
+Above, we considered a method allowing to read values and update from inputs. The flaw of this is a need of reading input one-by-one and lack of files uploading. FormData attended to solve these problems.
+
+In contrast to `property`, FormData works with form tag, not with input tag.
+
+[source,scala]
+-----------------------------------
+val myForm = elementId
+val pictureFieldName = "picture"
+
+'form(
+  myForm,
+  'div(
+    'legend("FormData Example"),
+    'p(
+      'label("Picture"),
+      'input('type /= "file", 'name /= pictureFieldName)
+    ),
+    'p(
+      'button("Submit")
+    )
+  ),
+  eventWithAccess('submit) { access =>
+    deferredTransition {
+      access
+        .downloadFormData(myForm)
+        .onProgress { (loaded, total) =>
+          transition { ... }
+        }
+        .start()
+        .map { formData =>
+          transition { ... }
+        }
+    }
+  }
+)
+-----------------------------------
+
+Use `onProgress` callback to handle progress of the form downloading. Function `start` return a `FormData`. Look API documentation for more details.
+
+https://github.com/fomkin/korolev/blob/v0.4.2/examples/form-data/src/main/scala/FormDataExample.scala[See full example]
+
+Delays
+~~~~~~
+Sometimes you want to update a page after a timeout. For example it is useful when you want to show some sort of notification and have to close it after a few seconds. Delays apply transition after a given `FiniteDuration`
+
+[source,scala]
+-----------------------------------
+type MyState = Boolean
+
+val render: Render = {
+  case true => 'body(
+    delay(3.seconds) {
+      case true => false
+    },
+    "Wait 3 seconds!"
+  )
+  case false => 'body(
+    'button(
+      event('click) {
+        immediateTransition {
+          case _ => true
+        }
+      },
+      "Push the button"
+    )
+  )
+}
+-----------------------------------
+
+https://github.com/fomkin/korolev/blob/v0.4.2/examples/delay/src/main/scala/DelayExample.scala[See full example]
+
+Environment configurator
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+Korolev is not just request-response, but push. One of big advantages of Korolev is ability to display server side events without additional code. Consider example where we have a page with some sort of notification list.
+
+[source,scala]
+-----------------------------------
+case class MyState(notifications: List[String])
+
+var render: Render = {
+  case MyState(notifications) =>
+    'ul(
+      notifications.map(notification =>
+        'li(notification)
+      )
+    )
+}
+-----------------------------------
+
+Also we have a message queue which has a topic with notifications for current user. The topic has identifier based on `deviceId` of a client. Lets try to bind an application state with messages from the queue.
+
+[source,scala]
+-------------------------------------------------------------------------------
+KorolevServiceConfig(
+  ...
+  envConfigurator = (deviceId, sessionId, applyTransition) => {
+    val subscribtion = messageQueue.subscribe(s"notifications-$deviceId") { notifiation =>
+      applyTransition {
+        case state: MyState =>
+          state.copy(
+            notifiations = notifiation :: state.notifiations
+          )
+      }
+    }
+    KorolevServiceConfig.Env(
+      onDestroy = () => subscribtion.unsubscribe(),
+      onMessage = PartialFunction.empty
+    )
+  }
+)
+-------------------------------------------------------------------------------
+
+That's all. Now every invocation of lambda which was passed to `messageQueue.subscribe` will run
+the transition which will prepend new notification to the state. Render will be invoked automatically and user will get the notification on his page.
+
+Routing
+~~~~~~~
+Router allows to integrate browser navigation to you app. In the router you define bidirectional mapping between the state and the URL.
+
+Let's pretends that you application is a blogging platform
+
+[source,scala]
+-------------------------------------------------------------------------------
+case class MyState(author: String, title: String, text: String)
+
+// Converts "The Cow: Saga" to "the-cow-saga"
+def captionToUrl(s: String) = ???
+
+KorolevServiceConfig(
+  ...
+  // Render the article
+  render = {
+    case MyState(author, title, text) => 'body(
+      'div(s"$author: $title"),
+      'div(text)
+    )
+  },
+  serverRouter = ServerRouter(
+    // Static router works when user enters
+    // with any url but "/".
+    static = (deviceId) => Router(
+      toState = {
+        case (_, Root / author / article) => articleServrice.load(author, article)
+        case _ => articleServrice.defaultArticle
+      }
+    ),
+    dynamic = (device, session) => Router(
+      fromState = {
+        case MyState(tab, _) =>
+          Root / tab.toLowerCase
+      },
+      toState = {
+        case (s, Root) =>
+          val u = s.copy(selectedTab = s.todos.keys.head)
+          Future.successful(u)
+        case (s, Root / name) =>
+          val key = s.todos.keys.find(_.toLowerCase == name)
+          Future.successful(key.fold(s)(k => s.copy(selectedTab = k)))
+      }
+    )
+  )
+)
+-------------------------------------------------------------------------------
+
+https://github.com/fomkin/korolev/blob/v0.4.2/examples/routing/src/main/scala/RoutingExample.scala#L93[See full example]
+
+Productivity
+------------
+
+Web Components
+~~~~~~~~~~~~~~
+
+Usually when we say "components" we mean an UI element with its own state. Korolev doesn't support components by design, cause it leads to multiple states and breaks the simplicity which we want to reach. However you still can use https://www.w3.org/standards/techs/components[WebComponents].
+
+[NOTE]
+============
+Korolev doesn't have any specific code to support WebComponents. WebComponent (Custom Elements + Shadow DOM) by design should behave as regular HTML tags. There is no difference between, for example, input or textarea, and any custom element.
+============
+
+https://github.com/fomkin/korolev/blob/v0.4.2/examples/web-component/src/main/scala/WebComponentExample.scala[See full example]
+
+Developer mode and "hot reload"
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Developer mode provides "hot reload" experience. Run your application with `korolev.dev=true` system property (or environment variable) and session will be kept alive after restart. We recommend to use https://github.com/spray/sbt-revolver[sbt-revolver] plugin.
+
+[source,bash]
+-------------------------------------------------------------------------------
+re-start --- -Dkorolev.dev=true
+-------------------------------------------------------------------------------
+
+Make a change in the source code of your app. Save the file. Switch to a browser and wait for changes to deliver. Developer mode does not work with custom `StateStorage`.
+
+[NOTE]
+============
+Ensure that everything is stateless except Korolev part of the application. For example, if you have models which hold state in hash maps they will be not saved. It will lead to inconsistency.
+============
+
+Serve files from resource directory
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Everything that placed in directory named `static` (in the classpath of the application) will be served from the root of the application endpoint. It may be useful when you want to distribute some small images or CSS with the app.
+
+[WARNING]
+============
+Korolev is not some sort of CDN node. Avoid to serve a lot of large files using this feature.
+============
+
+Integrations
+------------
+
+JCache
+~~~~~~
+
+For large applications, when one node can't serve all clients, you need a way to scale application to multiple nodes. Although Korolev usually use permanent connections, a case when a client connects to a wrong node is possible. First, it may happen when reconnect. Second, it may happen when the client downgrades his connection from WebSocket to long polling for some reason. It means that every node in a cluster should have access to all user states (sessions).
+
+To fix this, you can apply any in-memory storage compatible with https://github.com/jsr107/jsr107spec[JCache]. Just add a dependency to your SBT configuration.
+
+[source,scala]
+------------------------------
+libraryDependencies += "com.github.fomkin" %% "korolev-jcache-support" % "0.4.2"
+------------------------------
+
+https://github.com/fomkin/korolev/blob/v0.4.2/examples/jcache/src/main/scala/JCacheExample.scala[See full example]
