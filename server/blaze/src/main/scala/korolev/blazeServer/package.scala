@@ -73,9 +73,9 @@ package object blazeServer {
       )
 
       val responseF = Async[F].map(korolevServer(korolevRequest)) {
-        case KorolevResponse.Http(status, streamOpt, responseHeaders) =>
-          val array = streamOpt.getOrElse(Array.empty)
-          HttpResponse(status.code, status.phrase, responseHeaders, ByteBuffer.wrap(array))
+        case KorolevResponse.Http(status, bodyOpt, responseHeaders) =>
+          val body = bodyOpt.getOrElse(Array.empty)
+          HttpResponse(status.code, status.phrase, responseHeaders, ByteBuffer.wrap(body))
         case KorolevResponse.WebSocket(publish, subscribe, destroy) =>
           val stage = new WebSocketStage {
             val stopHeartbeat = scheduler.schedule(5.seconds) {
