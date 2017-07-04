@@ -123,10 +123,7 @@ object Korolev {
         }
 
         def property[T](elementId: ElementId[F, S, M]): PropertyHandler[F, T] = {
-          val idF = effectsReactor
-            .elements
-            .get(elementId)
-            .fold(noElementException[Id])(id => async.pure(id))
+          val idF = getId(elementId)
           new PropertyHandler[F, T] {
             def get(propName: Symbol): F[T] = idF flatMap { id =>
               client.callAndFlush("ExtractProperty", id.mkString, propName.name)
@@ -140,11 +137,23 @@ object Korolev {
         def property[T](id: ElementId[F, S, M], propName: Symbol): F[T] =
           property[T](id).get(propName)
 
-        def downloadFormData(eId: ElementId[F, S, M]): FormDataDownloader[F, S] = new FormDataDownloader[F, S] {
+        def focus(elementId: ElementId[F, S, M]): F[Unit] = {
+          val idF = getId(elementId)
+          idF flatMap { id =>
+            client.callAndFlush[Unit]("Focus", id.mkString)
+          }
+        }
 
+        private def getId(elementId: ElementId[F, S, M]): F[Id] =
+          effectsReactor
+            .elements
+            .get(elementId)
+            .fold(noElementException[Id])(id => async.pure(id))
+
+        def downloadFormData(elementId: ElementId[F, S, M]): FormDataDownloader[F, S] = new FormDataDownloader[F, S] {
           val descriptor = Random.alphanumeric.take(5).mkString
 
-          def start(): F[FormData] = effectsReactor.elements.get(eId) match {
+          def start(): F[FormData] = effectsReactor.elements.get(elementId) match {
             case Some(id) =>
               val promise = async.promise[FormData]
               val future = client.call[Unit]("UploadForm", id.mkString, descriptor)

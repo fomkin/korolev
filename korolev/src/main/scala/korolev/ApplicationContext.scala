@@ -88,6 +88,8 @@ class ApplicationContext[F[+_]: Async, S, M](implicit scheduler: Scheduler[F]) {
     case anyState => anyState
   }
 
+  val emptyTransition: PartialFunction[S, S] = { case x => x }
+
   def transition(t: Transition): Transition = t
 }
 
@@ -130,6 +132,8 @@ object ApplicationContext {
     def property[T](id: ElementId[F, S, M], propName: Symbol): F[T]
 
     def property[T](id: ElementId[F, S, M]): PropertyHandler[F, T]
+
+    def focus(id: ElementId[F, S, M]): F[Unit]
 
     /**
       * Publish message to environment
