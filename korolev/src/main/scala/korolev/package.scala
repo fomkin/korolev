@@ -1,6 +1,3 @@
-/**
-  * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
-  */
 package object korolev {
 
   // Routing API

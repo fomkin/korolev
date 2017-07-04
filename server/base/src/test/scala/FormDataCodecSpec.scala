@@ -4,9 +4,6 @@ import java.nio.charset.StandardCharsets
 import korolev.server.FormDataCodec
 import org.scalatest.{FlatSpec, Matchers}
 
-/**
-  * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
-  */
 class FormDataCodecSpec extends FlatSpec with Matchers {
   "decode" should "parse valid multipart/form-data body" in {
     val body = """--Asrf456BGe4h

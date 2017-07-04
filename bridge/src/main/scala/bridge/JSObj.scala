@@ -1,11 +1,9 @@
 package bridge
 
-import scala.language.higherKinds
 import korolev.Async
 
 /**
- * JavaScript Object presentation. 
- * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
+ * JavaScript Object representation.
  */
 abstract class JSObj[F[+_]: Async] extends JSLink {
 

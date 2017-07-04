@@ -2,9 +2,6 @@ package korolev
 
 import java.io.File
 
-/**
-  * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
-  */
 private[korolev] object DevMode {
 
   private val DevModeKey = "korolev.dev"

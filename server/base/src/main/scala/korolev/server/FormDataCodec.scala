@@ -7,9 +7,6 @@ import korolev.FormData
 
 import scala.annotation.tailrec
 
-/**
-  * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
-  */
 final class FormDataCodec(maxPartSize: Int) {
 
   import FormDataCodec._

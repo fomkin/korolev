@@ -1,7 +1,6 @@
 package korolev
 
 import scala.annotation.tailrec
-import scala.language.higherKinds
 
 /**
   * URL routing definition
@@ -10,8 +9,6 @@ import scala.language.higherKinds
   * @tparam S Type of State
   * @tparam Ctx Any additional data need
   *             to construct a state from path
-  *
-  * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
   */
 case class Router[F[+_]: Async, S, Ctx]
 (

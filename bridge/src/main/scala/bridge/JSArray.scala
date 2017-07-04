@@ -1,11 +1,9 @@
 package bridge
 
-import scala.language.higherKinds
 import korolev.Async
 
 /**
- * JavaScript Array presentation
- * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
+ * JavaScript Array representation.
  */
 abstract class JSArray[F[+_]: Async] extends JSObj[F] {
 

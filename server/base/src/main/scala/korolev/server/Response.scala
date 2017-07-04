@@ -2,9 +2,6 @@ package korolev.server
 
 import java.nio.charset.StandardCharsets
 
-/**
-  * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
-  */
 sealed trait Response
 
 object Response {

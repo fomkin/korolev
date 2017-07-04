@@ -1,7 +1,7 @@
 import korolev._
-import korolev.server.{KorolevServiceConfig, ServerRouter, StateStorage, _}
-import korolev.blazeServer.{KorolevBlazeServer, _}
+import korolev.blazeServer._
 import korolev.execution._
+import korolev.server.{KorolevServiceConfig, ServerRouter, StateStorage}
 
 import scala.concurrent.Future
 

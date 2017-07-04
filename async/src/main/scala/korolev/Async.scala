@@ -3,7 +3,6 @@ package korolev
 import scala.annotation.implicitNotFound
 import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future}
-import scala.language.higherKinds
 import scala.util.{Failure, Success, Try}
 
 @implicitNotFound("Instance of Async for ${F} is not found. If you want Future, ensure that execution context is passed to the scope (import korolev.execution.defaultExecutor)")
@@ -43,7 +42,7 @@ object Async {
     def sequence[A](xs: Seq[Future[A]]): Future[Seq[A]] = Future.sequence(xs)
     def promise[A]: Promise[Future, A] = {
       val promise = scala.concurrent.Promise[A]()
-      Promise(promise.future, promise.complete)
+      Promise(promise.future, a => { promise.complete(a); () })
     }
   }
 

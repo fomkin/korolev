@@ -9,10 +9,7 @@ import korolev.Async.Promise
 import scala.annotation.switch
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
-import scala.language.higherKinds
-/**
-  * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
-  */
+
 case class JsonQueuedJsAccess[F[+_]: Async](sendJson: String => Unit) extends JSAccess[F] {
 
   protected val promises = TrieMap.empty[Int, Promise[F, Any]]
@@ -39,6 +36,7 @@ case class JsonQueuedJsAccess[F[+_]: Async](sendJson: String => Unit) extends JS
       i += 1
     }
     sb.append('"')
+    ()
   }
 
   def seqToJSON(xs: Seq[Any]): String = {
@@ -78,6 +76,7 @@ case class JsonQueuedJsAccess[F[+_]: Async](sendJson: String => Unit) extends JS
   def send(args: Seq[Any]): Unit = {
     val message = seqToJSON(args)
     queue.add(message)
+    ()
   }
 
 

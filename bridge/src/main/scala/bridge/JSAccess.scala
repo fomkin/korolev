@@ -1,12 +1,10 @@
 package bridge
 
-import java.util.concurrent.FutureTask
 import java.util.concurrent.atomic.AtomicInteger
 
 import korolev.Async
 
 import scala.collection.mutable
-import scala.language.higherKinds
 import scala.util.{Failure, Success}
 
 object JSAccess {
@@ -25,8 +23,7 @@ object JSAccess {
 }
 
 /**
- * Provide access to remote page with JavaScript engine
- * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
+ * Provides access to remote page with JavaScript engine.
  */
 abstract class JSAccess[F[+_]: Async] { self ⇒
 
@@ -146,6 +143,7 @@ abstract class JSAccess[F[+_]: Async] { self ⇒
           promise.complete(Failure(exception))
         }
         promises -= reqId
+        ()
       case None ⇒
         println(s"Promise for $reqId not found")
     }

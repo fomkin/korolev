@@ -3,14 +3,10 @@ package bridge
 import korolev.Async.Promise
 import utest._
 
-import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
-/**
- * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
- */
 object JSAccessSuite extends TestSuite {
 
   import utest.framework.ExecutionContext.RunNow
@@ -129,7 +125,7 @@ object JSAccessSuite extends TestSuite {
         val req = acc.request[Float]("get", acc.obj("myObj"), "width")
         var calls = 0
         req.failed.foreach {
-          case err ⇒
+          err ⇒
             assert(err.getMessage == "error")
             calls += 1
         }

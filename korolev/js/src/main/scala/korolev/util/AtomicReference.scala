@@ -1,9 +1,6 @@
 package korolev.util
 
-/** Scala wrapper around AtomicReference
-  *
-  * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
-  */
+/** Scala wrapper around `AtomicReference`. */
 class AtomicReference[T](initialValue: T) {
 
   private var value = initialValue

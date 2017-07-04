@@ -16,7 +16,6 @@ import korolev.execution.defaultExecutor
 import korolev.server.{KorolevService, KorolevServiceConfig, MimeTypes, Request => KorolevRequest, Response => KorolevResponse}
 
 import scala.concurrent.Future
-import scala.language.higherKinds
 
 package object akkahttp {
 

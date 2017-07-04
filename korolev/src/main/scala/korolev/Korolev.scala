@@ -1,9 +1,8 @@
 package korolev
 
-import java.io.File
-import java.util.concurrent.atomic.AtomicInteger
-import java.io.RandomAccessFile
+import java.io.{File, RandomAccessFile}
 import java.nio.ByteBuffer
+import java.util.concurrent.atomic.AtomicInteger
 
 import bridge.JSAccess
 import korolev.ApplicationContext._
@@ -16,7 +15,6 @@ import levsha.{Document, Id}
 import slogging.LazyLogging
 
 import scala.collection.mutable
-import scala.language.{higherKinds, postfixOps}
 import scala.util.{Failure, Random, Success, Try}
 
 abstract class Korolev[F[+ _]: Async, S, M] {
@@ -25,9 +23,6 @@ abstract class Korolev[F[+ _]: Async, S, M] {
   def resolveFormData(descriptor: String, formData: Try[FormData]): Unit
 }
 
-/**
-  * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
-  */
 object Korolev {
 
   trait MutableMapFactory {
@@ -113,6 +108,7 @@ object Korolev {
         // when formData loading is complete
         formDataProgressTransitions.remove(descriptor)
         formDataPromises.remove(descriptor)
+        ()
       }
 
       val currentRenderNum = new AtomicInteger(0)
@@ -174,7 +170,7 @@ object Korolev {
           // History callback
           jsAccess.registerCallbackAndFlush[String] { pathString =>
             val path = Router.Path.fromString(pathString)
-            val maybeState = router.toState.lift(stateManager.state, path)
+            val maybeState = router.toState.lift((stateManager.state, path))
             maybeState foreach { asyncState =>
               val unit = async.flatMap(asyncState)(stateManager.update)
               async.run(unit) {
@@ -190,7 +186,7 @@ object Korolev {
           jsAccess.registerCallbackAndFlush[String] { targetAndType =>
             val Array(renderNum, target, tpe) = targetAndType.split(':')
             if (currentRenderNum.get == renderNum.toInt) {
-              calculateEventPropagation(Id(target), tpe) forall { eventId =>
+              calculateEventPropagation(Id(target), tpe) foreach { eventId =>
                 val eventResultOpt = effectsReactor.events.get(eventId) map {
                   case event: ApplicationContext.EventWithAccess[F, S, M] => event.effect(browserAccess)
                   case event: ApplicationContext.SimpleEvent[F, S, M] => event.effect()
@@ -200,7 +196,7 @@ object Korolev {
                   er.it.fold(async.unit)(it => stateManager(it)) flatMap { _ =>
                     // Apply deferred transition
                     er.dt.fold(async.unit) { transitionF =>
-                      transitionF.map(stateManager.apply)
+                      transitionF.flatMap(stateManager.apply)
                     }
                   } run {
                     case Success(_) => // ok transitions was applied
@@ -313,6 +309,7 @@ object Korolev {
         case element: ApplicationContext.ElementId[F, S, M] =>
           elements.put(element, id)
       }
+      ()
     }
 
     /** Should be invoked before rendering */

@@ -3,11 +3,6 @@ package korolev.server
 import korolev.server.StateStorage.{DeviceId, SessionId}
 import korolev.{Async, Router}
 
-import scala.language.higherKinds
-
-/**
-  * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
-  */
 case class ServerRouter[F[+_]: Async, S](
   static: DeviceId => Router[F, S, Unit],
   dynamic: (DeviceId, SessionId) => Router[F, S, S],

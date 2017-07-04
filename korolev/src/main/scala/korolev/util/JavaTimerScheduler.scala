@@ -7,12 +7,8 @@ import korolev.Async.AsyncOps
 import korolev.util.Scheduler.{Cancel, JobHandler}
 
 import scala.concurrent.duration.FiniteDuration
-import scala.language.higherKinds
 import scala.util.Success
 
-/**
-  * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
-  */
 final class JavaTimerScheduler[F[+_]: Async] extends Scheduler[F] {
 
   private val timer = new Timer()
@@ -31,7 +27,7 @@ final class JavaTimerScheduler[F[+_]: Async] extends Scheduler[F] {
     }
     timer.schedule(task, delay.toMillis)
     JobHandler(
-      cancel = () => task.cancel,
+      cancel = () => { task.cancel(); () },
       result = promise.future
     )
   }
@@ -42,6 +38,6 @@ final class JavaTimerScheduler[F[+_]: Async] extends Scheduler[F] {
     }
     val millis = interval.toMillis
     timer.schedule(task, millis, millis)
-    () => task.cancel
+    () => { task.cancel(); () }
   }
 }

@@ -19,7 +19,7 @@
     function scheduleAddHandler(element) {
       if (!addHandler)
         return;
-      if (scheduledAddHandlerItems.length == 0) {
+      if (scheduledAddHandlerItems.length === 0) {
         setTimeout(function() {
           scheduledAddHandlerItems.forEach(addHandler);
           scheduledAddHandlerItems.length = 0;
@@ -68,10 +68,10 @@
               }
               eventHandler(renderNum + ':' + event.target.vId + ':' + event.type);
             }
-          }
+          };
           root.addEventListener(name, listener);
           rootListeners.push({ 'listener': listener, 'type': name });
-        }
+        };
         listenFun('submit', true);
       },
       UnregisterGlobalEventHandler: function() {
@@ -92,7 +92,7 @@
         newElement = document.createElement(tag);
         newElement.vId = childId;
         scheduleAddHandler(newElement);
-        if (child && child.parentNode == parent) {
+        if (child && child.parentNode === parent) {
           parent.replaceChild(newElement, child);
         } else {
           parent.appendChild(newElement);
@@ -106,7 +106,7 @@
         if (!parent) return;
         newElement = document.createTextNode(text);
         newElement.vId = childId;
-        if (child && child.parentNode == parent) {
+        if (child && child.parentNode === parent) {
           parent.replaceChild(newElement, child);
         } else {
           parent.appendChild(newElement);
@@ -128,12 +128,12 @@
       },
       SetAttr: function(id, name, value, isProperty) {
         var element = els[id];
-        if (isProperty) element[name] = value
+        if (isProperty) element[name] = value;
         else element.setAttribute(name, value);
       },
       RemoveAttr: function(id, name, isProperty) {
         var element = els[id];
-        if (isProperty) element[name] = undefined
+        if (isProperty) element[name] = undefined;
         else element.removeAttribute(name);
       },
       RegisterHistoryHandler: function(handler) {
@@ -168,9 +168,8 @@
         request.upload.onprogress = function(event) {
           var arg = [descriptor, event.loaded, event.total].join(':');
           formDataProgressHandler(arg);
-        }
+        };
         request.send(formData);
-        return;
       },
       ReloadCss: function() {
         var links = document.getElementsByTagName("link");
@@ -277,7 +276,7 @@
                 break;
               default:
                 if (typeof window.ErrorEvent === "function") {
-                var message = "Unknown error"
+                var message = "Unknown error";
                   event = new ErrorEvent('error', {
                     error: new Error(message),
                     message: message
@@ -323,15 +322,15 @@
         request.send(message);
       }
 
-      var fakeWs = global.document.createDocumentFragment()
+      var fakeWs = global.document.createDocumentFragment();
       global.Korolev.connection = fakeWs;
       fakeWs.close = function() {
         event = new Event('close');
         fakeWs.dispatchEvent(event);
-      }
+      };
       fakeWs.send = function(message) {
         lpPublish(fakeWs, message);
-      }
+      };
       fakeWs.addEventListener('open', onOpen);
       Bridge.webSocket(fakeWs, function(resolve, err) {
         if (err) reconnect()
@@ -343,7 +342,7 @@
 
     function reconnect() {
       // Create connection lost widget
-      if (connectionLostWidget == null) {
+      if (connectionLostWidget === null) {
         connectionLostWidget = document.createElement('div');
         connectionLostWidget.innerHTML = KorolevConnectionLostWidget;
         connectionLostWidget = connectionLostWidget.children[0];
@@ -353,11 +352,11 @@
       Korolev.UnregisterGlobalEventHandler();
       Korolev.UnregisterHistoryHandler();
       console.log("Connection closed. Global event handler us unregistered. Try to reconnect.");
-      if (selectedConnectionType == 'ws') {
+      if (selectedConnectionType === 'ws') {
         setTimeout(initializeBridgeWs, reconnectTimeout);
       }
       else {
-        if (connectionType == 'ws') setTimeout(initializeBridgeLongPolling, reconnectTimeout);
+        if (connectionType === 'ws') setTimeout(initializeBridgeLongPolling, reconnectTimeout);
         else setTimeout(initializeBridgeWs, reconnectTimeout);
       }
       reconnectTimeout = Math.min(reconnectTimeout * 2, MaxReconnectTimeout);

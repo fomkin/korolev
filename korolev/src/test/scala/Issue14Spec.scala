@@ -7,13 +7,9 @@ import scala.collection.mutable
 import scala.concurrent.Future
 import korolev.testExecution._
 
-/**
-  * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
-  */
 class Issue14Spec extends FlatSpec with Matchers {
 
   import Issue14Spec.applicationContext._
-  import Issue14Spec.applicationContext.symbolDsl._
 
   "Korolev" should "ignore events from outdated DOM" in {
 

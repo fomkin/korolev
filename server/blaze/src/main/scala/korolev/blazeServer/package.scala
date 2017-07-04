@@ -15,11 +15,7 @@ import org.http4s.websocket.WebsocketBits._
 
 import scala.concurrent.Promise
 import scala.concurrent.duration._
-import scala.language.higherKinds
 
-/**
-  * @author Aleksey Fomkin <aleksey.fomkin@gmail.com>
-  */
 package object blazeServer {
 
   def blazeService[F[+_]: Async, S, M]: BlazeServiceBuilder[F, S, M] =
@@ -97,6 +93,7 @@ package object blazeServer {
               super.stageStartup()
               subscribe { outgoingMessage =>
                 channelWrite(Text(outgoingMessage))
+                ()
               }
             }
           }
@@ -115,7 +112,8 @@ package object blazeServer {
   ): ServerChannel = {
 
     val f: BufferPipelineBuilder = _ => {
-      def serviceStage = LeafBuilder(new HttpServerStage(config.maxRequestBodySize, config.maxRequestHeaderSize)(service))
+      def serviceStage =
+        LeafBuilder(new HttpServerStage(config.maxRequestBodySize.toLong, config.maxRequestHeaderSize)(service))
       config.sslContext match {
         case Some(sslContext) =>
           val eng = sslContext.createSSLEngine()
