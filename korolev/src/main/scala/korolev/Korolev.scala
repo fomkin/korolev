@@ -258,6 +258,7 @@ object Korolev {
             } else {
               renderInitialState()
               renderContext.diff(DiffRenderContext.DummyChangesPerformer)
+              if (devMode.isActive) devMode.saveRenderContext(renderContext)
             }
           }
 
@@ -271,10 +272,13 @@ object Korolev {
               case Some(node) =>
                 // Perform changes only when renderer for state is defined
                 renderContext.swap()
+                // Reset all event handlers delays and elements
+                effectsReactor.prepare()
                 node(renderContext)
                 renderContext.diff(changesPerformer)
                 if (devMode.isActive)
                   devMode.saveRenderContext(renderContext)
+                effectsReactor.cancelObsoleteDelays()
               case None =>
                 logger.warn(s"Render is not defined for ${state.getClass.getSimpleName}")
             }
