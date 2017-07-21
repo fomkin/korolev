@@ -32,7 +32,6 @@ class HttpServerStage(maxReqBody: Long, maxNonbody: Int)(handleRequest: HttpServ
   private var uri: String = _
   private var method: String = _
   private var minor: Int = -1
-  private var major: Int = -1
   private var headers = new ArrayBuffer[(String, String)]
 
   /////////////////////////////////////////////////////////////////////////////////////////
@@ -75,7 +74,6 @@ class HttpServerStage(maxReqBody: Long, maxNonbody: Int)(handleRequest: HttpServ
     uri = null
     method = null
     minor = -1
-    major = -1
     headers.clear()
   }
 
@@ -252,7 +250,6 @@ class HttpServerStage(maxReqBody: Long, maxNonbody: Int)(handleRequest: HttpServ
     minorversion: Int): Boolean = {
     this.uri = uri
     this.method = methodString
-    this.major = majorversion
     this.minor = minorversion
     false
   }

@@ -5,7 +5,6 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 
-import bridge.JSAccess
 import korolev.Async._
 import korolev.Korolev.MutableMapFactory
 import levsha.impl.{AbstractTextRenderContext, TextPrettyPrintingConfig}
@@ -13,7 +12,6 @@ import slogging.LazyLogging
 
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
-import scala.io.Source
 import scala.util.{Failure, Random, Success, Try}
 
 package object server extends LazyLogging {
@@ -51,18 +49,21 @@ package object server extends LazyLogging {
 
         val document = 'html(
           'head(
-            'script('language /= "javascript", bridgeJs),
             'script('language /= "javascript",
-              s"""var KorolevSessionId = '$sessionId';
-                 |var KorolevServerRootPath = '${config.serverRouter.rootPath}';
-                 |var KorolevConnectionLostWidget = '${
+              s"""
+                 |window['KorolevConfig'] = {
+                 |  'sessionId': '$sessionId',
+                 |  'serverRootPath': '${config.serverRouter.rootPath}',
+                 |  'connectionLostWidget': '${
                    val textRenderContext = createTextRenderContext()
                    config.connectionLostWidget(textRenderContext)
                    textRenderContext.mkString
-                 }';
-              """.stripMargin,
-              korolevJs
+                 }'
+                 |}
+                 |
+              """.stripMargin
             ),
+            'script('src /= "korolev-client.min.js"),
             config.head
           ),
           config.render(state)
@@ -315,18 +316,6 @@ package object server extends LazyLogging {
   private[server] object misc {
     val htmlContentType = "text/html; charset=utf-8"
     val binaryContentType = "application/octet-stream"
-    val korolevJs = {
-      import scala.concurrent.Future
-      val classLoader = classOf[Korolev[Future, Any, Any]].getClassLoader
-      val stream = classLoader.getResourceAsStream("korolev.js")
-      Source.fromInputStream(stream).mkString
-    }
-    val bridgeJs = {
-      import scala.concurrent.Future
-      val classLoader = classOf[JSAccess[Future]].getClassLoader
-      val stream = classLoader.getResourceAsStream("bridge.js")
-      Source.fromInputStream(stream).mkString
-    }
   }
 
 }

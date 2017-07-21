@@ -3,7 +3,9 @@
   var MinReconnectTimeout = 200;
   var MaxReconnectTimeout = 5000;
 
-  global.Korolev = (function() {
+  var KorolevConfig = global['KorolevConfig'];
+  var Bridge = global['Bridge'];
+  var Korolev = global['Korolev'] = (function() {
     var root = null,
       els = null,
       addHandler = null,
@@ -28,10 +30,10 @@
       scheduledAddHandlerItems.push(element);
     }
     return {
-      SetRenderNum: function(n) {
+      'SetRenderNum': function(n) {
         renderNum = n;
       },
-      RegisterRoot: function(rootNode) {
+      'RegisterRoot': function(rootNode) {
         function aux(prefix, node) {
           var children = node.childNodes;
           for (var i = 0; i < children.length; i++) {
@@ -46,20 +48,20 @@
         els = { "1": rootNode };
         aux("1", rootNode);
       },
-      CleanRoot: function() {
+      'CleanRoot': function() {
         while (root.children.length > 0)
           root.removeChild(root.children[0]);
       },
-      RegisterGlobalAddHandler: function(f) {
+      'RegisterGlobalAddHandler': function(f) {
         addHandler = f;
       },
-      RegisterFormDataProgressHandler: function(f) {
+      'RegisterFormDataProgressHandler': function(f) {
         formDataProgressHandler = f;
       },
-      RegisterGlobalRemoveHandler: function(f) {
+      'RegisterGlobalRemoveHandler': function(f) {
         removeHandler = f;
       },
-      RegisterGlobalEventHandler: function(eventHandler) {
+      'RegisterGlobalEventHandler': function(eventHandler) {
         listenFun = function(name, preventDefault) {
           var listener = function(event) {
             if (event.target.vId) {
@@ -74,17 +76,17 @@
         };
         listenFun('submit', true);
       },
-      UnregisterGlobalEventHandler: function() {
+      'UnregisterGlobalEventHandler': function() {
         rootListeners.forEach(function(item) {
           root.removeEventListener(item.type, item.listener);
         });
         listenFun = null;
         rootListeners.length = 0;
       },
-      ListenEvent: function(type, preventDefault) {
+      'ListenEvent': function(type, preventDefault) {
         listenFun(type, preventDefault);
       },
-      Create: function(id, childId, tag) {
+      'Create': function(id, childId, tag) {
         var parent = els[id],
           child = els[childId],
           newElement;
@@ -99,7 +101,7 @@
         }
         els[childId] = newElement;
       },
-      CreateText: function(id, childId, text) {
+      'CreateText': function(id, childId, text) {
         var parent = els[id],
           child = els[childId],
           newElement;
@@ -113,7 +115,7 @@
         }
         els[childId] = newElement;
       },
-      Remove: function(id, childId) {
+      'Remove': function(id, childId) {
         var parent = els[id],
           child = els[childId];
         if (!parent) return;
@@ -122,50 +124,50 @@
           parent.removeChild(child);
         }
       },
-      ExtractProperty: function(id, propertyName) {
+      'ExtractProperty': function(id, propertyName) {
         var element = els[id];
         return element[propertyName];
       },
-      SetAttr: function(id, name, value, isProperty) {
+      'SetAttr': function(id, name, value, isProperty) {
         var element = els[id];
         if (isProperty) element[name] = value;
         else element.setAttribute(name, value);
       },
-      RemoveAttr: function(id, name, isProperty) {
+      'RemoveAttr': function(id, name, isProperty) {
         var element = els[id];
         if (isProperty) element[name] = undefined;
         else element.removeAttribute(name);
       },
-      Focus: function (id) {
+      'Focus': function (id) {
         var element = els[id];
         element.focus();
       },
-      RegisterHistoryHandler: function(handler) {
+      'RegisterHistoryHandler': function(handler) {
         global.addEventListener('popstate', historyHandler = function(event) {
           if (event.state === null) handler(initialPath);
           else handler(event.state);
         });
       },
-      UnregisterHistoryHandler: function() {
+      'UnregisterHistoryHandler': function() {
         if (historyHandler !== null) {
           global.removeEventListener('popstate', historyHandler);
           historyHandler = null;
         }
       },
-      ChangePageUrl: function(path) {
+      'ChangePageUrl': function(path) {
         console.log(path);
         if (path !== global.location.pathname)
           global.history.pushState(path, '', path);
       },
-      UploadForm: function(id, descriptor) {
+      'UploadForm': function(id, descriptor) {
         var form = els[id];
         var formData = new FormData(form);
         var request = new XMLHttpRequest();
         var deviceId = getCookie('device');
-        var uri = KorolevServerRootPath +
+        var uri = KorolevConfig['serverRootPath'] +
           'bridge' +
           '/' + deviceId +
-          '/' + KorolevSessionId +
+          '/' + KorolevConfig['sessionId'] +
           '/form-data' +
           '/' + descriptor;
         request.open("POST", uri, true);
@@ -175,7 +177,7 @@
         };
         request.send(formData);
       },
-      ReloadCss: function() {
+      'ReloadCss': function() {
         var links = document.getElementsByTagName("link");
         for (var i = 0; i < links.length; i++) {
           var link = links[i];
@@ -195,7 +197,7 @@
     var selectedConnectionType = null;
     var reconnectTimeout = MinReconnectTimeout;
 
-    global.Korolev.RegisterRoot(root);
+    Korolev.RegisterRoot(root);
 
     function initializeBridgeWs() {
       // When WebSocket is not supported always use Long Polling
@@ -207,14 +209,14 @@
       var uri, ws;
       if (loc.protocol === "https:") uri = "wss://";
       else uri = "ws://";
-      uri += loc.host + KorolevServerRootPath +
+      uri += loc.host + KorolevConfig['serverRootPath'] +
         'bridge/web-socket' +
         '/' + deviceId +
-        '/' + KorolevSessionId;
+        '/' + KorolevConfig['korolevSessionId'];
       console.log('Try to open connection to ' + uri + ' using WebSocket');
       ws = new WebSocket(uri);
       ws.addEventListener('open', onOpen);
-      global.Korolev.connection = ws;
+      Korolev.connection = ws;
 
       Bridge.webSocket(ws, function(res, err) {
         if (err) reconnect()
@@ -224,10 +226,10 @@
 
     function initializeBridgeLongPolling() {
       connectionType = "lp";
-      var uriPrefix = loc.protocol + "//" + loc.host + KorolevServerRootPath +
+      var uriPrefix = loc.protocol + "//" + loc.host + KorolevConfig['serverRootPath'] +
         'bridge/long-polling' +
         '/' + deviceId +
-        '/' + KorolevSessionId +
+        '/' + KorolevConfig['sessionId'] +
         '/';
 
       console.log('Try to open connection to ' + uriPrefix + ' using long polling');
@@ -327,9 +329,9 @@
       }
 
       var fakeWs = global.document.createDocumentFragment();
-      global.Korolev.connection = fakeWs;
+      Korolev.connection = fakeWs;
       fakeWs.close = function() {
-        event = new Event('close');
+        var event = new Event('close');
         fakeWs.dispatchEvent(event);
       };
       fakeWs.send = function(message) {
@@ -348,7 +350,7 @@
       // Create connection lost widget
       if (connectionLostWidget === null) {
         connectionLostWidget = document.createElement('div');
-        connectionLostWidget.innerHTML = KorolevConnectionLostWidget;
+        connectionLostWidget.innerHTML = KorolevConfig['connectionLostWidget'];
         connectionLostWidget = connectionLostWidget.children[0];
         document.body.appendChild(connectionLostWidget);
       }

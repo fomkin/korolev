@@ -1,17 +1,10 @@
 (function(global) {
-  try {
-    if (global instanceof DedicatedWorkerGlobalScope) {
-      return;
-    }
-  } catch (e) {}
-
-  global.Bridge = (function (global) {
+  global['Bridge'] = (function (global) {
     'use strict';
 
-    var protocolDebugEnabled = (localStorage.getItem("$bridge.protocolDebugEnabled") === 'true'),
-        tmpLinkLifetime = parseInt(localStorage.getItem("$bridge.tmpLinkLifetime")) || 5000,
+    var protocolDebugEnabled = (global.localStorage.getItem("$bridge.protocolDebugEnabled") === 'true'),
+        tmpLinkLifetime = parseInt(global.localStorage.getItem("$bridge.tmpLinkLifetime")) || 5000,
         LinkPrefix = '@link:',
-        SourceMappingPattern = '//# sourceMappingURL=',
         ArrayPrefix = '@arr:',
         ObjPrefix = '@obj:',
         UnitResult = "@unit",
@@ -25,19 +18,10 @@
           type: 'application/javascript'
         };
 
-    function Transferable(value) {
-      this.value = value
-    }
-
     function Bridge(postMessageFunction, testEnv) {
       function postMessage(data) {
         var res = data[2], value;
-        if (res instanceof Transferable) {
-          value = res.value;
-          data[2] = value;
-          postMessageFunction(data, [value]);
-        }
-        else postMessageFunction(data);
+        postMessageFunction(data);
       }
       var self = this,
           initialize = null,
@@ -96,9 +80,6 @@
         }
         if (arg === null) {
           return NullResult;
-        }
-        if (arg instanceof Transferable) {
-          return arg
         }
         if (typeof arg === 'object') {
           var id = linksIndex[arg] || tmpLinksIndex[arg];
@@ -234,7 +215,7 @@
       var initialized = false;
 
       function notifyInitialized() {
-        for (var i = 0; i < i.length; i++)
+        for (var i = 0; i < initializationCallbacks.length; i++)
           initializationCallbacks[i](self);
         initializationCallbacks = null;
       }
@@ -350,85 +331,9 @@
     return {
 
       /**
-       * Run Scala.js compiled application in the
-       * same thread as DOM runs
-       */
-
-      basic: function (mainClass, scriptUrl, cb) {
-        var tag = document.createElement('script');
-        tag.setAttribute('src', scriptUrl);
-
-        tag.addEventListener('load', function () {
-          var scope = {},
-            jsAccess = new bridge.NativeJSAccess(scope),
-            bridgeObj = new Bridge(function (data) {
-              scope.onmessage({data : data});
-            });
-
-          scope.postMessage = function (data) {
-            bridgeObj.receive(data);
-          };
-
-          eval(mainClass)().main(jsAccess);
-          cb(bridgeObj);
-        });
-
-        document.addEventListener('DOMContentLoaded', function() {
-          document.head.appendChild(tag);
-        });
-      },
-
-      /**
-       * Run Scala.js compiled application in the
-       * same thread as DOM runs
-       */
-      worker: function (mainClass, scriptUrl, dependencies, cb) {
-        var toAbsoluteUrl = function (url) {
-          var parser = document.createElement('a');
-          parser.href = url;
-          return parser.href;
-        };
-
-        if (typeof dependencies === "string") dependencies = [dependencies];
-        if (!dependencies || dependencies instanceof Array === false) dependencies = [];
-
-        var scripts = dependencies.map(toAbsoluteUrl);
-        scripts.push(toAbsoluteUrl(scriptUrl));
-        var injectedJS = ('if (typeof console === "undefined") {\n' +
-          'var noop = function() {};\n' +
-          'console = { log: noop, error: noop }\n' +
-          '};\n' +
-          'importScripts("{0}");\n' +
-          'console.log("Scripts imported to worker");\n' +
-          'var jsAccess = new bridge.NativeJSAccess(this);\n' +
-          '{1}().main(jsAccess);\n' +
-          'console.log("Application started inside worker");')
-              .replace('{0}', scripts.join('\", \"'))
-              .replace('{1}', mainClass);
-
-        var launcherBlob = new Blob([injectedJS], JSMimeType);
-
-        // Run launcher in WebWorker
-        var worker = new Worker(URL.createObjectURL(launcherBlob));
-
-        var bridge = new Bridge(function(data, transferable) {
-          if (protocolDebugEnabled) {
-            console.log('<-', data, transferable);
-          }
-          worker.postMessage(data, transferable);
-        });
-
-        worker.addEventListener('message', function(event) {
-          bridge.receive(event.data);
-        });
-
-        bridge.onInitialize(cb);
-      },
-
-      /**
        * Connect to remote server via WebSocket
        */
-      webSocket: function (urlOrWs, cb) {
+      'webSocket': function (urlOrWs, cb) {
         var ws = null;
         if (typeof urlOrWs === 'object') ws = urlOrWs;
         else ws = new WebSocket(urlOrWs);
@@ -445,18 +350,16 @@
         bridge.onInitialize(cb);
       },
 
-      create: function (postMessage, testEnv) {
+      'create': function (postMessage, testEnv) {
         return new Bridge(postMessage, testEnv);
       },
 
-      Transferable: Transferable,
-
-      setProtocolDebugEnabled: function(value) {
-        localStorage.setItem("$bridge.protocolDebugEnabled", value);
+      'setProtocolDebugEnabled': function(value) {
+        global.localStorage.setItem("$bridge.protocolDebugEnabled", value);
         protocolDebugEnabled = value;
       },
-      setTmpLinkLifetime: function(value) {
-        localStorage.setItem("$bridge.tmpLinkLifetime", value);
+      'setTmpLinkLifetime': function(value) {
+        global.localStorage.setItem("$bridge.tmpLinkLifetime", value);
         console.log('Restart application to apply changes');
       }
     };

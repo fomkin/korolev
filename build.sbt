@@ -145,7 +145,14 @@ lazy val korolev = project.
       "com.github.fomkin" %% "levsha-core" % levshaVersion,
       "com.github.fomkin" %% "levsha-events" % levshaVersion
     ),
-    unmanagedResourceDirectories in Compile += file("korolev") / "shared" / "src" / "main" / "resources"
+    resourceGenerators in Compile += Def
+      .task {
+        val source = baseDirectory.value / "src" / "main" / "es6"
+        val target = (resourceManaged in Compile).value / "static"
+        val log = streams.value.log
+        JsUtils.assembleJs(source, target, log)
+      }
+      .taskValue
   ).
   dependsOn(bridge).
   enablePlugins(SbtOsgi).settings(korolevOsgiSettings:_*)
