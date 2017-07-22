@@ -59,7 +59,7 @@ package object server extends LazyLogging {
                    config.connectionLostWidget(textRenderContext)
                    textRenderContext.mkString
                  }'
-                 |}
+                 |};
                  |
               """.stripMargin
             ),

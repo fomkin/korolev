@@ -36,7 +36,7 @@ object JsUtils {
         options.setLanguageOut(LanguageMode.ECMASCRIPT5_STRICT)
         options.setSourceMapIncludeSourcesContent(true)
         options.setSourceMapLocationMappings(List(new LocationMapping(source.getAbsolutePath, "korolev/es6")).asJava)
-        options.setSourceMapOutputPath(sourceMapOutputFile.getAbsolutePath)
+        options.setSourceMapOutputPath(sourceMapOutputFile.getName)
         options.setEnvironment(CompilerOptions.Environment.BROWSER)
 
         CompilationLevel.ADVANCED_OPTIMIZATIONS.setOptionsForCompilationLevel(options)
@@ -49,11 +49,11 @@ object JsUtils {
     val sourceMapOutput = {
       val stringBuilder = new java.lang.StringBuilder()
       //stringBuilder.append(")]}")
-      compilationResult.sourceMap.appendTo(stringBuilder, "korolev-client.min.js")
+      compilationResult.sourceMap.appendTo(stringBuilder, sourceMapOutputFile.getName)
       stringBuilder.toString
     }
 
-    IO.write(sourceOutputFile, "//@ sourceMappingURL=korolev-client.min.js.map\n" + sourceOutput)
+    IO.write(sourceOutputFile, sourceOutput + "\n//# sourceMappingURL=korolev-client.min.js.map\n")
     IO.write(sourceMapOutputFile, sourceMapOutput)
     Seq(sourceOutputFile, sourceMapOutputFile)
   }

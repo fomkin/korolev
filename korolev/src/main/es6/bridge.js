@@ -1,367 +1,274 @@
-(function(global) {
-  global['Bridge'] = (function (global) {
-    'use strict';
+var protocolDebugEnabled = true //(window.localStorage.getItem("$bridge.protocolDebugEnabled") === 'true');
 
-    var protocolDebugEnabled = (global.localStorage.getItem("$bridge.protocolDebugEnabled") === 'true'),
-        tmpLinkLifetime = parseInt(global.localStorage.getItem("$bridge.tmpLinkLifetime")) || 5000,
-        LinkPrefix = '@link:',
-        ArrayPrefix = '@arr:',
-        ObjPrefix = '@obj:',
-        UnitResult = "@unit",
-        NullResult = "@null",
+const LinkPrefix = '@link:';
+const ArrayPrefix = '@arr:';
+const ObjPrefix = '@obj:';
+const UnitResult = "@unit";
+const NullResult = "@null";
+const HookSuccess = "@hook_success";
+const HookFailure = "@hook_failure";
+const LinkNotFound = "Link no found";
 
-        HookSuccess = "@hook_success",
-        HookFailure = "@hook_failure",
+export class Bridge {
 
-        LinkNotFound = "Link no found",
-        JSMimeType = {
-          type: 'application/javascript'
-        };
+  constructor(postMessageFunction) {
 
-    function Bridge(postMessageFunction, testEnv) {
-      function postMessage(data) {
-        var res = data[2], value;
-        postMessageFunction(data);
+    this.postMessageFunction = postMessageFunction;
+    this.links = { 'global': window };
+    this.initializationCallbacks = [];
+    this.initialized = false;
+
+    window._bridgeLink = 'global';
+  }
+
+  //---------------------------------------------------------------------------
+  //
+  //  Private methods
+  //
+  //---------------------------------------------------------------------------
+
+  /** @private */
+  _postMessage(data) {
+    var res = data[2], value;
+    this.postMessageFunction(data);
+  }
+
+
+  /** @private */
+  _getLink(id) {
+    return this.links[id];
+  }
+
+  /** @private */
+  _unpackArgs(args) {
+    var l = args.length,
+        i = 0,
+        arg = null,
+        id = null,
+        tpe = null;
+    for (i = 0; i < l; i += 1) {
+      arg = args[i];
+      tpe = typeof arg;
+      if (tpe === 'string' && arg.indexOf(LinkPrefix) === 0) {
+        id = arg.substring(LinkPrefix.length);
+        args[i] = this._getLink(id);
       }
-      var self = this,
-          initialize = null,
-          lastLinkId = 0,
-          tmpLinks = {},
-          tmpLinksIndex = {},
-          tmpLinksTime = {},
-          links = {},
-          linksIndex = {};
-
-        links['global'] = global;
-        links['testEnv'] = testEnv;
-        linksIndex[global] = 'global';
-        linksIndex[testEnv] = 'testEnv';
-
-      function createTmpLink(obj) {
-        var id = lastLinkId.toString();
-        lastLinkId++;
-        tmpLinks[id] = obj;
-        tmpLinks[obj] = id;
-        tmpLinksTime[id] = Date.now();
-        return id;
+      else if (tpe === 'object' && arg instanceof Array) {
+        this._unpackArgs(arg)
       }
+    }
+    return args;
+  }
 
-      function getLink(id) {
-        var tmpLink = tmpLinks[id];
-        if (tmpLink !== undefined) {
-          return tmpLink;
-        }
-        return links[id];
+  /** @private */
+  _packResult(arg) {
+    if (arg === undefined) {
+      return UnitResult;
+    }
+    if (arg === null) {
+      return NullResult;
+    }
+    if (typeof arg === 'object') {
+      var id = arg._bridgeLink;
+      if (arg instanceof Array) {
+        return ArrayPrefix + id;
       }
+      return ObjPrefix + id;
+    }
+    return arg;
+  }
 
-      function unpackArgs(args) {
-        var l = args.length,
-            i = 0,
-            arg = null,
-            id = null,
-            tpe = null;
-        for (i = 0; i < l; i += 1) {
-          arg = args[i];
-          tpe = typeof arg;
-          if (tpe === 'string' && arg.indexOf(LinkPrefix) === 0) {
-            id = arg.substring(LinkPrefix.length);
-            args[i] = getLink(id);
-          }
-          else if (tpe === 'object' && arg instanceof Array) {
-            unpackArgs(arg)
-          }
-        }
-        return args;
+  /** @private */
+  _createHook(reqId, success, cb) {
+    let self = this;
+    return function hook(res) {
+      cb([reqId, success, self._packResult(res)]);
+    };
+  }
+
+  /** @private */
+  _receiveCall(reqId, args, cb) {
+    let self = this;
+    var obj = args[0],
+        res = null,
+        err = null,
+        name = null,
+        callArgs = null,
+        hasHooks = false,
+        arg = null,
+        i = 0;
+    if (!obj) {
+      cb([reqId, false, LinkNotFound]);
+      return;
+    }
+    name = args[1];
+    callArgs = args.slice(2);
+    for (i = 0; i < callArgs.length; i++) {
+      arg = callArgs[i];
+      if (arg === HookSuccess) {
+        callArgs[i] = self._createHook(reqId, true, cb);
+        hasHooks = true;
+      } else if (arg === HookFailure) {
+        callArgs[i] = self._createHook(reqId, false, cb);
+        hasHooks = true;
       }
-
-      function packResult(arg) {
-        if (arg === undefined) {
-          return UnitResult;
+    }
+    try {
+      if (hasHooks) {
+        obj[name].apply(obj, callArgs);
+      } else {
+        res = self._packResult(obj[name].apply(obj, callArgs));
+        if (res === undefined) {
+          res = UnitResult;
         }
-        if (arg === null) {
-          return NullResult;
-        }
-        if (typeof arg === 'object') {
-          var id = linksIndex[arg] || tmpLinksIndex[arg];
-          if (id === undefined) {
-            id = createTmpLink(arg);
-          }
-          if (arg instanceof Array) {
-            return ArrayPrefix + id;
-          }
-          return ObjPrefix + id;
-        }
-        return arg;
+        cb([reqId, true, res]);
       }
+    } catch (exception) {
+      err = obj._bridgeLink + '.' + name + '(' + callArgs + ') call failure: ' + exception;
+      console.error(err);
+      cb([reqId, false, err]);
+    }
+  }
 
-      function createHook(reqId, success, cb) {
-        return function hook(res) {
-          cb([reqId, success, packResult(res)]);
-        };
+  /** @private */
+  _receiveGet(reqId, args, cb) {
+    var obj = args[0],
+        res = null,
+        err = null;
+    if (obj) {
+      res = obj[args[1]];
+      if (res === undefined) {
+        err = obj + "." + args[1] + " is undefined";
+        cb([reqId, false, err]);
+      } else {
+        cb([reqId, true, this._packResult(res)]);
       }
+    } else {
+      cb([reqId, false, LinkNotFound]);
+    }
+  }
 
-      function receiveCall(reqId, args, cb) {
-        var obj = args[0],
-            res = null,
-            err = null,
-            name = null,
-            callArgs = null,
-            hasHooks = false,
-            arg = null,
-            i = 0;
-        if (!obj) {
-          cb([reqId, false, LinkNotFound]);
-          return;
-        }
-        name = args[1];
-        callArgs = args.slice(2);
-        for (i = 0; i < callArgs.length; i++) {
-          arg = callArgs[i];
-          if (arg === HookSuccess) {
-            callArgs[i] = createHook(reqId, true, cb);
-            hasHooks = true;
-          } else if (arg === HookFailure) {
-            callArgs[i] = createHook(reqId, false, cb);
-            hasHooks = true;
-          }
-        }
-        try {
-          if (hasHooks) {
-            obj[name].apply(obj, callArgs);
-          } else {
-            res = packResult(obj[name].apply(obj, callArgs));
-            if (res === undefined) {
-              res = UnitResult;
-            }
-            cb([reqId, true, res]);
-          }
-        } catch (exception) {
-          err = obj + '.' + name + '(' + callArgs + ') call failure: ' + exception;
-          console.error(err);
-          cb([reqId, false, err]);
-        }
-      }
+  /** @private */
+  _receiveGetAndSaveAs(reqId, args) {
+    let subject = args[0];
+    if (!subject) {
+      this._postMessage([reqId, false, LinkNotFound]);
+      return;
+    }
+    let property = args[1];
+    let newId = args[2];
+    let object = subject[property];
+    if (!object) {
+      this._postMessage([reqId, false, `Property ${property} not found`]);
+    }
+    else if (typeof object !== "object") {
+      this._postMessage([reqId, false, `${property} is ${typeof object}`]);
+    }
+    else {
+      object._bridgeLink = newId;
+      this.links[newId] = object;
+      this._postMessage([reqId, true, this._packResult(object)]);
+    }
+  }
 
-      function receiveSave(reqId, args, cb) {
-        var obj = args[0],
-            newId = args[1];
-        if (obj) {
-          links[newId] = obj;
-          linksIndex[obj] = newId;
-          cb([reqId, true, packResult(obj)]);
-        } else {
-          cb([reqId, false, LinkNotFound]);
-        }
-      }
+  /** @private */
+  _notifyInitialized() {
+    for (var i = 0; i < this.initializationCallbacks.length; i++)
+      this.initializationCallbacks[i](self);
+    this.initializationCallbacks = null;
+  }
 
-      function receiveCallAndSaveAs(reqId, args, cb) {
-        var newId = args[2],
-            id = null,
-            err = null;
-        args = args.slice(0,2).concat(args.slice(3));
-        receiveCall(reqId, args, function (callRes) {
-          callRes = callRes[2];
-          if (callRes.indexOf(ObjPrefix) !== -1) {
-            id = callRes.substring(ObjPrefix.length);
-            receiveSave(reqId, [getLink(id), newId], cb);
-          } else {
-            err = args[1] + ' returns ' + (typeof callRes);
-            cb([reqId, false, err]);
-          }
-        });
-      }
+  //---------------------------------------------------------------------------
+  //
+  //  Public methods
+  //
+  //---------------------------------------------------------------------------
 
-      function receiveGet(reqId, args, cb) {
-        var obj = args[0],
-            res = null,
-            err = null;
-        if (obj) {
-          res = obj[args[1]];
-          if (res === undefined) {
-            err = obj + "." + args[1] + " is undefined";
-            cb([reqId, false, err]);
-          } else {
-            cb([reqId, true, packResult(res)]);
-          }
-        } else {
-          cb([reqId, false, LinkNotFound]);
-        }
-      }
+  receive(data) {
+    let self = this;
 
-      function receiveGetAndSaveAs(reqId, args, cb) {
-        var newId = args[2];
-        receiveGet(reqId, args, function (callRes) {
-          var id = null, err;
-          callRes = callRes[2];
-          if (callRes.indexOf(ObjPrefix) !== -1) {
-            id = callRes.substring(ObjPrefix.length);
-            receiveSave(reqId, [getLink(id), newId], cb);
-          } else {
-            err = args[1] + ' returns ' + (typeof callRes);
-            cb([reqId, false, err]);
-          }
-        });
-      }
+    if (protocolDebugEnabled) console.log('->', data);
 
-      this.checkLinkExists = function (id) {
-        return unpackArgs([LinkPrefix + id])[0] !== undefined;
-      };
-
-      this.checkLinkSaved = function (id) {
-        return links[id] !== null;
-      };
-
-      var initializationCallbacks = [];
-      var initialized = false;
-
-      function notifyInitialized() {
-        for (var i = 0; i < initializationCallbacks.length; i++)
-          initializationCallbacks[i](self);
-        initializationCallbacks = null;
-      }
-
-      this.onInitialize = function(cb) {
-        if (initialized) {
-          cb(self);
-          return;
-        }
-        initializationCallbacks.push(cb);
-      };
-
-      this.receive = function (data) {
-        if (protocolDebugEnabled) console.log('->', data);
-
-        // requests batch processing)
-        if (data[0] === "batch") {
-          var requests = data.slice(1);
-          requests.forEach(function (request) {
-            self.receive(request);
-          });
-          return;
-        }
-
-        var reqId = data[0],
-            method = data[1],
-            rawArgs = data.slice(2),
-            args = unpackArgs(rawArgs.concat());
-
-        switch (method) {
-          // Misc
-          case 'init':
-            initialized = true;
-            notifyInitialized();
-
-            postMessage([reqId, true, UnitResult]);
-            setInterval(function () {
-              var result = 0;
-              for(var id in tmpLinksIndex) {
-                var dt = Date.now() - tmpLinksTime[id], obj;
-                if (dt > tmpLinkLifetime) {
-                  obj = tmpLinks[id];
-                  tmpLinks[id] = null;
-                  tmpLinksTime[id] = null;
-                  tmpLinksIndex[obj] = null;
-                  result++;
-                }
-              }
-            }, tmpLinkLifetime);
-
-
-            break;
-          case 'registerCallback':
-            (function BridgeRegisterCallback() {
-              var callbackId = args[0];
-              function callback(arg) {
-                postMessage([-1, callbackId, packResult(arg)]);
-              }
-              links[callbackId] = callback;
-              linksIndex[callback] = callbackId;
-              postMessage([reqId, true, ObjPrefix + callbackId]);
-            })();
-            break;
-          // Link methods
-          case 'save':
-            receiveSave(reqId, args, postMessage);
-            break;
-          case 'free':
-            (function BridgeReceiveFree() {
-              var obj = args[0],
-                  id = rawArgs[0].replace(LinkPrefix, '');
-              if (obj) {
-                links[id] = null;
-                tmpLinks[id] = null;
-                postMessage([reqId, true, UnitResult]);
-              } else {
-                postMessage([reqId, false, LinkNotFound]);
-              }
-            })();
-            break;
-            // Object methods
-          case 'getAndSaveAs':
-            receiveGetAndSaveAs(reqId, args, postMessage);
-            break;
-          case 'get':
-            receiveGet(reqId, args, postMessage);
-            break;
-          case 'set':
-            (function BridgeReceiveSet() {
-              var obj = args[0],
-                  name = null,
-                  value = null;
-              if (obj) {
-                name = args[1];
-                value = args[2];
-                obj[name] = value;
-                postMessage([reqId, true, UnitResult]);
-              } else {
-                postMessage([reqId, false, LinkNotFound]);
-              }
-            })();
-            break;
-          case 'call':
-            receiveCall(reqId, args, postMessage);
-            break;
-          case 'callAndSaveAs':
-            receiveCallAndSaveAs(reqId, args, postMessage);
-            break;
-        }
-      };
+    // requests batch processing)
+    if (data[0] === "batch") {
+      var requests = data.slice(1);
+      requests.forEach(function (request) {
+        self.receive(request);
+      });
+      return;
     }
 
-    return {
+    var reqId = data[0],
+        method = data[1],
+        rawArgs = data.slice(2),
+        args = self._unpackArgs(rawArgs.concat());
 
-      /**
-       * Connect to remote server via WebSocket
-       */
-      'webSocket': function (urlOrWs, cb) {
-        var ws = null;
-        if (typeof urlOrWs === 'object') ws = urlOrWs;
-        else ws = new WebSocket(urlOrWs);
-        var bridge = new Bridge(function (data) {
-          if (protocolDebugEnabled) {
-            console.log('<-', data);
+    switch (method) {
+
+      // Misc
+      case 'init':
+        self.initialized = true;
+        self._notifyInitialized();
+        self._postMessage([reqId, true, UnitResult]);
+        break;
+
+      case 'registerCallback':
+        (function BridgeRegisterCallback() {
+          var callbackId = args[0];
+          function callback(arg) {
+            self._postMessage([-1, callbackId, self._packResult(arg)]);
           }
-          ws.send(JSON.stringify(data));
-        });
-        ws.addEventListener('message', function (event) {
-          bridge.receive(JSON.parse(event.data));
-        });
-        ws.addEventListener('error', function(error) { cb(null, error) });
-        bridge.onInitialize(cb);
-      },
+          self.links[callbackId] = callback;
+          callback._bridgeLink = callbackId;
+          self._postMessage([reqId, true, ObjPrefix + callbackId]);
+        })();
+        break;
 
-      'create': function (postMessage, testEnv) {
-        return new Bridge(postMessage, testEnv);
-      },
+      // Object methods
+      case 'getAndSaveAs':
+        this._receiveGetAndSaveAs(reqId, args);
+        break;
 
-      'setProtocolDebugEnabled': function(value) {
-        global.localStorage.setItem("$bridge.protocolDebugEnabled", value);
-        protocolDebugEnabled = value;
-      },
-      'setTmpLinkLifetime': function(value) {
-        global.localStorage.setItem("$bridge.tmpLinkLifetime", value);
-        console.log('Restart application to apply changes');
-      }
-    };
-  }(global));
-})(this);
+      case 'get':
+        self._receiveGet(reqId, args, (data) => self._postMessage(data));
+        break;
+
+      case 'call':
+        self._receiveCall(reqId, args, (data) => self._postMessage(data));
+        break;
+    }
+  }
+
+  onInitialize(cb) {
+    if (this.initialized) {
+      cb(self);
+      return;
+    }
+    this.initializationCallbacks.push(cb);
+  }
+}
+
+/**
+ * Connect to remote server via WebSocket
+ */
+export function createWebSocketBridge(urlOrWs, cb) {
+  var ws = null;
+  if (typeof urlOrWs === 'object') ws = urlOrWs;
+  else ws = new WebSocket(urlOrWs);
+  var bridge = new Bridge(function (data) {
+    if (protocolDebugEnabled) {
+      console.log('<-', data);
+    }
+    ws.send(JSON.stringify(data));
+  });
+  ws.addEventListener('message', function (event) {
+    bridge.receive(JSON.parse(event.data));
+  });
+  ws.addEventListener('error', function(error) { cb(null, error) });
+  bridge.onInitialize(cb);
+}
+
+export function setProtocolDebugEnabled(value) {
+  window.localStorage.setItem("$bridge.protocolDebugEnabled", value);
+  protocolDebugEnabled = value;
+}
