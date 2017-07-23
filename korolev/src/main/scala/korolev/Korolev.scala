@@ -46,7 +46,7 @@ object Korolev {
     new Korolev[F, S, M] with LazyLogging {
 
       val async = Async[F]
-      implicit val er = Async.ErrorReporter(e => logger.error(e.getMessage, e))
+      //implicit val er = Async.ErrorReporter(e => logger.error(e.getMessage, e))
 
       def handleAsyncError(message: Throwable => String): (Try[_] => Unit) = {
         case Failure(e) => logger.error(message(e), e)

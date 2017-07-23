@@ -12,7 +12,7 @@ Korolev runs a single-page application on the server side, keeping in the browse
 
 ## Why?
 
-* Lightning-fast page loading speed
+* Lightning-fast page loading speed (8kB of uncompressed JS)
 * Comparable to static HTML client-side RAM consumption
 * Indexable pages out of the box
 * Routing out of the box
@@ -24,7 +24,7 @@ Korolev runs a single-page application on the server side, keeping in the browse
 ## Documentation
 
 * [User guide](https://fomkin.org/korolev/user-guide.html) [(download PDF)](https://fomkin.org/korolev/user-guide.pdf)
-* [API overview](https://www.javadoc.io/doc/com.github.fomkin/korolev_2.12/0.4.1) 
+* [API overview](https://www.javadoc.io/doc/com.github.fomkin/korolev_2.12/0.4.3) 
 
 ## Tools
 

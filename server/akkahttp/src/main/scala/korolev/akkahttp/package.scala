@@ -63,7 +63,7 @@ package object akkahttp {
     }
 
   private def inFlow(maxMessageSize: Int, publish: String => Unit)
-                    (implicit actorSystem: ActorSystem, materializer: Materializer): Flow[Message, String, NotUsed] =
+                    (implicit materializer: Materializer): Flow[Message, String, NotUsed] =
     Flow[Message]
       .mapAsync(1) {
         case TextMessage.Strict(text) =>
