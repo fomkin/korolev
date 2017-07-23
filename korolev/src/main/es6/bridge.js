@@ -1,5 +1,3 @@
-var protocolDebugEnabled = true //(window.localStorage.getItem("$bridge.protocolDebugEnabled") === 'true');
-
 const LinkPrefix = '@link:';
 const ArrayPrefix = '@arr:';
 const ObjPrefix = '@obj:';
@@ -8,9 +6,13 @@ const NullResult = "@null";
 const HookSuccess = "@hook_success";
 const HookFailure = "@hook_failure";
 const LinkNotFound = "Link no found";
+const ProtocolDebugEnabledKey = "$bridge.protocolDebugEnabled";
+
+var protocolDebugEnabled = window.localStorage.getItem(ProtocolDebugEnabledKey) === 'true';
 
 export class Bridge {
 
+  /** @param {function(*)} postMessageFunction */
   constructor(postMessageFunction) {
 
     this.postMessageFunction = postMessageFunction;
@@ -30,6 +32,8 @@ export class Bridge {
   /** @private */
   _postMessage(data) {
     var res = data[2], value;
+    if (protocolDebugEnabled)
+      console.log('<-', data);
     this.postMessageFunction(data);
   }
 
@@ -184,6 +188,7 @@ export class Bridge {
   //
   //---------------------------------------------------------------------------
 
+  /** @param {*} data */
   receive(data) {
     let self = this;
 
@@ -239,6 +244,7 @@ export class Bridge {
     }
   }
 
+  /** param {function(?Bridge, ?Error)} cb */
   onInitialize(cb) {
     if (this.initialized) {
       cb(self);
@@ -248,27 +254,8 @@ export class Bridge {
   }
 }
 
-/**
- * Connect to remote server via WebSocket
- */
-export function createWebSocketBridge(urlOrWs, cb) {
-  var ws = null;
-  if (typeof urlOrWs === 'object') ws = urlOrWs;
-  else ws = new WebSocket(urlOrWs);
-  var bridge = new Bridge(function (data) {
-    if (protocolDebugEnabled) {
-      console.log('<-', data);
-    }
-    ws.send(JSON.stringify(data));
-  });
-  ws.addEventListener('message', function (event) {
-    bridge.receive(JSON.parse(event.data));
-  });
-  ws.addEventListener('error', function(error) { cb(null, error) });
-  bridge.onInitialize(cb);
-}
-
+/** @param {boolean} value */
 export function setProtocolDebugEnabled(value) {
-  window.localStorage.setItem("$bridge.protocolDebugEnabled", value);
+  window.localStorage.setItem(ProtocolDebugEnabledKey, value.toString());
   protocolDebugEnabled = value;
 }

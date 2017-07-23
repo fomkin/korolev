@@ -208,7 +208,6 @@ export class Korolev {
     * @param {string} path
     */
   ChangePageUrl(path) {
-    console.log(path);
     if (path !== window.location.pathname)
       window.history.pushState(path, '', path);
   }
