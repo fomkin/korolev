@@ -36,7 +36,7 @@ window['Bridge'] = {
   'setProtocolDebugEnabled': setProtocolDebugEnabled
 };
 
-window.document.addEventListener("DOMContentLoaded", function() {
+window.document.addEventListener("DOMContentLoaded", () => {
 
   korolev.RegisterRoot(window.document.body);
 
@@ -56,17 +56,15 @@ window.document.addEventListener("DOMContentLoaded", function() {
     var closeHandler = (event) => {
       connection.dispatcher.removeEventListener('message', messageHandler);
       connection.dispatcher.removeEventListener('close', closeHandler);
-      clw.show();
       korolev.UnregisterGlobalEventHandler();
       korolev.UnregisterHistoryHandler();
-      connection.connect();
+      clw.show();
     }
     connection.dispatcher.addEventListener('message', messageHandler);
     connection.dispatcher.addEventListener('close', closeHandler);
   });
 
-  connection.dispatcher.addEventListener('error', (event) => {
-    // Reconnect when error
+  connection.dispatcher.addEventListener('close', () => {
     connection.connect();
   });
 
