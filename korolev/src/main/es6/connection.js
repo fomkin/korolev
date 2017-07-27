@@ -29,7 +29,7 @@ export class Connection {
 
     this._reconnectTimeout = MIN_RECONNECT_TIMEOUT;
     this._webSocketsSupported = window.WebSocket !== undefined;
-    this._connectionType = ConnectionType.WEB_SOCKET;
+    this._connectionType = ConnectionType.LONG_POLLING;
     this._wasConnected = false;
 
     /** @type {?ConnectionType} */
@@ -160,7 +160,7 @@ export class Connection {
 
   /** @private */
   _onOpen() {
-    console.log("Connection opened.");
+    console.log("Connection opened");
     let event = this._createEvent('open');
     this._wasConnected = true
     this._reconnectTimeout = MIN_RECONNECT_TIMEOUT;
@@ -202,34 +202,32 @@ export class Connection {
 
   connect() {
 
-    if (this._wasConnected) {
+    if (this._wasConnected)
       console.log('Reconnecting...');
-      if (this._selectedConnectionType !== null) {
-        let ct = this._selectedConnectionType;
-        setTimeout(
-          () => this._connectUsingConnectionType(ct),
-          this._reconnectTimeout
-        );
-      } else {
-        switch (this._connectionType) {
-          case ConnectionType.WEB_SOCKET:
-            setTimeout(
-              () => this._connectUsingConnectionType(ConnectionType.LONG_POLLING),
-              this._reconnectTimeout
-            );
-            break;
-          case ConnectionType.LONG_POLLING:
-            setTimeout(
-              () => this._connectUsingConnectionType(ConnectionType.WEB_SOCKET),
-              this._reconnectTimeout
-            );
-            break;
-        }
-      }
+
+    if (this._selectedConnectionType !== null) {
+      let ct = this._selectedConnectionType;
+      setTimeout(
+        () => this._connectUsingConnectionType(ct),
+        this._reconnectTimeout
+      );
     } else {
-      this._connectUsingConnectionType(ConnectionType.WEB_SOCKET)
+      switch (this._connectionType) {
+        case ConnectionType.WEB_SOCKET:
+          setTimeout(
+            () => this._connectUsingConnectionType(ConnectionType.LONG_POLLING),
+            this._reconnectTimeout
+          );
+          break;
+        case ConnectionType.LONG_POLLING:
+          setTimeout(
+            () => this._connectUsingConnectionType(ConnectionType.WEB_SOCKET),
+            this._reconnectTimeout
+          );
+          break;
+      }
     }
-    
+
     this._reconnectTimeout = Math.min(this._reconnectTimeout * 2, MAX_RECONNECT_TIMEOUT);
   }
 
