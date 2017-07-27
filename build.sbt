@@ -247,7 +247,8 @@ lazy val `integration-tests` = project.
       "org.seleniumhq.selenium" % "selenium-java" % "2.53.1"
     )
   ).
-  dependsOn(`server-blaze`)
+  dependsOn(`server-blaze`).
+  dependsOn(`server-akkahttp`)
 
 lazy val `performance-benchmark` = project.
   settings(commonSettings).
