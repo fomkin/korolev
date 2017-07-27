@@ -2,14 +2,13 @@ package gp
 
 import korolev._
 import korolev.server._
-import korolev.blazeServer._
 import korolev.execution._
 
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.Future
 
-object GuineaPigServer {
+object GuineaPigService {
 
   case class State(
     selectedTab: String = "tab1",
@@ -38,7 +37,7 @@ object GuineaPigServer {
   val storage = StateStorage.default[Future, State](State())
   val inputId = elementId
 
-  val service = blazeService[Future, State, Any] from KorolevServiceConfig[Future, State, Any](
+  val service = KorolevServiceConfig[Future, State, Any](
     stateStorage = storage,
     head = {
       Seq(
