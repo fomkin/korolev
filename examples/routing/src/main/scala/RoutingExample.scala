@@ -31,12 +31,13 @@ object RoutingExample extends KorolevBlazeServer {
           'div ("Super TODO tracker"),
           'div (
             state.todos.keys map { name =>
-              'span (
+              'a(
                 event('click) {
                   immediateTransition { case s =>
                     s.copy(selectedTab = name)
                   }
                 },
+                'href /= "/" + name.toLowerCase, disableHref,
                 'style /= "margin-left: 10px",
                 if (name == state.selectedTab) 'strong (name)
                 else name
