@@ -7,6 +7,7 @@ import korolev.execution._
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.Future
+import scala.concurrent.duration._
 
 object GuineaPigService {
 
@@ -17,7 +18,8 @@ object GuineaPigService {
       "tab2" -> State.Todo(7),
       "tab3" -> State.Todo(2)
     ),
-    uploadedText: String = ""
+    uploadedText: String = "",
+    delayOn: Boolean = false
   )
 
   object State {
@@ -145,6 +147,20 @@ object GuineaPigService {
                 }
               }
             )
+          ),
+          'div('id /= "delay-text",
+            if (state.delayOn) "Wait a second" else "Click me",
+            if (state.delayOn) {
+              delay(1.second) {
+                case s => s.copy(delayOn = false)
+              }
+            } else {
+              event('click) {
+                immediateTransition {
+                  case s => s.copy(delayOn = true)
+                }
+              }
+            }
           )
         )
     },
@@ -152,7 +168,7 @@ object GuineaPigService {
       ServerRouter(
         dynamic = (_, _) => Router(
           fromState = {
-            case State(tab, _, _) =>
+            case State(tab, _, _, _) =>
               Root / tab.toLowerCase
           },
           toState = {

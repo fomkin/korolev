@@ -9,7 +9,7 @@ import org.openqa.selenium.{By, Platform, WebDriver}
 import tools._
 
 import scala.collection.JavaConverters._
-//import scala.concurrent.duration._
+import scala.concurrent.duration._
 
 object GuineaPigScenarios {
 
@@ -102,6 +102,20 @@ object GuineaPigScenarios {
       else {
         StepResult.CowardlySkipped("Not supported")
       }
+    },
+    step("Delay should be performed") { wd =>
+      val el = wd.findElement(By.id("delay-text"))
+      el.click()
+      sleep(200.millis)
+      assert(
+        "delay-text should be 'Wait a second'",
+        el.getText == "Wait a second"
+      )
+      sleep(900.millis)
+      assert(
+        "delay-text should be 'Click me'",
+        el.getText == "Click me"
+      )
     }
   )
 
