@@ -97,12 +97,16 @@ export class Korolev {
     * @param {string} childId
     * @param {string} tag
     */
-  Create(id, childId, tag) {
+  Create(id, childId, xmlNs, tag) {
     var parent = this.els[id],
       child = this.els[childId],
       newElement;
     if (!parent) return;
-    newElement = document.createElement(tag);
+    if (xmlNs === 0) {
+      newElement = document.createElement(tag);
+    } else {
+      newElement = document.createElementNS(xmlNs, tag);
+    }
     newElement.vId = childId;
     if (child && child.parentNode === parent) {
       parent.replaceChild(newElement, child);
@@ -160,10 +164,14 @@ export class Korolev {
     * @param {string} value
     * @param {boolean} isProperty
     */
-  SetAttr(id, name, value, isProperty) {
+  SetAttr(id, xmlNs, name, value, isProperty) {
     var element = this.els[id];
     if (isProperty) element[name] = value;
-    else element.setAttribute(name, value);
+    else if (xmlNs === 0) {
+      element.setAttribute(name, value);
+    } else {
+      element.setAttributeNS(xmlNs, name, value);
+    }
   }
 
    /**
@@ -171,10 +179,14 @@ export class Korolev {
     * @param {string} name
     * @param {boolean} isProperty
     */
-  RemoveAttr(id, name, isProperty) {
+  RemoveAttr(id, xmlNs, name, isProperty) {
     var element = this.els[id];
     if (isProperty) element[name] = undefined;
-    else element.removeAttribute(name);
+    else if (xmlNs === 0) {
+      element.removeAttribute(name);
+    } else {
+      element.removeAttributeNS(xmlNs, name);
+    }
   }
 
    /**

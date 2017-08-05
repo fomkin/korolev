@@ -26,17 +26,16 @@ object GameOfLife extends KorolevBlazeServer {
       case universe =>
         'body(
           'div(
-            'input(
-              'type /= "button",
-              'value /= "Step",
+            'button(
               event('click) {
                 immediateTransition { case state =>
                   state.next
                 }
-              }
+              },
+              "Step"
             )
           ),
-          'svg('width /= viewSideS, 'height /= viewSideS,
+          ns.svg('svg)('width /= viewSideS, 'height /= viewSideS,
             for {
               x <- 0 until universe.size
               y <- 0 until universe.size
@@ -45,7 +44,7 @@ object GameOfLife extends KorolevBlazeServer {
                   val p = cellRadius + n * (cellWidth + cellGap)
                   p.toString
                 }
-                'circle(
+                ns.svg('circle)(
                   'cx /= pos(x),
                   'cy /= pos(y),
                   'r /= cellRadiusS,

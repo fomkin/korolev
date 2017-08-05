@@ -86,17 +86,19 @@ object Korolev {
           client.call("CreateText", id.parent.get.mkString, id.mkString, text).runIgnoreResult()
         def create(id: Id, xmlNs: String, tag: String): Unit = {
           val parent = id.parent.fold("0")(_.mkString)
-          client.call("Create", parent, id.mkString, tag).runIgnoreResult()
+          val pXmlns = if (xmlNs eq levsha.XmlNs.html.uri) 0 else xmlNs
+          client.call("Create", parent, id.mkString, pXmlns, tag).runIgnoreResult()
         }
         def setAttr(id: Id, xmlNs: String, name: String, value: String): Unit = {
           val p = isProp(name)
           val n = escapeName(name, p)
-          client.call("SetAttr", id.mkString, n, value, p).runIgnoreResult()
+          val pXmlns = if (xmlNs eq levsha.XmlNs.html.uri) 0 else xmlNs
+          client.call("SetAttr", id.mkString, pXmlns, n, value, p).runIgnoreResult()
         }
         def removeAttr(id: Id, xmlNs: String, name: String): Unit = {
           val p = isProp(name)
           val n = escapeName(name, p)
-          client.call("RemoveAttr", id.mkString, n, p).runIgnoreResult()
+          client.call("RemoveAttr", id.mkString, xmlNs, n, p).runIgnoreResult()
         }
       }
 
