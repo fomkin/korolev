@@ -1,5 +1,5 @@
-Korolev single page applications framework
-==========================================
+Korolev: Single Page Applications Framework
+============================================
 Aleksey Fomkin <aleksey.fomkin@gmail.com>
 :source-highlighter: pygments
 :numbered:
@@ -284,7 +284,7 @@ val pictureFieldName = "picture"
 
 Use `onProgress` callback to handle progress of the form downloading. Function `start` return a `FormData`. Look API documentation for more details.
 
-https://github.com/fomkin/korolev/blob/v0.4.2/examples/form-data/src/main/scala/FormDataExample.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.5.0/examples/form-data/src/main/scala/FormDataExample.scala[See full example]
 
 Delays
 ~~~~~~
@@ -314,7 +314,7 @@ val render: Render = {
 }
 -----------------------------------
 
-https://github.com/fomkin/korolev/blob/v0.4.2/examples/delay/src/main/scala/DelayExample.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.5.0/examples/delay/src/main/scala/DelayExample.scala[See full example]
 
 Environment configurator
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -410,7 +410,7 @@ KorolevServiceConfig(
 )
 -------------------------------------------------------------------------------
 
-https://github.com/fomkin/korolev/blob/v0.4.2/examples/routing/src/main/scala/RoutingExample.scala#L93[See full example]
+https://github.com/fomkin/korolev/blob/v0.5.0/examples/routing/src/main/scala/RoutingExample.scala#L93[See full example]
 
 Productivity
 ------------
@@ -425,7 +425,7 @@ Usually when we say "components" we mean an UI element with its own state. Korol
 Korolev doesn't have any specific code to support WebComponents. WebComponent (Custom Elements + Shadow DOM) by design should behave as regular HTML tags. There is no difference between, for example, input or textarea, and any custom element.
 ============
 
-https://github.com/fomkin/korolev/blob/v0.4.2/examples/web-component/src/main/scala/WebComponentExample.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.5.0/examples/web-component/src/main/scala/WebComponentExample.scala[See full example]
 
 Developer mode and "hot reload"
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -466,10 +466,10 @@ To fix this, you can apply any in-memory storage compatible with https://github.
 
 [source,scala]
 ------------------------------
-libraryDependencies += "com.github.fomkin" %% "korolev-jcache-support" % "0.4.2"
+libraryDependencies += "com.github.fomkin" %% "korolev-jcache-support" % "0.5.0"
 ------------------------------
 
-https://github.com/fomkin/korolev/blob/v0.4.2/examples/jcache/src/main/scala/JCacheExample.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.5.0/examples/jcache/src/main/scala/JCacheExample.scala[See full example]
 
 Akka HTTP
 ~~~~~~~~~
