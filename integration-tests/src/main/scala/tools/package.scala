@@ -15,7 +15,12 @@ package object tools {
     Scenario(name, steps)
 
   def assert(message: String, f: => Boolean) = {
-    if (!f) StepResult.Error(new AssertionError(message)) else StepResult.Ok
+    if (!f) {
+      val exception = new AssertionError(message)
+      throw exception
+    } else {
+      StepResult.Ok
+    }
   }
 
   def fail(message: String): Unit = {
