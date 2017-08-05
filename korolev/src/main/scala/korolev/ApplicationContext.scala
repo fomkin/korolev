@@ -35,7 +35,7 @@ class ApplicationContext[F[+_]: Async, S, M](implicit scheduler: Scheduler[F]) {
 
     implicit final class KorolevSymbolOps(s: Symbol) {
       def :=(value: String): Document.Attr[Effect] = Document.Attr { rc =>
-        rc.setAttr('^' + s.name.replaceAll("([A-Z]+)", "-$1").toLowerCase, value)
+        rc.setAttr(levsha.XmlNs.html, '^' + s.name.replaceAll("([A-Z]+)", "-$1").toLowerCase, value)
       }
     }
   }
