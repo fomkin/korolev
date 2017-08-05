@@ -17,7 +17,7 @@ object GuineaPigService {
       "tab2" -> State.Todo(7),
       "tab3" -> State.Todo(2)
     ),
-    log: Seq[String] = Vector.empty
+    uploadedText: String = ""
   )
 
   object State {
@@ -35,6 +35,8 @@ object GuineaPigService {
 
   val logger = LoggerFactory.getLogger("GuineaPig")
   val storage = StateStorage.default[Future, State](State())
+
+  val uploadFormId = elementId
   val inputId = elementId
 
   val service = KorolevServiceConfig[Future, State, Any](
@@ -57,10 +59,7 @@ object GuineaPigService {
                 'id /= name,
                 event('click) {
                   immediateTransition { case s =>
-                    s.copy(
-                      selectedTab = name,
-                      log = s.log :+ s"Change selected tab to $name"
-                    )
+                    s.copy(selectedTab = name)
                   }
                 },
                 'style /= "margin-left: 10px",
@@ -89,10 +88,7 @@ object GuineaPigService {
                       immediateTransition { case s =>
                         val todos = s.todos(s.selectedTab)
                         val updated = todos.updated(i, todos(i).copy(done = !todo.done))
-                        s.copy(
-                          todos = s.todos + (s.selectedTab -> updated),
-                          log = s.log :+ s"Todo checkbox clicked"
-                        )
+                        s.copy(todos = s.todos + (s.selectedTab -> updated))
                       }
                     }
                   ),
@@ -104,19 +100,14 @@ object GuineaPigService {
             // Generate AddTodo action when 'Add' button clicked
             eventWithAccess('submit) { access =>
               logger.info("Submit clicked")
-              immediateTransition { case s =>
-                s.copy(log = s.log :+ s"Submit clicked")
-              } deferredTransition {
+              deferredTransition {
                 val property = access.property[String](inputId)
                 property.get('value) flatMap { value =>
                   logger.info("Value received")
                   property.set('value, "") map { _ =>
                     val todo = State.Todo(value, done = false)
                     transition { case s =>
-                      s.copy(
-                        todos = s.todos + (s.selectedTab -> (s.todos(s.selectedTab) :+ todo)),
-                        log = s.log :+ s"New Todo added"
-                      )
+                      s.copy(todos = s.todos + (s.selectedTab -> (s.todos(s.selectedTab) :+ todo)))
                     }
                   }
                 }
@@ -133,9 +124,27 @@ object GuineaPigService {
               "Add todo"
             )
           ),
-          'pre(
-            'div('strong("Server log:")),
-            state.log.map(s => 'div(s))
+          'div(
+            'div('id /= "upload-text", state.uploadedText),
+            'form(
+              uploadFormId,
+              'id /= "upload-form",
+              'input('type /= "file", 'name /= "upload-input"),
+              'button('id /= "upload-button", "Submit"),
+              eventWithAccess('submit) { access =>
+                deferredTransition {
+                  access
+                    .downloadFormData(uploadFormId)
+                    .start()
+                    .map { result =>
+                      transition {
+                        case s =>
+                          s.copy(uploadedText = result.text("upload-input"))
+                      }
+                    }
+                }
+              }
+            )
           )
         )
     },

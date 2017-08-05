@@ -1,13 +1,19 @@
 window.document.addEventListener("DOMContentLoaded", function() {
   Bridge.setProtocolDebugEnabled(true);
   var display = document.createElement("pre");
-  display.innerHTML = "<div><strong>Client log</strong></div>";
+  display.setAttribute('style', 'height: 300px; overflow-y: scroll')
+  display.innerHTML = '<div><strong id="debug-log-label">Client log</strong></div>';
   document.body.appendChild(display);
   console.log = function() {
     var line = document.createElement("div");
-    for (var i = 0; i < arguments.length; i++)
-      line.textContent = arguments[i];
+    for (var i = 0; i < arguments.length; i++) {
+      if (arguments[i].indexOf("ListenEvent") > -1) {
+        document.getElementById('debug-log-label').textContent = 'Client log (connected)';
+      }
+      line.textContent += arguments[i];
+    }
     display.appendChild(line);
+    display.scrollTop = display.scrollHeight;
   };
   console.error = function() {
     var line = document.createElement("div");
