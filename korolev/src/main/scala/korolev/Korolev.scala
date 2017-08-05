@@ -84,16 +84,16 @@ object Korolev {
           client.call("Remove", id.parent.get.mkString, id.mkString).runIgnoreResult()
         def createText(id: Id, text: String): Unit =
           client.call("CreateText", id.parent.get.mkString, id.mkString, text).runIgnoreResult()
-        def create(id: Id, tag: String): Unit = {
+        def create(id: Id, xmlNs: String, tag: String): Unit = {
           val parent = id.parent.fold("0")(_.mkString)
           client.call("Create", parent, id.mkString, tag).runIgnoreResult()
         }
-        def setAttr(id: Id, name: String, value: String): Unit = {
+        def setAttr(id: Id, xmlNs: String, name: String, value: String): Unit = {
           val p = isProp(name)
           val n = escapeName(name, p)
           client.call("SetAttr", id.mkString, n, value, p).runIgnoreResult()
         }
-        def removeAttr(id: Id, name: String): Unit = {
+        def removeAttr(id: Id, xmlNs: String, name: String): Unit = {
           val p = isProp(name)
           val n = escapeName(name, p)
           client.call("RemoveAttr", id.mkString, n, p).runIgnoreResult()
@@ -240,7 +240,7 @@ object Korolev {
 
           // Perform initial rendering
           if (fromScratch) {
-            renderContext.openNode("body")
+            renderContext.openNode(levsha.XmlNs.html, "body")
             renderContext.closeNode("body")
             renderContext.diff(DiffRenderContext.DummyChangesPerformer)
           } else {

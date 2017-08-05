@@ -50,8 +50,7 @@ package object server extends LazyLogging {
         val document = 'html(
           'head(
             'script('language /= "javascript",
-              s"""
-                 |window['KorolevConfig'] = {
+              s"""window['KorolevConfig'] = {
                  |  'sessionId': '$sessionId',
                  |  'serverRootPath': '${config.serverRouter.rootPath}',
                  |  'connectionLostWidget': '${
@@ -59,9 +58,7 @@ package object server extends LazyLogging {
                    config.connectionLostWidget(textRenderContext)
                    textRenderContext.mkString
                  }'
-                 |};
-                 |
-              """.stripMargin
+                 |};""".stripMargin
             ),
             'script('src /= "korolev-client.min.js"),
             config.head

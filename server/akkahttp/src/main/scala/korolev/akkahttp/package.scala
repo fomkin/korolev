@@ -57,7 +57,7 @@ package object akkahttp {
 
             complete(upgrade.handleMessagesWithSinkSource(in, out))
           case _ =>
-            throw new RuntimeException // cannot happen
+              throw new RuntimeException // cannot happen
         }
       }
     }
