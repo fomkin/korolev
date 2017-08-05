@@ -84,7 +84,7 @@ final class FormDataCodec(maxPartSize: Int) {
           buffer.get(bytes)
           val rawHeaders = new String(bytes, StandardCharsets.ISO_8859_1)
           val headers = rawHeaders.split('\n').toList map { line =>
-            val Array(key, value) = line.split(':')
+            val Array(key, value) = line.split(":", 2)
             key.trim -> value.trim
           }
           buffer.clear()

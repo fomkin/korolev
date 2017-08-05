@@ -6,16 +6,14 @@ import akka.stream.ActorMaterializer
 import korolev.execution._
 import korolev.blazeServer._
 import korolev.akkahttp._
-import org.openqa.selenium.By
 import org.openqa.selenium.remote.DesiredCapabilities
 import slogging.{LoggerConfig, SLF4JLoggerFactory}
 import tools._
 
-import scala.collection.JavaConverters._
-import scala.concurrent.Future
+import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 
-object GuineaPigTests extends App {
+object GuineaPigR extends App {
 
   val genericCaps = Seq(
     Caps(DesiredCapabilities.chrome _)(
@@ -103,54 +101,16 @@ object GuineaPigTests extends App {
 
   val appUrl = "http://localhost:8000"
 
-  val runScenario = () => scenario("Evil, inhuman experiment")(genericCaps)(
-    step("Page should be open successfully") { wd =>
-      // Open browser
-      wd.get(appUrl + "/")
-      assert(wd.getTitle == "The Test App")
-      sleep(10.seconds)
-    },
-    step("Switch to second tab") { wd =>
-      wd.findElement(By.id("tab2")).click()
-      sleep(5.seconds)
-      assert(wd.getCurrentUrl == s"$appUrl/tab2")
-    },
-    step("Click on first ToDo") { wd =>
-      val firstToDoCheckBox = wd
-        .findElements(By.className("todo_checkbox")).asScala
-        .head
-      firstToDoCheckBox.click()
-      sleep(5.seconds)
-      assert(
-        firstToDoCheckBox
-        .getAttribute("class")
-        .contains("todo_checkbox__checked")
-      )
-    },
-    step("Todo should be added after 'Add todo' click") { implicit wd =>
-      // Add new todo
-      val newTodoText = "Hello world"
-      val input = wd.findElement(By.id("todo-input"))
-      input.scrollTo()
-      input.sendKeys(newTodoText)
-      wd.findElement(By.id("todo-submit-button")).click()
-      sleep(10.seconds)
+  val runScenario = () => {
+    val resultFutures = GuineaPigScenarios
+      .all
+      .map(_.run(genericCaps:_*))
+    val resultFuture = Future
+      .sequence[Boolean, Seq](resultFutures)
+      .map(_.forall(identity))
+    Await.result(resultFuture, 1.hour)
+  }
 
-      // Check new dod
-      val newTodoExists = wd
-        .findElements(By.className("todo")).asScala
-        .last.getText == newTodoText
-
-      // Verify conditions
-      if (!newTodoExists) {
-        fail("Added todo entry is not found in todos list")
-      }
-    },
-    step("Field should be empty after todo was added") { wd =>
-      val value = wd.findElement(By.id("todo-input")).getAttribute("value")
-      assert(value == "", "Field should be empty")
-    }
-  )
 
   def runSerial(futures: List[(() => Boolean) => Future[Boolean]]): Future[Boolean] = futures match {
     case Nil => Future.successful(true)

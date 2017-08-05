@@ -23,7 +23,6 @@ object AkkaHttpExample extends App {
 
   private implicit val actorSystem = ActorSystem()
   private implicit val materializer = ActorMaterializer()
-  private implicit val ec = actorSystem.dispatcher
 
   private val route = akkaHttpService(config).apply(AkkaHttpServerConfig())
 
