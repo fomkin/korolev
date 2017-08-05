@@ -106,7 +106,7 @@ object GuineaPigR extends App {
       .all
       .map(_.run(genericCaps:_*))
     val resultFuture = Future
-      .sequence(resultFutures)
+      .sequence[Boolean, Seq](resultFutures)
       .map(_.forall(identity))
     Await.result(resultFuture, 1.hour)
   }

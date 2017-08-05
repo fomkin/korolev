@@ -8,11 +8,15 @@ package object tools {
 
   val logger = LoggerFactory.getLogger("tools")
 
-  def step(caption: String)(lambda: WebDriver => Unit) =
+  def step(caption: String)(lambda: WebDriver => StepResult) =
     Step(caption, lambda)
 
   def scenario(name: String)(steps: Step*): Scenario =
     Scenario(name, steps)
+
+  def assert(message: String, f: => Boolean) = {
+    if (!f) StepResult.Error(new AssertionError(message)) else StepResult.Ok
+  }
 
   def fail(message: String): Unit = {
     throw new AssertionError(message)

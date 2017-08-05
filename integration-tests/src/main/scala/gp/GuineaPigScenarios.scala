@@ -21,8 +21,8 @@ object GuineaPigScenarios {
     step("Page should be open successfully") { wd =>
       // Open browser
       wd.get(appUrl + "/")
-      assert(wd.getTitle == "The Test App")
-      assert(
+      assert("Title", wd.getTitle == "The Test App")
+      assert("Connected",
         wait(wd).until(
           ExpectedConditions.textMatches(
             By.id("debug-log-label"),
@@ -33,7 +33,7 @@ object GuineaPigScenarios {
     },
     step("Switch to second tab") { wd =>
       wd.findElement(By.id("tab2")).click()
-      assert(wait(wd).until(ExpectedConditions.urlToBe(s"$appUrl/tab2")))
+      assert("Url should be tab2", wait(wd).until(ExpectedConditions.urlToBe(s"$appUrl/tab2")))
     },
     step("Click on first ToDo") { wd =>
       val firstToDoCheckBox = wd
@@ -41,7 +41,7 @@ object GuineaPigScenarios {
         .asScala
         .head
       firstToDoCheckBox.click()
-      assert(wait(wd).until(
+      assert("Todo should be checked", wait(wd).until(
         ExpectedConditions.attributeContains(
           firstToDoCheckBox,
           "class",
@@ -57,7 +57,7 @@ object GuineaPigScenarios {
       input.sendKeys(newTodoText)
       wd.findElement(By.id("todo-submit-button")).click()
       // Check new dod
-      assert(wait(wd).until(
+      assert(s"Last todo text should contain $newTodoText", wait(wd).until(
         ExpectedConditions.textToBe(
           By.xpath("(//div[@class='todo'])[last()]"),
           newTodoText
@@ -66,7 +66,7 @@ object GuineaPigScenarios {
     },
     step("Field should be empty after todo was added") { wd =>
       val value = wd.findElement(By.id("todo-input")).getAttribute("value")
-      assert(value == "", "Field should be empty")
+      assert("Field should be empty", value == "")
     },
     step("Uploaded text file should be displayed") { wd =>
       val shouldRun = wd match {
@@ -92,12 +92,15 @@ object GuineaPigScenarios {
         }
         wd.findElement(By.name("upload-input")).sendKeys(file.getAbsolutePath)
         wd.findElement(By.id("upload-button")).click()
-        assert(wait(wd).until(
+        assert(s"upload-text.textContent should be $text", wait(wd).until(
           ExpectedConditions.textToBe(
             By.id("upload-text"),
             text
           )
         ))
+      }
+      else {
+        StepResult.CowardlySkipped("Not supported")
       }
     }
   )

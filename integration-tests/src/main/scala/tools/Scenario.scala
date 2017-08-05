@@ -9,7 +9,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 case class Scenario(name: String, steps: Seq[Step]) {
 
-  def run(cases: Caps*) = {
+  def run(cases: Caps*): Future[Boolean] = {
     // Sauce labs give us 5 parallel sessions
     implicit val defaultExecutor = ExecutionContext.fromExecutorService(Executors.newWorkStealingPool(5))
 
@@ -47,20 +47,25 @@ case class Scenario(name: String, steps: Seq[Step]) {
               sb.append(s"- ${step.caption} 😓\n")
               runScenariosRec(skip = true, xs)
             case step :: xs =>
-              try {
+              val result = try {
                 step.lambda(webDriver)
-                sb.append(s"- ${step.caption} 😃\n")
-                runScenariosRec(skip = false, xs)
               } catch {
-                case e: Throwable =>
+                case e: Throwable => StepResult.Error(e)
+              }
+              result match {
+                case StepResult.CowardlySkipped(reason) =>
+                  sb.append(s"- ${step.caption} ($reason) 🤐\n")
+                case StepResult.Ok =>
+                  sb.append(s"- ${step.caption} 😃\n")
+                case StepResult.Error(e) =>
                   sb.append(s"- ${step.caption} 😡\n")
                   sb.append(Console.RED)
                   sb.append(s"  Cause: ${e.getMessage}")
                   for (st <- e.getStackTrace)
                     sb.append(s"    $st\n")
                   sb.append(Console.RESET)
-                  runScenariosRec(skip = true, xs)
               }
+              runScenariosRec(skip = false, xs)
           }
 
         val isPassed = runScenariosRec(skip = false, steps.toList)
