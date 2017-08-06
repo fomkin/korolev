@@ -98,7 +98,8 @@ object Korolev {
         def removeAttr(id: Id, xmlNs: String, name: String): Unit = {
           val p = isProp(name)
           val n = escapeName(name, p)
-          client.call("RemoveAttr", id.mkString, xmlNs, n, p).runIgnoreResult()
+          val pXmlns = if (xmlNs eq levsha.XmlNs.html.uri) 0 else xmlNs
+          client.call("RemoveAttr", id.mkString, pXmlns, n, p).runIgnoreResult()
         }
       }
 
