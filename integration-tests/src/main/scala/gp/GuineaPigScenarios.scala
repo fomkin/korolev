@@ -66,7 +66,7 @@ object GuineaPigScenarios {
     },
     step("Field should be empty after todo was added") { wd =>
       val value = wd.findElement(By.id("todo-input")).getAttribute("value")
-      assert("Field should be empty", value == "")
+      assert("Field should be empty", value == "property value")
     },
     step("Uploaded text file should be displayed") { wd =>
       val shouldRun = wd match {

@@ -132,7 +132,8 @@ object Korolev {
               client.callAndFlush("ExtractProperty", id.mkString, propName.name)
             }
             def set(propName: Symbol, value: T): F[Unit] = idF flatMap { id =>
-              client.callAndFlush("SetAttr", id.mkString, propName.name, value, true)
+              // Xmlns argument is empty cause it will be ignored
+              client.callAndFlush("SetAttr", id.mkString, "", propName.name, value, true)
             }
           }
         }

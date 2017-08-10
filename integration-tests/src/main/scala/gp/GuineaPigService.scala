@@ -106,7 +106,7 @@ object GuineaPigService {
                 val property = access.property[String](inputId)
                 property.get('value) flatMap { value =>
                   logger.info("Value received")
-                  property.set('value, "") map { _ =>
+                  property.set('value, "property value") map { _ =>
                     val todo = State.Todo(value, done = false)
                     transition { case s =>
                       s.copy(todos = s.todos + (s.selectedTab -> (s.todos(s.selectedTab) :+ todo)))
