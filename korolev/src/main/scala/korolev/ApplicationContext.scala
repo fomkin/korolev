@@ -184,11 +184,11 @@ object ApplicationContext {
     def cancel(): Unit
   }
 
-  final case class ComponentEntry[F[+_]: Async, AS, M, CS, E](component: Component[F, CS, E], state: CS)
+  final case class ComponentEntry[F[+_]: Async, AS, M, CS, E](component: Component[F, CS, E], state: CS, f: E => EventResult[F, AS])
     extends Effect[F, AS, M] {
 
     def createInstance(frontend: Frontend[F], eventRegistry: EventRegistry[F]) = {
-      new ComponentInstance[F, AS, M, CS, E](state, frontend, eventRegistry, component)
+      new ComponentInstance[F, AS, M, CS, E](state, frontend, eventRegistry, component, f)
     }
   }
 

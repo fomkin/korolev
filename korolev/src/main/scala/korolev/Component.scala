@@ -11,7 +11,7 @@ import levsha.events.EventId
 import levsha.{Id, StatefulRenderContext, XmlNs}
 
 import scala.collection.mutable
-import scala.util.{Failure, Random}
+import scala.util.{Failure, Random, Success}
 
 sealed abstract class Component[F[+ _]: Async, CS, E] {
 
@@ -24,7 +24,7 @@ sealed abstract class Component[F[+ _]: Async, CS, E] {
   val context = ApplicationContext[F, CS, E](Async[F], null) // TODO ERROR
 
   def apply[AS, M](initialState: CS)(f: E => EventResult[F, AS]): ComponentEntry[F, AS, M, CS, E] =
-    ComponentEntry(this, initialState)
+    ComponentEntry(this, initialState, f)
 
   def render(state: CS): Node[Effect[F, CS, E]]
 }
@@ -94,20 +94,21 @@ object Component {
   final class ComponentInstance[F[+ _]: Async, AS, M, CS, E](initialState: CS,
                                                              frontend: Frontend[F],
                                                              eventRegistry: EventRegistry[F],
-                                                             val component: Component[F, CS, E]) {
+                                                             val component: Component[F, CS, E],
+                                                             eventHandler: E => EventResult[F, AS]) {
 
     private val async = Async[F]
     private val state = AtomicReference(initialState)
     private val lastSetState = AtomicReference(initialState)
     private val markedDelays = mutable.Set.empty[Id] // Set of the delays which are should survive
-    private val elements = mutable.Map.empty[ApplicationContext.ElementId[F, CS, E], Id]
-    private val events = mutable.Map.empty[EventId, ApplicationContext.Event[F, CS, E]]
-    private val delays = mutable.Map.empty[Id, ApplicationContext.Delay[F, CS, E]]
+    private val elements = mutable.Map.empty[ElementId[F, CS, E], Id]
+    private val events = mutable.Map.empty[EventId, Event[F, CS, E]]
+    private val delays = mutable.Map.empty[Id, Delay[F, CS, E]]
     private val nestedComponents = mutable.Map.empty[Id, ComponentInstance[F, CS, E, _, _]]
     private val formDataPromises = mutable.Map.empty[String, Promise[F, FormData]]
     private val formDataProgressTransitions = mutable.Map.empty[String, (Int, Int) => Transition[CS]]
     private val stateChangeSubscribers = mutable.ArrayBuffer.empty[() => Unit]
-    private val eventSubscribers = mutable.ArrayBuffer.empty[E => Unit]
+    private val eventSubscribers = mutable.ArrayBuffer.empty[EventResult[F, AS] => _]
 
     private object browserAccess extends Access[F, CS, E] {
 
@@ -142,7 +143,7 @@ object Component {
         getId(element).flatMap(id => frontend.focus(id))
 
       def publish(message: E): F[Unit] = {
-        eventSubscribers.foreach(_(message))
+        eventSubscribers.foreach(_(eventHandler(message)))
         async.unit
       }
 
@@ -163,21 +164,45 @@ object Component {
       }
     }
 
+    private def applyEventResult(er: EventResult[F, CS]): Boolean = {
+      // Apply immediate transition
+      er.it match {
+        case None => ()
+        case Some(transition) =>
+          applyTransition(transition)
+      }
+      // Apply deferred transition
+      er.dt.fold(async.unit) { transitionF =>
+        transitionF.map { transition =>
+          applyTransition(transition)
+        }
+      } run {
+        case Success(_) =>
+        // ok transitions was applied
+        case Failure(e) =>
+        // TODO log error
+        //logger.error("Exception during applying transition", e)
+      }
+      !er.sp
+    }
+
     /**
       * Subscribe to component instance state changes.
       * Callback will be invoked for every state change.
       */
     def subscribeStateChange(callback: () => Unit): () => Unit = {
       stateChangeSubscribers += callback
-      () => { stateChangeSubscribers -= callback; () }
+      () =>
+        { stateChangeSubscribers -= callback; () }
     }
 
     /**
       * TODO
       */
-    def subscribeEvents(callback: E => Unit): () => Unit = {
+    def subscribeEvents(callback: EventResult[F, AS] => _): () => Unit = {
       eventSubscribers += callback
-      () => { eventSubscribers -= callback; () }
+      () =>
+        { eventSubscribers -= callback; () }
     }
 
     /**
@@ -215,15 +240,15 @@ object Component {
         def addTextNode(text: String): Unit = rc.addTextNode(text)
         def addMisc(misc: Effect[F, CS, E]): Unit = {
           misc match {
-            case event: ApplicationContext.Event[F, CS, E] =>
+            case event: Event[F, CS, E] =>
               val id = rc.currentId
               events.put(EventId(id, event.`type`.name, event.phase), event)
               eventRegistry.registerEventType(event.`type`)
-            case element: ApplicationContext.ElementId[F, CS, E] =>
+            case element: ElementId[F, CS, E] =>
               val id = rc.currentId
               elements.put(element, id)
               ()
-            case delay: ApplicationContext.Delay[F, CS, E] =>
+            case delay: Delay[F, CS, E] =>
               val id = rc.currentId
               markedDelays += id
               if (!delays.contains(id)) {
@@ -232,7 +257,8 @@ object Component {
                 // TODO start delay
               }
               ()
-            case entry @ ApplicationContext.ComponentEntry(value, newState) =>
+            case entry @ ComponentEntry(value, newState, _) =>
+              // TODO Event handler was changed but instance not. May be eventHandler should be mutable
               rc.openNode(value.xmlNs, value.tag)
               val id = rc.currentId
               nestedComponents.get(id) match {
@@ -242,6 +268,7 @@ object Component {
                 case _ =>
                   val nested = entry.createInstance(frontend, eventRegistry)
                   nestedComponents.put(id, nested)
+                  nested.subscribeEvents(applyEventResult)
                   nested.applyRenderContext(proxy.asInstanceOf)
               }
               rc.closeNode(value.tag)
@@ -249,6 +276,25 @@ object Component {
         }
       }
       node(proxy)
+    }
+
+    def applyTransition(transition: Transition[CS]): Unit = {
+      state.transform { currentState =>
+        transition.lift(currentState) match {
+          case None           => currentState
+          case Some(newState) => newState
+        }
+      }
+      ()
+    }
+
+    def applyEvent(eventId: EventId): Boolean = events.get(eventId) match {
+      case Some(event: EventWithAccess[F, CS, E]) => applyEventResult(event.effect(browserAccess))
+      case Some(event: SimpleEvent[F, CS, E])     => applyEventResult(event.effect())
+      case None =>
+        nestedComponents.values.forall { nested =>
+          nested.applyEvent(eventId)
+        }
     }
   }
 
