@@ -11,9 +11,9 @@ import levsha.events.EventId
 import levsha.{Id, StatefulRenderContext, XmlNs}
 
 import scala.collection.mutable
-import scala.util.{Failure, Random, Success}
+import scala.util.{Failure, Random, Success, Try}
 
-sealed abstract class Component[F[+ _]: Async, CS, E] {
+abstract class Component[F[+ _]: Async, CS, E] {
 
   val id = UUID.randomUUID()
 
@@ -81,15 +81,21 @@ object Component {
       */
     def registerEventType(`type`: Symbol): Unit = {
       if (!knownEventTypes.contains(`type`)) {
-        frontend
-          .listenEvent(`type`.name, preventDefault = false)
-          .runIgnoreResult
+        knownEventTypes += `type`
+        frontend.listenEvent(`type`.name, preventDefault = false).runIgnoreResult
       }
     }
   }
 
   /**
     * Component state holder and effects performer
+    *
+    * Performing cycle:
+    *
+    * 1. [[prepare()]]
+    * 2. Optionally [[setState()]]
+    * 3. [[applyRenderContext()]]
+    * 4. [[cancelObsoleteDelays()]]
     */
   final class ComponentInstance[F[+ _]: Async, AS, M, CS, E](initialState: CS,
                                                              frontend: Frontend[F],
@@ -241,15 +247,16 @@ object Component {
         def addMisc(misc: Effect[F, CS, E]): Unit = {
           misc match {
             case event: Event[F, CS, E] =>
-              val id = rc.currentId
+              val id = rc.currentId.parent.get
+              println(s"events.put(${EventId(id, event.`type`.name, event.phase)}, $event)")
               events.put(EventId(id, event.`type`.name, event.phase), event)
               eventRegistry.registerEventType(event.`type`)
             case element: ElementId[F, CS, E] =>
-              val id = rc.currentId
+              val id = rc.currentId.parent.get
               elements.put(element, id)
               ()
             case delay: Delay[F, CS, E] =>
-              val id = rc.currentId
+              val id = rc.currentId.parent.get
               markedDelays += id
               if (!delays.contains(id)) {
                 delays.put(id, delay)
@@ -260,7 +267,7 @@ object Component {
             case entry @ ComponentEntry(value, newState, _) =>
               // TODO Event handler was changed but instance not. May be eventHandler should be mutable
               rc.openNode(value.xmlNs, value.tag)
-              val id = rc.currentId
+              val id = rc.currentId.parent.get
               nestedComponents.get(id) match {
                 case Some(nested) if nested.component.tag == value.tag && nested.component.xmlNs == value.xmlNs =>
                   nested.setStateUnsafe(newState)
@@ -268,6 +275,7 @@ object Component {
                 case _ =>
                   val nested = entry.createInstance(frontend, eventRegistry)
                   nestedComponents.put(id, nested)
+                  nested.subscribeStateChange(() => stateChangeSubscribers.foreach(_()))
                   nested.subscribeEvents(applyEventResult)
                   nested.applyRenderContext(proxy.asInstanceOf)
               }
@@ -285,16 +293,60 @@ object Component {
           case Some(newState) => newState
         }
       }
-      ()
+      stateChangeSubscribers.foreach(_())
     }
 
-    def applyEvent(eventId: EventId): Boolean = events.get(eventId) match {
-      case Some(event: EventWithAccess[F, CS, E]) => applyEventResult(event.effect(browserAccess))
-      case Some(event: SimpleEvent[F, CS, E])     => applyEventResult(event.effect())
-      case None =>
-        nestedComponents.values.forall { nested =>
-          nested.applyEvent(eventId)
-        }
+    def applyEvent(eventId: EventId): Boolean = {
+      println(s"applyEvent: events.get($eventId) == ${events.get(eventId)}")
+      events.get(eventId) match {
+        case Some(event: EventWithAccess[F, CS, E]) => applyEventResult(event.effect(browserAccess))
+        case Some(event: SimpleEvent[F, CS, E])     => applyEventResult(event.effect())
+        case None =>
+          nestedComponents.values.forall { nested =>
+            nested.applyEvent(eventId)
+          }
+      }
+    }
+
+    /** Remove all delays which was not marked during rendering */
+    def cancelObsoleteDelays(): Unit = {
+      delays foreach {
+        case (id, delay) =>
+          if (!markedDelays.contains(id)) {
+            delays.remove(id)
+            delay.cancel()
+          }
+      }
+      nestedComponents.values.foreach { nested =>
+        nested.cancelObsoleteDelays()
+      }
+    }
+
+    /** Should be invoked before rendering */
+    def prepare(): Unit = {
+      markedDelays.clear()
+      elements.clear()
+      events.clear()
+      // Remove only finished delays
+      delays foreach {
+        case (id, delay) =>
+          if (delay.finished)
+            delays.remove(id)
+      }
+      nestedComponents.values.foreach { nested =>
+        nested.prepare()
+      }
+    }
+
+    def resolveFormData(descriptor: String, formData: Try[FormData]): Unit = {
+      formDataPromises.get(descriptor) foreach { promise =>
+        promise.complete(formData)
+      }
+      // Remove promise and onProgress handler
+      // when formData loading is complete
+      formDataProgressTransitions.remove(descriptor)
+      formDataPromises.remove(descriptor)
+      ()
     }
   }
 

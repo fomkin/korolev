@@ -164,12 +164,13 @@ package object server extends LazyLogging {
           def apply[K, V]: mutable.Map[K, V] = TrieMap.empty[K, V]
         }
         val korolev = Korolev(
-          makeSessionKey(deviceId, sessionId), dux, jsAccess, state, config.render, router, env.onMessage,
+          makeSessionKey(deviceId, sessionId), jsAccess, state, config.render, router, env.onMessage,
           fromScratch = isNew, createMutableMap = trieMapFactory
         )
         // Subscribe on state updates an push them to storage
-        korolev.stateManager.subscribe(state => config.stateStorage.write(deviceId, sessionId, state))
-        korolev.stateManager.onDestroy(env.onDestroy)
+        // TODO onDestroy and on state change
+        //korolev.stateManager.subscribe(state => config.stateStorage.write(deviceId, sessionId, state))
+        //korolev.stateManager.onDestroy(env.onDestroy)
 
         new KorolevSession[F] {
 
@@ -206,7 +207,8 @@ package object server extends LazyLogging {
               currentPromise.get() foreach { promise =>
                 promise.complete(Failure(new SessionDestroyedException("Session has been closed")))
               }
-              korolev.stateManager.destroy()
+              // TODO destroy
+              //korolev.stateManager.destroy()
               sessions.remove(sessionKey)
             }
             Async[F].unit
