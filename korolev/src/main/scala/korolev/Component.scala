@@ -363,6 +363,12 @@ object Component {
       formDataPromises.remove(descriptor)
       ()
     }
+
+    def handleFormDataProgress(descriptor: String, loaded: Int, total: Int): Unit = {
+      formDataProgressTransitions.get(descriptor) foreach { f =>
+        applyTransition(f(loaded.toInt, total.toInt))
+      }
+    }
   }
 
 }

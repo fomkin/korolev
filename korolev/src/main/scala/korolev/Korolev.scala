@@ -163,11 +163,7 @@ object Korolev {
           // FormData progress callback
           jsAccess.registerCallbackAndFlush[String] { descriptorLoadedTotal =>
             val Array(descriptor, loaded, total) = descriptorLoadedTotal.split(':')
-//            formDataProgressTransitions.get(descriptor) foreach { f =>
-//              stateManager(f(loaded.toInt, total.toInt))
-//            }
-            // TODO form data progress processing
-            ()
+            topLevelComponentInstance.handleFormDataProgress(descriptor, loaded.toInt, total.toInt)
           } flatMap { callback =>
             client.callAndFlush[Unit]("RegisterFormDataProgressHandler", callback)
           },
@@ -201,7 +197,6 @@ object Korolev {
 
           val onState = () => {
             // Set page url if router exists
-            // TODO routing
             router.fromState
               .lift(topLevelComponentInstance.getState)
               .foreach(path => client.call("ChangePageUrl", path.toString))
