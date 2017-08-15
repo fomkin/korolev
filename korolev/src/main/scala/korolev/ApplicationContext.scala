@@ -1,6 +1,5 @@
 package korolev
 
-import korolev.Async.AsyncOps
 import korolev.Component.{ComponentInstance, EventRegistry, Frontend}
 import korolev.StateManager.Transition
 import korolev.util.Scheduler
@@ -63,11 +62,12 @@ class ApplicationContext[F[+_]: Async, S, M](implicit scheduler: Scheduler[F]) {
 
     def cancel(): Unit = _jobHandler.foreach(_.cancel())
 
-    def start(applyTransition: Transition => F[Unit]): Unit = {
+    def start(applyTransition: Transition => Unit): Unit = {
       _jobHandler = Some {
         scheduler.scheduleOnce(delay) {
           _finished = true
-          applyTransition(transition).runIgnoreResult()
+          println(s"delay finished == ${_finished}")
+          applyTransition(transition)
         }
       }
     }
@@ -179,7 +179,7 @@ object ApplicationContext {
   }
 
   sealed abstract class Delay[F[+_]: Async, S, M] extends Effect[F, S, M] {
-    def start(applyTransition: Transition[S] => F[Unit]): Unit
+    def start(applyTransition: Transition[S] => Unit): Unit
     def finished: Boolean
     def cancel(): Unit
   }

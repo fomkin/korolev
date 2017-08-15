@@ -6,7 +6,7 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 
 import korolev.Async._
-import korolev.Korolev.MutableMapFactory
+import korolev.util.Scheduler
 import levsha.RenderContext
 import levsha.impl.{AbstractTextRenderContext, TextPrettyPrintingConfig}
 import slogging.LazyLogging
@@ -23,7 +23,7 @@ package object server extends LazyLogging {
   def korolevService[F[+_]: Async, S, M](
     mimeTypes: MimeTypes,
     config: KorolevServiceConfig[F, S, M]
-  ): KorolevService[F] = {
+  )(implicit scheduler: Scheduler[F]): KorolevService[F] = {
 
     import misc._
 
@@ -169,13 +169,9 @@ package object server extends LazyLogging {
         val dux = StateManager[F, S](state)
         val router = config.serverRouter.dynamic(deviceId, sessionId)
         val env = config.envConfigurator(deviceId, sessionId, dux.apply)
-        val trieMapFactory = new MutableMapFactory {
-          def apply[K, V]: mutable.Map[K, V] = TrieMap.empty[K, V]
-        }
         val korolev = Korolev(
           makeSessionKey(deviceId, sessionId), jsAccess, state, config.render, router, env.onMessage,
-          fromScratch = isNew, createMutableMap = trieMapFactory
-        )
+          fromScratch = isNew)
         // Subscribe on state updates an push them to storage
         // TODO onDestroy and on state change
         //korolev.stateManager.subscribe(state => config.stateStorage.write(deviceId, sessionId, state))

@@ -5,7 +5,7 @@ import java.util.UUID
 import korolev.ApplicationContext._
 import korolev.Async._
 import korolev.StateManager.Transition
-import korolev.util.AtomicReference
+import korolev.util.{AtomicReference, Scheduler}
 import levsha.Document.Node
 import levsha.events.EventId
 import levsha.{Id, StatefulRenderContext, XmlNs}
@@ -13,11 +13,11 @@ import levsha.{Id, StatefulRenderContext, XmlNs}
 import scala.collection.mutable
 import scala.util.{Failure, Random, Success, Try}
 
-abstract class Component[F[+ _]: Async, CS, E] {
+abstract class Component[F[+ _]: Async, CS, E](implicit scheduler: Scheduler[F]) {
 
   val id = UUID.randomUUID()
 
-  val context = ApplicationContext[F, CS, E](Async[F], null) // TODO ERROR
+  val context = ApplicationContext[F, CS, E]
 
   def apply[AS, M](initialState: CS)(f: E => EventResult[F, AS]): ComponentEntry[F, AS, M, CS, E] =
     ComponentEntry(this, initialState, f)
@@ -28,13 +28,13 @@ abstract class Component[F[+ _]: Async, CS, E] {
 object Component {
 
   def apply[F[+ _]: Async, S, E](
-      renderFunction: (ApplicationContext[F, S, E], S) => Node[Effect[F, S, E]]): Component[F, S, E] = {
+      renderFunction: (ApplicationContext[F, S, E], S) => Node[Effect[F, S, E]])(implicit scheduler: Scheduler[F]): Component[F, S, E] = {
     new ComponentFunction(renderFunction)
   }
 
   /** A way to define components in functional style */
   private class ComponentFunction[F[+ _]: Async, S, E](
-      renderFunction: (ApplicationContext[F, S, E], S) => Node[Effect[F, S, E]])
+      renderFunction: (ApplicationContext[F, S, E], S) => Node[Effect[F, S, E]])(implicit scheduler: Scheduler[F])
       extends Component[F, S, E] {
 
     def render(state: S): Node[Effect[F, S, E]] = {
@@ -103,9 +103,9 @@ object Component {
     private val state = AtomicReference(initialState)
     private val lastSetState = AtomicReference(initialState)
     private val markedDelays = mutable.Set.empty[Id] // Set of the delays which are should survive
+    private val delays = mutable.Map.empty[Id, Delay[F, CS, E]]
     private val elements = mutable.Map.empty[ElementId[F, CS, E], Id]
     private val events = mutable.Map.empty[EventId, Event[F, CS, E]]
-    private val delays = mutable.Map.empty[Id, Delay[F, CS, E]]
     private val nestedComponents = mutable.Map.empty[Id, ComponentInstance[F, CS, E, _, _]]
     private val formDataPromises = mutable.Map.empty[String, Promise[F, FormData]]
     private val formDataProgressTransitions = mutable.Map.empty[String, (Int, Int) => Transition[CS]]
@@ -273,11 +273,10 @@ object Component {
               val id = rc.currentContainerId
               markedDelays += id
               if (!delays.contains(id)) {
+                println(s"new delay $id")
                 delays.put(id, delay)
-                //onStartDelay(delay)
-                // TODO start delay
+                delay.start(applyTransition)
               }
-              ()
             case entry @ ComponentEntry(value, newState, _) =>
               // TODO Event handler was changed but instance not. May be eventHandler should be mutable
               val id = rc.currentContainerId
@@ -345,6 +344,7 @@ object Component {
       // Remove only finished delays
       delays foreach {
         case (id, delay) =>
+          println(s"delay.finished = ${delay.finished}")
           if (delay.finished)
             delays.remove(id)
       }

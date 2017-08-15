@@ -14,7 +14,7 @@ import slogging.LazyLogging
 
 import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
-import Async._
+import korolev.util.Scheduler
 
 abstract class Korolev[F[+ _]: Async, S, M] {
   def jsAccess: JSAccess[F]
@@ -38,8 +38,7 @@ object Korolev {
                                  render: PartialFunction[S, Document.Node[ApplicationContext.Effect[F, S, M]]],
                                  router: Router[F, S, S],
                                  messageHandler: PartialFunction[M, Unit],
-                                 fromScratch: Boolean,
-                                 createMutableMap: MutableMapFactory = defaultMutableMapFactory): Korolev[F, S, M] =
+                                 fromScratch: Boolean)(implicit scheduler: Scheduler[F]): Korolev[F, S, M] =
     new Korolev[F, S, M] with LazyLogging {
 
       val async = Async[F]
@@ -211,6 +210,7 @@ object Korolev {
               // Perform changes only when renderer for state is defined
             renderContext.swap()
             // Reset all event handlers delays and elements
+            topLevelComponentInstance.prepare()
             topLevelComponentInstance.applyRenderContext(renderContext)
             renderContext.diff(changesPerformer)
 //              if (devMode.isActive)
