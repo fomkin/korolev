@@ -202,7 +202,6 @@ package object server extends LazyLogging {
             }
           }
 
-
           def resolveFormData(descriptor: String, formData: Try[FormData]): Unit = {
             korolev.resolveFormData(descriptor, formData)
           }

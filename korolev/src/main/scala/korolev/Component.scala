@@ -4,7 +4,7 @@ import java.util.UUID
 
 import korolev.ApplicationContext._
 import korolev.Async._
-import korolev.util.{AtomicReference, Scheduler}
+import korolev.util.Scheduler
 import levsha.Document.Node
 import levsha.events.EventId
 import levsha.{Id, StatefulRenderContext, XmlNs}
@@ -26,8 +26,8 @@ abstract class Component[F[+ _]: Async, CS, E](implicit scheduler: Scheduler[F])
 
 object Component {
 
-  def apply[F[+ _]: Async, S, E](
-      renderFunction: (ApplicationContext[F, S, E], S) => Node[Effect[F, S, E]])(implicit scheduler: Scheduler[F]): Component[F, S, E] = {
+  def apply[F[+ _]: Async, S, E](renderFunction: (ApplicationContext[F, S, E], S) => Node[Effect[F, S, E]])(
+      implicit scheduler: Scheduler[F]): Component[F, S, E] = {
     new ComponentFunction(renderFunction)
   }
 
@@ -99,8 +99,6 @@ object Component {
                                                              eventHandler: E => EventResult[F, AS]) {
 
     private val async = Async[F]
-    private val state = AtomicReference(initialState)
-    private val lastSetState = AtomicReference(initialState)
     private val markedDelays = mutable.Set.empty[Id] // Set of the delays which are should survive
     private val delays = mutable.Map.empty[Id, Delay[F, CS, E]]
     private val elements = mutable.Map.empty[ElementId[F, CS, E], Id]
@@ -110,6 +108,8 @@ object Component {
     private val formDataProgressTransitions = mutable.Map.empty[String, (Int, Int) => Transition[CS]]
     private val stateChangeSubscribers = mutable.ArrayBuffer.empty[() => Unit]
     private val eventSubscribers = mutable.ArrayBuffer.empty[EventResult[F, AS] => _]
+    private var state = initialState
+    private var lastSetState = initialState
 
     private object browserAccess extends Access[F, CS, E] {
 
@@ -212,44 +212,32 @@ object Component {
       * last [[setState]] value and don't update current state if
       * new state and last setState value is equals.
       */
-    def setState(newState: CS, force: Boolean = false): CS = {
+    def setState(newState: CS, force: Boolean = false): Unit = this.synchronized {
       if (force) {
-        state() = newState
-        lastSetState() = newState
-        newState
+        state = newState
+        lastSetState = newState
       } else {
-        state.transform { current =>
-          val prevLSS = lastSetState()
-          // TODO this is wrong! transform should be effectless
-          val newLSS = lastSetState.transform { last =>
-            println(s"current = $current, newState = $newState, last = $last")
-            if (newState != last) newState
-            else last
-          }
-          if (prevLSS != newLSS) {
-            println(s"setState had been performed")
-            newLSS
-          }
-          else current
+        if (lastSetState != newState) {
+          state = newState
+          lastSetState = newState
         }
       }
     }
 
-    def getState: CS = state()
+    def getState: CS = state
 
     /**
       * Type-unsafe version of setState
       */
-    def setStateUnsafe(newState: Any): CS = {
+    def setStateUnsafe(newState: Any): Unit = {
       setState(newState.asInstanceOf[CS])
     }
 
     /**
       * TODO doc
       */
-    def applyRenderContext(rc: StatefulRenderContext[Effect[F, AS, M]]): Unit = {
-      println(s"applyRenderContext; state = ${state()}")
-      val node = component.render(state())
+    def applyRenderContext(rc: StatefulRenderContext[Effect[F, AS, M]]): Unit = this.synchronized {
+      val node = component.render(state)
       val proxy = new StatefulRenderContext[Effect[F, CS, E]] { proxy =>
         def currentId: Id = rc.currentId
         def currentContainerId: Id = rc.currentContainerId
@@ -261,7 +249,6 @@ object Component {
           misc match {
             case event: Event[F, CS, E] =>
               val id = rc.currentContainerId
-              println(s"events.put(${EventId(id, event.`type`.name, event.phase)}, $event)")
               events.put(EventId(id, event.`type`.name, event.phase), event)
               eventRegistry.registerEventType(event.`type`)
             case element: ElementId[F, CS, E] =>
@@ -272,7 +259,6 @@ object Component {
               val id = rc.currentContainerId
               markedDelays += id
               if (!delays.contains(id)) {
-                println(s"new delay $id")
                 delays.put(id, delay)
                 delay.start(applyTransition)
               }
@@ -296,24 +282,18 @@ object Component {
       node(proxy)
     }
 
-    def applyTransition(transition: Transition[CS]): Unit = {
-      state.transform { currentState =>
-        transition.lift(currentState) match {
-          case None           => currentState
-          case Some(newState) => newState
-        }
+    def applyTransition(transition: Transition[CS]): Unit = this.synchronized {
+      transition.lift(state) match {
+        case Some(newState) => state = newState
+        case None           => ()
       }
       stateChangeSubscribers.foreach(_())
     }
 
-    def applyEvent(eventId: EventId): Boolean = {
+    def applyEvent(eventId: EventId): Boolean = this.synchronized {
       events.get(eventId) match {
-        case Some(event: EventWithAccess[F, CS, E]) =>
-          println(s"applyEvent: events.get($eventId) == ${events.get(eventId)}")
-          applyEventResult(event.effect(browserAccess))
-        case Some(event: SimpleEvent[F, CS, E])     =>
-          println(s"applyEvent: events.get($eventId) == ${events.get(eventId)}")
-          applyEventResult(event.effect())
+        case Some(event: EventWithAccess[F, CS, E]) => applyEventResult(event.effect(browserAccess))
+        case Some(event: SimpleEvent[F, CS, E]) => applyEventResult(event.effect())
         case None =>
           nestedComponents.values.forall { nested =>
             nested.applyEvent(eventId)
@@ -322,7 +302,7 @@ object Component {
     }
 
     /** Remove all delays which was not marked during rendering */
-    def cancelObsoleteDelays(): Unit = {
+    def cancelObsoleteDelays(): Unit = this.synchronized {
       delays foreach {
         case (id, delay) =>
           if (!markedDelays.contains(id)) {
@@ -336,14 +316,13 @@ object Component {
     }
 
     /** Should be invoked before rendering */
-    def prepare(): Unit = {
+    def prepare(): Unit = this.synchronized {
       markedDelays.clear()
       elements.clear()
       events.clear()
       // Remove only finished delays
       delays foreach {
         case (id, delay) =>
-          println(s"delay.finished = ${delay.finished}")
           if (delay.finished)
             delays.remove(id)
       }
@@ -352,7 +331,7 @@ object Component {
       }
     }
 
-    def resolveFormData(descriptor: String, formData: Try[FormData]): Unit = {
+    def resolveFormData(descriptor: String, formData: Try[FormData]): Unit = this.synchronized {
       formDataPromises.get(descriptor) match {
         case Some(promise) =>
           promise.complete(formData)
@@ -368,7 +347,7 @@ object Component {
       }
     }
 
-    def handleFormDataProgress(descriptor: String, loaded: Int, total: Int): Unit = {
+    def handleFormDataProgress(descriptor: String, loaded: Int, total: Int): Unit = this.synchronized {
       formDataProgressTransitions.get(descriptor) match {
         case None =>
           nestedComponents.values.foreach { nested =>
@@ -380,4 +359,3 @@ object Component {
   }
 
 }
-

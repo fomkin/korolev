@@ -65,7 +65,6 @@ class ApplicationContext[F[+_]: Async, S, M](implicit scheduler: Scheduler[F]) {
       _jobHandler = Some {
         scheduler.scheduleOnce(delay) {
           _finished = true
-          println(s"delay finished == ${_finished}")
           applyTransition(transition)
         }
       }
