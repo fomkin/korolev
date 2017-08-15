@@ -213,22 +213,30 @@ object Component {
       * last [[setState]] value and don't update current state if
       * new state and last setState value is equals.
       */
-    def setState(newState: CS): CS = {
-      state.transform { current =>
-        val prevLSS = lastSetState()
-        // TODO this is wrong! transform should be effectless
-        val newLSS = lastSetState.transform { last =>
-          println(s"current = $current, newState = $newState, last = $last")
-          if (newState != last) newState
-          else last
+    def setState(newState: CS, force: Boolean = false): CS = {
+      if (force) {
+        state() = newState
+        lastSetState() = newState
+        newState
+      } else {
+        state.transform { current =>
+          val prevLSS = lastSetState()
+          // TODO this is wrong! transform should be effectless
+          val newLSS = lastSetState.transform { last =>
+            println(s"current = $current, newState = $newState, last = $last")
+            if (newState != last) newState
+            else last
+          }
+          if (prevLSS != newLSS) {
+            println(s"setState had been performed")
+            newLSS
+          }
+          else current
         }
-        if (prevLSS != newLSS) {
-          println(s"setState had been performed")
-          newLSS
-        }
-        else current
       }
     }
+
+    def getState: CS = state()
 
     /**
       * Type-unsafe version of setState

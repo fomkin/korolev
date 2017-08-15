@@ -14,6 +14,7 @@ import slogging.LazyLogging
 
 import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
+import Async._
 
 abstract class Korolev[F[+ _]: Async, S, M] {
   def jsAccess: JSAccess[F]
@@ -134,18 +135,16 @@ object Korolev {
         Seq(
           // History callback
           jsAccess.registerCallbackAndFlush[String] { pathString =>
-            ()
-            // TODO routing
-//            val path = Router.Path.fromString(pathString)
-//            val maybeState = router.toState.lift((stateManager.state, path))
-//            maybeState foreach { asyncState =>
-//              val unit = async.flatMap(asyncState)(stateManager.update)
-//              async.run(unit) {
-//                case Success(_) => // do nothing
-//                case Failure(e) =>
-//                  logger.error("Error occurred when updating state", e)
-//              }
-//            }
+            val path = Router.Path.fromString(pathString)
+            val maybeState = router.toState.lift((topLevelComponentInstance.getState, path))
+            maybeState foreach { asyncState =>
+              asyncState run {
+                case Success(newState) =>
+                  topLevelComponentInstance.setState(newState, force = true)
+                case Failure(e) =>
+                  logger.error("Error occurred when updating state", e)
+              }
+            }
           } flatMap { historyCallback =>
             client.callAndFlush[Unit]("RegisterHistoryHandler", historyCallback)
           },
@@ -204,9 +203,9 @@ object Korolev {
           val onState = () => {
             // Set page url if router exists
             // TODO routing
-//            router.fromState
-//              .lift(state)
-//              .foreach(path => client.call("ChangePageUrl", path.toString))
+            router.fromState
+              .lift(topLevelComponentInstance.getState)
+              .foreach(path => client.call("ChangePageUrl", path.toString))
 
             // Perform rendering
               // Perform changes only when renderer for state is defined

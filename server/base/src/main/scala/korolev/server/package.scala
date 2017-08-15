@@ -7,6 +7,7 @@ import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 
 import korolev.Async._
 import korolev.Korolev.MutableMapFactory
+import levsha.RenderContext
 import levsha.impl.{AbstractTextRenderContext, TextPrettyPrintingConfig}
 import slogging.LazyLogging
 
@@ -41,8 +42,16 @@ package object server extends LazyLogging {
 
       Async[F].map(writeResultF) { state =>
         val dsl = new levsha.TemplateDsl[ApplicationContext.Effect[F, S, M]]()
-        def createTextRenderContext() = new AbstractTextRenderContext[ApplicationContext.Effect[F, S, M]]() {
-          val prettyPrinting = TextPrettyPrintingConfig.noPrettyPrinting
+        def createTextRenderContext() = {
+          new AbstractTextRenderContext[ApplicationContext.Effect[F, S, M]] {
+            val prettyPrinting = TextPrettyPrintingConfig.noPrettyPrinting
+            override def addMisc(misc: ApplicationContext.Effect[F, S, M]): Unit = misc match {
+              case ApplicationContext.ComponentEntry(component, value, _) =>
+                val rc = this.asInstanceOf[RenderContext[ApplicationContext.Effect[F, Any, Any]]]
+                component.render(value).apply(rc)
+              case _ => ()
+            }
+          }
         }
         val textRenderContext = createTextRenderContext()
         import dsl._
