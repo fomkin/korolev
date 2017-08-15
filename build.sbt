@@ -230,6 +230,13 @@ lazy val webComponentExample = (project in examples / "web-component").
   settings(mainClass := Some("WebComponentExample")).
   dependsOn(`server-blaze`)
 
+lazy val componentExample = (project in examples / "component").
+  enablePlugins(JavaAppPackaging).
+  enablePlugins(UniversalPlugin).
+  settings(exampleSettings: _*).
+  settings(mainClass := Some("ComponentExample")).
+  dependsOn(`server-blaze`)
+
 lazy val akkaHttpExample = (project in examples / "akka-http").
   enablePlugins(JavaAppPackaging).
   enablePlugins(UniversalPlugin).
@@ -270,7 +277,7 @@ lazy val root = project.in(file(".")).
     `jcache-support`,
     simpleExample, routingExample, gameOfLifeExample,
     jcacheExample, formDataExample, delayExample, focusExample,
-    webComponentExample, akkaHttpExample,
+    webComponentExample, componentExample, akkaHttpExample,
     `integration-tests`, `performance-benchmark`
   )
 

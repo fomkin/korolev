@@ -17,10 +17,6 @@ abstract class Component[F[+ _]: Async, CS, E] {
 
   val id = UUID.randomUUID()
 
-  def tag: String = "div"
-
-  def xmlNs: XmlNs = XmlNs.html
-
   val context = ApplicationContext[F, CS, E](Async[F], null) // TODO ERROR
 
   def apply[AS, M](initialState: CS)(f: E => EventResult[F, AS]): ComponentEntry[F, AS, M, CS, E] =
@@ -218,11 +214,19 @@ object Component {
       * new state and last setState value is equals.
       */
     def setState(newState: CS): CS = {
-      state.transform { _ =>
-        lastSetState.transform { last =>
-          if (last != newState) newState
+      state.transform { current =>
+        val prevLSS = lastSetState()
+        // TODO this is wrong! transform should be effectless
+        val newLSS = lastSetState.transform { last =>
+          println(s"current = $current, newState = $newState, last = $last")
+          if (newState != last) newState
           else last
         }
+        if (prevLSS != newLSS) {
+          println(s"setState had been performed")
+          newLSS
+        }
+        else current
       }
     }
 
@@ -237,9 +241,11 @@ object Component {
       * TODO doc
       */
     def applyRenderContext(rc: StatefulRenderContext[Effect[F, AS, M]]): Unit = {
+      println(s"applyRenderContext; state = ${state()}")
       val node = component.render(state())
       val proxy = new StatefulRenderContext[Effect[F, CS, E]] { proxy =>
         def currentId: Id = rc.currentId
+        def currentContainerId: Id = rc.currentContainerId
         def openNode(xmlNs: XmlNs, name: String): Unit = rc.openNode(xmlNs, name)
         def closeNode(name: String): Unit = rc.closeNode(name)
         def setAttr(xmlNs: XmlNs, name: String, value: String): Unit = rc.setAttr(xmlNs, name, value)
@@ -247,16 +253,16 @@ object Component {
         def addMisc(misc: Effect[F, CS, E]): Unit = {
           misc match {
             case event: Event[F, CS, E] =>
-              val id = rc.currentId.parent.get
+              val id = rc.currentContainerId
               println(s"events.put(${EventId(id, event.`type`.name, event.phase)}, $event)")
               events.put(EventId(id, event.`type`.name, event.phase), event)
               eventRegistry.registerEventType(event.`type`)
             case element: ElementId[F, CS, E] =>
-              val id = rc.currentId.parent.get
+              val id = rc.currentContainerId
               elements.put(element, id)
               ()
             case delay: Delay[F, CS, E] =>
-              val id = rc.currentId.parent.get
+              val id = rc.currentContainerId
               markedDelays += id
               if (!delays.contains(id)) {
                 delays.put(id, delay)
@@ -266,10 +272,9 @@ object Component {
               ()
             case entry @ ComponentEntry(value, newState, _) =>
               // TODO Event handler was changed but instance not. May be eventHandler should be mutable
-              rc.openNode(value.xmlNs, value.tag)
-              val id = rc.currentId.parent.get
+              val id = rc.currentContainerId
               nestedComponents.get(id) match {
-                case Some(nested) if nested.component.tag == value.tag && nested.component.xmlNs == value.xmlNs =>
+                case Some(nested) if nested.component.id == value.id =>
                   nested.setStateUnsafe(newState)
                   nested.applyRenderContext(proxy)
                 case _ =>
@@ -277,9 +282,8 @@ object Component {
                   nestedComponents.put(id, nested)
                   nested.subscribeStateChange(() => stateChangeSubscribers.foreach(_()))
                   nested.subscribeEvents(applyEventResult)
-                  nested.applyRenderContext(proxy.asInstanceOf)
+                  nested.applyRenderContext(proxy)
               }
-              rc.closeNode(value.tag)
           }
         }
       }
@@ -297,10 +301,13 @@ object Component {
     }
 
     def applyEvent(eventId: EventId): Boolean = {
-      println(s"applyEvent: events.get($eventId) == ${events.get(eventId)}")
       events.get(eventId) match {
-        case Some(event: EventWithAccess[F, CS, E]) => applyEventResult(event.effect(browserAccess))
-        case Some(event: SimpleEvent[F, CS, E])     => applyEventResult(event.effect())
+        case Some(event: EventWithAccess[F, CS, E]) =>
+          println(s"applyEvent: events.get($eventId) == ${events.get(eventId)}")
+          applyEventResult(event.effect(browserAccess))
+        case Some(event: SimpleEvent[F, CS, E])     =>
+          println(s"applyEvent: events.get($eventId) == ${events.get(eventId)}")
+          applyEventResult(event.effect())
         case None =>
           nestedComponents.values.forall { nested =>
             nested.applyEvent(eventId)
@@ -352,36 +359,3 @@ object Component {
 
 }
 
-//
-//object Demo {
-//
-//  import korolev.execution._
-//
-//  val myComponent = Component[Future, String, String] { (ctx, state) =>
-//    import ctx._
-//    import symbolDsl._
-//
-//    'button (
-//      state,
-//      eventWithAccess('click) { access =>
-//        access.publish("click happened")
-//        noTransition
-//      }
-//    )
-//  }
-//
-//  val ac = ApplicationContext[Future, Int, Any]
-//
-//  import ac._
-//  import symbolDsl._
-//
-//  'form (
-//    'input ('type /= "text"),
-//    myComponent[Int, Any]("Ok") {
-//      case "click happened" =>
-//        immediateTransition {
-//          case n => n + 1
-//        }
-//    }
-//  )
-//}
