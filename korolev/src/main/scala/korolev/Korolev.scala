@@ -284,7 +284,7 @@ object Korolev {
                   devMode.saveRenderContext(renderContext)
                 effectsReactor.cancelObsoleteDelays()
               case None =>
-                logger.warn(s"Render is not defined for ${state.getClass.getSimpleName}")
+                logger.warn(s"Render is not defined for $state.getClass.getSimpleName}")
             }
             client.call("SetRenderNum", currentRenderNum.incrementAndGet()).runIgnoreResult()
             jsAccess.flush()

@@ -1,10 +1,11 @@
 package korolev
 
+import korolev.Async.AsyncOps
+import korolev.Component.{ComponentInstance, EventRegistry, Frontend}
 import korolev.StateManager.Transition
 import korolev.util.Scheduler
-import korolev.Async.AsyncOps
 import levsha.Document.Empty
-import levsha.{Document, TemplateDsl}
+import levsha._
 import levsha.events.EventPhase
 
 import scala.concurrent.duration.FiniteDuration
@@ -183,22 +184,30 @@ object ApplicationContext {
     def cancel(): Unit
   }
 
+  final case class ComponentEntry[F[+_]: Async, AS, M, CS, E](component: Component[F, CS, E], state: CS)
+    extends Effect[F, AS, M] {
+
+    def createInstance(frontend: Frontend[F], eventRegistry: EventRegistry[F]) = {
+      new ComponentInstance[F, AS, M, CS, E](state, frontend, eventRegistry, component)
+    }
+  }
+
   sealed abstract class Event[F[+_]: Async, S, M] extends Effect[F, S, M] {
     def `type`: Symbol
     def phase: EventPhase
   }
 
-  case class EventWithAccess[F[+_]: Async, S, M](
+  final case class EventWithAccess[F[+_]: Async, S, M](
       `type`: Symbol,
       phase: EventPhase,
       effect: Access[F, S, M] => EventResult[F, S])
       extends Event[F, S, M]
 
-  case class SimpleEvent[F[+_]: Async, S, M](`type`: Symbol,
+  final case class SimpleEvent[F[+_]: Async, S, M](`type`: Symbol,
                                       phase: EventPhase,
                                       effect: () => EventResult[F, S])
     extends Event[F, S, M]
 
-  class ElementId[F[+_]: Async, S, M] extends Effect[F, S, M]
+  final class ElementId[F[+_]: Async, S, M] extends Effect[F, S, M]
 
 }
