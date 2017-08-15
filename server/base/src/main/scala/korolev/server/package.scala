@@ -166,9 +166,9 @@ package object server extends LazyLogging {
       } map { case (isNew, state) =>
 
         // Create Korolev with dynamic router
-        val dux = StateManager[F, S](state)
         val router = config.serverRouter.dynamic(deviceId, sessionId)
-        val env = config.envConfigurator(deviceId, sessionId, dux.apply)
+        // TODO state access from env
+        val env = config.envConfigurator(deviceId, sessionId, null)
         val korolev = Korolev(
           makeSessionKey(deviceId, sessionId), jsAccess, state, config.render, router, env.onMessage,
           fromScratch = isNew)

@@ -1,7 +1,6 @@
 package korolev
 
 import korolev.Component.{ComponentInstance, EventRegistry, Frontend}
-import korolev.StateManager.Transition
 import korolev.util.Scheduler
 import levsha.Document.Empty
 import levsha._
@@ -17,7 +16,7 @@ class ApplicationContext[F[+_]: Async, S, M](implicit scheduler: Scheduler[F]) {
   type Effect = ApplicationContext.Effect[F, S, M]
   type Event = ApplicationContext.Event[F, S, M]
   type EventFactory[T] = T => Event
-  type Transition = StateManager.Transition[S]
+  type Transition = korolev.Transition[S]
   type Render = PartialFunction[S, Document.Node[Effect]]
   type ElementId = ApplicationContext.ElementId[F, S, M]
 
@@ -81,10 +80,10 @@ class ApplicationContext[F[+_]: Async, S, M](implicit scheduler: Scheduler[F]) {
       effect: Access[F, S, M] => EventResult[F, S]): EventWithAccess[F, S, M] =
     EventWithAccess(name, phase, effect)
 
-  def immediateTransition(transition: StateManager.Transition[S]): EventResult[F, S] =
+  def immediateTransition(transition: Transition): EventResult[F, S] =
     EventResult[F, S](Some(transition), None, sp = false)
 
-  def deferredTransition(transition: F[StateManager.Transition[S]]): EventResult[F, S] =
+  def deferredTransition(transition: F[Transition]): EventResult[F, S] =
     EventResult[F, S](None, Some(transition), sp = false)
 
   /**

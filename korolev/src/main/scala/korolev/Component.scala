@@ -4,7 +4,6 @@ import java.util.UUID
 
 import korolev.ApplicationContext._
 import korolev.Async._
-import korolev.StateManager.Transition
 import korolev.util.{AtomicReference, Scheduler}
 import levsha.Document.Node
 import levsha.events.EventId
@@ -354,19 +353,28 @@ object Component {
     }
 
     def resolveFormData(descriptor: String, formData: Try[FormData]): Unit = {
-      formDataPromises.get(descriptor) foreach { promise =>
-        promise.complete(formData)
+      formDataPromises.get(descriptor) match {
+        case Some(promise) =>
+          promise.complete(formData)
+          // Remove promise and onProgress handler
+          // when formData loading is complete
+          formDataProgressTransitions.remove(descriptor)
+          formDataPromises.remove(descriptor)
+          ()
+        case None =>
+          nestedComponents.values.foreach { nested =>
+            nested.resolveFormData(descriptor, formData)
+          }
       }
-      // Remove promise and onProgress handler
-      // when formData loading is complete
-      formDataProgressTransitions.remove(descriptor)
-      formDataPromises.remove(descriptor)
-      ()
     }
 
     def handleFormDataProgress(descriptor: String, loaded: Int, total: Int): Unit = {
-      formDataProgressTransitions.get(descriptor) foreach { f =>
-        applyTransition(f(loaded.toInt, total.toInt))
+      formDataProgressTransitions.get(descriptor) match {
+        case None =>
+          nestedComponents.values.foreach { nested =>
+            nested.handleFormDataProgress(descriptor, loaded, total)
+          }
+        case Some(f) => applyTransition(f(loaded.toInt, total.toInt))
       }
     }
   }
