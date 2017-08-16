@@ -2,7 +2,7 @@ package korolev.server
 
 import korolev.server.KorolevServiceConfig.{ApplyTransition, Env, EnvConfigurator}
 import korolev.server.StateStorage.{DeviceId, SessionId}
-import korolev.{ApplicationContext, Async}
+import korolev.{ApplicationContext, Async, Transition}
 import levsha.{Document, TemplateDsl}
 
 case class KorolevServiceConfig[F[+_]: Async, S, M](
@@ -20,7 +20,7 @@ case class KorolevServiceConfig[F[+_]: Async, S, M](
 
 object KorolevServiceConfig {
   case class Env[M](onDestroy: () => Unit, onMessage: PartialFunction[M, Unit])
-  type ApplyTransition[F[+_], S] = PartialFunction[S, S] => F[Unit]
+  type ApplyTransition[F[+_], S] = Transition[S] => F[Unit]
   type EnvConfigurator[F[+_], S, M] = (DeviceId, SessionId, ApplyTransition[F, S]) => Env[M]
 
   def defaultConnectionLostWidget[MiscType] = {

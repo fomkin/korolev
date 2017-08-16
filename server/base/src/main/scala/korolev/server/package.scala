@@ -167,15 +167,15 @@ package object server extends LazyLogging {
 
         // Create Korolev with dynamic router
         val router = config.serverRouter.dynamic(deviceId, sessionId)
-        // TODO state access from env
-        val env = config.envConfigurator(deviceId, sessionId, null)
-        val korolev = Korolev(
-          makeSessionKey(deviceId, sessionId), jsAccess, state, config.render, router, env.onMessage,
-          fromScratch = isNew)
+        val korolev = Korolev(makeSessionKey(deviceId, sessionId), jsAccess, state, config.render, router, fromScratch = isNew)
+        val applyTransition = korolev.topLevelComponentInstance.applyTransition _ andThen Async[F].pureStrict _
+        val env = config.envConfigurator(deviceId, sessionId, applyTransition)
+        // Subscribe to events to publish them to env
+        korolev.topLevelComponentInstance.subscribeEvents(env.onMessage)
+
         // Subscribe on state updates an push them to storage
-        // TODO onDestroy and on state change
+        // TODO state change
         //korolev.stateManager.subscribe(state => config.stateStorage.write(deviceId, sessionId, state))
-        //korolev.stateManager.onDestroy(env.onDestroy)
 
         new KorolevSession[F] {
 
@@ -211,8 +211,7 @@ package object server extends LazyLogging {
               currentPromise.get() foreach { promise =>
                 promise.complete(Failure(new SessionDestroyedException("Session has been closed")))
               }
-              // TODO destroy
-              //korolev.stateManager.destroy()
+              env.onDestroy()
               sessions.remove(sessionKey)
             }
             Async[F].unit

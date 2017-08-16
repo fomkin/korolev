@@ -43,7 +43,15 @@ object ComponentExample extends KorolevBlazeServer {
             immediateTransition {
               case n => n + 1
             }
-          }
+          },
+          'button(
+            "Click me too",
+            event('click) {
+              immediateTransition {
+                case n => n + 1
+              }
+            }
+          )
         )
     }
   )

@@ -5,39 +5,29 @@ import java.util.concurrent.atomic.AtomicInteger
 import bridge.JSAccess
 import korolev.ApplicationContext._
 import korolev.Async.AsyncOps
-import korolev.Component.{EventRegistry, Frontend}
+import korolev.Component.{ComponentInstance, EventRegistry, Frontend}
 import levsha.events.calculateEventPropagation
 import levsha.impl.DiffRenderContext
 import levsha.impl.DiffRenderContext.ChangesPerformer
 import levsha.{Document, Id, XmlNs}
 import slogging.LazyLogging
 
-import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
 import korolev.util.Scheduler
 
 abstract class Korolev[F[+ _]: Async, S, M] {
   def jsAccess: JSAccess[F]
   def resolveFormData(descriptor: String, formData: Try[FormData]): Unit
+  def topLevelComponentInstance: ComponentInstance[F, S, M, S, M]
 }
 
 object Korolev {
-
-  trait MutableMapFactory {
-    def apply[K, V]: mutable.Map[K, V]
-  }
-
-  object defaultMutableMapFactory extends MutableMapFactory {
-    def apply[K, V]: mutable.Map[K, V] =
-      mutable.Map.empty
-  }
 
   def apply[F[+ _]: Async, S, M](identifier: String,
                                  ja: JSAccess[F],
                                  initialState: S,
                                  render: PartialFunction[S, Document.Node[ApplicationContext.Effect[F, S, M]]],
                                  router: Router[F, S, S],
-                                 messageHandler: PartialFunction[M, Unit],
                                  fromScratch: Boolean)(implicit scheduler: Scheduler[F]): Korolev[F, S, M] =
     new Korolev[F, S, M] with LazyLogging {
 
@@ -85,9 +75,7 @@ object Korolev {
             }
           }
         }
-        // TODO handle messages
-        val entry = component[S, M](initialState)(_ => EventResult())
-        entry.createInstance(frontend, eventRegistry)
+        new ComponentInstance[F, S, M, S, M](initialState, frontend, eventRegistry, component)
       }
       val renderContext = DiffRenderContext[Effect[F, S, M]]()
       // TODO Dev Mode: restore render context state
@@ -156,7 +144,6 @@ object Korolev {
               }
               ()
             }
-              //propagateEvent(events(), stateManager, browserAccess, Id(target), tpe)
           } flatMap { eventCallback =>
             client.callAndFlush[Unit]("RegisterGlobalEventHandler", eventCallback)
           },
@@ -201,16 +188,17 @@ object Korolev {
               .lift(topLevelComponentInstance.getState)
               .foreach(path => client.call("ChangePageUrl", path.toString))
 
-            // Perform rendering
-              // Perform changes only when renderer for state is defined
+            // Prepare render context
             renderContext.swap()
             // Reset all event handlers delays and elements
             topLevelComponentInstance.prepare()
+            // Perform rendering
             topLevelComponentInstance.applyRenderContext(renderContext)
+            // Infer changes
             renderContext.diff(changesPerformer)
 //              if (devMode.isActive)
 //                devMode.saveRenderContext(renderContext)
-            topLevelComponentInstance.cancelObsoleteDelays()
+            topLevelComponentInstance.dropObsoleteMisc()
             client.call("SetRenderNum", currentRenderNum.incrementAndGet()).runIgnoreResult()
             jsAccess.flush()
           }

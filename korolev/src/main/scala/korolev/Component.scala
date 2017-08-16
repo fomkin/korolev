@@ -74,7 +74,7 @@ object Component {
       * all events of the type. If event already listening
       * on the client side, client will be not notified again.
       */
-    def registerEventType(`type`: Symbol): Unit = {
+    def registerEventType(`type`: Symbol): Unit = knownEventTypes.synchronized {
       if (!knownEventTypes.contains(`type`)) {
         knownEventTypes += `type`
         frontend.listenEvent(`type`.name, preventDefault = false).runIgnoreResult
@@ -90,16 +90,18 @@ object Component {
     * 1. [[prepare()]]
     * 2. Optionally [[setState()]]
     * 3. [[applyRenderContext()]]
-    * 4. [[cancelObsoleteDelays()]]
+    * 4. [[dropObsoleteMisc()]]
     */
   final class ComponentInstance[F[+ _]: Async, AS, M, CS, E](initialState: CS,
                                                              frontend: Frontend[F],
                                                              eventRegistry: EventRegistry[F],
-                                                             val component: Component[F, CS, E],
-                                                             eventHandler: E => EventResult[F, AS]) {
+                                                             val component: Component[F, CS, E]) {
 
     private val async = Async[F]
+
+    private val miscLock = new Object()
     private val markedDelays = mutable.Set.empty[Id] // Set of the delays which are should survive
+    private val markedComponentInstances = mutable.Set.empty[Id]
     private val delays = mutable.Map.empty[Id, Delay[F, CS, E]]
     private val elements = mutable.Map.empty[ElementId[F, CS, E], Id]
     private val events = mutable.Map.empty[EventId, Event[F, CS, E]]
@@ -107,7 +109,9 @@ object Component {
     private val formDataPromises = mutable.Map.empty[String, Promise[F, FormData]]
     private val formDataProgressTransitions = mutable.Map.empty[String, (Int, Int) => Transition[CS]]
     private val stateChangeSubscribers = mutable.ArrayBuffer.empty[() => Unit]
-    private val eventSubscribers = mutable.ArrayBuffer.empty[EventResult[F, AS] => _]
+    private val eventSubscribers = mutable.ArrayBuffer.empty[E => _]
+
+    private val stateLock = new Object()
     private var state = initialState
     private var lastSetState = initialState
 
@@ -144,7 +148,7 @@ object Component {
         getId(element).flatMap(id => frontend.focus(id))
 
       def publish(message: E): F[Unit] = {
-        eventSubscribers.foreach(_(eventHandler(message)))
+        eventSubscribers.foreach(_(message))
         async.unit
       }
 
@@ -180,7 +184,7 @@ object Component {
       } run {
         case Success(_) =>
         // ok transitions was applied
-        case Failure(e) =>
+        case Failure(_) =>
         // TODO log error
         //logger.error("Exception during applying transition", e)
       }
@@ -200,7 +204,7 @@ object Component {
     /**
       * TODO
       */
-    def subscribeEvents(callback: EventResult[F, AS] => _): () => Unit = {
+    def subscribeEvents(callback: E => _): () => Unit = {
       eventSubscribers += callback
       () =>
         { eventSubscribers -= callback; () }
@@ -212,7 +216,7 @@ object Component {
       * last [[setState]] value and don't update current state if
       * new state and last setState value is equals.
       */
-    def setState(newState: CS, force: Boolean = false): Unit = this.synchronized {
+    def setState(newState: CS, force: Boolean = false): Unit = stateLock.synchronized {
       if (force) {
         state = newState
         lastSetState = newState
@@ -236,7 +240,7 @@ object Component {
     /**
       * TODO doc
       */
-    def applyRenderContext(rc: StatefulRenderContext[Effect[F, AS, M]]): Unit = this.synchronized {
+    def applyRenderContext(rc: StatefulRenderContext[Effect[F, AS, M]]): Unit = miscLock.synchronized {
       val node = component.render(state)
       val proxy = new StatefulRenderContext[Effect[F, CS, E]] { proxy =>
         def currentId: Id = rc.currentId
@@ -262,18 +266,20 @@ object Component {
                 delays.put(id, delay)
                 delay.start(applyTransition)
               }
-            case entry @ ComponentEntry(value, newState, _) =>
+            case entry @ ComponentEntry(value, newState, eventHandler: (Any => EventResult[F, CS])) =>
               // TODO Event handler was changed but instance not. May be eventHandler should be mutable
               val id = rc.currentContainerId
               nestedComponents.get(id) match {
                 case Some(nested) if nested.component.id == value.id =>
+                  markedComponentInstances += id
                   nested.setStateUnsafe(newState)
                   nested.applyRenderContext(proxy)
                 case _ =>
                   val nested = entry.createInstance(frontend, eventRegistry)
+                  markedComponentInstances += id
                   nestedComponents.put(id, nested)
                   nested.subscribeStateChange(() => stateChangeSubscribers.foreach(_()))
-                  nested.subscribeEvents(applyEventResult)
+                  nested.subscribeEvents((e: Any) => applyEventResult(eventHandler(e)))
                   nested.applyRenderContext(proxy)
               }
           }
@@ -282,7 +288,7 @@ object Component {
       node(proxy)
     }
 
-    def applyTransition(transition: Transition[CS]): Unit = this.synchronized {
+    def applyTransition(transition: Transition[CS]): Unit = stateLock.synchronized {
       transition.lift(state) match {
         case Some(newState) => state = newState
         case None           => ()
@@ -290,7 +296,7 @@ object Component {
       stateChangeSubscribers.foreach(_())
     }
 
-    def applyEvent(eventId: EventId): Boolean = this.synchronized {
+    def applyEvent(eventId: EventId): Boolean = {
       events.get(eventId) match {
         case Some(event: EventWithAccess[F, CS, E]) => applyEventResult(event.effect(browserAccess))
         case Some(event: SimpleEvent[F, CS, E]) => applyEventResult(event.effect())
@@ -302,7 +308,7 @@ object Component {
     }
 
     /** Remove all delays which was not marked during rendering */
-    def cancelObsoleteDelays(): Unit = this.synchronized {
+    def dropObsoleteMisc(): Unit = miscLock.synchronized {
       delays foreach {
         case (id, delay) =>
           if (!markedDelays.contains(id)) {
@@ -310,13 +316,16 @@ object Component {
             delay.cancel()
           }
       }
-      nestedComponents.values.foreach { nested =>
-        nested.cancelObsoleteDelays()
+      nestedComponents foreach {
+        case (id, nested) =>
+          if (!markedComponentInstances.contains(id)) nestedComponents.remove(id)
+          else nested.dropObsoleteMisc()
       }
     }
 
     /** Should be invoked before rendering */
-    def prepare(): Unit = this.synchronized {
+    def prepare(): Unit = miscLock.synchronized {
+      markedComponentInstances.clear()
       markedDelays.clear()
       elements.clear()
       events.clear()
@@ -331,7 +340,7 @@ object Component {
       }
     }
 
-    def resolveFormData(descriptor: String, formData: Try[FormData]): Unit = this.synchronized {
+    def resolveFormData(descriptor: String, formData: Try[FormData]): Unit = miscLock.synchronized {
       formDataPromises.get(descriptor) match {
         case Some(promise) =>
           promise.complete(formData)
@@ -347,7 +356,7 @@ object Component {
       }
     }
 
-    def handleFormDataProgress(descriptor: String, loaded: Int, total: Int): Unit = this.synchronized {
+    def handleFormDataProgress(descriptor: String, loaded: Int, total: Int): Unit = miscLock.synchronized {
       formDataProgressTransitions.get(descriptor) match {
         case None =>
           nestedComponents.values.foreach { nested =>
