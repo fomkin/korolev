@@ -14,6 +14,8 @@ abstract class Scheduler[F[+ _] : Async] {
 
 object Scheduler {
 
+  def apply[F[+_]: Scheduler]: Scheduler[F] = implicitly[Scheduler[F]]
+
   type Cancel = () => Unit
 
   case class JobHandler[F[+_]: Async, +T](

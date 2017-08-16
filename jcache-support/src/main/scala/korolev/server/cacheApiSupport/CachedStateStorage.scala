@@ -43,7 +43,7 @@ final class CachedStateStorage[F[+_]: Async, T](cache: Cache[String, T], initial
   if (cache == null)
     throw new NullPointerException("cache shouldn't be null")
 
-  def initial(deviceId: DeviceId): F[T] =
+  def createTopLevelState(deviceId: DeviceId): F[T] =
     initialState(deviceId)
 
   def read(deviceId: DeviceId, sessionId: SessionId): F[Option[T]] = Async[F] fork {

@@ -18,7 +18,7 @@ object ComponentExample extends KorolevBlazeServer {
   def randomRgb() = (Random.nextInt(255), Random.nextInt(255), Random.nextInt(255))
 
   // Declare component as a function syntax
-  val ComponentAsFunction = Component[Future, Rgb, Unit] { (context, state) =>
+  val ComponentAsFunction = Component[Future, Rgb, String, Unit](Black) { (context, label, state) =>
 
     import context._
     import symbolDsl._
@@ -27,7 +27,7 @@ object ComponentExample extends KorolevBlazeServer {
 
     'div(
       'style /= s"border: 2px solid rgb($r, $g, $b)",
-      "Click me!",
+      label,
       eventWithAccess('click) { access =>
         deferredTransition {
           access.publish(()).map { _ =>
@@ -41,16 +41,16 @@ object ComponentExample extends KorolevBlazeServer {
   }
 
   // Declare component as an object syntax
-  object ComponentAsObject extends Component[Future, Rgb, Unit] {
+  object ComponentAsObject extends Component[Future, Rgb, String, Unit](Black) {
 
     import context._
     import symbolDsl._
 
-    def render(state: (Int, Int, Int)): Node = {
+    def render(label: String, state: (Int, Int, Int)): Node = {
       val (r, g, b) = state
       'div(
         'style /= s"border: 2px solid rgb($r, $g, $b)",
-        "Click me!",
+        label,
         eventWithAccess('click) { access =>
           deferredTransition {
             access.publish(()).map { _ =>
@@ -71,12 +71,12 @@ object ComponentExample extends KorolevBlazeServer {
       case state =>
         'body(
           s"Button clicked $state times",
-          ComponentAsObject(Red) { _ =>
+          ComponentAsObject("Click me, i'm function") { _ =>
             immediateTransition {
               case n => n + 1
             }
           },
-          ComponentAsFunction(Black) { _ =>
+          ComponentAsFunction("Click me, i'm object") { _ =>
             immediateTransition {
               case n => n + 1
             }

@@ -18,7 +18,7 @@ import korolev.util.Scheduler
 abstract class Korolev[F[+ _]: Async, S, M] {
   def jsAccess: JSAccess[F]
   def resolveFormData(descriptor: String, formData: Try[FormData]): Unit
-  def topLevelComponentInstance: ComponentInstance[F, S, M, S, M]
+  def topLevelComponentInstance: ComponentInstance[F, S, M, S, Any, M]
 }
 
 object Korolev {
@@ -62,8 +62,8 @@ object Korolev {
             client.callAndFlush("ExtractProperty", id.mkString, name)
         }
         val eventRegistry = new EventRegistry[F](frontend)
-        val component = new Component[F, S, M](Component.TopLevelComponentId) {
-          def render(state: S): Document.Node[Effect[F, S, M]] = {
+        val component = new Component[F, S, Any, M](initialState, Component.TopLevelComponentId) {
+          def render(parameters: Any, state: S): Document.Node[Effect[F, S, M]] = {
             renderer(state).getOrElse {
               Document.Node[Effect[F, S, M]] { rc =>
                 // TODO better reporting
@@ -75,7 +75,7 @@ object Korolev {
             }
           }
         }
-        new ComponentInstance[F, S, M, S, M](initialState, frontend, eventRegistry, component)
+        new ComponentInstance[F, S, M, S, Any, M](Id(1.toShort), frontend, eventRegistry, component)
       }
       val renderContext = DiffRenderContext[Effect[F, S, M]]()
       // TODO Dev Mode: restore render context state
@@ -127,7 +127,7 @@ object Korolev {
             maybeState foreach { asyncState =>
               asyncState run {
                 case Success(newState) =>
-                  topLevelComponentInstance.setState(newState, force = true)
+                  topLevelComponentInstance.setState(newState)
                 case Failure(e) =>
                   logger.error("Error occurred when updating state", e)
               }
@@ -176,7 +176,7 @@ object Korolev {
 //              renderContext.diff(changesPerformer)
 //              devMode.saveRenderContext(renderContext)
 //            } else {
-              topLevelComponentInstance.applyRenderContext(renderContext)
+              topLevelComponentInstance.applyRenderContext(0, renderContext)
               renderContext.diff(DiffRenderContext.DummyChangesPerformer)
 //              if (devMode.isActive) devMode.saveRenderContext(renderContext)
 //            }
@@ -193,7 +193,7 @@ object Korolev {
             // Reset all event handlers delays and elements
             topLevelComponentInstance.prepare()
             // Perform rendering
-            topLevelComponentInstance.applyRenderContext(renderContext)
+            topLevelComponentInstance.applyRenderContext(0, renderContext)
             // Infer changes
             renderContext.diff(changesPerformer)
 //              if (devMode.isActive)

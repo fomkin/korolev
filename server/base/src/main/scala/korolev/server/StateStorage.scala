@@ -5,8 +5,10 @@ import java.io._
 import korolev.Async
 import slogging.LazyLogging
 
+import scala.reflect.runtime.universe._
 import scala.collection.concurrent.TrieMap
 import korolev.DevMode
+import levsha.Id
 
 abstract class StateStorage[F[+_]: Async, T] {
 
@@ -17,19 +19,19 @@ abstract class StateStorage[F[+_]: Async, T] {
     * @param deviceId Identifier of device
     * @return Future with new state
     */
-  def initial(deviceId: DeviceId): F[T]
+  def createTopLevelState(deviceId: DeviceId): F[T]
 
   /**
     * Restore session from storage on initialize a new one
     * @return Future with result if session already exists
     */
-  def read(deviceId: DeviceId, sessionId: SessionId): F[Option[T]]
+  def read[A: TypeTag](deviceId: DeviceId, sessionId: SessionId, node: Id): F[Option[A]]
 
   /**
     * Save session to storage
     * @return Future of successful saving
     */
-  def write(deviceId: DeviceId, sessionId: SessionId, value: T): F[T]
+  def write[A: TypeTag](deviceId: DeviceId, sessionId: SessionId, node: Id, value: A): F[A]
 }
 
 object StateStorage extends LazyLogging {
@@ -46,7 +48,7 @@ object StateStorage extends LazyLogging {
     * @return The state storage
     */
   def default[F[+_]: Async, T](initialState: => T): StateStorage[F, T] = new DefaultStateStorage[F, T] {
-    def initial(deviceId: String): F[T] = Async[F].pure(initialState)
+    def createTopLevelState(deviceId: String): F[T] = Async[F].pure(initialState)
   }
 
   /**
@@ -69,17 +71,17 @@ object StateStorage extends LazyLogging {
     * @return The state storage
     */
   def forDeviceId[F[+_]: Async, T](initialState: DeviceId => F[T]): StateStorage[F, T] = new DefaultStateStorage[F, T] {
-    def initial(deviceId: String): F[T] = initialState(deviceId)
+    def createTopLevelState(deviceId: String): F[T] = initialState(deviceId)
   }
 
   private abstract class DefaultStateStorage[F[+_]: Async, T] extends StateStorage[F, T] {
 
-    val storage = TrieMap.empty[String, T]
+    val storage = TrieMap.empty[String, Any]
 
-    def read(deviceId: DeviceId, sessionId: SessionId): F[Option[T]] = {
+    def read[A: TypeTag](deviceId: DeviceId, sessionId: SessionId, node: Id): F[Option[A]] = {
       if (DevMode.isActive) {
         Async[F].fork {
-          val file = getSessionFile(deviceId, sessionId)
+          val file = getStateFile(deviceId, sessionId, node)
           if (file.exists) {
             val fileStream = new FileInputStream(file)
             val objectStream = new ObjectInputStream(fileStream)
@@ -87,7 +89,7 @@ object StateStorage extends LazyLogging {
               Some(
                 objectStream
                   .readObject()
-                  .asInstanceOf[T]
+                  .asInstanceOf[A]
               )
             } catch {
               case _:InvalidClassException =>
@@ -101,15 +103,17 @@ object StateStorage extends LazyLogging {
             None
           }
         }
-      } else {
-        Async[F].pure(storage.get(mkKey(deviceId, sessionId)))
+      } else Async[F].pure {
+        storage
+          .get(mkKey(deviceId, sessionId, node))
+          .asInstanceOf[Option[A]]
       }
     }
 
-    def write(deviceId: DeviceId, sessionId: SessionId, value: T): F[T] = {
+    def write[A: TypeTag](deviceId: DeviceId, sessionId: SessionId, node: Id, value: A): F[A] = {
       if (DevMode.isActive) {
         Async[F].fork {
-          val file = getSessionFile(deviceId, sessionId)
+          val file = getStateFile(deviceId, sessionId, node)
           val fileStream = new FileOutputStream(file)
           val objectStream = new ObjectOutputStream(fileStream)
           try {
@@ -121,15 +125,15 @@ object StateStorage extends LazyLogging {
           }
         }
       } else {
-        storage.put(mkKey(deviceId, sessionId), value)
+        storage.put(mkKey(deviceId, sessionId, node), value)
         Async[F].pure(value)
       }
     }
 
-    def mkKey(deviceId: DeviceId, sessionId: SessionId): String =
-      s"$deviceId-$sessionId"
+    def mkKey(deviceId: DeviceId, sessionId: SessionId, node: Id): String =
+      s"$deviceId-$sessionId-${node.mkString}"
 
-    def getSessionFile(deviceId: DeviceId, sessionId: SessionId): File =
-      new File(DevMode.sessionsDirectory, mkKey(deviceId, sessionId))
+    def getStateFile(deviceId: DeviceId, sessionId: SessionId, node: Id): File =
+      new File(DevMode.sessionsDirectory, mkKey(deviceId, sessionId, node))
   }
 }

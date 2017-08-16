@@ -54,17 +54,19 @@ class ApplicationContext[F[+_]: Async, S, M](implicit scheduler: Scheduler[F]) {
     */
   def delay(delay: FiniteDuration)(transition: Transition): Delay[F, S, M] = new Delay[F, S, M] {
 
-    @volatile var _jobHandler = Option.empty[Scheduler.JobHandler[F, _]]
-    @volatile var _finished = false
+    @volatile private var handler = Option.empty[Scheduler.JobHandler[F, _]]
+    @volatile private var finished = false
 
-    def finished: Boolean = _finished
+    def isFinished: Boolean = finished
 
-    def cancel(): Unit = _jobHandler.foreach(_.cancel())
+    def cancel(): Unit = {
+      handler.foreach(_.cancel())
+    }
 
     def start(applyTransition: Transition => Unit): Unit = {
-      _jobHandler = Some {
+      handler = Some {
         scheduler.scheduleOnce(delay) {
-          _finished = true
+          finished = true
           applyTransition(transition)
         }
       }
@@ -96,12 +98,12 @@ class ApplicationContext[F[+_]: Async, S, M](implicit scheduler: Scheduler[F]) {
 
   def transition(t: Transition): Transition = t
 
-  implicit final class ComponentDsl[CS, E](component: Component[F, CS, E]) {
-    def apply(initialState: CS)(f: E => EventResult[F, S]): ComponentEntry[F, S, M, CS, E] =
-      ComponentEntry(component, initialState, f)
+  implicit final class ComponentDsl[CS, P, E](component: Component[F, CS, P, E]) {
+    def apply(parameters: P)(f: E => EventResult[F, S]): ComponentEntry[F, S, M, CS, P, E] =
+      ComponentEntry(component, parameters, f)
 
-    def silent(initialState: CS): ComponentEntry[F, S, M, CS, E] =
-      ComponentEntry(component, initialState, _ => EventResult())
+    def silent(parameters: P): ComponentEntry[F, S, M, CS, P, E] =
+      ComponentEntry(component, parameters, _ => EventResult())
   }
 }
 
@@ -154,7 +156,7 @@ object ApplicationContext {
 
     /** Downloads form from client
       * {{{
-      * eventWithAccess('submit) { access => 
+      * eventWithAccess('submit) { access =>
       *   access
       *     .downloadFormData(myForm)
       *     .onProgress { (loaded, total) =>
@@ -186,15 +188,15 @@ object ApplicationContext {
 
   sealed abstract class Delay[F[+_]: Async, S, M] extends Effect[F, S, M] {
     def start(applyTransition: Transition[S] => Unit): Unit
-    def finished: Boolean
+    def isFinished: Boolean
     def cancel(): Unit
   }
 
-  final case class ComponentEntry[F[+_]: Async, AS, M, CS, E](component: Component[F, CS, E], state: CS, f: E => EventResult[F, AS])
-    extends Effect[F, AS, M] {
-
-    def createInstance(frontend: Frontend[F], eventRegistry: EventRegistry[F]): ComponentInstance[F, AS, M, CS, E] = {
-      new ComponentInstance(state, frontend, eventRegistry, component)
+  final case class ComponentEntry[F[+_]: Async, AS, M, CS, P, E](component: Component[F, CS, P, E],
+                                                                 parameters: P,
+                                                                 eventHandler: E => EventResult[F, AS]) extends Effect[F, AS, M] {
+    def createInstance(node: Id, frontend: Frontend[F], eventRegistry: EventRegistry[F]): ComponentInstance[F, AS, M, CS, P, E] = {
+      new ComponentInstance(node, frontend, eventRegistry, component)
     }
   }
 

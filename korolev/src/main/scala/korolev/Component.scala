@@ -18,7 +18,8 @@ import scala.util.{Failure, Random, Success, Try}
   * @tparam S State of the component
   * @tparam E Type of events produced by component
   */
-abstract class Component[F[+ _]: Async: Scheduler, S, E](val id: String = Random.alphanumeric.take(5).mkString) {
+abstract class Component[F[+ _]: Async: Scheduler, S, P, E](val initialState: S,
+                                                            val id: String = Random.alphanumeric.take(5).mkString) {
 
   /**
     * Component context.
@@ -33,26 +34,23 @@ abstract class Component[F[+ _]: Async: Scheduler, S, E](val id: String = Random
   /**
     * Component render
     */
-  def render(state: S): context.symbolDsl.Node
+  def render(parameters: P, state: S): context.symbolDsl.Node
 }
 
 object Component {
 
   /** (context, state) => document */
-  type Render[F[+ _], S, E] = (ApplicationContext[F, S, E], S) => Node[Effect[F, S, E]]
+  type Render[F[+ _], S, P, E] = (ApplicationContext[F, S, E], P, S) => Node[Effect[F, S, E]]
 
   /**
     * Create component in functional style
     * @param f Component renderer
     * @see [[Component]]
     */
-  def apply[F[+ _]: Async: Scheduler, S, E](f: Render[F, S, E]): Component[F, S, E] =
-    new ComponentFunction(f)
-
-  /** A way to define components in functional style */
-  private class ComponentFunction[F[+ _]: Async: Scheduler, S, E](f: Render[F, S, E]) extends Component[F, S, E] {
-
-    def render(state: S): Node[Effect[F, S, E]] = f(context, state)
+  def apply[F[+ _]: Async: Scheduler, S, P, E](s: S)(f: Render[F, S, P, E]): Component[F, S, P, E] = {
+    new Component[F, S, P, E](s) {
+      def render(parameters: P, state: S): Node[Effect[F, S, E]] = f(context, parameters, state)
+    }
   }
 
   /**
@@ -106,29 +104,28 @@ object Component {
     * 3. [[applyRenderContext()]]
     * 4. [[dropObsoleteMisc()]]
     */
-  final class ComponentInstance[F[+ _]: Async, AS, M, CS, E](initialState: CS,
-                                                             frontend: Frontend[F],
-                                                             eventRegistry: EventRegistry[F],
-                                                             val component: Component[F, CS, E]) {
+  final class ComponentInstance[F[+ _]: Async, AS, M, CS, P, E](nodeId: Id,
+                                                                frontend: Frontend[F],
+                                                                eventRegistry: EventRegistry[F],
+                                                                val component: Component[F, CS, P, E]) {
 
     private val async = Async[F]
-
     private val miscLock = new Object()
     private val stateLock = new Object()
+    private val subscriptionsLock = new Object()
 
     private val markedDelays = mutable.Set.empty[Id] // Set of the delays which are should survive
     private val markedComponentInstances = mutable.Set.empty[Id]
     private val delays = mutable.Map.empty[Id, Delay[F, CS, E]]
     private val elements = mutable.Map.empty[ElementId[F, CS, E], Id]
     private val events = mutable.Map.empty[EventId, Event[F, CS, E]]
-    private val nestedComponents = mutable.Map.empty[Id, ComponentInstance[F, CS, E, _, _]]
+    private val nestedComponents = mutable.Map.empty[Id, ComponentInstance[F, CS, E, _, _, _]]
     private val formDataPromises = mutable.Map.empty[String, Promise[F, FormData]]
     private val formDataProgressTransitions = mutable.Map.empty[String, (Int, Int) => Transition[CS]]
-    private val stateChangeSubscribers = mutable.ArrayBuffer.empty[() => Unit]
-    private val eventSubscribers = mutable.ArrayBuffer.empty[E => _]
+    private var state = component.initialState
 
-    private var state = initialState
-    private var lastSetState = initialState
+    private val stateChangeSubscribers = mutable.ArrayBuffer.empty[() => Unit]
+    private var eventSubscription = Option.empty[E => _]
 
     private object browserAccess extends Access[F, CS, E] {
 
@@ -163,7 +160,7 @@ object Component {
         getId(element).flatMap(id => frontend.focus(id))
 
       def publish(message: E): F[Unit] = {
-        eventSubscribers.foreach(_(message))
+        eventSubscription.foreach(f => f(message))
         async.unit
       }
 
@@ -207,7 +204,7 @@ object Component {
     }
 
     private def createUnsubscribe[T](from: mutable.Buffer[T], that: T) = { () =>
-      { from -= that; () }
+      subscriptionsLock.synchronized { from -= that; () }
     }
 
     /**
@@ -215,8 +212,10 @@ object Component {
       * Callback will be invoked for every state change.
       */
     def subscribeStateChange(callback: () => Unit): () => Unit = {
-      stateChangeSubscribers += callback
-      createUnsubscribe(stateChangeSubscribers, callback)
+      subscriptionsLock.synchronized {
+        stateChangeSubscribers += callback
+        createUnsubscribe(stateChangeSubscribers, callback)
+      }
     }
 
     /**
@@ -224,27 +223,17 @@ object Component {
       * Callback will be invoked on call of [[Access.publish()]] in the
       * component instance context.
       */
-    def subscribeEvents(callback: E => _): () => Unit = {
-      eventSubscribers += callback
-      createUnsubscribe(stateChangeSubscribers, callback)
+    def setEventsSubscription(callback: E => _): Unit = {
+      subscriptionsLock.synchronized {
+        eventSubscription = Some(callback)
+      }
     }
 
     /**
-      * Set state of the component from the outside. For example
-      * from a top level component. Component instance remember
-      * last [[setState]] value and don't update current state if
-      * new state and last setState value is equals.
+      * Set state of the component from the outside.
       */
-    def setState(newState: CS, force: Boolean = false): Unit = stateLock.synchronized {
-      if (force) {
-        state = newState
-        lastSetState = newState
-      } else {
-        if (lastSetState != newState) {
-          state = newState
-          lastSetState = newState
-        }
-      }
+    def setState(newState: CS): Unit = stateLock.synchronized {
+      state = newState
     }
 
     /**
@@ -262,8 +251,8 @@ object Component {
     /**
       * TODO doc
       */
-    def applyRenderContext(rc: StatefulRenderContext[Effect[F, AS, M]]): Unit = miscLock.synchronized {
-      val node = component.render(state)
+    def applyRenderContext(parameters: P, rc: StatefulRenderContext[Effect[F, AS, M]]): Unit = miscLock.synchronized {
+      val node = component.render(parameters, state)
       val proxy = new StatefulRenderContext[Effect[F, CS, E]] { proxy =>
         def currentId: Id = rc.currentId
         def currentContainerId: Id = rc.currentContainerId
@@ -288,21 +277,22 @@ object Component {
                 delays.put(id, delay)
                 delay.start(applyTransition)
               }
-            case entry @ ComponentEntry(value, newState, eventHandler: (Any => EventResult[F, CS])) =>
-              // TODO Event handler was changed but instance not. May be eventHandler should be mutable
+            case entry @ ComponentEntry(_, _: Any, _: (Any => EventResult[F, CS])) =>
               val id = rc.currentId
               nestedComponents.get(id) match {
-                case Some(nested) if nested.component.id == value.id =>
+                case Some(n: ComponentInstance[F, CS, E, Any, Any, Any]) if n.component.id == entry.component.id =>
+                  // Use nested component
                   markedComponentInstances += id
-                  nested.setStateUnsafe(newState)
-                  nested.applyRenderContext(proxy)
+                  n.setEventsSubscription((e: Any) => applyEventResult(entry.eventHandler(e)))
+                  n.applyRenderContext(entry.parameters, proxy)
                 case _ =>
-                  val nested = entry.createInstance(frontend, eventRegistry)
+                  // Create new nested component
+                  val n = entry.createInstance(id, frontend, eventRegistry)
                   markedComponentInstances += id
-                  nestedComponents.put(id, nested)
-                  nested.subscribeStateChange(() => stateChangeSubscribers.foreach(_()))
-                  nested.subscribeEvents((e: Any) => applyEventResult(eventHandler(e)))
-                  nested.applyRenderContext(proxy)
+                  nestedComponents.put(id, n)
+                  n.subscribeStateChange(() => stateChangeSubscribers.foreach(_()))
+                  n.setEventsSubscription((e: Any) => applyEventResult(entry.eventHandler(e)))
+                  n.applyRenderContext(entry.parameters, proxy)
               }
           }
         }
@@ -310,10 +300,12 @@ object Component {
       node(proxy)
     }
 
-    def applyTransition(transition: Transition[CS]): Unit = stateLock.synchronized {
-      transition.lift(state) match {
-        case Some(newState) => state = newState
-        case None           => ()
+    def applyTransition(transition: Transition[CS]): Unit = {
+      stateLock.synchronized {
+        transition.lift(state) match {
+          case Some(newState) => state = newState
+          case None           => ()
+        }
       }
       stateChangeSubscribers.foreach(_())
     }
@@ -361,7 +353,7 @@ object Component {
       // Remove only finished delays
       delays foreach {
         case (id, delay) =>
-          if (delay.finished)
+          if (delay.isFinished)
             delays.remove(id)
       }
       nestedComponents.values.foreach { nested =>

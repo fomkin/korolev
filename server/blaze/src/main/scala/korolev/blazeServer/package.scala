@@ -15,19 +15,20 @@ import org.http4s.websocket.WebsocketBits._
 
 import scala.concurrent.Promise
 import scala.concurrent.duration._
+import scala.reflect.runtime.universe.TypeTag
 
 package object blazeServer {
 
-  def blazeService[F[+_]: Async, S, M]: BlazeServiceBuilder[F, S, M] =
+  def blazeService[F[+_]: Async, S: TypeTag, M]: BlazeServiceBuilder[F, S, M] =
     new BlazeServiceBuilder(server.mimeTypes)
 
-  def blazeService[F[+_]: Async, S, M](mimeTypes: MimeTypes): BlazeServiceBuilder[F, S, M] =
+  def blazeService[F[+_]: Async, S: TypeTag, M](mimeTypes: MimeTypes): BlazeServiceBuilder[F, S, M] =
     new BlazeServiceBuilder(mimeTypes)
 
-  def blazeService[F[+_]: Async, S, M](
+  def blazeService[F[+_]: Async: Scheduler, S: TypeTag, M](
     config: KorolevServiceConfig[F, S, M],
     mimeTypes: MimeTypes
-  )(implicit scheduler: Scheduler[F]): HttpService = {
+  ): HttpService = {
 
     val korolevServer = korolev.server.korolevService(mimeTypes, config)
 
@@ -74,7 +75,7 @@ package object blazeServer {
           HttpResponse(status.code, status.phrase, responseHeaders, ByteBuffer.wrap(body))
         case KorolevResponse.WebSocket(publish, subscribe, destroy) =>
           val stage = new WebSocketStage {
-            val stopHeartbeat = scheduler.schedule(5.seconds) {
+            val stopHeartbeat = Scheduler[F].schedule(5.seconds) {
               channelWrite(Ping())
             }
             def destroyAndStopTimer(): Unit = {
