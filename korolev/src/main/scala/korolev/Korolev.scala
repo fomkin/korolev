@@ -62,7 +62,7 @@ object Korolev {
             client.callAndFlush("ExtractProperty", id.mkString, name)
         }
         val eventRegistry = new EventRegistry[F](frontend)
-        val component = new Component[F, S, M] {
+        val component = new Component[F, S, M](Component.TopLevelComponentId) {
           def render(state: S): Document.Node[Effect[F, S, M]] = {
             renderer(state).getOrElse {
               Document.Node[Effect[F, S, M]] { rc =>

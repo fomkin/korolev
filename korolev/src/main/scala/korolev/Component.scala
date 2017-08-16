@@ -1,7 +1,5 @@
 package korolev
 
-import java.util.UUID
-
 import korolev.ApplicationContext._
 import korolev.Async._
 import korolev.util.Scheduler
@@ -12,33 +10,49 @@ import levsha.{Id, StatefulRenderContext, XmlNs}
 import scala.collection.mutable
 import scala.util.{Failure, Random, Success, Try}
 
-abstract class Component[F[+ _]: Async, CS, E](implicit scheduler: Scheduler[F]) {
+/**
+  * Component definition. Every Korolev application is a component.
+  * Extent it to declare component in object oriented style.
+  *
+  * @tparam F Control monad
+  * @tparam S State of the component
+  * @tparam E Type of events produced by component
+  */
+abstract class Component[F[+ _]: Async: Scheduler, S, E](val id: String = Random.alphanumeric.take(5).mkString) {
 
-  val id = UUID.randomUUID()
+  /**
+    * Component context.
+    *
+    * {{{
+    *  import context._
+    *  import symbolDsl._
+    * }}}
+    */
+  val context = ApplicationContext[F, S, E]
 
-  val context = ApplicationContext[F, CS, E]
-
-  def apply[AS, M](initialState: CS)(f: E => EventResult[F, AS]): ComponentEntry[F, AS, M, CS, E] =
-    ComponentEntry(this, initialState, f)
-
-  def render(state: CS): Node[Effect[F, CS, E]]
+  /**
+    * Component render
+    */
+  def render(state: S): context.symbolDsl.Node
 }
 
 object Component {
 
-  def apply[F[+ _]: Async, S, E](renderFunction: (ApplicationContext[F, S, E], S) => Node[Effect[F, S, E]])(
-      implicit scheduler: Scheduler[F]): Component[F, S, E] = {
-    new ComponentFunction(renderFunction)
-  }
+  /** (context, state) => document */
+  type Render[F[+ _], S, E] = (ApplicationContext[F, S, E], S) => Node[Effect[F, S, E]]
+
+  /**
+    * Create component in functional style
+    * @param f Component renderer
+    * @see [[Component]]
+    */
+  def apply[F[+ _]: Async: Scheduler, S, E](f: Render[F, S, E]): Component[F, S, E] =
+    new ComponentFunction(f)
 
   /** A way to define components in functional style */
-  private class ComponentFunction[F[+ _]: Async, S, E](
-      renderFunction: (ApplicationContext[F, S, E], S) => Node[Effect[F, S, E]])(implicit scheduler: Scheduler[F])
-      extends Component[F, S, E] {
+  private class ComponentFunction[F[+ _]: Async: Scheduler, S, E](f: Render[F, S, E]) extends Component[F, S, E] {
 
-    def render(state: S): Node[Effect[F, S, E]] = {
-      renderFunction(context, state)
-    }
+    def render(state: S): Node[Effect[F, S, E]] = f(context, state)
   }
 
   /**
@@ -100,6 +114,8 @@ object Component {
     private val async = Async[F]
 
     private val miscLock = new Object()
+    private val stateLock = new Object()
+
     private val markedDelays = mutable.Set.empty[Id] // Set of the delays which are should survive
     private val markedComponentInstances = mutable.Set.empty[Id]
     private val delays = mutable.Map.empty[Id, Delay[F, CS, E]]
@@ -111,7 +127,6 @@ object Component {
     private val stateChangeSubscribers = mutable.ArrayBuffer.empty[() => Unit]
     private val eventSubscribers = mutable.ArrayBuffer.empty[E => _]
 
-    private val stateLock = new Object()
     private var state = initialState
     private var lastSetState = initialState
 
@@ -191,23 +206,27 @@ object Component {
       !er.sp
     }
 
+    private def createUnsubscribe[T](from: mutable.Buffer[T], that: T) = { () =>
+      { from -= that; () }
+    }
+
     /**
       * Subscribe to component instance state changes.
       * Callback will be invoked for every state change.
       */
     def subscribeStateChange(callback: () => Unit): () => Unit = {
       stateChangeSubscribers += callback
-      () =>
-        { stateChangeSubscribers -= callback; () }
+      createUnsubscribe(stateChangeSubscribers, callback)
     }
 
     /**
-      * TODO
+      * Subscribes to component instance events.
+      * Callback will be invoked on call of [[Access.publish()]] in the
+      * component instance context.
       */
     def subscribeEvents(callback: E => _): () => Unit = {
       eventSubscribers += callback
-      () =>
-        { eventSubscribers -= callback; () }
+      createUnsubscribe(stateChangeSubscribers, callback)
     }
 
     /**
@@ -228,14 +247,17 @@ object Component {
       }
     }
 
-    def getState: CS = state
-
     /**
       * Type-unsafe version of setState
       */
     def setStateUnsafe(newState: Any): Unit = {
       setState(newState.asInstanceOf[CS])
     }
+
+    /**
+      * Gives current state of the component instance
+      */
+    def getState: CS = state
 
     /**
       * TODO doc
@@ -268,7 +290,7 @@ object Component {
               }
             case entry @ ComponentEntry(value, newState, eventHandler: (Any => EventResult[F, CS])) =>
               // TODO Event handler was changed but instance not. May be eventHandler should be mutable
-              val id = rc.currentContainerId
+              val id = rc.currentId
               nestedComponents.get(id) match {
                 case Some(nested) if nested.component.id == value.id =>
                   markedComponentInstances += id
@@ -299,7 +321,7 @@ object Component {
     def applyEvent(eventId: EventId): Boolean = {
       events.get(eventId) match {
         case Some(event: EventWithAccess[F, CS, E]) => applyEventResult(event.effect(browserAccess))
-        case Some(event: SimpleEvent[F, CS, E]) => applyEventResult(event.effect())
+        case Some(event: SimpleEvent[F, CS, E])     => applyEventResult(event.effect())
         case None =>
           nestedComponents.values.forall { nested =>
             nested.applyEvent(eventId)
@@ -307,7 +329,10 @@ object Component {
       }
     }
 
-    /** Remove all delays which was not marked during rendering */
+    /**
+      * Remove all delays and nested component instances
+      * which were not marked during applying render context.
+      */
     def dropObsoleteMisc(): Unit = miscLock.synchronized {
       delays foreach {
         case (id, delay) =>
@@ -323,7 +348,11 @@ object Component {
       }
     }
 
-    /** Should be invoked before rendering */
+    /**
+      * Prepares component instance to applying render context.
+      * Removes all temporary and obsolete misc.
+      * All nested components also will be prepared.
+      */
     def prepare(): Unit = miscLock.synchronized {
       markedComponentInstances.clear()
       markedDelays.clear()
@@ -367,4 +396,5 @@ object Component {
     }
   }
 
+  final val TopLevelComponentId = "top-level"
 }

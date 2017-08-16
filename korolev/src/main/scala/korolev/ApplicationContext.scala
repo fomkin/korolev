@@ -95,6 +95,14 @@ class ApplicationContext[F[+_]: Async, S, M](implicit scheduler: Scheduler[F]) {
   val emptyTransition: PartialFunction[S, S] = { case x => x }
 
   def transition(t: Transition): Transition = t
+
+  implicit final class ComponentDsl[CS, E](component: Component[F, CS, E]) {
+    def apply(initialState: CS)(f: E => EventResult[F, S]): ComponentEntry[F, S, M, CS, E] =
+      ComponentEntry(component, initialState, f)
+
+    def silent(initialState: CS): ComponentEntry[F, S, M, CS, E] =
+      ComponentEntry(component, initialState, _ => EventResult())
+  }
 }
 
 object ApplicationContext {
