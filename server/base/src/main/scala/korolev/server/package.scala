@@ -21,7 +21,7 @@ package object server extends LazyLogging {
   type MimeTypes = String => Option[String]
   type KorolevService[F[+_]] = PartialFunction[Request, F[Response]]
 
-  def korolevService[F[+_]: Async, S: TypeTag, M](
+  def korolevService[F[+_]: Async, S, M](
     mimeTypes: MimeTypes,
     config: KorolevServiceConfig[F, S, M]
   )(implicit scheduler: Scheduler[F]): KorolevService[F] = {
@@ -32,17 +32,14 @@ package object server extends LazyLogging {
 
     def renderStatic(request: Request): F[Response] = {
       val (_, deviceId) = deviceFromRequest(request)
-      val sessionId = Random.alphanumeric.take(16).mkString
+      val sessionId = Random.alphanumeric.take(6).mkString
       val stateF = config.serverRouter
         .static(deviceId)
         .toState
         .lift(((), request.path))
         .getOrElse(config.stateStorage.createTopLevelState(deviceId))
 
-      // TODO drop it
-      val writeResultF = Async[F].flatMap(stateF)(config.stateStorage.write(deviceId, sessionId, Id(), _))
-
-      Async[F].map(writeResultF) { state =>
+      stateF.flatMap(config.stateStorage.write(deviceId, sessionId, Id.TopLevel, _)).map { state =>
         val dsl = new levsha.TemplateDsl[ApplicationContext.Effect[F, S, M]]()
         def createTextRenderContext() = {
           new AbstractTextRenderContext[ApplicationContext.Effect[F, S, M]] {
@@ -50,7 +47,7 @@ package object server extends LazyLogging {
             override def addMisc(misc: ApplicationContext.Effect[F, S, M]): Unit = misc match {
               case ApplicationContext.ComponentEntry(component, parameters, _) =>
                 val rc = this.asInstanceOf[RenderContext[ApplicationContext.Effect[F, Any, Any]]]
-                // TODO use state from state storage
+                // Static pages always made from scratch
                 component.render(parameters, component.initialState).apply(rc)
               case _ => ()
             }
@@ -139,7 +136,7 @@ package object server extends LazyLogging {
 
     def deviceFromRequest(request: Request): (Boolean, String) = {
       request.cookie("device") match {
-        case None => true -> Random.alphanumeric.take(16).mkString
+        case None => true -> Random.alphanumeric.take(6).mkString
         case Some(deviceId) => false -> deviceId
       }
     }
@@ -163,22 +160,29 @@ package object server extends LazyLogging {
       }
 
       // Session storage access
-      config.stateStorage.read(deviceId, sessionId, Id()) flatMap {
-        case Some(state) => Async[F].pure((false, state))
-        case None => config.stateStorage.createTopLevelState(deviceId).map(state => (true, state))
-      } map { case (isNew, state) =>
+      config.stateStorage.readAll(deviceId, sessionId) flatMap {
+        case stateReaderOpt @ Some(stateReader) =>
+          stateReader.read[S](Id.TopLevel) match {
+            case Some(state) => Async[F].pure((false, state, stateReaderOpt))
+            case None => config.stateStorage.createTopLevelState(deviceId).map(state => (true, state, stateReaderOpt))
+          }
+        case None =>
+          config.stateStorage.createTopLevelState(deviceId).map(state => (true, state, None))
+      } map { case (isNew, state, stateReaderOpt) =>
 
         // Create Korolev with dynamic router
         val router = config.serverRouter.dynamic(deviceId, sessionId)
-        val korolev = Korolev(makeSessionKey(deviceId, sessionId), jsAccess, state, config.render, router, fromScratch = isNew)
+        val sessionKey = makeSessionKey(deviceId, sessionId)
+        val korolev = Korolev(sessionKey, jsAccess, state, stateReaderOpt, config.render, router, fromScratch = isNew)
         val applyTransition = korolev.topLevelComponentInstance.applyTransition _ andThen Async[F].pureStrict _
         val env = config.envConfigurator(deviceId, sessionId, applyTransition)
         // Subscribe to events to publish them to env
         korolev.topLevelComponentInstance.setEventsSubscription(env.onMessage)
 
         // Subscribe on state updates an push them to storage
-        // TODO state change
-        //korolev.stateManager.subscribe(state => config.stateStorage.write(deviceId, sessionId, state))
+        korolev.topLevelComponentInstance.subscribeStateChange { (node, state) =>
+          config.stateStorage.write(deviceId, sessionId, node, state).runIgnoreResult
+        }
 
         new KorolevSession[F] {
 

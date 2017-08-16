@@ -19,7 +19,7 @@ import scala.util.{Failure, Random, Success, Try}
   * @tparam E Type of events produced by component
   */
 abstract class Component[F[+ _]: Async: Scheduler, S, P, E](val initialState: S,
-                                                            val id: String = Random.alphanumeric.take(5).mkString) {
+                                                            val id: String = Random.alphanumeric.take(6).mkString) {
 
   /**
     * Component context.
@@ -124,7 +124,7 @@ object Component {
     private val formDataProgressTransitions = mutable.Map.empty[String, (Int, Int) => Transition[CS]]
     private var state = component.initialState
 
-    private val stateChangeSubscribers = mutable.ArrayBuffer.empty[() => Unit]
+    private val stateChangeSubscribers = mutable.ArrayBuffer.empty[(Id, Any) => Unit]
     private var eventSubscription = Option.empty[E => _]
 
     private object browserAccess extends Access[F, CS, E] {
@@ -211,7 +211,7 @@ object Component {
       * Subscribe to component instance state changes.
       * Callback will be invoked for every state change.
       */
-    def subscribeStateChange(callback: () => Unit): () => Unit = {
+    def subscribeStateChange(callback: (Id, Any) => Unit): () => Unit = {
       subscriptionsLock.synchronized {
         stateChangeSubscribers += callback
         createUnsubscribe(stateChangeSubscribers, callback)
@@ -243,6 +243,12 @@ object Component {
       setState(newState.asInstanceOf[CS])
     }
 
+    def restoreState(stateReader: StateReader): Unit = {
+      stateReader.read[CS](nodeId) foreach { newState =>
+        setState(newState)
+      }
+    }
+
     /**
       * Gives current state of the component instance
       */
@@ -251,7 +257,10 @@ object Component {
     /**
       * TODO doc
       */
-    def applyRenderContext(parameters: P, rc: StatefulRenderContext[Effect[F, AS, M]]): Unit = miscLock.synchronized {
+    def applyRenderContext(parameters: P,
+                           rc: StatefulRenderContext[Effect[F, AS, M]],
+                           stateReaderOpt: Option[StateReader]): Unit = miscLock.synchronized {
+      
       val node = component.render(parameters, state)
       val proxy = new StatefulRenderContext[Effect[F, CS, E]] { proxy =>
         def currentId: Id = rc.currentId
@@ -281,18 +290,29 @@ object Component {
               val id = rc.currentId
               nestedComponents.get(id) match {
                 case Some(n: ComponentInstance[F, CS, E, Any, Any, Any]) if n.component.id == entry.component.id =>
-                  // Use nested component
+                  // Use nested component instance
                   markedComponentInstances += id
                   n.setEventsSubscription((e: Any) => applyEventResult(entry.eventHandler(e)))
-                  n.applyRenderContext(entry.parameters, proxy)
+                  n.applyRenderContext(entry.parameters, proxy, stateReaderOpt)
                 case _ =>
-                  // Create new nested component
+                  // Create new nested component instance
                   val n = entry.createInstance(id, frontend, eventRegistry)
                   markedComponentInstances += id
                   nestedComponents.put(id, n)
-                  n.subscribeStateChange(() => stateChangeSubscribers.foreach(_()))
+                  stateReaderOpt.foreach { stateReader =>
+                    // If state reader is available then try to
+                    // to restore state for this nested component instance
+                    n.restoreState(stateReader)
+                  }
+                  n.subscribeStateChange { (id, state) =>
+                    // Propagate nested component instance state change event
+                    // to high-level component instance
+                    stateChangeSubscribers.foreach { f =>
+                      f(id, state)
+                    }
+                  }
                   n.setEventsSubscription((e: Any) => applyEventResult(entry.eventHandler(e)))
-                  n.applyRenderContext(entry.parameters, proxy)
+                  n.applyRenderContext(entry.parameters, proxy, stateReaderOpt)
               }
           }
         }
@@ -307,7 +327,9 @@ object Component {
           case None           => ()
         }
       }
-      stateChangeSubscribers.foreach(_())
+      stateChangeSubscribers.foreach { f =>
+        f(nodeId, state)
+      }
     }
 
     def applyEvent(eventId: EventId): Boolean = {

@@ -15,17 +15,16 @@ import org.http4s.websocket.WebsocketBits._
 
 import scala.concurrent.Promise
 import scala.concurrent.duration._
-import scala.reflect.runtime.universe.TypeTag
 
 package object blazeServer {
 
-  def blazeService[F[+_]: Async, S: TypeTag, M]: BlazeServiceBuilder[F, S, M] =
+  def blazeService[F[+_]: Async, S, M]: BlazeServiceBuilder[F, S, M] =
     new BlazeServiceBuilder(server.mimeTypes)
 
-  def blazeService[F[+_]: Async, S: TypeTag, M](mimeTypes: MimeTypes): BlazeServiceBuilder[F, S, M] =
+  def blazeService[F[+_]: Async, S, M](mimeTypes: MimeTypes): BlazeServiceBuilder[F, S, M] =
     new BlazeServiceBuilder(mimeTypes)
 
-  def blazeService[F[+_]: Async: Scheduler, S: TypeTag, M](
+  def blazeService[F[+_]: Async: Scheduler, S, M](
     config: KorolevServiceConfig[F, S, M],
     mimeTypes: MimeTypes
   ): HttpService = {

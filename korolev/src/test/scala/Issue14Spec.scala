@@ -26,7 +26,7 @@ class Issue14Spec extends FlatSpec with Matchers {
       identifier = "",
       ja = jSAccess,
       sm = StateManager[Future, Issue14Spec.S]("firstState"),
-      initialState = "firstState",
+      topLevelInitialState = "firstState",
       fromScratch = true,
       router = Router.empty[Future, String, String],
       messageHandler = PartialFunction.empty,

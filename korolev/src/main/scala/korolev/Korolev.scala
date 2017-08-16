@@ -25,7 +25,8 @@ object Korolev {
 
   def apply[F[+ _]: Async, S, M](identifier: String,
                                  ja: JSAccess[F],
-                                 initialState: S,
+                                 topLevelInitialState: S,
+                                 stateReaderOpt: Option[StateReader],
                                  render: PartialFunction[S, Document.Node[ApplicationContext.Effect[F, S, M]]],
                                  router: Router[F, S, S],
                                  fromScratch: Boolean)(implicit scheduler: Scheduler[F]): Korolev[F, S, M] =
@@ -62,6 +63,7 @@ object Korolev {
             client.callAndFlush("ExtractProperty", id.mkString, name)
         }
         val eventRegistry = new EventRegistry[F](frontend)
+        val initialState = stateReaderOpt.flatMap(_.read[S](Id.TopLevel)).getOrElse(topLevelInitialState)
         val component = new Component[F, S, Any, M](initialState, Component.TopLevelComponentId) {
           def render(parameters: Any, state: S): Document.Node[Effect[F, S, M]] = {
             renderer(state).getOrElse {
@@ -75,7 +77,7 @@ object Korolev {
             }
           }
         }
-        new ComponentInstance[F, S, M, S, Any, M](Id(1.toShort), frontend, eventRegistry, component)
+        new ComponentInstance[F, S, M, S, Any, M](Id.TopLevel, frontend, eventRegistry, component)
       }
       val renderContext = DiffRenderContext[Effect[F, S, M]]()
       // TODO Dev Mode: restore render context state
@@ -176,13 +178,13 @@ object Korolev {
 //              renderContext.diff(changesPerformer)
 //              devMode.saveRenderContext(renderContext)
 //            } else {
-              topLevelComponentInstance.applyRenderContext(0, renderContext)
+              topLevelComponentInstance.applyRenderContext(0, renderContext, stateReaderOpt)
               renderContext.diff(DiffRenderContext.DummyChangesPerformer)
 //              if (devMode.isActive) devMode.saveRenderContext(renderContext)
 //            }
           }
 
-          val onState = () => {
+          def onState(giveStateReader: Boolean) = {
             // Set page url if router exists
             router.fromState
               .lift(topLevelComponentInstance.getState)
@@ -193,7 +195,10 @@ object Korolev {
             // Reset all event handlers delays and elements
             topLevelComponentInstance.prepare()
             // Perform rendering
-            topLevelComponentInstance.applyRenderContext(0, renderContext)
+            topLevelComponentInstance.applyRenderContext(
+              parameters = (), // Boxed unit as parameter. Top level component doesn't need parameters
+              stateReaderOpt = if (giveStateReader) stateReaderOpt else None,
+              rc = renderContext)
             // Infer changes
             renderContext.diff(changesPerformer)
 //              if (devMode.isActive)
@@ -203,8 +208,8 @@ object Korolev {
             jsAccess.flush()
           }
 
-          topLevelComponentInstance.subscribeStateChange(onState)
-          if (fromScratch) onState()
+          topLevelComponentInstance.subscribeStateChange((_, _) => onState(giveStateReader = false))
+          if (fromScratch) onState(giveStateReader = true)
           else jsAccess.flush()
         case Failure(e) =>
           logger.error("Error occurred on event callback registration", e)

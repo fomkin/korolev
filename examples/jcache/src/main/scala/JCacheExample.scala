@@ -19,10 +19,10 @@ object JCacheExample extends KorolevBlazeServer {
     val cacheName = "default"
     val cachingProvider = new HazelcastCachingProvider()
     val cacheManager = cachingProvider.getCacheManager()
-    val cache = Option(cacheManager.getCache(cacheName, classOf[String], classOf[State])) getOrElse {
-      val config = new MutableConfiguration[String, State]()
-      config.setTypes(classOf[String], classOf[State])
-      cacheManager.createCache[String, State, config.type](cacheName, config)
+    val cache = Option(cacheManager.getCache(cacheName, classOf[String], classOf[Any])) getOrElse {
+      val config = new MutableConfiguration[String, Any]()
+      config.setTypes(classOf[String], classOf[Any])
+      cacheManager.createCache[String, Any, config.type](cacheName, config)
     }
 
     CachedStateStorage[Future, State] (cache) { _ =>
