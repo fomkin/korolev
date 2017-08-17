@@ -214,6 +214,74 @@ Korolev expects `EventResult` as a return type of event handlers. There are thre
 
 Also, you can combine `immediateTransition` and `deferredTransition`.
 
+Stateful components
+~~~~~~~~~~~~~~~~~~~
+
+In the world of frontend people often names "component" every thing which has HTML-like markup. Until 0.6 version, Korolev had not have components support (excepting WebComponents from a client side). When we say "component" we means something that has it's own state. In case of Korolev, components also dispatches events to higher level components or to application on the top level.
+
+Worthy to note that application is a component too, so you can perceive Korolev's components system as a system of composing of applications. Korolev components is not lightweight, so if you can implement feature without components, do it without components. Use components only when it really necessary.
+
+Components are independent. Every component has it's own context. It opens a way to write reusable code.
+
+There are two ways to define component. Functional and object oriented style. Let's take a look on functional style components
+
+[source,scala]
+-----------------------------------
+val MyComponent = Component[Future, ComponentState, ComponentParameters, EventType](initialState) { (context, parameters, state) =>
+
+  import context._
+  import symbolDsl._
+
+  'div(
+    parameters.toString,
+    state.toString,
+    event('click) {
+      // Change component state here
+    }
+  )
+}
+-----------------------------------
+
+Same component can be defined in object oriented style.
+
+[source,scala]
+-----------------------------------
+object MyComponent extends Component[Future, ComponentState, ComponentParameters, EventType](initialState) {
+
+  import context._
+  import symbolDsl._
+
+  def render(parameters: ComponentParameters, state: ComponentState): Node = {
+    'div(
+      parameters.toString,
+      state.toString,
+      event('click) {
+        // Change component state here
+      }
+    )
+  }
+}
+-----------------------------------
+
+Let's use our component in the application.
+
+[source,scala]
+-----------------------------------
+'body(
+  "Hello world!",
+  MyComponent(parameters) { _ =>
+    // make transition on component event
+    immediateTransition {
+      case n => n + 1
+    }
+  },
+  // If you don't want to handle event, use silent instance
+  MyComponent.silent(parameters)
+)
+-----------------------------------
+
+https://github.com/fomkin/korolev/blob/v0.5.2/examples/component/src/main/scala/ComponentExample.scala[See full example]
+
 Access element properties
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
