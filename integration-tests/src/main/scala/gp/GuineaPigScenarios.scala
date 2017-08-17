@@ -116,6 +116,26 @@ object GuineaPigScenarios {
         "delay-text should be 'Click me'",
         el.getText == "Click me"
       )
+    },
+    step("Component should change its state") { wd =>
+      val el = wd.findElement(By.id("the-component"))
+      val checks = for (i <- 1 to 5) yield {
+        el.click()
+        sleep(1.second)
+        val text = el.getText
+        if (text == "label " + i) 1 else 0
+      }
+      assert("should be 5", checks.sum == 5)
+    },
+    step("Component should produce event") { wd =>
+      val el = wd.findElement(By.id("the-component"))
+      el.click()
+      assert(s"upload-text.textContent should be 'Cat'", wait(wd).until(
+        ExpectedConditions.textToBe(
+          By.id("from-component"),
+          "Cat"
+        )
+      ))
     }
   )
 
