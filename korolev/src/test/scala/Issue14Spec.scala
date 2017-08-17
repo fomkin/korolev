@@ -25,11 +25,9 @@ class Issue14Spec extends FlatSpec with Matchers {
     Korolev(
       identifier = "",
       ja = jSAccess,
-      sm = StateManager[Future, Issue14Spec.S]("firstState"),
       topLevelInitialState = "firstState",
       fromScratch = true,
       router = Router.empty[Future, String, String],
-      messageHandler = PartialFunction.empty,
       render = {
         Issue14Spec.render(
           firstEvent = event('mousedown) {
@@ -45,7 +43,8 @@ class Issue14Spec extends FlatSpec with Matchers {
             }
           }
         )
-      }
+      },
+      stateReaderOpt = None
     )
 
     jSAccess.resolvePromise(0, isSuccess = true, "@obj:@Korolev")
