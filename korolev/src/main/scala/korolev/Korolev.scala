@@ -1,5 +1,7 @@
 package korolev
 
+import java.io.{File, RandomAccessFile}
+import java.nio.ByteBuffer
 import java.util.concurrent.atomic.AtomicInteger
 
 import bridge.JSAccess
@@ -40,14 +42,13 @@ object Korolev {
         case Success(_) => // do nothing
       }
 
+      val devMode = new RenderContextDevMode(identifier, fromScratch)
       val jsAccess = ja
       val client = {
         // Prepare frontend
         jsAccess.global.getAndSaveAs("Korolev", "@Korolev")
         jsAccess.obj("@Korolev")
       }
-      // TODO Dev Mode
-      //val devMode = new RenderContextDevMode(identifier, fromScratch)
       val topLevelComponentInstance = {
         val renderer = render.lift
         val frontend = new Frontend[F] {
@@ -79,12 +80,7 @@ object Korolev {
         }
         new ComponentInstance[F, S, M, S, Any, M](Id.TopLevel, frontend, eventRegistry, component)
       }
-      val renderContext = DiffRenderContext[Effect[F, S, M]]()
-      // TODO Dev Mode: restore render context state
-//      (
-//        onMisc = effectsReactor.miscCallback,
-//        savedBuffer = devMode.loadRenderContext()
-//      )
+      val renderContext = DiffRenderContext[Effect[F, S, M]](savedBuffer = devMode.loadRenderContext())
 
       val changesPerformer = new ChangesPerformer {
         private def isProp(name: String) = name.charAt(0) == '^'
@@ -157,8 +153,8 @@ object Korolev {
             client.callAndFlush[Unit]("RegisterFormDataProgressHandler", callback)
           },
           client.callAndFlush[Unit]("SetRenderNum", 0),
-          if (fromScratch) client.callAndFlush("CleanRoot") else async.unit //,
-          //if (devMode.isActive) client.callAndFlush("ReloadCss") else async.unit
+          if (fromScratch) client.callAndFlush("CleanRoot") else async.unit,
+          if (devMode.isActive) client.callAndFlush("ReloadCss") else async.unit
         )
       }
 
@@ -172,16 +168,16 @@ object Korolev {
             renderContext.closeNode("body")
             renderContext.diff(DiffRenderContext.DummyChangesPerformer)
           } else {
-//            if (devMode.hasSavedRenderContext) {
-//              renderContext.swap()
-//              renderInitialState()
-//              renderContext.diff(changesPerformer)
-//              devMode.saveRenderContext(renderContext)
-//            } else {
-              topLevelComponentInstance.applyRenderContext(0, renderContext, stateReaderOpt)
+            if (devMode.hasSavedRenderContext) {
+              renderContext.swap()
+              topLevelComponentInstance.applyRenderContext((), renderContext, stateReaderOpt)
+              renderContext.diff(changesPerformer)
+              devMode.saveRenderContext(renderContext)
+            } else {
+              topLevelComponentInstance.applyRenderContext((), renderContext, stateReaderOpt)
               renderContext.diff(DiffRenderContext.DummyChangesPerformer)
-//              if (devMode.isActive) devMode.saveRenderContext(renderContext)
-//            }
+              if (devMode.isActive) devMode.saveRenderContext(renderContext)
+            }
           }
 
           def onState(giveStateReader: Boolean) = {
@@ -192,17 +188,21 @@ object Korolev {
 
             // Prepare render context
             renderContext.swap()
+
             // Reset all event handlers delays and elements
             topLevelComponentInstance.prepare()
+
             // Perform rendering
             topLevelComponentInstance.applyRenderContext(
               parameters = (), // Boxed unit as parameter. Top level component doesn't need parameters
               stateReaderOpt = if (giveStateReader) stateReaderOpt else None,
               rc = renderContext)
+
             // Infer changes
             renderContext.diff(changesPerformer)
-//              if (devMode.isActive)
-//                devMode.saveRenderContext(renderContext)
+            if (devMode.isActive) devMode.saveRenderContext(renderContext)
+
+            // Make korolev ready to next render
             topLevelComponentInstance.dropObsoleteMisc()
             client.call("SetRenderNum", currentRenderNum.incrementAndGet()).runIgnoreResult()
             jsAccess.flush()
@@ -216,40 +216,40 @@ object Korolev {
       }
     }
 
-//  class RenderContextDevMode(identifier: String, fromScratch: Boolean) {
-//
-//    lazy val file = new File(DevMode.renderStateDirectory, identifier)
-//
-//    lazy val hasSavedRenderContext = DevMode.isActive && file.exists && !fromScratch
-//
-//    def isActive = DevMode.isActive
-//
-//    def loadRenderContext() = if (hasSavedRenderContext) {
-//      val nioFile = new RandomAccessFile(file, "r")
-//      val channel = nioFile.getChannel
-//      try {
-//        val buffer = ByteBuffer.allocate(channel.size.toInt)
-//        channel.read(buffer)
-//        buffer.position(0)
-//        Some(buffer)
-//      } finally {
-//        nioFile.close()
-//        channel.close()
-//      }
-//    } else {
-//      None
-//    }
-//
-//    def saveRenderContext(renderContext: DiffRenderContext[_]) = {
-//      val nioFile = new RandomAccessFile(file, "rw")
-//      val channel = nioFile.getChannel
-//      try {
-//        val buffer = renderContext.save()
-//        channel.write(buffer)
-//      } finally {
-//        nioFile.close()
-//        channel.close()
-//      }
-//    }
-//  }
+  class RenderContextDevMode(identifier: String, fromScratch: Boolean) {
+
+    lazy val file = new File(DevMode.renderStateDirectory, identifier)
+
+    lazy val hasSavedRenderContext = DevMode.isActive && file.exists && !fromScratch
+
+    def isActive = DevMode.isActive
+
+    def loadRenderContext() = if (hasSavedRenderContext) {
+      val nioFile = new RandomAccessFile(file, "r")
+      val channel = nioFile.getChannel
+      try {
+        val buffer = ByteBuffer.allocate(channel.size.toInt)
+        channel.read(buffer)
+        buffer.position(0)
+        Some(buffer)
+      } finally {
+        nioFile.close()
+        channel.close()
+      }
+    } else {
+      None
+    }
+
+    def saveRenderContext(renderContext: DiffRenderContext[_]) = {
+      val nioFile = new RandomAccessFile(file, "rw")
+      val channel = nioFile.getChannel
+      try {
+        val buffer = renderContext.save()
+        channel.write(buffer)
+      } finally {
+        nioFile.close()
+        channel.close()
+      }
+    }
+  }
 }
