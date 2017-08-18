@@ -1,7 +1,7 @@
 package korolev
 
-import korolev.util.Scheduler
-import korolev.util.Scheduler.{Cancel, JobHandler}
+import korolev.execution.Scheduler
+import Scheduler._
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration

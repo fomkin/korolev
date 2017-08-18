@@ -4,8 +4,8 @@ import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 import java.nio.channels.AsynchronousChannelGroup
 
+import korolev.execution.Scheduler
 import korolev.server.{KorolevServiceConfig, MimeTypes, Request => KorolevRequest, Response => KorolevResponse}
-import korolev.util.Scheduler
 import org.http4s.blaze.channel._
 import org.http4s.blaze.channel.nio2.NIO2SocketServerGroup
 import org.http4s.blaze.http.{HttpResponse, HttpService, Response, WSResponse}
@@ -70,7 +70,7 @@ package object blazeServer {
 
       val responseF = Async[F].map(korolevServer(korolevRequest)) {
         case KorolevResponse.Http(status, bodyOpt, responseHeaders) =>
-          val body = bodyOpt.getOrElse(Array.empty)
+          val body = bodyOpt.getOrElse(Array.empty[Byte])
           HttpResponse(status.code, status.phrase, responseHeaders, ByteBuffer.wrap(body))
         case KorolevResponse.WebSocket(publish, subscribe, destroy) =>
           val stage = new WebSocketStage {

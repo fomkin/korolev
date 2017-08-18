@@ -2,7 +2,8 @@ package korolev.server
 
 import java.io._
 
-import korolev.{Async, DevMode, StateReader}
+import korolev.internal.DevMode
+import korolev.{Async, StateReader}
 import slogging.LazyLogging
 
 import scala.collection.concurrent.TrieMap

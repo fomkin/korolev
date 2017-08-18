@@ -12,9 +12,8 @@ import akka.http.scaladsl.server.Route
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Flow, Sink}
 import korolev.akkahttp.util.{IncomingMessageHandler, OutgoingMessageWriter}
-import korolev.execution.defaultExecutor
+import korolev.execution.{Scheduler, defaultExecutor}
 import korolev.server.{KorolevService, KorolevServiceConfig, MimeTypes, Request => KorolevRequest, Response => KorolevResponse}
-import korolev.util.Scheduler
 
 import scala.concurrent.Future
 

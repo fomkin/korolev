@@ -1,14 +1,14 @@
 package korolev
 
-import korolev.Component.{ComponentInstance, EventRegistry, Frontend}
-import korolev.util.Scheduler
+import korolev.execution.Scheduler
+import korolev.internal.{ComponentInstance, EventRegistry, Frontend}
 import levsha.Document.Empty
 import levsha._
 import levsha.events.EventPhase
 
 import scala.concurrent.duration.FiniteDuration
 
-class ApplicationContext[F[+_]: Async, S, M](implicit scheduler: Scheduler[F]) {
+class ApplicationContext[F[+_]: Async: Scheduler, S, M] {
 
   import ApplicationContext._
   import EventPhase._
@@ -65,7 +65,7 @@ class ApplicationContext[F[+_]: Async, S, M](implicit scheduler: Scheduler[F]) {
 
     def start(applyTransition: Transition => Unit): Unit = {
       handler = Some {
-        scheduler.scheduleOnce(delay) {
+        Scheduler[F].scheduleOnce(delay) {
           finished = true
           applyTransition(transition)
         }

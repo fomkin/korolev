@@ -1,15 +1,16 @@
-package korolev.util
+package korolev.execution
 
 import java.util.{Timer, TimerTask}
 
 import korolev.Async
 import korolev.Async.AsyncOps
-import korolev.util.Scheduler.{Cancel, JobHandler}
 
 import scala.concurrent.duration.FiniteDuration
 import scala.util.Success
 
 final class JavaTimerScheduler[F[+_]: Async] extends Scheduler[F] {
+
+  import Scheduler._
 
   private val timer = new Timer()
   private val async = Async[F]

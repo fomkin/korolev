@@ -7,7 +7,6 @@ import korolev.server.StateStorage
 import korolev.server.StateStorage.{DeviceId, SessionId}
 import levsha.Id
 
-
 /**
   * State storage based on
   * <a href="https://jcp.org/aboutJava/communityprocess/final/jsr107/index.html">

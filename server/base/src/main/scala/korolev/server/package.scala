@@ -7,7 +7,8 @@ import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 
 import scala.reflect.runtime.universe._
 import korolev.Async._
-import korolev.util.Scheduler
+import korolev.execution.Scheduler
+import korolev.internal.ApplicationInstance
 import levsha.{Id, RenderContext}
 import levsha.impl.{AbstractTextRenderContext, TextPrettyPrintingConfig}
 import slogging.LazyLogging
@@ -173,7 +174,7 @@ package object server extends LazyLogging {
         // Create Korolev with dynamic router
         val router = config.serverRouter.dynamic(deviceId, sessionId)
         val sessionKey = makeSessionKey(deviceId, sessionId)
-        val korolev = Korolev(sessionKey, jsAccess, state, stateReaderOpt, config.render, router, fromScratch = isNew)
+        val korolev = new ApplicationInstance(sessionKey, jsAccess, state, stateReaderOpt, config.render, router, fromScratch = isNew)
         val applyTransition = korolev.topLevelComponentInstance.applyTransition _ andThen Async[F].pureStrict _
         val env = config.envConfigurator(deviceId, sessionId, applyTransition)
         // Subscribe to events to publish them to env
@@ -210,7 +211,7 @@ package object server extends LazyLogging {
           }
 
           def resolveFormData(descriptor: String, formData: Try[FormData]): Unit = {
-            korolev.resolveFormData(descriptor, formData)
+            korolev.topLevelComponentInstance.resolveFormData(descriptor, formData)
           }
 
           def destroy(): F[Unit] = {
