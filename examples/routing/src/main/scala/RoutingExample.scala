@@ -107,9 +107,9 @@ object RoutingExample extends KorolevBlazeServer {
         static = (deviceId) => Router(
           toState = {
             case (_, Root) =>
-              storage.initial(deviceId)
+              storage.createTopLevelState(deviceId)
             case (_, Root / name) =>
-              storage.initial(deviceId) map { s =>
+              storage.createTopLevelState(deviceId) map { s =>
                 val key = s.todos.keys.find(_.toLowerCase == name)
                 key.fold(s)(k => s.copy(selectedTab = k))
               }

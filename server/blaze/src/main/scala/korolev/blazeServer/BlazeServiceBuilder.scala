@@ -1,11 +1,11 @@
 package korolev.blazeServer
 
 import korolev.Async
+import korolev.execution.Scheduler
 import korolev.server.{KorolevServiceConfig, MimeTypes}
-import korolev.util.Scheduler
 import org.http4s.blaze.http.HttpService
 
-final class BlazeServiceBuilder[F[+_]: Async, S, M](mimeTypes: MimeTypes) {
-  def from(config: KorolevServiceConfig[F, S, M])(implicit scheduler: Scheduler[F]): HttpService =
+final class BlazeServiceBuilder[F[+_]: Async: Scheduler, S, M](mimeTypes: MimeTypes) {
+  def from(config: KorolevServiceConfig[F, S, M]): HttpService =
     blazeService(config, mimeTypes)
 }

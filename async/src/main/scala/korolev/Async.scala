@@ -7,6 +7,7 @@ import scala.util.{Failure, Success, Try}
 
 @implicitNotFound("Instance of Async for ${F} is not found. If you want Future, ensure that execution context is passed to the scope (import korolev.execution.defaultExecutor)")
 trait Async[F[+_]] {
+  def pureStrict[A](value: A): F[A]
   def pure[A](value: => A): F[A]
   def fork[A](value: => A): F[A]
   def unit: F[Unit]
@@ -30,9 +31,8 @@ object Async {
 
   private final class FutureAsync(implicit ec: ExecutionContext) extends Async[Future] {
     val unit: Future[Unit] = Future.successful(())
-    def pure[A](value: => A): Future[A] =
-      try Future.successful(value)
-      catch { case e: Throwable => Future.failed(e) }
+    def pureStrict[A](value: A): Future[A] = Future.successful(value)
+    def pure[A](value: => A): Future[A] = Future.successful(value)
     def fork[A](value: => A): Future[A] = Future(value)
     def fromTry[A](value: => Try[A]): Future[A] = Future.fromTry(value)
     def flatMap[A, B](m: Future[A])(f: (A) => Future[B]): Future[B] = m.flatMap(f)

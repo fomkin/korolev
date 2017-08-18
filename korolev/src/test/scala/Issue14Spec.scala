@@ -2,6 +2,7 @@ import bridge.JSAccess
 import korolev._
 import org.scalatest.{FlatSpec, Matchers}
 import korolev.Async.Promise
+import korolev.internal.ApplicationInstance
 
 import scala.collection.mutable
 import scala.concurrent.Future
@@ -22,14 +23,11 @@ class Issue14Spec extends FlatSpec with Matchers {
       implicit val executionContext = korolev.testExecution.defaultExecutor
     }
 
-    Korolev(
+    new ApplicationInstance(
       identifier = "",
-      ja = jSAccess,
-      sm = StateManager[Future, Issue14Spec.S]("firstState"),
-      initialState = "firstState",
+      jsAccess = jSAccess,
       fromScratch = true,
       router = Router.empty[Future, String, String],
-      messageHandler = PartialFunction.empty,
       render = {
         Issue14Spec.render(
           firstEvent = event('mousedown) {
@@ -45,7 +43,8 @@ class Issue14Spec extends FlatSpec with Matchers {
             }
           }
         )
-      }
+      },
+      stateReader = StateReader.withTopLevelState("firstState")
     )
 
     jSAccess.resolvePromise(0, isSuccess = true, "@obj:@Korolev")

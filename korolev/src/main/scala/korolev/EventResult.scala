@@ -1,15 +1,15 @@
 package korolev
 
 case class EventResult[F[+_]: Async, S](
-    it: Option[StateManager.Transition[S]] = None,
-    dt: Option[F[StateManager.Transition[S]]] = None,
+    it: Option[Transition[S]] = None,
+    dt: Option[F[Transition[S]]] = None,
     sp: Boolean = false
 ) {
 
-  def deferredTransition(transition: F[StateManager.Transition[S]]): EventResult[F, S] =
+  def deferredTransition(transition: F[Transition[S]]): EventResult[F, S] =
     copy(dt = Some(transition))
 
-  def immediateTransition(transition: StateManager.Transition[S]): EventResult[F, S] =
+  def immediateTransition(transition: Transition[S]): EventResult[F, S] =
     copy(it = Some(transition))
 
   def stopPropagation: EventResult[F, S] = copy(sp = true)

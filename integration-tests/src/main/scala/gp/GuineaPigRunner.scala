@@ -13,7 +13,7 @@ import tools._
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 
-object GuineaPigR extends App {
+object GuineaPigRunner extends App {
 
   val genericCaps = Seq(
     Caps(DesiredCapabilities.chrome _)(

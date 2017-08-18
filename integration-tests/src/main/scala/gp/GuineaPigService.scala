@@ -19,7 +19,8 @@ object GuineaPigService {
       "tab3" -> State.Todo(2)
     ),
     uploadedText: String = "",
-    delayOn: Boolean = false
+    delayOn: Boolean = false,
+    eventFromComponentReceived: Boolean = false
   )
 
   object State {
@@ -40,6 +41,27 @@ object GuineaPigService {
 
   val uploadFormId = elementId
   val inputId = elementId
+
+  val TheComponent = Component[Future, Int, String, Unit](0) { (context, label, state) =>
+    import context._
+    import symbolDsl._
+    'span(
+      'id /= "the-component",
+      s"$label $state",
+      eventWithAccess('click) { access =>
+        deferredTransition {
+          val future =
+            if (state == 5) access.publish(())
+            else Future.successful(())
+          future.map { _ =>
+            transition {
+              case n => n + 1
+            }
+          }
+        }
+      }
+    )
+  }
 
   val service = KorolevServiceConfig[Future, State, Any](
     stateStorage = storage,
@@ -161,6 +183,17 @@ object GuineaPigService {
                 }
               }
             }
+          ),
+          'div(
+            TheComponent("label") { _ =>
+              immediateTransition {
+                case s => s.copy(eventFromComponentReceived = true)
+              }
+            },
+            'span('id /= "from-component",
+              if (state.eventFromComponentReceived) "Cat"
+              else "Dog"
+            )
           )
         )
     },
@@ -168,7 +201,7 @@ object GuineaPigService {
       ServerRouter(
         dynamic = (_, _) => Router(
           fromState = {
-            case State(tab, _, _, _) =>
+            case State(tab, _, _, _, _) =>
               Root / tab.toLowerCase
           },
           toState = {
@@ -183,9 +216,9 @@ object GuineaPigService {
         static = (deviceId) => Router(
           toState = {
             case (_, Root) =>
-              storage.initial(deviceId)
+              storage.createTopLevelState(deviceId)
             case (_, Root / name) =>
-              storage.initial(deviceId) map { s =>
+              storage.createTopLevelState(deviceId) map { s =>
                 val key = s.todos.keys.find(_.toLowerCase == name)
                 key.fold(s)(k => s.copy(selectedTab = k))
               }

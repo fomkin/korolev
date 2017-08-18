@@ -19,10 +19,10 @@ object JCacheExample extends KorolevBlazeServer {
     val cacheName = "default"
     val cachingProvider = new HazelcastCachingProvider()
     val cacheManager = cachingProvider.getCacheManager()
-    val cache = Option(cacheManager.getCache(cacheName, classOf[String], classOf[State])) getOrElse {
-      val config = new MutableConfiguration[String, State]()
-      config.setTypes(classOf[String], classOf[State])
-      cacheManager.createCache[String, State, config.type](cacheName, config)
+    val cache = Option(cacheManager.getCache(cacheName, classOf[String], classOf[Any])) getOrElse {
+      val config = new MutableConfiguration[String, Any]()
+      config.setTypes(classOf[String], classOf[Any])
+      cacheManager.createCache[String, Any, config.type](cacheName, config)
     }
 
     CachedStateStorage[Future, State] (cache) { _ =>
@@ -125,9 +125,9 @@ object JCacheExample extends KorolevBlazeServer {
         static = (deviceId) => Router(
           toState = {
             case (_, Root) =>
-              storage.initial(deviceId)
+              storage.createTopLevelState(deviceId)
             case (_, Root / name) =>
-              storage.initial(deviceId) map { s =>
+              storage.createTopLevelState(deviceId) map { s =>
                 val key = s.todos.keys.find(_.toLowerCase == name)
                 key.fold(s)(k => s.copy(selectedTab = k))
               }

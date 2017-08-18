@@ -5,8 +5,10 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 
+import scala.reflect.runtime.universe._
 import korolev.Async._
-import korolev.Korolev.MutableMapFactory
+import korolev.internal.ApplicationInstance
+import levsha.{Id, RenderContext}
 import levsha.impl.{AbstractTextRenderContext, TextPrettyPrintingConfig}
 import slogging.LazyLogging
 
@@ -30,19 +32,26 @@ package object server extends LazyLogging {
 
     def renderStatic(request: Request): F[Response] = {
       val (_, deviceId) = deviceFromRequest(request)
-      val sessionId = Random.alphanumeric.take(16).mkString
+      val sessionId = Random.alphanumeric.take(6).mkString
       val stateF = config.serverRouter
         .static(deviceId)
         .toState
         .lift(((), request.path))
-        .getOrElse(config.stateStorage.initial(deviceId))
+        .getOrElse(config.stateStorage.createTopLevelState(deviceId))
 
-      val writeResultF = Async[F].flatMap(stateF)(config.stateStorage.write(deviceId, sessionId, _))
-
-      Async[F].map(writeResultF) { state =>
+      stateF.flatMap(config.stateStorage.write(deviceId, sessionId, Id.TopLevel, _)).map { state =>
         val dsl = new levsha.TemplateDsl[ApplicationContext.Effect[F, S, M]]()
-        def createTextRenderContext() = new AbstractTextRenderContext[ApplicationContext.Effect[F, S, M]]() {
-          val prettyPrinting = TextPrettyPrintingConfig.noPrettyPrinting
+        def createTextRenderContext() = {
+          new AbstractTextRenderContext[ApplicationContext.Effect[F, S, M]] {
+            val prettyPrinting = TextPrettyPrintingConfig.noPrettyPrinting
+            override def addMisc(misc: ApplicationContext.Effect[F, S, M]): Unit = misc match {
+              case ApplicationContext.ComponentEntry(component, parameters, _) =>
+                val rc = this.asInstanceOf[RenderContext[ApplicationContext.Effect[F, Any, Any]]]
+                // Static pages always made from scratch
+                component.render(parameters, component.initialState).apply(rc)
+              case _ => ()
+            }
+          }
         }
         val textRenderContext = createTextRenderContext()
         import dsl._
@@ -127,7 +136,7 @@ package object server extends LazyLogging {
 
     def deviceFromRequest(request: Request): (Boolean, String) = {
       request.cookie("device") match {
-        case None => true -> Random.alphanumeric.take(16).mkString
+        case None => true -> Random.alphanumeric.take(6).mkString
         case Some(deviceId) => false -> deviceId
       }
     }
@@ -151,25 +160,27 @@ package object server extends LazyLogging {
       }
 
       // Session storage access
-      config.stateStorage.read(deviceId, sessionId) flatMap {
-        case Some(state) => Async[F].pure((false, state))
-        case None => config.stateStorage.initial(deviceId).map(state => (true, state))
-      } map { case (isNew, state) =>
+      config.stateStorage.readAll(deviceId, sessionId) flatMap {
+        case Some(stateReader) => Async[F].pure(false -> stateReader)
+        case None => config
+          .stateStorage
+          .createTopLevelState(deviceId)
+          .map(state => true -> StateReader.withTopLevelState(state))
+      } map { case (isNew, stateReader) =>
 
         // Create Korolev with dynamic router
-        val dux = StateManager[F, S](state)
         val router = config.serverRouter.dynamic(deviceId, sessionId)
-        val env = config.envConfigurator(deviceId, sessionId, dux.apply)
-        val trieMapFactory = new MutableMapFactory {
-          def apply[K, V]: mutable.Map[K, V] = TrieMap.empty[K, V]
-        }
-        val korolev = Korolev(
-          makeSessionKey(deviceId, sessionId), dux, jsAccess, state, config.render, router, env.onMessage,
-          fromScratch = isNew, createMutableMap = trieMapFactory
-        )
+        val sessionKey = makeSessionKey(deviceId, sessionId)
+        val korolev = new ApplicationInstance(sessionKey, jsAccess, stateReader, config.render, router, fromScratch = isNew)
+        val applyTransition = korolev.topLevelComponentInstance.applyTransition _ andThen Async[F].pureStrict _
+        val env = config.envConfigurator(deviceId, sessionId, applyTransition)
+        // Subscribe to events to publish them to env
+        korolev.topLevelComponentInstance.setEventsSubscription(env.onMessage)
+
         // Subscribe on state updates an push them to storage
-        korolev.stateManager.subscribe(state => config.stateStorage.write(deviceId, sessionId, state))
-        korolev.stateManager.onDestroy(env.onDestroy)
+        korolev.topLevelComponentInstance.subscribeStateChange { (node, state) =>
+          config.stateStorage.write(deviceId, sessionId, node, state).runIgnoreResult
+        }
 
         new KorolevSession[F] {
 
@@ -196,9 +207,8 @@ package object server extends LazyLogging {
             }
           }
 
-
           def resolveFormData(descriptor: String, formData: Try[FormData]): Unit = {
-            korolev.resolveFormData(descriptor, formData)
+            korolev.topLevelComponentInstance.resolveFormData(descriptor, formData)
           }
 
           def destroy(): F[Unit] = {
@@ -206,7 +216,7 @@ package object server extends LazyLogging {
               currentPromise.get() foreach { promise =>
                 promise.complete(Failure(new SessionDestroyedException("Session has been closed")))
               }
-              korolev.stateManager.destroy()
+              env.onDestroy()
               sessions.remove(sessionKey)
             }
             Async[F].unit
