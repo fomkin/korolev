@@ -217,13 +217,13 @@ Also, you can combine `immediateTransition` and `deferredTransition`.
 Stateful components
 ~~~~~~~~~~~~~~~~~~~
 
-In the world of frontend people often names "component" every thing which has HTML-like markup. Until 0.6 version, Korolev had not have components support (excepting WebComponents from a client side). When we say "component" we means something that has it's own state. In case of Korolev, components also dispatches events to higher level components or to application on the top level.
+In the world of front-end development people often name every thing that has HTML-like markup a "component". Until version 0.6, Korolev didn't have components support (except WebComponents on a client side). When we say "component" we mean something that has its own state. In Korolev case, components also dispatch events to other components up in the hierarchy or to the application on the top.
 
-Worthy to note that application is a component too, so you can perceive Korolev's components system as a system of composing of applications. Korolev components is not lightweight, so if you can implement feature without components, do it without components. Use components only when it really necessary.
+Worth to note that application is a component too, so you can consider Korolev's components system as a system composed of applications. Korolev components are not lightweight, so if you can implement a feature without components, do it so. Use components only when they are really necessary.
 
-Components are independent. Every component has it's own context. It opens a way to write reusable code.
+Components are independent. Every component has its own context. It opens up a way to write reusable code.
 
-There are two ways to define component. Functional and object oriented style. Let's take a look on functional style components
+There are two ways to define a component: in functional and in object-oriented style. Let's take a look at functional style components.
 
 [source,scala]
 -----------------------------------
@@ -242,7 +242,7 @@ val MyComponent = Component[Future, ComponentState, ComponentParameters, EventTy
 }
 -----------------------------------
 
-Same component can be defined in object oriented style.
+Same component can be defined in object-oriented style.
 
 [source,scala]
 -----------------------------------
