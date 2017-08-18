@@ -35,7 +35,7 @@ object WebComponentExample extends KorolevBlazeServer {
             'button ("Korolev", event('click)(setLatLon(55.9226846, 37.7961706)))
           ),
           'leafletMap (
-            'style /= "width: 500px; height: 300px",
+            'width @= 500, 'height @= 300,
             'latitude /= state.lat.toString,
             'longitude /= state.lon.toString,
             'zoom /= "10"

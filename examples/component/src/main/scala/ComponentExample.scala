@@ -26,7 +26,9 @@ object ComponentExample extends KorolevBlazeServer {
     val (r, g, b) = state
 
     'div(
-      'style /= s"border: 2px solid rgb($r, $g, $b)",
+      'borderWidth @= 2,
+      'borderStyle @= "solid",
+      'borderColor @= s"rgb($r, $g, $b)",
       label,
       eventWithAccess('click) { access =>
         deferredTransition {
@@ -49,7 +51,9 @@ object ComponentExample extends KorolevBlazeServer {
     def render(label: String, state: (Int, Int, Int)): Node = {
       val (r, g, b) = state
       'div(
-        'style /= s"border: 2px solid rgb($r, $g, $b)",
+        'borderWidth @= 2,
+        'borderStyle @= "solid",
+        'borderColor @= s"rgb($r, $g, $b)",
         label,
         eventWithAccess('click) { access =>
           deferredTransition {

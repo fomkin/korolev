@@ -5,11 +5,9 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 
-import scala.reflect.runtime.universe._
 import korolev.Async._
 import korolev.internal.ApplicationInstance
-import levsha.{Id, RenderContext}
-import levsha.impl.{AbstractTextRenderContext, TextPrettyPrintingConfig}
+import levsha.Id
 import slogging.LazyLogging
 
 import scala.collection.concurrent.TrieMap
@@ -41,19 +39,7 @@ package object server extends LazyLogging {
 
       stateF.flatMap(config.stateStorage.write(deviceId, sessionId, Id.TopLevel, _)).map { state =>
         val dsl = new levsha.TemplateDsl[ApplicationContext.Effect[F, S, M]]()
-        def createTextRenderContext() = {
-          new AbstractTextRenderContext[ApplicationContext.Effect[F, S, M]] {
-            val prettyPrinting = TextPrettyPrintingConfig.noPrettyPrinting
-            override def addMisc(misc: ApplicationContext.Effect[F, S, M]): Unit = misc match {
-              case ApplicationContext.ComponentEntry(component, parameters, _) =>
-                val rc = this.asInstanceOf[RenderContext[ApplicationContext.Effect[F, Any, Any]]]
-                // Static pages always made from scratch
-                component.render(parameters, component.initialState).apply(rc)
-              case _ => ()
-            }
-          }
-        }
-        val textRenderContext = createTextRenderContext()
+        val textRenderContext = new HtmlRenderContext[F, S, M]()
         import dsl._
 
         val document = 'html(
@@ -63,7 +49,7 @@ package object server extends LazyLogging {
                  |  'sessionId': '$sessionId',
                  |  'serverRootPath': '${config.serverRouter.rootPath}',
                  |  'connectionLostWidget': '${
-                   val textRenderContext = createTextRenderContext()
+                   val textRenderContext = new HtmlRenderContext[F, S, M]()
                    config.connectionLostWidget(textRenderContext)
                    textRenderContext.mkString
                  }'

@@ -40,6 +40,41 @@ Ok, now you are ready to start hacking with Korolev.
 Understanding Korolev
 ---------------------
 
+Template DSL
+~~~~~~~~~~~~
+
+Korolev uses https://github.com/fomkin/levsha[Levsha] as DSL (domain specific language) for templating. DSL allows to declare DOM inside Scala code remain within Scala syntax. Take a look.
+
+[source,scala]
+-----------------------------------
+'div(
+  'backgroundColor @= "yellow",
+  'input('type /= "text")
+)
+-----------------------------------
+
+This code fragment corresponds to HTML below.
+
+[source,html]
+-----------------------------------
+<div style="background-color: yellow">
+  <input type="text"></input>
+</div>
+-----------------------------------
+
+As you can see there are three simple rules:
+
+1. `'tag()` declares tag
+2. `'attribute /= "value"` declares attribute
+3. `'backgroundColor @= "black"` declares style
+
+And one more special thing. Use `:=` when you want to set attribute as an element's property. It may be useful when some data can be passed through attribute. For example value of `'input`.
+
+[NOTE]
+==========================
+Style keys are camelCased in order to be consistent with accessing the properties on DOM nodes from JS (e.g. node.style.backgroundImage). Vendor prefixes other than ms should begin with a capital letter. This is why WebkitTransition has an uppercase "W".
+==========================
+
 Device and Session
 ~~~~~~~~~~~~~~~~~~
 

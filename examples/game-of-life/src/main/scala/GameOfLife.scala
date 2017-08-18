@@ -45,10 +45,10 @@ object GameOfLife extends KorolevBlazeServer {
                   p.toString
                 }
                 ns.svg('circle)(
-                  'cx /= pos(x),
-                  'cy /= pos(y),
-                  'r /= cellRadiusS,
-                  'fill /= {
+                  'cx   @= pos(x),
+                  'cy   @= pos(y),
+                  'r    @= cellRadiusS,
+                  'fill @= {
                     if (universe(x, y).alive) "#000000"
                     else "#EEEEEE"
                   },
