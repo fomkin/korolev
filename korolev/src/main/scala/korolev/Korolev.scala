@@ -173,7 +173,7 @@ object Korolev {
             }
           }
 
-          def onState(giveStateReader: Boolean) = {
+          def onState(giveStateReader: Boolean) = renderContext.synchronized {
             // Set page url if router exists
             router.fromState
               .lift(topLevelComponentInstance.getState)
