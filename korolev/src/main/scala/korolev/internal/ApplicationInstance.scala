@@ -34,11 +34,10 @@ final class ApplicationInstance[F[+ _]: Async, S, M](
     val component = new Component[F, S, Any, M](initialState, Component.TopLevelComponentId) {
       def render(parameters: Any, state: S): Document.Node[Effect[F, S, M]] = {
         renderer(state).getOrElse {
+          logger.error(s"Render is not defined for $state")
           Document.Node[Effect[F, S, M]] { rc =>
-            // TODO better reporting
-            // TODO should be safe!
             rc.openNode(XmlNs.html, "body")
-            rc.addTextNode("Render didn't defined for this state")
+            rc.addTextNode("Render is not defined for the state")
             rc.closeNode("body")
           }
         }

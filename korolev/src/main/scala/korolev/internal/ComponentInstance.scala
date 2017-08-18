@@ -3,9 +3,9 @@ package korolev.internal
 import korolev._
 import ApplicationContext._
 import Async._
-
 import levsha.{Id, StatefulRenderContext, XmlNs}
 import levsha.events.EventId
+import slogging.LazyLogging
 
 import scala.collection.mutable
 import scala.util.{Failure, Random, Success, Try}
@@ -23,7 +23,8 @@ import scala.util.{Failure, Random, Success, Try}
 final class ComponentInstance[F[+ _]: Async, AS, M, CS, P, E](nodeId: Id,
                                                               frontend: ClientSideApi[F],
                                                               eventRegistry: EventRegistry[F],
-                                                              val component: Component[F, CS, P, E]) {
+                                                              val component: Component[F, CS, P, E])
+  extends LazyLogging {
 
   private val async = Async[F]
   private val miscLock = new Object()
@@ -112,9 +113,8 @@ final class ComponentInstance[F[+ _]: Async, AS, M, CS, P, E](nodeId: Id,
     } run {
       case Success(_) =>
       // ok transitions was applied
-      case Failure(_) =>
-      // TODO log error
-      //logger.error("Exception during applying transition", e)
+      case Failure(e) =>
+        logger.error("Exception during applying transition", e)
     }
     !er.sp
   }
@@ -170,9 +170,6 @@ final class ComponentInstance[F[+ _]: Async, AS, M, CS, P, E](nodeId: Id,
     */
   def getState: CS = state
 
-  /**
-    * TODO doc
-    */
   def applyRenderContext(parameters: P,
                          rc: StatefulRenderContext[Effect[F, AS, M]],
                          stateReaderOpt: Option[StateReader]): Unit = miscLock.synchronized {
