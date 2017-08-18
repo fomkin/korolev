@@ -7,7 +7,6 @@ import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 
 import scala.reflect.runtime.universe._
 import korolev.Async._
-import korolev.execution.Scheduler
 import korolev.internal.ApplicationInstance
 import levsha.{Id, RenderContext}
 import levsha.impl.{AbstractTextRenderContext, TextPrettyPrintingConfig}
@@ -25,7 +24,7 @@ package object server extends LazyLogging {
   def korolevService[F[+_]: Async, S, M](
     mimeTypes: MimeTypes,
     config: KorolevServiceConfig[F, S, M]
-  )(implicit scheduler: Scheduler[F]): KorolevService[F] = {
+  ): KorolevService[F] = {
 
     import misc._
 
@@ -162,19 +161,17 @@ package object server extends LazyLogging {
 
       // Session storage access
       config.stateStorage.readAll(deviceId, sessionId) flatMap {
-        case stateReaderOpt @ Some(stateReader) =>
-          stateReader.read[S](Id.TopLevel) match {
-            case Some(state) => Async[F].pure((false, state, stateReaderOpt))
-            case None => config.stateStorage.createTopLevelState(deviceId).map(state => (true, state, stateReaderOpt))
-          }
-        case None =>
-          config.stateStorage.createTopLevelState(deviceId).map(state => (true, state, None))
-      } map { case (isNew, state, stateReaderOpt) =>
+        case Some(stateReader) => Async[F].pure(false -> stateReader)
+        case None => config
+          .stateStorage
+          .createTopLevelState(deviceId)
+          .map(state => true -> StateReader.withTopLevelState(state))
+      } map { case (isNew, stateReader) =>
 
         // Create Korolev with dynamic router
         val router = config.serverRouter.dynamic(deviceId, sessionId)
         val sessionKey = makeSessionKey(deviceId, sessionId)
-        val korolev = new ApplicationInstance(sessionKey, jsAccess, state, stateReaderOpt, config.render, router, fromScratch = isNew)
+        val korolev = new ApplicationInstance(sessionKey, jsAccess, stateReader, config.render, router, fromScratch = isNew)
         val applyTransition = korolev.topLevelComponentInstance.applyTransition _ andThen Async[F].pureStrict _
         val env = config.envConfigurator(deviceId, sessionId, applyTransition)
         // Subscribe to events to publish them to env

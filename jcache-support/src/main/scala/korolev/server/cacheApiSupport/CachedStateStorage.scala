@@ -51,6 +51,8 @@ final class CachedStateStorage[F[+_]: Async, T](cache: Cache[String, Any], initi
       val values = ids.flatMap(id => readStrict(deviceId, sessionId, id))
       val table = ids.zip(values).toMap
       new StateReader {
+        val topLevelValue = table(Id.TopLevel)
+        def topLevel[A]: A = topLevelValue.asInstanceOf[A]
         def read[A](node: Id): Option[A] = {
           table.get(node).asInstanceOf[Option[A]]
         }

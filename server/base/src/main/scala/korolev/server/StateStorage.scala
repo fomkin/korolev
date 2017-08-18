@@ -104,7 +104,7 @@ object StateStorage extends LazyLogging {
       if (DevMode.isActive) {
         async.fork {
           getSessionDirectory(deviceId, sessionId) map { dir =>
-            val map = dir.list()
+            val states = dir.list()
               .toList
               .flatMap { name =>
                 val node = Id(name)
@@ -114,14 +114,18 @@ object StateStorage extends LazyLogging {
               }
               .toMap
             new StateReader {
+              val topLevelValue = states(Id.TopLevel)
+              def topLevel[A]: A = topLevelValue.asInstanceOf[A]
               def read[A](node: Id): Option[A] =
-                map.get(node).asInstanceOf[Option[A]]
+                states.get(node).asInstanceOf[Option[A]]
             }
           }
         }
       } else async.pure {
         storage.get(mkKey(deviceId, sessionId)) map { states =>
           new StateReader {
+            val topLevelValue = states(Id.TopLevel)
+            def topLevel[A]: A = topLevelValue.asInstanceOf[A]
             def read[A](node: Id): Option[A] =
               states.get(node).asInstanceOf[Option[A]]
           }

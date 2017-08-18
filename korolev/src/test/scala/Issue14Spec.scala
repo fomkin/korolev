@@ -26,7 +26,6 @@ class Issue14Spec extends FlatSpec with Matchers {
     new ApplicationInstance(
       identifier = "",
       jsAccess = jSAccess,
-      topLevelInitialState = "firstState",
       fromScratch = true,
       router = Router.empty[Future, String, String],
       render = {
@@ -45,7 +44,7 @@ class Issue14Spec extends FlatSpec with Matchers {
           }
         )
       },
-      stateReaderOpt = None
+      stateReader = StateReader.withTopLevelState("firstState")
     )
 
     jSAccess.resolvePromise(0, isSuccess = true, "@obj:@Korolev")

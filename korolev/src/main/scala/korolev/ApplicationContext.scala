@@ -1,7 +1,7 @@
 package korolev
 
 import korolev.execution.Scheduler
-import korolev.internal.{ComponentInstance, EventRegistry, Frontend}
+import korolev.internal.{ComponentInstance, EventRegistry, ClientSideApi}
 import levsha.Document.Empty
 import levsha._
 import levsha.events.EventPhase
@@ -195,7 +195,7 @@ object ApplicationContext {
   final case class ComponentEntry[F[+_]: Async, AS, M, CS, P, E](component: Component[F, CS, P, E],
                                                                  parameters: P,
                                                                  eventHandler: E => EventResult[F, AS]) extends Effect[F, AS, M] {
-    def createInstance(node: Id, frontend: Frontend[F], eventRegistry: EventRegistry[F]): ComponentInstance[F, AS, M, CS, P, E] = {
+    def createInstance(node: Id, frontend: ClientSideApi[F], eventRegistry: EventRegistry[F]): ComponentInstance[F, AS, M, CS, P, E] = {
       new ComponentInstance(node, frontend, eventRegistry, component)
     }
   }

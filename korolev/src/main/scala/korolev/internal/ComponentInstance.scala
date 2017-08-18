@@ -21,9 +21,9 @@ import scala.util.{Failure, Random, Success, Try}
   * 4. [[dropObsoleteMisc()]]
   */
 final class ComponentInstance[F[+ _]: Async, AS, M, CS, P, E](nodeId: Id,
-  frontend: Frontend[F],
-  eventRegistry: EventRegistry[F],
-  val component: Component[F, CS, P, E]) {
+                                                              frontend: ClientSideApi[F],
+                                                              eventRegistry: EventRegistry[F],
+                                                              val component: Component[F, CS, P, E]) {
 
   private val async = Async[F]
   private val miscLock = new Object()
@@ -174,8 +174,8 @@ final class ComponentInstance[F[+ _]: Async, AS, M, CS, P, E](nodeId: Id,
     * TODO doc
     */
   def applyRenderContext(parameters: P,
-    rc: StatefulRenderContext[Effect[F, AS, M]],
-    stateReaderOpt: Option[StateReader]): Unit = miscLock.synchronized {
+                         rc: StatefulRenderContext[Effect[F, AS, M]],
+                         stateReaderOpt: Option[StateReader]): Unit = miscLock.synchronized {
 
     val node = component.render(parameters, state)
     val proxy = new StatefulRenderContext[Effect[F, CS, E]] { proxy =>
