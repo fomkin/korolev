@@ -1,8 +1,7 @@
 package korolev
 
 import korolev.execution.Scheduler
-import korolev.internal.{ComponentInstance, EventRegistry, ClientSideApi}
-import levsha.Document.Empty
+import korolev.internal.{ClientSideApi, ComponentInstance, EventRegistry}
 import levsha._
 import levsha.events.EventPhase
 
@@ -20,31 +19,7 @@ class ApplicationContext[F[+_]: Async: Scheduler, S, M] {
   type Render = PartialFunction[S, Document.Node[Effect]]
   type ElementId = ApplicationContext.ElementId[F, S, M]
 
-  final class ExtendedTemplateDsl extends TemplateDsl[ApplicationContext.Effect[F, S, M]] {
-
-    type Document = levsha.Document[Effect]
-    type Node     = levsha.Document.Node[Effect]
-    type Attr     = levsha.Document.Attr[Effect]
-
-    @deprecated("Use Node instead of VDom", "0.4.0")
-    type VDom = Node
-
-    @deprecated("Use void instead of <>", since = "0.4.0")
-    val <> = Empty
-
-    /**
-      * Make 'a tag non-clickable
-      */
-    val disableHref = 'onclick /= "return false"
-
-    implicit final class KorolevSymbolOps(s: Symbol) {
-      def :=(value: String): Document.Attr[Effect] = Document.Attr { rc =>
-        rc.setAttr(levsha.XmlNs.html, '^' + s.name.replaceAll("([A-Z]+)", "-$1").toLowerCase, value)
-      }
-    }
-  }
-
-  val symbolDsl = new ExtendedTemplateDsl()
+  val symbolDsl = new KorolevTemplateDsl[F, S, M]()
 
   def elementId = new ApplicationContext.ElementId[F, S, M]()
 

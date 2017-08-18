@@ -19,10 +19,12 @@ final class ClientSideApi[F[+ _]: Async](jsAccess: JSAccess[F]) extends ChangesP
     jsAccess.obj("@Korolev")
   }
 
-  private def isProp(name: String) = name.charAt(0) == '^'
+  private def isProperty(name: String) = name.charAt(0) == '^'
 
-  private def escapeName(name: String, isProp: Boolean) =
-    if (isProp) name.substring(1)
+  private def isStyle(name: String) = name.charAt(0) == '*'
+
+  private def escapeName(name: String, truncate: Boolean) =
+    if (truncate) name.substring(1)
     else name
 
   private def registerCallback(apiFunctionName: String, f: String => Unit) = {
@@ -60,9 +62,6 @@ final class ClientSideApi[F[+ _]: Async](jsAccess: JSAccess[F]) extends ChangesP
   def focus(id: Id): F[Unit] =
     client.callAndFlush("Focus", id.mkString)
 
-  def setAttr[T](id: Id, xmlNs: String, name: String, value: T, isProperty: Boolean): F[Unit] =
-    client.callAndFlush("SetAttr", id.mkString, xmlNs, name, value, isProperty)
-
   def extractProperty[T](id: Id, name: String): F[T] =
     client.callAndFlush("ExtractProperty", id.mkString, name)
 
@@ -90,21 +89,34 @@ final class ClientSideApi[F[+ _]: Async](jsAccess: JSAccess[F]) extends ChangesP
     client.call("Create", parent, id.mkString, pXmlns, tag).runIgnoreResult()
   }
 
+  def setAttr[T](id: Id, xmlNs: String, name: String, value: T, isProperty: Boolean): F[Unit] =
+    client.callAndFlush("SetAttr", id.mkString, xmlNs, name, value, isProperty)
+
   def setAttr(id: Id, xmlNs: String, name: String, value: String): Unit = {
-    val p = isProp(name)
-    val n = escapeName(name, p)
-    val pXmlns =
-      if (xmlNs eq levsha.XmlNs.html.uri) 0
-      else xmlNs
-    client.call("SetAttr", id.mkString, pXmlns, n, value, p).runIgnoreResult()
+    if (isStyle(name)) {
+      val n = escapeName(name, truncate = true)
+      client.call("SetStyle", id.mkString, n, value).runIgnoreResult()
+    } else {
+      val p = isProperty(name)
+      val n = escapeName(name, p)
+      val pXmlns =
+        if (xmlNs eq levsha.XmlNs.html.uri) 0
+        else xmlNs
+      client.call("SetAttr", id.mkString, pXmlns, n, value, p).runIgnoreResult()
+    }
   }
 
   def removeAttr(id: Id, xmlNs: String, name: String): Unit = {
-    val p = isProp(name)
-    val n = escapeName(name, p)
-    val pXmlns =
-      if (xmlNs eq levsha.XmlNs.html.uri) 0
-      else xmlNs
-    client.call("RemoveAttr", id.mkString, pXmlns, n, p).runIgnoreResult()
+    if (isStyle(name)) {
+      val n = escapeName(name, truncate = true)
+      client.call("RemoveStyle", id.mkString, n).runIgnoreResult()
+    } else {
+      val p = isProperty(name)
+      val n = escapeName(name, p)
+      val pXmlns =
+        if (xmlNs eq levsha.XmlNs.html.uri) 0
+        else xmlNs
+      client.call("RemoveAttr", id.mkString, pXmlns, n, p).runIgnoreResult()
+    }
   }
 }

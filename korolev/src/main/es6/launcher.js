@@ -22,6 +22,8 @@ window['Korolev'] = {
   'ExtractProperty': korolev.ExtractProperty.bind(korolev),
   'SetAttr': korolev.SetAttr.bind(korolev),
   'RemoveAttr': korolev.RemoveAttr.bind(korolev),
+  'SetStyle': korolev.SetStyle.bind(korolev),
+  'RemoveStyle': korolev.RemoveStyle.bind(korolev),
   'Focus': korolev.Focus.bind(korolev),
   'RegisterHistoryHandler': korolev.RegisterHistoryHandler.bind(korolev),
   'UnregisterHistoryHandler': korolev.UnregisterHistoryHandler.bind(korolev),

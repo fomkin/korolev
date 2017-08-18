@@ -21,7 +21,7 @@ object SimpleExample extends KorolevBlazeServer {
       case state =>
         'body(
           'div("Super TODO tracker"),
-          'div('style /= "height: 250px; overflow-y: scroll",
+          'div('height @= 250, 'overflowY @= "scroll",
             (state.todos zipWithIndex) map {
               case (todo, i) =>
                 'div(
@@ -39,14 +39,15 @@ object SimpleExample extends KorolevBlazeServer {
                   ),
                   if (state.edit.contains(i)) {
                     'form(
-                      'style /= "display: inline-block; margin-bottom: -10px",
+                      'marginBottom @= -10,
+                      'display @= "inlineBlock",
                       'input(
                         editInputId,
-                        'style /= "display: inline-block",
+                        'display @= "inline-block",
                         'type /= "text",
                         'value := todo.text
                       ),
-                      'button('style /= "display: inline-block", "Save"),
+                      'button('display @= "inline-block", "Save"),
                       eventWithAccess('submit) { access =>
                         deferredTransition {
                           access.property[String](editInputId, 'value) map { value =>
@@ -61,7 +62,7 @@ object SimpleExample extends KorolevBlazeServer {
                     )
                   } else {
                     'span(
-                      if (todo.done) 'style /= "text-decoration: line-through" else void,
+                      if (todo.done) 'textDecoration @= "line-through" else void,
                       todo.text,
                       event('dblclick) {
                         immediateTransition {

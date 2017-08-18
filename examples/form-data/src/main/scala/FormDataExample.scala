@@ -108,7 +108,7 @@ object FormDataExample extends KorolevBlazeServer(BlazeServerConfig(maxRequestBo
                 'div (
                   'class /= "progress-bar progress-bar-striped progress-bar-animated",
                   'role /= "progress-bar",
-                  'style /= s"width: ${(loaded.toDouble / total) * 100}%"
+                  'width @= s"${(loaded.toDouble / total) * 100}%"
                 )
               )
             )
@@ -117,10 +117,9 @@ object FormDataExample extends KorolevBlazeServer(BlazeServerConfig(maxRequestBo
       case Complete(picture, mimeType, width, height) =>
         'body (
           'div (
-            'style /=
-            s"""background-image: url("data:$mimeType;base64,$picture");""" +
-            s"width: ${width}px;" +
-            s"height: ${height}px"
+            'backgroundImage @= s"url('data:$mimeType;base64,$picture')",
+            'width @= width,
+            'height @= height
           )
         )
     },

@@ -86,7 +86,7 @@ object GuineaPigService {
                     s.copy(selectedTab = name)
                   }
                 },
-                'style /= "margin-left: 10px",
+                'marginLeft @= 10,
                 if (name == state.selectedTab) 'strong(name)
                 else name
               )

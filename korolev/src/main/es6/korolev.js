@@ -191,6 +191,25 @@ export class Korolev {
 
    /**
     * @param {string} id
+    * @param {string} name
+    * @param {string} value
+    */
+  SetStyle(id, name, value) {
+    var element = this.els[id];
+    element.style[name] = value;
+  }
+
+   /**
+    * @param {string} id
+    * @param {string} name
+    */
+  RemoveStyle(id, name) {
+    var element = this.els[id];
+    element.style[name] = null;
+  }
+
+   /**
+    * @param {string} id
     */
   Focus(id) {
     var element = this.els[id];
