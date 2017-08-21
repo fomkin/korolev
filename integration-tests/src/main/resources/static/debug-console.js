@@ -7,7 +7,7 @@ window.document.addEventListener("DOMContentLoaded", function() {
   console.log = function() {
     var line = document.createElement("div");
     for (var i = 0; i < arguments.length; i++) {
-      if (arguments[i].indexOf("ListenEvent") > -1) {
+      if (arguments[i].indexOf("[0,0 ]") > -1) {
         document.getElementById('debug-log-label').textContent = 'Client log (connected)';
       }
       line.textContent += arguments[i];

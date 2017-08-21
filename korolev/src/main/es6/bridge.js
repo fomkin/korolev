@@ -1,256 +1,58 @@
-const LinkPrefix = '@link:';
-const ArrayPrefix = '@arr:';
-const ObjPrefix = '@obj:';
-const UnitResult = "@unit";
-const NullResult = "@null";
-const HookSuccess = "@hook_success";
-const HookFailure = "@hook_failure";
-const LinkNotFound = "Link no found";
+import { Korolev, CallbackType } from './korolev.js';
+import { Connection } from './connection.js';
+
 const ProtocolDebugEnabledKey = "$bridge.protocolDebugEnabled";
 
 var protocolDebugEnabled = window.localStorage.getItem(ProtocolDebugEnabledKey) === 'true';
 
 export class Bridge {
 
-  /** @param {function(*)} postMessageFunction */
-  constructor(postMessageFunction) {
+  /**
+   * @param {Connection} connection
+   */
+  constructor(config, connection) {
+    this._korolev = new Korolev(config, this._onCallback.bind(this));
+    this._korolev.registerRoot(document.body);
+    this._connection = connection
+    this._messageHandler = this._onMessage.bind(this)
 
-    this.postMessageFunction = postMessageFunction;
-    this.links = { 'global': window };
-    this.initializationCallbacks = [];
-    this.initialized = false;
-
-    window._bridgeLink = 'global';
+    connection.dispatcher.addEventListener("message", this._messageHandler);
   }
 
-  //---------------------------------------------------------------------------
-  //
-  //  Private methods
-  //
-  //---------------------------------------------------------------------------
-
-  /** @private */
-  _postMessage(data) {
-    var res = data[2], value;
+  /**
+   * @param {CallbackType} type
+   * @param {string} args
+   */
+  _onCallback(type, args) {
+    let message = JSON.stringify([type, args])
     if (protocolDebugEnabled)
-      console.log('<-', data);
-    this.postMessageFunction(data);
+      console.log('<-', message);
+    this._connection.send(message);
   }
 
-
-  /** @private */
-  _getLink(id) {
-    return this.links[id];
-  }
-
-  /** @private */
-  _unpackArgs(args) {
-    var l = args.length,
-        i = 0,
-        arg = null,
-        id = null,
-        tpe = null;
-    for (i = 0; i < l; i += 1) {
-      arg = args[i];
-      tpe = typeof arg;
-      if (tpe === 'string' && arg.indexOf(LinkPrefix) === 0) {
-        id = arg.substring(LinkPrefix.length);
-        args[i] = this._getLink(id);
-      }
-      else if (tpe === 'object' && arg instanceof Array) {
-        this._unpackArgs(arg)
-      }
-    }
-    return args;
-  }
-
-  /** @private */
-  _packResult(arg) {
-    if (arg === undefined) {
-      return UnitResult;
-    }
-    if (arg === null) {
-      return NullResult;
-    }
-    if (typeof arg === 'object') {
-      var id = arg._bridgeLink;
-      if (arg instanceof Array) {
-        return ArrayPrefix + id;
-      }
-      return ObjPrefix + id;
-    }
-    return arg;
-  }
-
-  /** @private */
-  _createHook(reqId, success, cb) {
-    let self = this;
-    return function hook(res) {
-      cb([reqId, success, self._packResult(res)]);
-    };
-  }
-
-  /** @private */
-  _receiveCall(reqId, args, cb) {
-    let self = this;
-    var obj = args[0],
-        res = null,
-        err = null,
-        name = null,
-        callArgs = null,
-        hasHooks = false,
-        arg = null,
-        i = 0;
-    if (!obj) {
-      cb([reqId, false, LinkNotFound]);
-      return;
-    }
-    name = args[1];
-    callArgs = args.slice(2);
-    for (i = 0; i < callArgs.length; i++) {
-      arg = callArgs[i];
-      if (arg === HookSuccess) {
-        callArgs[i] = self._createHook(reqId, true, cb);
-        hasHooks = true;
-      } else if (arg === HookFailure) {
-        callArgs[i] = self._createHook(reqId, false, cb);
-        hasHooks = true;
-      }
-    }
-    try {
-      if (hasHooks) {
-        obj[name].apply(obj, callArgs);
-      } else {
-        res = self._packResult(obj[name].apply(obj, callArgs));
-        if (res === undefined) {
-          res = UnitResult;
-        }
-        cb([reqId, true, res]);
-      }
-    } catch (exception) {
-      err = obj._bridgeLink + '.' + name + '(' + callArgs + ') call failure: ' + exception;
-      console.error(err);
-      cb([reqId, false, err]);
+  _onMessage(event) {
+    if (protocolDebugEnabled)
+      console.log('->', event.data);
+    let commands = /** @type {Array} */ (JSON.parse(event.data));
+    let pCode = commands.shift();
+    let k = this._korolev;
+    switch (pCode) {
+      case 0: k.setRenderNum.apply(k, commands); break;
+      case 1: k.cleanRoot.apply(k, commands); break;
+      case 2: k.listenEvent.apply(k, commands); break;
+      case 3: k.extractProperty.apply(k, commands); break;
+      case 4: k.modifyDom(commands); break;
+      case 5: k.focus.apply(k, commands); break;
+      case 6: k.changePageUrl.apply(k, commands); break;
+      case 7: k.uploadForm.apply(k, commands); break;
+      case 8: k.reloadCss.apply(k, commands); break;
+      default: console.error(`Procedure ${pCode} is undefined`);
     }
   }
 
-  /** @private */
-  _receiveGet(reqId, args, cb) {
-    var obj = args[0],
-        res = null,
-        err = null;
-    if (obj) {
-      res = obj[args[1]];
-      if (res === undefined) {
-        err = obj + "." + args[1] + " is undefined";
-        cb([reqId, false, err]);
-      } else {
-        cb([reqId, true, this._packResult(res)]);
-      }
-    } else {
-      cb([reqId, false, LinkNotFound]);
-    }
-  }
-
-  /** @private */
-  _receiveGetAndSaveAs(reqId, args) {
-    let subject = args[0];
-    if (!subject) {
-      this._postMessage([reqId, false, LinkNotFound]);
-      return;
-    }
-    let property = args[1];
-    let newId = args[2];
-    let object = subject[property];
-    if (!object) {
-      this._postMessage([reqId, false, `Property ${property} not found`]);
-    }
-    else if (typeof object !== "object") {
-      this._postMessage([reqId, false, `${property} is ${typeof object}`]);
-    }
-    else {
-      object._bridgeLink = newId;
-      this.links[newId] = object;
-      this._postMessage([reqId, true, this._packResult(object)]);
-    }
-  }
-
-  /** @private */
-  _notifyInitialized() {
-    for (var i = 0; i < this.initializationCallbacks.length; i++)
-      this.initializationCallbacks[i](self);
-    this.initializationCallbacks = null;
-  }
-
-  //---------------------------------------------------------------------------
-  //
-  //  Public methods
-  //
-  //---------------------------------------------------------------------------
-
-  /** @param {*} data */
-  receive(data) {
-    let self = this;
-
-    if (protocolDebugEnabled) console.log('->', data);
-
-    // requests batch processing)
-    if (data[0] === "batch") {
-      var requests = data.slice(1);
-      requests.forEach(function (request) {
-        self.receive(request);
-      });
-      return;
-    }
-
-    var reqId = data[0],
-        method = data[1],
-        rawArgs = data.slice(2),
-        args = self._unpackArgs(rawArgs.concat());
-
-    switch (method) {
-
-      // Misc
-      case 'init':
-        self.initialized = true;
-        self._notifyInitialized();
-        self._postMessage([reqId, true, UnitResult]);
-        break;
-
-      case 'registerCallback':
-        (function BridgeRegisterCallback() {
-          var callbackId = args[0];
-          function callback(arg) {
-            self._postMessage([-1, callbackId, self._packResult(arg)]);
-          }
-          self.links[callbackId] = callback;
-          callback._bridgeLink = callbackId;
-          self._postMessage([reqId, true, ObjPrefix + callbackId]);
-        })();
-        break;
-
-      // Object methods
-      case 'getAndSaveAs':
-        this._receiveGetAndSaveAs(reqId, args);
-        break;
-
-      case 'get':
-        self._receiveGet(reqId, args, (data) => self._postMessage(data));
-        break;
-
-      case 'call':
-        self._receiveCall(reqId, args, (data) => self._postMessage(data));
-        break;
-    }
-  }
-
-  /** param {function(?Bridge, ?Error)} cb */
-  onInitialize(cb) {
-    if (this.initialized) {
-      cb(self);
-      return;
-    }
-    this.initializationCallbacks.push(cb);
+  destroy() {
+    this._connection.dispatcher.removeEventListener("message", this._messageHandler);
+    this._korolev.destroy();
   }
 }
 

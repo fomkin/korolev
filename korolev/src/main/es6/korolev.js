@@ -1,36 +1,82 @@
 import { getCookie } from './utils.js';
 
+/** @enum {number} */
+export const CallbackType = {
+  DOM_EVENT: 0, // `$renderNum:$elementId:$eventType`
+  FORM_DATA_PROGRESS: 1, // `$descriptor:$loaded:$total`
+  EXTRACT_PROPERTY_RESPONSE: 2, // `$descriptor:$value`
+  HISTORY: 3  // URL
+}
+
+export const PropertyType = {
+  STRING: 0,
+  NUMBER: 1,
+  BOOLEAN: 2,
+  OBJECT: 3,
+  ERROR: 4
+}
+
 export class Korolev {
 
-  /** @param {Object} config */
-  constructor(config) {
+  /**
+   * @param {Object} config
+   * @param {function(CallbackType, string)} callback
+   */
+  constructor(config, callback) {
     /** @type {Object} */
     this.config = config;
     /** @type {HTMLElement} */
     this.root = document.body;
     /** @type {Object} */
     this.els = {};
-    /** @type {?function(string)} */
-    this.formDataProgressHandler = null;
     /** @type {number} */
     this.renderNum = 0;
     /** @type {Array} */
     this.rootListeners = [];
-    /** @type {?function(string, boolean)} */
-    this.listenFun = null;
     /** @type {?function(Event)} */
     this.historyHandler = null;
     /** @type {string} */
     this.initialPath = window.location.pathname;
-  }
+    /** @type {function(CallbackType, string)} */
+    this.callback = callback;
 
+    this.listenRoot = (name, preventDefault) => {
+      var listener = (event) => {
+        if (event.target.vId) {
+          if (preventDefault) {
+            event.preventDefault();
+          }
+          this.callback(CallbackType.DOM_EVENT, this.renderNum + ':' + event.target.vId + ':' + event.type);
+        }
+      };
+      this.root.addEventListener(name, listener);
+      this.rootListeners.push({ 'listener': listener, 'type': name });
+    };
+
+    this.listenRoot('submit', true);
+
+    this.historyHandler = (/** @type {Event} */ event) => {
+      if (event.state === null) callback(CallbackType.HISTORY, this.initialPath);
+      else callback(CallbackType.HISTORY, event.state);
+    }
+
+    window.addEventListener('popstate', this.historyHandler);
+  }
+  
+  destroy() {
+    // Remove root listeners
+    this.rootListeners.forEach((o) => this.root.removeEventListener(o.type, o.listener));
+    // Remove popstate handler
+    window.removeEventListener('popstate', this.historyHandler);
+  }
+  
   /** @param {number} n */
-  SetRenderNum(n) {
+  setRenderNum(n) {
     this.renderNum = n;
   }
 
   /** @param {HTMLElement} rootNode */
-  RegisterRoot(rootNode) {
+  registerRoot(rootNode) {
     let self = this;
     function aux(prefix, node) {
       var children = node.childNodes;
@@ -42,62 +88,51 @@ export class Korolev {
         aux(id, child);
       }
     }
-    this.root = rootNode;
-    this.els["1"] = rootNode;
+    self.root = rootNode;
+    self.els["1"] = rootNode;
     aux("1", rootNode);
   }
 
-  CleanRoot() {
+  cleanRoot() {
     while (this.root.children.length > 0)
       this.root.removeChild(this.root.children[0]);
-  }
-
-  /** @param {function(string)} f */
-  RegisterFormDataProgressHandler(f) {
-    this.formDataProgressHandler = f;
-  }
-
-  /** @param {function(string)} eventHandler */
-  RegisterGlobalEventHandler(eventHandler) {
-    let self = this;
-    self.listenFun = function(name, preventDefault) {
-      var listener = function(event) {
-        if (event.target.vId) {
-          if (preventDefault) {
-            event.preventDefault();
-          }
-          eventHandler(self.renderNum + ':' + event.target.vId + ':' + event.type);
-        }
-      };
-      self.root.addEventListener(name, listener);
-      self.rootListeners.push({ 'listener': listener, 'type': name });
-    };
-    self.listenFun('submit', true);
-  }
-
-  UnregisterGlobalEventHandler() {
-    let self = this;
-    self.rootListeners.forEach(function(item) {
-      self.root.removeEventListener(item.type, item.listener);
-    });
-    self.listenFun = null;
-    self.rootListeners.length = 0;
   }
 
    /**
     * @param {string} type
     * @param {boolean} preventDefault
     */
-  ListenEvent(type, preventDefault) {
-    this.listenFun(type, preventDefault);
+  listenEvent(type, preventDefault) {
+    this.listenRoot(type, preventDefault);
   }
 
+  /**
+   * @param {Array} data
+   */
+  modifyDom(data) {
+    // Reverse data to use pop() instead of shift()
+    // pop() faster than shift()
+    let atad = data.reverse();
+    let r = atad.pop.bind(atad);
+    while (data.length > 0) {
+      switch (r()) {
+        case 0: this.create(r(), r(), r(), r()); break;
+        case 1: this.createText(r(), r(), r()); break;
+        case 2: this.remove(r(), r()); break;
+        case 3: this.setAttr(r(), r(), r(), r(), r()); break;
+        case 4: this.removeAttr(r(), r(), r(), r()); break;
+        case 5: this.setStyle(r(), r(), r()); break;
+        case 6: this.removeStyle(r(), r()); break;
+      }
+    }
+  }
+  
    /**
     * @param {string} id
     * @param {string} childId
     * @param {string} tag
     */
-  Create(id, childId, xmlNs, tag) {
+  create(id, childId, xmlNs, tag) {
     var parent = this.els[id],
       child = this.els[childId],
       newElement;
@@ -121,7 +156,7 @@ export class Korolev {
     * @param {string} childId
     * @param {string} text
     */
-  CreateText(id, childId, text) {
+  createText(id, childId, text) {
     var parent = this.els[id],
       child = this.els[childId],
       newElement;
@@ -140,7 +175,7 @@ export class Korolev {
     * @param {string} id
     * @param {string} childId
     */
-  Remove(id, childId) {
+  remove(id, childId) {
     var parent = this.els[id],
       child = this.els[childId];
     if (!parent) return;
@@ -150,12 +185,44 @@ export class Korolev {
   }
 
    /**
+    * @param {string} descriptor
     * @param {string} id
     * @param {string} propertyName
     */
-  ExtractProperty(id, propertyName) {
-    var element = this.els[id];
-    return element[propertyName];
+  extractProperty(descriptor, id, propertyName) {
+    let element = this.els[id];
+    let value = element[propertyName];
+    var result, type;
+    switch (typeof value) {
+      case 'undefined':
+        type = PropertyType.ERROR;
+        result = `${propertyName} is undefined`;
+        break;
+      case 'function':
+        type = PropertyType.ERROR;
+        result = `${propertyName} is a function`;
+        break;
+      case 'object':
+        type = PropertyType.OBJECT;
+        result = JSON.stringify(value);
+        break;
+      case 'string':
+        type = PropertyType.STRING;
+        result = value;
+        break;
+      case 'number':
+        type = PropertyType.NUMBER;
+        result = value;
+        break;
+      case 'boolean':
+        type = PropertyType.BOOLEAN;
+        result = value;
+        break;
+    }
+    this.callback(
+      CallbackType.EXTRACT_PROPERTY_RESPONSE,
+      `${descriptor}:${type}:${result}`
+    );
   }
 
    /**
@@ -164,7 +231,7 @@ export class Korolev {
     * @param {string} value
     * @param {boolean} isProperty
     */
-  SetAttr(id, xmlNs, name, value, isProperty) {
+  setAttr(id, xmlNs, name, value, isProperty) {
     var element = this.els[id];
     if (isProperty) element[name] = value;
     else if (xmlNs === 0) {
@@ -179,7 +246,7 @@ export class Korolev {
     * @param {string} name
     * @param {boolean} isProperty
     */
-  RemoveAttr(id, xmlNs, name, isProperty) {
+  removeAttr(id, xmlNs, name, isProperty) {
     var element = this.els[id];
     if (isProperty) element[name] = undefined;
     else if (xmlNs === 0) {
@@ -194,7 +261,7 @@ export class Korolev {
     * @param {string} name
     * @param {string} value
     */
-  SetStyle(id, name, value) {
+  setStyle(id, name, value) {
     var element = this.els[id];
     element.style[name] = value;
   }
@@ -203,7 +270,7 @@ export class Korolev {
     * @param {string} id
     * @param {string} name
     */
-  RemoveStyle(id, name) {
+  removeStyle(id, name) {
     var element = this.els[id];
     element.style[name] = null;
   }
@@ -211,34 +278,15 @@ export class Korolev {
    /**
     * @param {string} id
     */
-  Focus(id) {
+  focus(id) {
     var element = this.els[id];
     element.focus();
   }
 
    /**
-    * @param {function(string)} handler
-    */
-  RegisterHistoryHandler(handler) {
-    let self = this;
-    self.historyHandler = function(/** @type {Event} */ event) {
-      if (event.state === null) handler(self.initialPath);
-      else handler(event.state);
-    }
-    window.addEventListener('popstate', self.historyHandler);
-  }
-
-  UnregisterHistoryHandler() {
-    if (this.historyHandler !== null) {
-      window.removeEventListener('popstate', this.historyHandler);
-      this.historyHandler = null;
-    }
-  }
-
-   /**
     * @param {string} path
     */
-  ChangePageUrl(path) {
+  changePageUrl(path) {
     if (path !== window.location.pathname)
       window.history.pushState(path, '', path);
   }
@@ -247,7 +295,7 @@ export class Korolev {
     * @param {string} id
     * @param {string} descriptor
     */
-  UploadForm(id, descriptor) {
+  uploadForm(id, descriptor) {
     let self = this;
     var form = self.els[id];
     var formData = new FormData(form);
@@ -262,12 +310,12 @@ export class Korolev {
     request.open("POST", uri, true);
     request.upload.onprogress = function(event) {
       var arg = [descriptor, event.loaded, event.total].join(':');
-      self.formDataProgressHandler(arg);
+      self.callback(CallbackType.FORM_DATA_PROGRESS, arg);
     };
     request.send(formData);
   }
 
-  ReloadCss() {
+  reloadCss() {
     var links = document.getElementsByTagName("link");
     for (var i = 0; i < links.length; i++) {
       var link = links[i];

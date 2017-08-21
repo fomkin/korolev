@@ -56,25 +56,29 @@ final class ComponentInstance[F[+ _]: Async, AS, M, CS, P, E](nodeId: Id,
         .get(elementId)
         .fold(noElementException[Id])(id => async.pure(id))
 
-    def property[T](elementId: ElementId[F, CS, E]): PropertyHandler[F, T] = {
+    def property(elementId: ElementId[F, CS, E]): PropertyHandler[F] = {
       val idF = getId(elementId)
-      new PropertyHandler[F, T] {
-        def get(propName: Symbol): F[T] = idF flatMap { id =>
+      new PropertyHandler[F] {
+        def get(propName: Symbol): F[String] = idF flatMap { id =>
           frontend.extractProperty(id, propName.name)
         }
 
-        def set(propName: Symbol, value: T): F[Unit] = idF flatMap { id =>
+        def set(propName: Symbol, value: Any): F[Unit] = idF flatMap { id =>
           // XmlNs argument is empty cause it will be ignored
-          frontend.setAttr(id, "", propName.name, value, isProperty = true)
+          frontend.setProperty(id, propName, value)
+          async.unit
         }
       }
     }
 
-    def property[T](element: ElementId[F, CS, E], propName: Symbol): F[T] =
-      property[T](element).get(propName)
+    def property(element: ElementId[F, CS, E], propName: Symbol): F[String] =
+      property(element).get(propName)
 
     def focus(element: ElementId[F, CS, E]): F[Unit] =
-      getId(element).flatMap(id => frontend.focus(id))
+      getId(element).flatMap { id =>
+        frontend.focus(id)
+        async.unit
+      }
 
     def publish(message: E): F[Unit] = {
       eventSubscription.foreach(f => f(message))
@@ -86,9 +90,9 @@ final class ComponentInstance[F[+ _]: Async, AS, M, CS, P, E](nodeId: Id,
 
       def start(): F[FormData] = getId(element) flatMap { id =>
         val promise = async.promise[FormData]
-        val future = frontend.uploadForm(id, descriptor)
+        frontend.uploadForm(id, descriptor)
         formDataPromises.put(descriptor, promise)
-        future.flatMap(_ => promise.future)
+        promise.future
       }
 
       def onProgress(f: (Int, Int) => Transition[CS]): this.type = {

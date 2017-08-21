@@ -2,7 +2,6 @@ package korolev.internal
 
 import java.util.concurrent.atomic.AtomicInteger
 
-import bridge.JSAccess
 import korolev.ApplicationContext._
 import korolev.Async.AsyncOps
 import korolev.{Async, Component, Router, StateReader}
@@ -15,7 +14,7 @@ import scala.util.{Failure, Success}
 
 final class ApplicationInstance[F[+ _]: Async, S, M](
     identifier: String,
-    jsAccess: JSAccess[F],
+    connection: Connection[F],
     stateReader: StateReader,
     render: PartialFunction[S, Document.Node[Effect[F, S, M]]],
     router: Router[F, S, S],
@@ -25,7 +24,7 @@ final class ApplicationInstance[F[+ _]: Async, S, M](
   private val devMode = new DevMode.ForRenderContext(identifier, fromScratch)
   private val currentRenderNum = new AtomicInteger(0)
   private val renderContext = DiffRenderContext[Effect[F, S, M]](savedBuffer = devMode.loadRenderContext())
-  private val frontend = new ClientSideApi[F](jsAccess)
+  private val frontend = new ClientSideApi[F](connection)
 
   val topLevelComponentInstance = {
     val renderer = render.lift
@@ -46,41 +45,11 @@ final class ApplicationInstance[F[+ _]: Async, S, M](
     new ComponentInstance[F, S, M, S, Any, M](Id.TopLevel, frontend, eventRegistry, component)
   }
 
-  private val initialization = frontend.initialize(
-    onHistory = { pathString =>
-      val path = Router.Path.fromString(pathString)
-      val maybeState = router.toState.lift((topLevelComponentInstance.getState, path))
-      maybeState foreach { asyncState =>
-        asyncState run {
-          case Success(newState) =>
-            topLevelComponentInstance.setState(newState)
-          case Failure(e) =>
-            logger.error("Error occurred when updating state", e)
-        }
-      }
-    },
-    onEvent = { targetAndType =>
-      val Array(renderNum, target, tpe) = targetAndType.split(':')
-      if (currentRenderNum.get == renderNum.toInt) {
-        calculateEventPropagation(Id(target), tpe) forall { eventId =>
-          topLevelComponentInstance.applyEvent(eventId)
-        }
-        ()
-      }
-    },
-    onFormDataProgress = { descriptorLoadedTotal =>
-      val Array(descriptor, loaded, total) = descriptorLoadedTotal.split(':')
-      topLevelComponentInstance.handleFormDataProgress(descriptor, loaded.toInt, total.toInt)
-    },
-    doCleanRoot = fromScratch,
-    doReloadCss = devMode.isActive
-  )
-
   private def onState(giveStateReader: Boolean) = renderContext.synchronized {
     // Set page url if router exists
     router.fromState
       .lift(topLevelComponentInstance.getState)
-      .foreach(path => frontend.changePageUrl(path).runIgnoreResult)
+      .foreach(path => frontend.changePageUrl(path))
 
     // Prepare render context
     renderContext.swap()
@@ -96,41 +65,81 @@ final class ApplicationInstance[F[+ _]: Async, S, M](
     )
 
     // Infer changes
+    frontend.startDomChanges()
     renderContext.diff(frontend)
-    if (devMode.isActive) devMode.saveRenderContext(renderContext)
+    frontend.flushDomChanges()
+
+    if (devMode.isActive)
+      devMode.saveRenderContext(renderContext)
 
     // Make korolev ready to next render
     topLevelComponentInstance.dropObsoleteMisc()
-    frontend.setRenderNum(currentRenderNum.incrementAndGet(), doFlush = false).runIgnoreResult
-
-    // Flush all commands as one packet
-    jsAccess.flush()
+    frontend.setRenderNum(currentRenderNum.incrementAndGet())
   }
 
-  initialization run {
-    case Success(_) =>
-      // Perform initial rendering
-      if (fromScratch) {
-        renderContext.openNode(levsha.XmlNs.html, "body")
-        renderContext.closeNode("body")
-        renderContext.diff(DiffRenderContext.DummyChangesPerformer)
-      } else {
-        if (devMode.hasSavedRenderContext) {
-          renderContext.swap()
-          topLevelComponentInstance.applyRenderContext((), renderContext, Some(stateReader))
-          renderContext.diff(frontend)
-          devMode.saveRenderContext(renderContext)
-        } else {
-          topLevelComponentInstance.applyRenderContext((), renderContext, Some(stateReader))
-          renderContext.diff(DiffRenderContext.DummyChangesPerformer)
-          if (devMode.isActive) devMode.saveRenderContext(renderContext)
+  frontend.setHandlers(
+    onHistory = { path =>
+      val maybeState = router.toState.lift((topLevelComponentInstance.getState, path))
+      maybeState foreach { asyncState =>
+        asyncState run {
+          case Success(newState) =>
+            topLevelComponentInstance.setState(newState)
+          case Failure(e) =>
+            logger.error("Error occurred when updating state", e)
         }
       }
+    },
+    onEvent = { (renderNum, target, tpe) =>
+      if (currentRenderNum.get == renderNum) {
+        calculateEventPropagation(target, tpe) forall { eventId =>
+          topLevelComponentInstance.applyEvent(eventId)
+        }
+        ()
+      }
+    },
+    onFormDataProgress = topLevelComponentInstance.handleFormDataProgress
+  )
 
-      topLevelComponentInstance.subscribeStateChange((_, _) => onState(giveStateReader = false))
-      if (fromScratch) onState(giveStateReader = true)
-      else jsAccess.flush()
-    case Failure(e) =>
-      logger.error("Error occurred on event callback registration", e)
+  frontend.setRenderNum(0)
+  
+  // Content should be created from scratch
+  // Remove all element from document.body
+  if (fromScratch)
+    frontend.cleanRoot()
+
+  // If dev mode is enabled and active
+  // CSS should be reloaded
+  if (devMode.isActive)
+    frontend.reloadCss()
+
+  // Perform initial rendering
+  if (fromScratch) {
+    renderContext.openNode(levsha.XmlNs.html, "body")
+    renderContext.closeNode("body")
+    renderContext.diff(DiffRenderContext.DummyChangesPerformer)
+  } else {
+
+    if (devMode.hasSavedRenderContext) {
+      renderContext.swap()
+      topLevelComponentInstance.applyRenderContext((), renderContext, Some(stateReader))
+      frontend.startDomChanges()
+      renderContext.diff(frontend)
+      frontend.flushDomChanges()
+      devMode.saveRenderContext(renderContext)
+    } else {
+
+      topLevelComponentInstance.applyRenderContext((), renderContext, Some(stateReader))
+      renderContext.diff(DiffRenderContext.DummyChangesPerformer)
+
+      if (devMode.isActive)
+        devMode.saveRenderContext(renderContext)
+    }
   }
+
+  topLevelComponentInstance.subscribeStateChange { (_, _) =>
+    onState(giveStateReader = false)
+  }
+
+  if (fromScratch)
+    onState(giveStateReader = true)
 }

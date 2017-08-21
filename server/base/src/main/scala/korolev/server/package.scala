@@ -2,11 +2,10 @@ package korolev
 
 import java.io.{ByteArrayOutputStream, InputStream}
 import java.nio.charset.StandardCharsets
-import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 
 import korolev.Async._
-import korolev.internal.ApplicationInstance
+import korolev.internal.{ApplicationInstance, Connection}
 import levsha.Id
 import slogging.LazyLogging
 
@@ -132,18 +131,7 @@ package object server extends LazyLogging {
 
     def createSession(deviceId: String, sessionId: String): F[KorolevSession[F]] = {
 
-      val sendingQueue = new ConcurrentLinkedQueue[String]()
-      val subscriber = new AtomicReference(Option.empty[String => Unit])
-      val jsAccess = {
-        val addToQueue: String => Unit = { message =>
-          sendingQueue.add(message)
-          ()
-        }
-        JsonQueuedJsAccess { message =>
-          val fOpt = subscriber.getAndSet(None)
-          fOpt.fold(addToQueue)(identity)(message)
-        }
-      }
+      val connection = new Connection[F]()
 
       // Session storage access
       config.stateStorage.readAll(deviceId, sessionId) flatMap {
@@ -157,7 +145,7 @@ package object server extends LazyLogging {
         // Create Korolev with dynamic router
         val router = config.serverRouter.dynamic(deviceId, sessionId)
         val sessionKey = makeSessionKey(deviceId, sessionId)
-        val korolev = new ApplicationInstance(sessionKey, jsAccess, stateReader, config.render, router, fromScratch = isNew)
+        val korolev = new ApplicationInstance(sessionKey, connection, stateReader, config.render, router, fromScratch = isNew)
         val applyTransition = korolev.topLevelComponentInstance.applyTransition _ andThen Async[F].pureStrict _
         val env = config.envConfigurator(deviceId, sessionId, applyTransition)
         // Subscribe to events to publish them to env
@@ -178,20 +166,12 @@ package object server extends LazyLogging {
           sessions.put(sessionKey, this)
 
           def publish(message: String): F[Unit] = {
-            Async[F].pure(jsAccess.receive(message))
+            connection.receive(message)
+            Async[F].unit
           }
 
-          def nextMessage: F[String] = {
-            if (sendingQueue.isEmpty) {
-              val promise = Async[F].promise[String]
-              currentPromise.set(Some(promise))
-              subscriber.set(Some(m => promise.complete(Success(m))))
-              promise.future
-            } else {
-              val message = sendingQueue.poll()
-              Async[F].pure(message)
-            }
-          }
+          def nextMessage: F[String] =
+            connection.sent
 
           def resolveFormData(descriptor: String, formData: Try[FormData]): Unit = {
             korolev.topLevelComponentInstance.resolveFormData(descriptor, formData)

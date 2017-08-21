@@ -212,8 +212,8 @@ val renderAnonymous: Render = {
         eventWithAccess('submit) { access =>
           deferredTransition {
             for {
-              login <- access.property[String](loginField, 'value)
-              password <- access.property[String](passwordField, 'value)
+              login <- access.property(loginField, 'value)
+              password <- access.property(passwordField, 'value)
               user <- authService.authorize(login, password)
             } yield {
               transition {
@@ -320,7 +320,7 @@ https://github.com/fomkin/korolev/blob/v0.5.2/examples/component/src/main/scala/
 Access element properties
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-In the scope of an event, you can access the element properties if an element was bound with `elementId`. You can get the value (limited by simple types like `String` and `Double`).
+In the scope of an event, you can access the element properties if an element was bound with `elementId`. You get the value as a string. If the value is an object (on client side) you will get JSON-string. You can parse it with any JSON-library you want.
 
 [source,scala]
 -----------------------------------
@@ -330,7 +330,7 @@ val loginField = elementId
 
 eventWithAccess('submit) { access =>
   deferredTransition {
-    access.property[String](loginField, 'value) map {
+    access.property(loginField, 'value) map {
       transition { ... }
     }
 }
@@ -340,7 +340,7 @@ Or you can set the value
 
 [source,scala]
 -----------------------------------
-access.property[String](loginField).set('value, "John Doe") map {
+access.property(loginField).set('value, "John Doe") map {
   transition { ... }
 }
 -----------------------------------

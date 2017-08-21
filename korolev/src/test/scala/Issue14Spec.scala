@@ -1,10 +1,7 @@
-import bridge.JSAccess
 import korolev._
 import org.scalatest.{FlatSpec, Matchers}
-import korolev.Async.Promise
-import korolev.internal.ApplicationInstance
+import korolev.internal.{ApplicationInstance, Connection}
 
-import scala.collection.mutable
 import scala.concurrent.Future
 import korolev.testExecution._
 
@@ -16,16 +13,11 @@ class Issue14Spec extends FlatSpec with Matchers {
 
     var counter = 0
 
-    val jSAccess = new JSAccess {
-      def send(args: Seq[Any]): Unit = {}
-      protected val promises = mutable.Map.empty[Int, Promise[Future, Any]]
-      protected val callbacks = mutable.Map.empty[String, (Any) => Unit]
-      implicit val executionContext = korolev.testExecution.defaultExecutor
-    }
+    val connection = new Connection[Future]()
 
     new ApplicationInstance(
       identifier = "",
-      jsAccess = jSAccess,
+      connection = connection,
       fromScratch = true,
       router = Router.empty[Future, String, String],
       render = {
@@ -47,15 +39,12 @@ class Issue14Spec extends FlatSpec with Matchers {
       stateReader = StateReader.withTopLevelState("firstState")
     )
 
-    jSAccess.resolvePromise(0, isSuccess = true, "@obj:@Korolev")
-    jSAccess.resolvePromise(1, isSuccess = true, "@obj:^cb0") // pop state handler
-    jSAccess.resolvePromise(2, isSuccess = true, "@obj:^cb1") // event handler
-    jSAccess.resolvePromise(3, isSuccess = true, "@obj:^cb2") // FormData progress handler
-    for (i <- 4 to 15) jSAccess.resolvePromise(i, isSuccess = true, "@unit")
+    def fireEvent(data: String) =
+      connection.receive(s"""[0,"$data"]""")
 
-    jSAccess.fireCallback("^cb1", "1:1_2_1:mousedown")
-    jSAccess.fireCallback("^cb1", "1:1_2_1:mouseup")
-    jSAccess.fireCallback("^cb1", "1:1_2_1:click")
+    fireEvent("1:1_2_1:mousedown")
+    fireEvent("1:1_2_1:mouseup")
+    fireEvent("1:1_2_1:click")
 
     counter should be (1)
   }
