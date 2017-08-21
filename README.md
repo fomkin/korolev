@@ -12,7 +12,7 @@ Korolev runs a single-page application on the server side, keeping in the browse
 
 ## Why?
 
-* Lightning-fast page loading speed (8kB of uncompressed JS)
+* Lightning-fast page loading speed (~6kB of uncompressed JS)
 * Comparable to static HTML client-side RAM consumption
 * Indexable pages out of the box
 * Routing out of the box

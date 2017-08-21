@@ -115,23 +115,6 @@ lazy val async = project.
   settings(normalizedName := "korolev-async").
   enablePlugins(SbtOsgi).settings(asyncOsgiSettings:_*)
 
-lazy val bridgeOsgiSettings = osgiSettings ++ Seq(
-  OsgiKeys.exportPackage := Seq("bridge.*;version=${Bundle-Version}")
-)
-
-lazy val bridge = project.
-  settings(commonSettings: _*).
-  settings(
-    normalizedName := "korolev-bridge",
-    libraryDependencies ++= Seq(
-      "com.lihaoyi" %% "utest" % "0.4.4" % Test
-    ),
-    testFrameworks += new TestFramework("utest.runner.Framework")
-    //unmanagedResourceDirectories in Compile += file("bridge") / "src" / "main" / "resources"
-  ).
-  dependsOn(async).
-  enablePlugins(SbtOsgi).settings(bridgeOsgiSettings:_*)
-
 lazy val korolevOsgiSettings = osgiSettings ++ Seq(
   OsgiKeys.exportPackage := Seq("korolev.*;version=${Bundle-Version}")
 )
@@ -154,7 +137,7 @@ lazy val korolev = project.
       }
       .taskValue
   ).
-  dependsOn(bridge).
+  dependsOn(async).
   enablePlugins(SbtOsgi).settings(korolevOsgiSettings:_*)
 
 lazy val `jcache-support` = project.
@@ -272,7 +255,7 @@ lazy val `performance-benchmark` = project.
 lazy val root = project.in(file(".")).
   settings(dontPublishSettings:_*).
   aggregate(
-    korolev, bridge, async,
+    korolev, async,
     server, `server-blaze`, `server-akkahttp`,
     `jcache-support`,
     simpleExample, routingExample, gameOfLifeExample,

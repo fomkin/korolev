@@ -1,7 +1,6 @@
 package korolev.internal
 
 import korolev.Async
-import Async._
 
 import scala.collection.mutable
 
@@ -21,7 +20,7 @@ final class EventRegistry[F[+ _]: Async](frontend: ClientSideApi[F]) {
   def registerEventType(`type`: Symbol): Unit = knownEventTypes.synchronized {
     if (!knownEventTypes.contains(`type`)) {
       knownEventTypes += `type`
-      frontend.listenEvent(`type`.name, preventDefault = false).runIgnoreResult
+      frontend.listenEvent(`type`.name, preventDefault = false)
     }
   }
 }

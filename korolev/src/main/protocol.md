@@ -45,7 +45,7 @@ From server to the client
 5. SetStyle(id, name, value)
 6. RemoveStyle(id, name)
 
-## Events
+## Callbacks
 
 From the client to the server
 
