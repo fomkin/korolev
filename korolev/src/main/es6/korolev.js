@@ -8,6 +8,14 @@ export const CallbackType = {
   HISTORY: 3  // URL
 }
 
+export const PropertyType = {
+  STRING: 0,
+  NUMBER: 1,
+  BOOLEAN: 2,
+  OBJECT: 3,
+  ERROR: 4
+}
+
 export class Korolev {
 
   /**
@@ -102,7 +110,10 @@ export class Korolev {
    * @param {Array} data
    */
   modifyDom(data) {
-    let r = data.shift.bind(data);
+    // Reverse data to use pop() instead of shift()
+    // pop() faster than shift()
+    let atad = data.reverse();
+    let r = atad.pop.bind(atad);
     while (data.length > 0) {
       switch (r()) {
         case 0: this.create(r(), r(), r(), r()); break;
@@ -179,10 +190,38 @@ export class Korolev {
     * @param {string} propertyName
     */
   extractProperty(descriptor, id, propertyName) {
-    var element = this.els[id];
+    let element = this.els[id];
+    let value = element[propertyName];
+    var result, type;
+    switch (typeof value) {
+      case 'undefined':
+        type = PropertyType.ERROR;
+        result = `${propertyName} is undefined`;
+        break;
+      case 'function':
+        type = PropertyType.ERROR;
+        result = `${propertyName} is a function`;
+        break;
+      case 'object':
+        type = PropertyType.OBJECT;
+        result = JSON.stringify(value);
+        break;
+      case 'string':
+        type = PropertyType.STRING;
+        result = value;
+        break;
+      case 'number':
+        type = PropertyType.NUMBER;
+        result = value;
+        break;
+      case 'boolean':
+        type = PropertyType.BOOLEAN;
+        result = value;
+        break;
+    }
     this.callback(
       CallbackType.EXTRACT_PROPERTY_RESPONSE,
-      descriptor + ':' + element[propertyName]
+      `${descriptor}:${type}:${result}`
     );
   }
 

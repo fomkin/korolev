@@ -58,5 +58,5 @@ From the client to the server
 
 0. DOM Event. Data: `$renderNum:$elementId:$eventType`
 1. FormData progress. Data: `$descriptor:$loaded:$total` 
-2. ExtractProperty response. Data:`$descriptor:$value`
+2. ExtractProperty response. Data:`$descriptor:$type:$value`
 3. History Event. Data: URL 

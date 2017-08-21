@@ -56,15 +56,14 @@ final class ComponentInstance[F[+ _]: Async, AS, M, CS, P, E](nodeId: Id,
         .get(elementId)
         .fold(noElementException[Id])(id => async.pure(id))
 
-    def property[T](elementId: ElementId[F, CS, E]): PropertyHandler[F, T] = {
+    def property(elementId: ElementId[F, CS, E]): PropertyHandler[F] = {
       val idF = getId(elementId)
-      new PropertyHandler[F, T] {
-        def get(propName: Symbol): F[T] = idF flatMap { id =>
-          // TODO get should be F[String]
-          frontend.extractProperty(id, propName.name).asInstanceOf[F[T]]
+      new PropertyHandler[F] {
+        def get(propName: Symbol): F[String] = idF flatMap { id =>
+          frontend.extractProperty(id, propName.name)
         }
 
-        def set(propName: Symbol, value: T): F[Unit] = idF flatMap { id =>
+        def set(propName: Symbol, value: Any): F[Unit] = idF flatMap { id =>
           // XmlNs argument is empty cause it will be ignored
           frontend.setProperty(id, propName, value)
           async.unit
@@ -72,8 +71,8 @@ final class ComponentInstance[F[+ _]: Async, AS, M, CS, P, E](nodeId: Id,
       }
     }
 
-    def property[T](element: ElementId[F, CS, E], propName: Symbol): F[T] =
-      property[T](element).get(propName)
+    def property(element: ElementId[F, CS, E], propName: Symbol): F[String] =
+      property(element).get(propName)
 
     def focus(element: ElementId[F, CS, E]): F[Unit] =
       getId(element).flatMap { id =>

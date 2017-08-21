@@ -106,7 +106,7 @@ object ApplicationContext {
       * eventWithAccess('click) { access =>
       *   deferredTransition {
       *     for {
-      *       request <- access.property[String]('value, searchField)
+      *       request <- access.property('value, searchField)
       *       result <- searchModel.search(request)
       *     } yield {
       *       transition {
@@ -118,9 +118,9 @@ object ApplicationContext {
       * }
       * }}}
       */
-    def property[T](id: ElementId[F, S, M], propName: Symbol): F[T]
+    def property(id: ElementId[F, S, M], propName: Symbol): F[String]
 
-    def property[T](id: ElementId[F, S, M]): PropertyHandler[F, T]
+    def property(id: ElementId[F, S, M]): PropertyHandler[F]
 
     def focus(id: ElementId[F, S, M]): F[Unit]
 
@@ -151,9 +151,9 @@ object ApplicationContext {
     def downloadFormData(id: ElementId[F, S, M]): FormDataDownloader[F, S]
   }
 
-  abstract class PropertyHandler[F[+_]: Async, T] {
-    def get(propName: Symbol): F[T]
-    def set(propName: Symbol, value: T): F[Unit]
+  abstract class PropertyHandler[F[+_]: Async] {
+    def get(propName: Symbol): F[String]
+    def set(propName: Symbol, value: Any): F[Unit]
   }
 
   abstract class FormDataDownloader[F[+_]: Async, S] {

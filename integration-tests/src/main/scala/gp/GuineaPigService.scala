@@ -125,7 +125,7 @@ object GuineaPigService {
             eventWithAccess('submit) { access =>
               logger.info("Submit clicked")
               deferredTransition {
-                val property = access.property[String](inputId)
+                val property = access.property(inputId)
                 property.get('value) flatMap { value =>
                   logger.info("Value received")
                   property.set('value, "property value") map { _ =>

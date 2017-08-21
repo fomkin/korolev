@@ -65,6 +65,7 @@ final class Connection[F[+ _] : Async] {
 
 object Connection {
 
+  /** Channel with only one consumer */
   final class Channel[F[+ _] : Async, T] {
 
     private val queue = new ConcurrentLinkedQueue[T]()

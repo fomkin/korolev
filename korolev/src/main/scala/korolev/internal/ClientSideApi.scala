@@ -66,7 +66,7 @@ final class ClientSideApi[F[+ _]: Async](connection: Connection[F])
     promise.future
   }
 
-  def setProperty[T](id: Id, name: Symbol, value: T): Unit = {
+  def setProperty(id: Id, name: Symbol, value: Any): Unit = {
     // TODO setProperty should be dedicated
     connection.send(Procedure.ModifyDom, ModifyDomProcedure.SetAttr, id.mkString, 0, name.name, value, true)
   }
@@ -149,8 +149,14 @@ final class ClientSideApi[F[+ _]: Async](connection: Connection[F])
           val Array(descriptor, loaded, total) = args.split(':')
           onFormDataProgress(descriptor, loaded.toInt, total.toInt)
         case CallbackType.ExtractPropertyResponse =>
-          val Array(descriptor, value) = args.split(":", 2)
-          promises.remove(descriptor).foreach(_.complete(Success(value)))
+          val Array(descriptor, propertyType, value) = args.split(":", 3)
+          val result = propertyType.toInt match {
+            case PropertyType.Error => Failure(ClientSideException(value))
+            case _ => Success(value)
+          }
+          promises
+            .remove(descriptor)
+            .foreach(_.complete(result))
         case CallbackType.History =>
           onHistory(Router.Path.fromString(args))
       }
@@ -191,6 +197,14 @@ object ClientSideApi {
     final val RemoveStyle = 6 // (id, name)
   }
 
+  object PropertyType {
+    final val String = 0
+    final val Number = 1
+    final val Boolean = 2
+    final val Object = 3
+    final val Error = 4
+  }
+
   object CallbackType {
     final val DomEvent = 0 // `$renderNum:$elementId:$eventType`
     final val FormDataProgress = 1 // `$descriptor:$loaded:$total`
@@ -198,4 +212,5 @@ object ClientSideApi {
     final val History = 3 // URL
   }
 
+  case class ClientSideException(message: String) extends Exception(message)
 }
