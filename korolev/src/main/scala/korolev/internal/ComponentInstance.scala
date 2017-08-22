@@ -15,10 +15,10 @@ import scala.util.{Failure, Random, Success, Try}
   *
   * Performing cycle:
   *
-  * 1. [[prepare()]]
-  * 2. Optionally [[setState()]]
-  * 3. [[applyRenderContext()]]
-  * 4. [[dropObsoleteMisc()]]
+  * 1. prepare()
+  * 2. Optionally setState()
+  * 3. applyRenderContext()
+  * 4. dropObsoleteMisc()
   */
 final class ComponentInstance[F[+ _]: Async, AS, M, CS, P, E](nodeId: Id,
                                                               frontend: ClientSideApi[F],
@@ -140,7 +140,7 @@ final class ComponentInstance[F[+ _]: Async, AS, M, CS, P, E](nodeId: Id,
 
   /**
     * Subscribes to component instance events.
-    * Callback will be invoked on call of [[Access.publish()]] in the
+    * Callback will be invoked on call of `access.publish()` in the
     * component instance context.
     */
   def setEventsSubscription(callback: E => _): Unit = {
@@ -203,13 +203,13 @@ final class ComponentInstance[F[+ _]: Async, AS, M, CS, P, E](nodeId: Id,
               delays.put(id, delay)
               delay.start(applyTransition)
             }
-          case entry @ ComponentEntry(_, _: Any, _: (Any => EventResult[F, CS])) =>
+          case entry @ ComponentEntry(_, _: Any, _: ((Access[F, CS, E], Any) => EventResult[F, CS])) =>
             val id = rc.currentId
             nestedComponents.get(id) match {
               case Some(n: ComponentInstance[F, CS, E, Any, Any, Any]) if n.component.id == entry.component.id =>
                 // Use nested component instance
                 markedComponentInstances += id
-                n.setEventsSubscription((e: Any) => applyEventResult(entry.eventHandler(e)))
+                n.setEventsSubscription((e: Any) => applyEventResult(entry.eventHandler(browserAccess, e)))
                 n.applyRenderContext(entry.parameters, proxy, stateReaderOpt)
               case _ =>
                 // Create new nested component instance
@@ -228,7 +228,7 @@ final class ComponentInstance[F[+ _]: Async, AS, M, CS, P, E](nodeId: Id,
                     f(id, state)
                   }
                 }
-                n.setEventsSubscription((e: Any) => applyEventResult(entry.eventHandler(e)))
+                n.setEventsSubscription((e: Any) => applyEventResult(entry.eventHandler(browserAccess, e)))
                 n.applyRenderContext(entry.parameters, proxy, stateReaderOpt)
             }
         }

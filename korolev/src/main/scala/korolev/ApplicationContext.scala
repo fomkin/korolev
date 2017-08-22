@@ -74,11 +74,11 @@ class ApplicationContext[F[+_]: Async: Scheduler, S, M] {
   def transition(t: Transition): Transition = t
 
   implicit final class ComponentDsl[CS, P, E](component: Component[F, CS, P, E]) {
-    def apply(parameters: P)(f: E => EventResult[F, S]): ComponentEntry[F, S, M, CS, P, E] =
+    def apply(parameters: P)(f: (Access[F, S, M], E) => EventResult[F, S]): ComponentEntry[F, S, M, CS, P, E] =
       ComponentEntry(component, parameters, f)
 
     def silent(parameters: P): ComponentEntry[F, S, M, CS, P, E] =
-      ComponentEntry(component, parameters, _ => EventResult())
+      ComponentEntry(component, parameters, (_, _) => EventResult())
   }
 }
 
@@ -169,7 +169,8 @@ object ApplicationContext {
 
   final case class ComponentEntry[F[+_]: Async, AS, M, CS, P, E](component: Component[F, CS, P, E],
                                                                  parameters: P,
-                                                                 eventHandler: E => EventResult[F, AS]) extends Effect[F, AS, M] {
+                                                                 eventHandler: (Access[F, AS, M], E) => EventResult[F, AS]) extends Effect[F, AS, M] {
+
     def createInstance(node: Id, frontend: ClientSideApi[F], eventRegistry: EventRegistry[F]): ComponentInstance[F, AS, M, CS, P, E] = {
       new ComponentInstance(node, frontend, eventRegistry, component)
     }
