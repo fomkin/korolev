@@ -3,6 +3,7 @@ package korolev.internal
 import korolev._
 import ApplicationContext._
 import Async._
+import levsha.Document.Node
 import levsha.{Id, StatefulRenderContext, XmlNs}
 import levsha.events.EventId
 import slogging.LazyLogging
@@ -177,8 +178,18 @@ final class ComponentInstance[F[+ _]: Async, AS, M, CS, P, E](nodeId: Id,
   def applyRenderContext(parameters: P,
                          rc: StatefulRenderContext[Effect[F, AS, M]],
                          stateReaderOpt: Option[StateReader]): Unit = miscLock.synchronized {
-
-    val node = component.render(parameters, state)
+    val node =
+      try {
+        component.render(parameters, state)
+      }
+      catch {
+        case e: MatchError => Node[Effect[F, CS, E]] { rc =>
+          logger.error(s"Render is not defined for $state", e)
+          rc.openNode(XmlNs.html, "span")
+          rc.addTextNode("Render is not defined for the state")
+          rc.closeNode("span")
+        }
+      }
     val proxy = new StatefulRenderContext[Effect[F, CS, E]] { proxy =>
       def currentId: Id = rc.currentId
       def currentContainerId: Id = rc.currentContainerId
