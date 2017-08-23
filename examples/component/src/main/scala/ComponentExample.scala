@@ -75,12 +75,12 @@ object ComponentExample extends KorolevBlazeServer {
       case state =>
         'body(
           s"Button clicked $state times",
-          ComponentAsObject("Click me, i'm function") { _ =>
+          ComponentAsObject("Click me, i'm function") { (_, _) =>
             immediateTransition {
               case n => n + 1
             }
           },
-          ComponentAsFunction("Click me, i'm object") { _ =>
+          ComponentAsFunction("Click me, i'm object") { (_, _) =>
             immediateTransition {
               case n => n + 1
             }
