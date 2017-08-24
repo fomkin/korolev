@@ -6,6 +6,10 @@ import levsha.events.EventPhase
 
 import scala.concurrent.duration.FiniteDuration
 
+/**
+  * Provides DSLs and effects for application or component
+  * @since 0.6.0
+  */
 final class Context[F[+_]: Async, S, M] {
 
   import Context._
@@ -59,27 +63,30 @@ final class Context[F[+_]: Async, S, M] {
 
 object Context {
 
-  sealed abstract class Effect[F[+_]: Async, S, M]
-
   /**
-    * @tparam F Monad
-    * @tparam S State
-    * @tparam M Message
+    * Creates new global context
+    *
+    * @tparam F Control monad
+    * @tparam S Type of application state
+    * @tparam M Type of events
     */
   def apply[F[+_]: Async, S, M] = new Context[F, S, M]()
 
+  /**
+    * Provides access to make side effects
+    */
   abstract class Access[F[+_]: Async, S, M] {
 
     /**
       * Extracts property of element from client-side DOM.
       *
-      * @param propName Name of property. 'value for example
       * @see [[Context.elementId]]
+      * @since 0.6.0
       * @example
       * {{{
       * event('click) { access =>
       *   for {
-      *     request <- access.property('value, searchField)
+      *     request <- access.property(searchField).get('value)
       *     result  <- searchModel.search(request)
       *     _       <- access.transition {
       *       case state: State.Awesome =>
@@ -89,9 +96,19 @@ object Context {
       * }
       * }}}
       */
+    def property(id: ElementId[F, S, M]): PropertyHandler[F]
+
+    /**
+      * Shortcut for `property(id).get(proName)`
+      * @since 0.6.0
+      */
     def property(id: ElementId[F, S, M], propName: Symbol): F[String]
 
-    def property(id: ElementId[F, S, M]): PropertyHandler[F]
+    /**
+      * Shortcut for `property(id).get('value)`
+      * @since 0.6.0
+      */
+    def valueOf(id: ElementId[F, S, M]): F[String] = property(id, 'value)
 
     /**
       * Makes focus on the element
@@ -136,6 +153,8 @@ object Context {
       */
     def transition(f: Transition[S]): F[Unit]
   }
+
+  sealed abstract class Effect[F[+_]: Async, S, M]
 
   abstract class PropertyHandler[F[+_]: Async] {
     def get(propName: Symbol): F[String]
