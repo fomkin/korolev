@@ -1,6 +1,6 @@
 package korolev
 
-import korolev.ApplicationContext._
+import korolev.Context._
 import korolev.execution.Scheduler
 import levsha.Document.Node
 
@@ -28,7 +28,7 @@ abstract class Component[F[+ _]: Async: Scheduler, S, P, E](val initialState: S,
     *  import symbolDsl._
     * }}}
     */
-  val context = ApplicationContext[F, S, E]
+  val context = Context[F, S, E]
 
   /**
     * Component render
@@ -39,7 +39,7 @@ abstract class Component[F[+ _]: Async: Scheduler, S, P, E](val initialState: S,
 object Component {
 
   /** (context, state) => document */
-  type Render[F[+ _], S, P, E] = (ApplicationContext[F, S, E], P, S) => Node[Effect[F, S, E]]
+  type Render[F[+ _], S, P, E] = (Context[F, S, E], P, S) => Node[Effect[F, S, E]]
 
   /**
     * Create component in functional style

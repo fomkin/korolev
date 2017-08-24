@@ -1,7 +1,7 @@
 package korolev.server
 
-import korolev.{ApplicationContext, Async}
-import ApplicationContext._
+import korolev.{Context, Async}
+import Context._
 import korolev.utils.HtmlUtil
 import levsha.{RenderContext, XmlNs}
 import levsha.impl.{AbstractTextRenderContext, TextPrettyPrintingConfig}
@@ -28,7 +28,7 @@ final class HtmlRenderContext[F[+_]: Async, S, M] extends AbstractTextRenderCont
 
   override def addMisc(misc: Effect[F, S, M]): Unit = misc match {
     case ComponentEntry(component, parameters, _) =>
-      val rc = this.asInstanceOf[RenderContext[ApplicationContext.Effect[F, Any, Any]]]
+      val rc = this.asInstanceOf[RenderContext[Context.Effect[F, Any, Any]]]
       // Static pages always made from scratch
       component.render(parameters, component.initialState).apply(rc)
     case _ => ()

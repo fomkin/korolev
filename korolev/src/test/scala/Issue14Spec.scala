@@ -54,7 +54,7 @@ object Issue14Spec {
 
   type S = String
 
-  val applicationContext = ApplicationContext[Future, Issue14Spec.S, Any]
+  val applicationContext = Context[Future, Issue14Spec.S, Any]
 
   import applicationContext._
   import applicationContext.symbolDsl._

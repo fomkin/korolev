@@ -71,7 +71,7 @@ object RoutingExample extends KorolevBlazeServer {
             // Generate AddTodo action when 'Add' button clicked
             eventWithAccess('submit) { access =>
               deferredTransition {
-                access.property(inputId, 'value) map { value =>
+                access.property[String](inputId, 'value) map { value =>
                   val todo = State.Todo(value, done = false)
                   transition { case s =>
                     s.copy(todos = s.todos + (s.selectedTab -> (s.todos(s.selectedTab) :+ todo)))

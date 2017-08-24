@@ -2,7 +2,7 @@ package korolev.internal
 
 import java.util.concurrent.atomic.AtomicInteger
 
-import korolev.ApplicationContext._
+import korolev.Context._
 import korolev.Async.AsyncOps
 import korolev.{Async, Component, Router, StateReader}
 import levsha.events.calculateEventPropagation

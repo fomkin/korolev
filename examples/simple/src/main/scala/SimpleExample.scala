@@ -50,7 +50,7 @@ object SimpleExample extends KorolevBlazeServer {
                       'button('display @= "inline-block", "Save"),
                       eventWithAccess('submit) { access =>
                         deferredTransition {
-                          access.property(editInputId, 'value) map { value =>
+                          access.property[String](editInputId, 'value) map { value =>
                             transition { case s =>
                               val updatedTodo = s.todos(i).copy(text = value)
                               val updatedTodos = s.todos.updated(i, updatedTodo)
@@ -77,7 +77,7 @@ object SimpleExample extends KorolevBlazeServer {
           'form(
             // Generate AddTodo action when 'Add' button clicked
             eventWithAccess('submit) { access =>
-              val prop = access.property(inputId)
+              val prop = access.property[String](inputId)
               deferredTransition {
                 prop.get('value) flatMap { value =>
                   prop.set('value, "") map { _ =>

@@ -1,7 +1,7 @@
 package korolev.internal
 
 import korolev._
-import ApplicationContext._
+import Context._
 import Async._
 import levsha.Document.Node
 import levsha.{Id, StatefulRenderContext, XmlNs}

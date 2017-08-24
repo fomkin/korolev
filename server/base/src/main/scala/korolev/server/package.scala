@@ -37,7 +37,7 @@ package object server extends LazyLogging {
         .getOrElse(config.stateStorage.createTopLevelState(deviceId))
 
       stateF.flatMap(config.stateStorage.write(deviceId, sessionId, Id.TopLevel, _)).map { state =>
-        val dsl = new levsha.TemplateDsl[ApplicationContext.Effect[F, S, M]]()
+        val dsl = new levsha.TemplateDsl[Context.Effect[F, S, M]]()
         val textRenderContext = new HtmlRenderContext[F, S, M]()
         import dsl._
 

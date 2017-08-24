@@ -24,7 +24,7 @@ object GuineaPigService {
   )
 
   object State {
-    val applicationContext = ApplicationContext[Future, State, Any]
+    val globalContext = Context[Future, State, Any]
     case class Todo(text: String, done: Boolean)
     object Todo {
       def apply(n: Int): Vector[Todo] = (0 to n).toVector map {
@@ -33,14 +33,14 @@ object GuineaPigService {
     }
   }
 
-  import State.applicationContext._
-  import State.applicationContext.symbolDsl._
+  import State.globalContext._
+  import State.globalContext.symbolDsl._
 
   val logger = LoggerFactory.getLogger("GuineaPig")
   val storage = StateStorage.default[Future, State](State())
 
-  val uploadFormId = elementId
-  val inputId = elementId
+  val uploadFormId = elementId()
+  val inputId = elementId()
 
   val TheComponent = Component[Future, Int, String, Unit](0) { (context, label, state) =>
     import context._
@@ -48,15 +48,13 @@ object GuineaPigService {
     'span(
       'id /= "the-component",
       s"$label $state",
-      eventWithAccess('click) { access =>
-        deferredTransition {
-          val future =
-            if (state == 5) access.publish(())
-            else Future.successful(())
-          future.map { _ =>
-            transition {
-              case n => n + 1
-            }
+      event('click) { access =>
+        val future =
+          if (state == 5) access.publish(())
+          else Future.successful(())
+        future.flatMap { _ =>
+          access.transition {
+            case n => n + 1
           }
         }
       }
@@ -81,8 +79,8 @@ object GuineaPigService {
             state.todos.keys map { name =>
               'span(
                 'id /= name,
-                event('click) {
-                  immediateTransition { case s =>
+                event('click) { access =>
+                  access.transition { case s =>
                     s.copy(selectedTab = name)
                   }
                 },
@@ -108,8 +106,8 @@ object GuineaPigService {
                       else "todo_checkbox todo_checkbox__checked"
                     },
                     // Generate transition when clicking checkboxes
-                    event('click) {
-                      immediateTransition { case s =>
+                    event('click) { access =>
+                      access.transition { case s =>
                         val todos = s.todos(s.selectedTab)
                         val updated = todos.updated(i, todos(i).copy(done = !todo.done))
                         s.copy(todos = s.todos + (s.selectedTab -> updated))
@@ -122,17 +120,15 @@ object GuineaPigService {
           ),
           'form(
             // Generate AddTodo action when 'Add' button clicked
-            eventWithAccess('submit) { access =>
+            event('submit) { access =>
               logger.info("Submit clicked")
-              deferredTransition {
-                val property = access.property(inputId)
-                property.get('value) flatMap { value =>
-                  logger.info("Value received")
-                  property.set('value, "property value") map { _ =>
-                    val todo = State.Todo(value, done = false)
-                    transition { case s =>
-                      s.copy(todos = s.todos + (s.selectedTab -> (s.todos(s.selectedTab) :+ todo)))
-                    }
+              val property = access.property(inputId)
+              property.get('value) flatMap { value =>
+                logger.info("Value received")
+                property.set('value, "property value") flatMap { _ =>
+                  val todo = State.Todo(value, done = false)
+                  access.transition { case s =>
+                    s.copy(todos = s.todos + (s.selectedTab -> (s.todos(s.selectedTab) :+ todo)))
                   }
                 }
               }
@@ -155,30 +151,30 @@ object GuineaPigService {
               'id /= "upload-form",
               'input('type /= "file", 'name /= "upload-input"),
               'button('id /= "upload-button", "Submit"),
-              eventWithAccess('submit) { access =>
-                deferredTransition {
-                  access
-                    .downloadFormData(uploadFormId)
-                    .start()
-                    .map { result =>
-                      transition {
-                        case s =>
-                          s.copy(uploadedText = result.text("upload-input"))
-                      }
+              event('submit) { access =>
+                access
+                  .downloadFormData(uploadFormId)
+                  .start()
+                  .flatMap { result =>
+                    access.transition {
+                      case s =>
+                        s.copy(uploadedText = result.text("upload-input"))
                     }
-                }
+                  }
               }
             )
           ),
           'div('id /= "delay-text",
             if (state.delayOn) "Wait a second" else "Click me",
             if (state.delayOn) {
-              delay(1.second) {
-                case s => s.copy(delayOn = false)
+              delay(1.second) { access =>
+                access.transition {
+                  case s => s.copy(delayOn = false)
+                }
               }
             } else {
-              event('click) {
-                immediateTransition {
+              event('click) { access =>
+                access.transition {
                   case s => s.copy(delayOn = true)
                 }
               }
