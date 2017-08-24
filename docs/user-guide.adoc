@@ -161,14 +161,14 @@ Transition is a function that applies to current state and produces a new state.
 val newFriend = "Karl Heinrich Marx"
 // This hypothetical service method adds friend
 // to the user friend list and returns Future[Unit]
-userService.addFriend(user.id, newFriend) map { _ =>
-  transition { case state @ Authorized(_, user) =>
+userService.addFriend(user.id, newFriend) flatMap { _ =>
+  access.transition { case state @ Authorized(_, user) =>
     state.copy(user = user.copy(user.friends :+ newFriend))
   }
 }
 --------------------------------------------------------------
 
-`Transition` is a type alias for `PartialFunction[S, S]` where `S` is the type of your state.
+`Transition` is a type alias for `S => S` where `S` is the type of your state.
 
 Events
 ~~~~~~
@@ -184,8 +184,8 @@ val renderAnonymous: Render = {
     'body(
       i.toString,
       'button("Increment",
-        event('click) {
-          immediateTransition {
+        event('click) { access =>
+          access.transition {
             case MyState(i) =>
               state.copy(i = i + 1)
           }
@@ -209,19 +209,16 @@ val renderAnonymous: Render = {
         'input('placeholder /= "Login", loginField),
         'input('placeholder /= "Password", passwordField),
         'button("Submit"),
-        eventWithAccess('submit) { access =>
-          deferredTransition {
-            for {
-              login <- access.property(loginField, 'value)
-              password <- access.property(passwordField, 'value)
-              user <- authService.authorize(login, password)
-            } yield {
-              transition {
-                case Anonymous(deviceId) =>
-                  Authorized(deviceId, user)
-              }
+        event('submit) { access =>
+          for {
+            login <- access.property(loginField, 'value)
+            password <- access.property(passwordField, 'value)
+            user <- authService.authorize(login, password)
+            _ <- access.transition {
+              case Anonymous(deviceId) =>
+                 Authorized(deviceId, user)
             }
-          }
+          } yield ()
         }
       )
     )
@@ -233,21 +230,7 @@ val render = renderAnonymous orElse renderAuthorized
 
 Event with access literally gives you an access to information from the client side. In this case, it it is values of the input fields.
 
-Event handlers should return `EventResult`.
-
-EventResult
-~~~~~~~~~~~
-
-Korolev expects `EventResult` as a return type of event handlers. There are three types of event results.
-
-
-1. `immediateTransition` - Is a transition which is applied to current state right now. It's useful for making lightweight synchronous transitions. For example, you have a page with the "Query" field and the "Search" button. When the button is clicked, your application requests database or micro-service to execute the query. But user wants to see reaction before receiving the data. So you update the state with "Loading" flag in `immediateTransition` and user sees reaction immediately. Signature of `immediateTransition` is `Transition` that is a type alias for `PartialFunction[S, S]` where `S` is your state type.
-
-2. `deferredTransition` - In the previous example, your application performs a request to some sort of backend. Such request in Scala is usually asynchronous. So `deferredTransition` is a way to make your application to wait for the response. `deferredTransition` will be applied to the state when the `Future` is completed. Signature of `deferredTransition` is `Future[Transition]`.
-
-3. `noTransition` - It means you don't want to make any reaction.
-
-Also, you can combine `immediateTransition` and `deferredTransition`.
+Event handlers should return F[Unit] which will be implicitly converted to `EventResult`.
 
 Stateful components
 ~~~~~~~~~~~~~~~~~~~
@@ -270,8 +253,9 @@ val MyComponent = Component[Future, ComponentState, ComponentParameters, EventTy
   'div(
     parameters.toString,
     state.toString,
-    event('click) {
+    event('click) { access =>
       // Change component state here
+      // using transition as usual.
     }
   )
 }
@@ -304,9 +288,9 @@ Let's use our component in the application.
 -----------------------------------
 'body(
   "Hello world!",
-  MyComponent(parameters) { _ =>
+  MyComponent(parameters) { (access, _) =>
     // make transition on component event
-    immediateTransition {
+    access.transition {
       case n => n + 1
     }
   },
@@ -315,7 +299,7 @@ Let's use our component in the application.
 )
 -----------------------------------
 
-https://github.com/fomkin/korolev/blob/v0.5.2/examples/component/src/main/scala/ComponentExample.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.6.0/examples/component/src/main/scala/ComponentExample.scala[See full example]
 
 Access element properties
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -328,11 +312,10 @@ val loginField = elementId
 
 ...
 
-eventWithAccess('submit) { access =>
-  deferredTransition {
-    access.property(loginField, 'value) map {
-      transition { ... }
-    }
+event('submit) { access =>
+  access.property(loginField, 'value) flatMap {
+    access.transition { ... }
+  }
 }
 -----------------------------------
 
@@ -340,10 +323,10 @@ Or you can set the value
 
 [source,scala]
 -----------------------------------
-access.property(loginField).set('value, "John Doe") map {
-  transition { ... }
-}
+access.property(loginField).set('value, "John Doe")
 -----------------------------------
+
+Also you can use shortcut `valueOf` for get values from elements.
 
 FormData
 ~~~~~~~~
@@ -369,25 +352,23 @@ val pictureFieldName = "picture"
       'button("Submit")
     )
   ),
-  eventWithAccess('submit) { access =>
-    deferredTransition {
-      access
-        .downloadFormData(myForm)
-        .onProgress { (loaded, total) =>
-          transition { ... }
-        }
-        .start()
-        .map { formData =>
-          transition { ... }
-        }
-    }
+  event('submit) { access =>
+    access
+      .downloadFormData(myForm)
+      .onProgress { (loaded, total) => state =>
+        state.copy(loaded = loaded, total = total)
+      }
+      .start()
+      .flatMap { formData =>
+        access.transition { ... }
+      }
   }
 )
 -----------------------------------
 
 Use `onProgress` callback to handle progress of the form downloading. Function `start` return a `FormData`. Look API documentation for more details.
 
-https://github.com/fomkin/korolev/blob/v0.5.2/examples/form-data/src/main/scala/FormDataExample.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.6.0/examples/form-data/src/main/scala/FormDataExample.scala[See full example]
 
 Delays
 ~~~~~~
@@ -399,17 +380,15 @@ type MyState = Boolean
 
 val render: Render = {
   case true => 'body(
-    delay(3.seconds) {
-      case true => false
+    delay(3.seconds) { access =>
+      access.transition(_ => false)
     },
     "Wait 3 seconds!"
   )
   case false => 'body(
     'button(
-      event('click) {
-        immediateTransition {
-          case _ => true
-        }
+      event('click) { access =>
+        access.transition(_ => true)
       },
       "Push the button"
     )
@@ -417,7 +396,7 @@ val render: Render = {
 }
 -----------------------------------
 
-https://github.com/fomkin/korolev/blob/v0.5.2/examples/delay/src/main/scala/DelayExample.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.6.0/examples/delay/src/main/scala/DelayExample.scala[See full example]
 
 Environment configurator
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -513,7 +492,7 @@ KorolevServiceConfig(
 )
 -------------------------------------------------------------------------------
 
-https://github.com/fomkin/korolev/blob/v0.5.2/examples/routing/src/main/scala/RoutingExample.scala#L93[See full example]
+https://github.com/fomkin/korolev/blob/v0.6.0/examples/routing/src/main/scala/RoutingExample.scala#L93[See full example]
 
 Productivity
 ------------
@@ -528,7 +507,7 @@ Usually when we say "components" we mean an UI element with its own state. Korol
 Korolev doesn't have any specific code to support WebComponents. WebComponent (Custom Elements + Shadow DOM) by design should behave as regular HTML tags. There is no difference between, for example, input or textarea, and any custom element.
 ============
 
-https://github.com/fomkin/korolev/blob/v0.5.2/examples/web-component/src/main/scala/WebComponentExample.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.6.0/examples/web-component/src/main/scala/WebComponentExample.scala[See full example]
 
 Developer mode and "hot reload"
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -569,10 +548,10 @@ To fix this, you can apply any in-memory storage compatible with https://github.
 
 [source,scala]
 ------------------------------
-libraryDependencies += "com.github.fomkin" %% "korolev-jcache-support" % "0.5.2"
+libraryDependencies += "com.github.fomkin" %% "korolev-jcache-support" % "0.6.0"
 ------------------------------
 
-https://github.com/fomkin/korolev/blob/v0.5.2/examples/jcache/src/main/scala/JCacheExample.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.6.0/examples/jcache/src/main/scala/JCacheExample.scala[See full example]
 
 Akka HTTP
 ~~~~~~~~~
@@ -581,7 +560,7 @@ Korolev provides smooth Akka HTTP integration out of the box. To use it, add a d
 
 [source,scala]
 ------------------------------
-libraryDependencies += "com.github.fomkin" %% "korolev-server-akkahttp" % "0.5.2"
+libraryDependencies += "com.github.fomkin" %% "korolev-server-akkahttp" % "0.6.0"
 ------------------------------
 
 And create Korolev route:
@@ -599,4 +578,4 @@ val korolevRoute = akkaHttpService(config).apply(AkkaHttpServerConfig())
 
 Then embed the route into your Akka HTTP routes structure.
 
-https://github.com/fomkin/korolev/blob/v0.5.2/examples/akka-http/src/main/scala/AkkaHttpExample.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.6.0/examples/akka-http/src/main/scala/AkkaHttpExample.scala[See full example]
