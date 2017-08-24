@@ -22,14 +22,14 @@ class Issue14Spec extends FlatSpec with Matchers {
       router = Router.empty[Future, String, String],
       render = {
         Issue14Spec.render(
-          firstEvent = event('mousedown) {
-            immediateTransition { case _ =>
+          firstEvent = event('mousedown) { access =>
+            access.transition { _ =>
               counter += 1
               "secondState"
             }
           },
-          secondEvent = event('click) {
-            immediateTransition { case _ =>
+          secondEvent = event('click) { access =>
+            access.transition { _ =>
               counter += 1
               "firstState"
             }
