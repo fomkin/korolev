@@ -3,7 +3,7 @@ package korolev
 import korolev.utils.HtmlUtil
 import levsha.Document.Empty
 import levsha.{Document, TemplateDsl}
-import ApplicationContext.Effect
+import Context.Effect
 
 /**
   * Levsha DSL with enrichments.

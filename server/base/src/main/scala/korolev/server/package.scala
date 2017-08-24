@@ -37,7 +37,7 @@ package object server extends LazyLogging {
         .getOrElse(config.stateStorage.createTopLevelState(deviceId))
 
       stateF.flatMap(config.stateStorage.write(deviceId, sessionId, Id.TopLevel, _)).map { state =>
-        val dsl = new levsha.TemplateDsl[ApplicationContext.Effect[F, S, M]]()
+        val dsl = new levsha.TemplateDsl[Context.Effect[F, S, M]]()
         val textRenderContext = new HtmlRenderContext[F, S, M]()
         import dsl._
 
@@ -144,8 +144,8 @@ package object server extends LazyLogging {
 
         // Create Korolev with dynamic router
         val router = config.serverRouter.dynamic(deviceId, sessionId)
-        val sessionKey = makeSessionKey(deviceId, sessionId)
-        val korolev = new ApplicationInstance(sessionKey, connection, stateReader, config.render, router, fromScratch = isNew)
+        val qualifiedSessionId = QualifiedSessionId(deviceId, sessionId)
+        val korolev = new ApplicationInstance(qualifiedSessionId, connection, stateReader, config.render, router, fromScratch = isNew)
         val applyTransition = korolev.topLevelComponentInstance.applyTransition _ andThen Async[F].pureStrict _
         val env = config.envConfigurator(deviceId, sessionId, applyTransition)
         // Subscribe to events to publish them to env

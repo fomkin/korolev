@@ -10,7 +10,7 @@ import scala.concurrent.Future
 
 object AkkaHttpExample extends App {
 
-  val applicationContext = ApplicationContext[Future, Boolean, Any]
+  val applicationContext = Context[Future, Boolean, Any]
 
   import applicationContext._
   import symbolDsl._

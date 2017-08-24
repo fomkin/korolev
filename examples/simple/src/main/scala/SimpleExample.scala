@@ -7,12 +7,12 @@ import scala.concurrent.Future
 
 object SimpleExample extends KorolevBlazeServer {
 
-  import State.applicationContext._
+  import State.globalContext._
   import symbolDsl._
 
   // Handler to input
-  val inputId = elementId
-  val editInputId = elementId
+  val inputId = elementId()
+  val editInputId = elementId()
 
   val service = blazeService[Future, State, Any] from KorolevServiceConfig [Future, State, Any] (
     serverRouter = ServerRouter.empty[Future, State],
@@ -30,10 +30,10 @@ object SimpleExample extends KorolevBlazeServer {
                     if (state.edit.nonEmpty) 'disabled /= "" else void,
                     if (todo.done) 'checked /= "" else void,
                     // Generate transition when clicking checkboxes
-                    event('click) {
-                      immediateTransition { case tState =>
-                        val updated = tState.todos.updated(i, tState.todos(i).copy(done = !todo.done))
-                        tState.copy(todos = updated)
+                    event('click) { access =>
+                      access.transition { s =>
+                        val updated = s.todos.updated(i, s.todos(i).copy(done = !todo.done))
+                        s.copy(todos = updated)
                       }
                     }
                   ),
@@ -48,14 +48,12 @@ object SimpleExample extends KorolevBlazeServer {
                         'value := todo.text
                       ),
                       'button('display @= "inline-block", "Save"),
-                      eventWithAccess('submit) { access =>
-                        deferredTransition {
-                          access.property(editInputId, 'value) map { value =>
-                            transition { case s =>
-                              val updatedTodo = s.todos(i).copy(text = value)
-                              val updatedTodos = s.todos.updated(i, updatedTodo)
-                              s.copy(todos = updatedTodos, edit = None)
-                            }
+                      event('submit) { access =>
+                        access.property(editInputId, 'value) flatMap { value =>
+                          access.transition { s =>
+                            val updatedTodo = s.todos(i).copy(text = value)
+                            val updatedTodos = s.todos.updated(i, updatedTodo)
+                            s.copy(todos = updatedTodos, edit = None)
                           }
                         }
                       }
@@ -64,10 +62,8 @@ object SimpleExample extends KorolevBlazeServer {
                     'span(
                       if (todo.done) 'textDecoration @= "line-through" else void,
                       todo.text,
-                      event('dblclick) {
-                        immediateTransition {
-                          case s => s.copy(edit = Some(i))
-                        }
+                      event('dblclick) { access =>
+                        access.transition(_.copy(edit = Some(i)))
                       }
                     )
                   }
@@ -76,16 +72,12 @@ object SimpleExample extends KorolevBlazeServer {
           ),
           'form(
             // Generate AddTodo action when 'Add' button clicked
-            eventWithAccess('submit) { access =>
+            event('submit) { access =>
               val prop = access.property(inputId)
-              deferredTransition {
-                prop.get('value) flatMap { value =>
-                  prop.set('value, "") map { _ =>
-                    val todo = State.Todo(value, done = false)
-                    transition { case tState =>
-                      tState.copy(todos = tState.todos :+ todo)
-                    }
-                  }
+              prop.get('value) flatMap { value =>
+                prop.set('value, "") flatMap { _ =>
+                  val todo = State.Todo(value, done = false)
+                  access.transition(s => s.copy(todos = s.todos :+ todo))
                 }
               }
             },
@@ -111,7 +103,7 @@ case class State(
 )
 
 object State {
-  val applicationContext = ApplicationContext[Future, State, Any]
+  val globalContext = Context[Future, State, Any]
   case class Todo(text: String, done: Boolean)
 }
 

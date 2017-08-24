@@ -6,12 +6,12 @@ package object korolev {
   type / = Router./
 
   @deprecated("Use ApplicationContext instead of Effects", "0.4.0")
-  val Effects = ApplicationContext
+  val Effects = Context
 
-  type Transition[State] = PartialFunction[State, State]
+  type Transition[State] = State => State
 
   object StateManager {
     @deprecated("Use korolev.Transition", "0.6.0")
-    type Transition[State] = PartialFunction[State, State]
+    type Transition[State] = State => State
   }
 }

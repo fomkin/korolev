@@ -8,7 +8,7 @@ import scala.util.Random
 
 object ComponentExample extends KorolevBlazeServer {
 
-  import State.applicationContext._
+  import State.globalContext._
   import symbolDsl._
 
   type Rgb = (Int, Int, Int)
@@ -30,12 +30,10 @@ object ComponentExample extends KorolevBlazeServer {
       'borderStyle @= "solid",
       'borderColor @= s"rgb($r, $g, $b)",
       label,
-      eventWithAccess('click) { access =>
-        deferredTransition {
-          access.publish(()).map { _ =>
-            transition {
-              case _ => randomRgb()
-            }
+      event('click) { access =>
+        access.publish(()).flatMap { _ =>
+          access.transition {
+            case _ => randomRgb()
           }
         }
       }
@@ -55,12 +53,10 @@ object ComponentExample extends KorolevBlazeServer {
         'borderStyle @= "solid",
         'borderColor @= s"rgb($r, $g, $b)",
         label,
-        eventWithAccess('click) { access =>
-          deferredTransition {
-            access.publish(()).map { _ =>
-              transition {
-                case _ => randomRgb()
-              }
+        event('click) { access =>
+          access.publish(()).flatMap { _ =>
+            access.transition {
+              case _ => randomRgb()
             }
           }
         }
@@ -75,20 +71,20 @@ object ComponentExample extends KorolevBlazeServer {
       case state =>
         'body(
           s"Button clicked $state times",
-          ComponentAsObject("Click me, i'm function") { (_, _) =>
-            immediateTransition {
+          ComponentAsObject("Click me, i'm function") { (access, _) =>
+            access.transition {
               case n => n + 1
             }
           },
-          ComponentAsFunction("Click me, i'm object") { (_, _) =>
-            immediateTransition {
+          ComponentAsFunction("Click me, i'm object") { (access, _) =>
+            access.transition {
               case n => n + 1
             }
           },
           'button(
             "Click me too",
-            event('click) {
-              immediateTransition {
+            event('click) { access =>
+              access.transition {
                 case n => n + 1
               }
             }
@@ -99,6 +95,6 @@ object ComponentExample extends KorolevBlazeServer {
 }
 
 object State {
-  val applicationContext = ApplicationContext[Future, Int, Any]
+  val globalContext = Context[Future, Int, Any]
 }
 
