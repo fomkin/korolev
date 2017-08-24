@@ -17,6 +17,8 @@ final class Context[F[+_]: Async, S, M] {
   type Transition = korolev.Transition[S]
   type Render = PartialFunction[S, Document.Node[Effect]]
   type ElementId = Context.ElementId[F, S, M]
+  type Access = Context.Access[F, S, M]
+  type EventResult = korolev.EventResult[F, S]
 
   val symbolDsl = new KorolevTemplateDsl[F, S, M]()
 
@@ -29,25 +31,25 @@ final class Context[F[+_]: Async, S, M] {
     * Schedules the transition with delay. For example it can be useful
     * when you want to hide something after timeout.
     */
-  def delay(duration: FiniteDuration)(effect: Access[F, S, M] => F[Unit]): Delay[F, S, M] =
+  def delay(duration: FiniteDuration)(effect: Access => F[Unit]): Delay[F, S, M] =
     Delay(duration, effect)
 
   def event(name: Symbol, phase: EventPhase = Bubbling)(
-      effect: Access[F, S, M] => EventResult[F, S]): Event =
+      effect: Access => EventResult): Event =
     Event(name, phase, effect)
 
   val emptyTransition: PartialFunction[S, S] = { case x => x }
 
-  implicit def effectToEventResult(effect: F[Unit]): EventResult[F, S] =
+  implicit def effectToEventResult(effect: F[Unit]): EventResult =
     EventResult(effect, stopPropagation = false)
 
   implicit final class EffectOps(effect: F[Unit]) {
-    def stopPropagation: EventResult[F, S] =
+    def stopPropagation: EventResult =
       EventResult(effect, stopPropagation = true)
   }
 
   implicit final class ComponentDsl[CS, P, E](component: Component[F, CS, P, E]) {
-    def apply(parameters: P)(f: (Access[F, S, M], E) => F[Unit]): ComponentEntry[F, S, M, CS, P, E] =
+    def apply(parameters: P)(f: (Access, E) => F[Unit]): ComponentEntry[F, S, M, CS, P, E] =
       ComponentEntry(component, parameters, f)
 
     def silent(parameters: P): ComponentEntry[F, S, M, CS, P, E] =

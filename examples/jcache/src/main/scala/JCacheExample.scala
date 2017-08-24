@@ -11,8 +11,8 @@ import scala.concurrent.Future
 
 object JCacheExample extends KorolevBlazeServer {
 
-  import State.applicationContext._
-  import State.applicationContext.symbolDsl._
+  import State.globalContext._
+  import State.globalContext.symbolDsl._
 
   val storage = {
 
@@ -30,7 +30,7 @@ object JCacheExample extends KorolevBlazeServer {
     }
   }
 
-  val inputId = elementId
+  val inputId = elementId()
 
   val service = blazeService[Future, State, Any] from KorolevServiceConfig [Future, State, Any] (
     stateStorage = storage,
@@ -51,8 +51,8 @@ object JCacheExample extends KorolevBlazeServer {
           'div(
             state.todos.keys map { name =>
               'span(
-                event('click) {
-                  immediateTransition { case s =>
+                event('click) { access =>
+                  access.transition { case s =>
                     s.copy(selectedTab = name)
                   }
                 },
@@ -72,8 +72,8 @@ object JCacheExample extends KorolevBlazeServer {
                       else "checkbox checkbox__checked"
                     },
                     // Generate transition when clicking checkboxes
-                    event('click) {
-                      immediateTransition { case s =>
+                    event('click) { access =>
+                      access.transition { case s =>
                         val todos = s.todos(s.selectedTab)
                         val updated = todos.updated(i, todos(i).copy(done = !todo.done))
                         s.copy(todos = s.todos + (s.selectedTab -> updated))
@@ -87,13 +87,11 @@ object JCacheExample extends KorolevBlazeServer {
           ),
           'form(
             // Generate AddTodo action when 'Add' button clicked
-            eventWithAccess('submit) { access =>
-              deferredTransition {
-                access.property[String](inputId, 'value) map { value =>
-                  val todo = State.Todo(value, done = false)
-                  transition { case s =>
-                    s.copy(todos = s.todos + (s.selectedTab -> (s.todos(s.selectedTab) :+ todo)))
-                  }
+            event('submit) { access =>
+              access.property(inputId, 'value) flatMap { value =>
+                val todo = State.Todo(value, done = false)
+                access.transition { case s =>
+                  s.copy(todos = s.todos + (s.selectedTab -> (s.todos(s.selectedTab) :+ todo)))
                 }
               }
             },
@@ -148,7 +146,7 @@ case class State(
 )
 
 object State {
-  val applicationContext = ApplicationContext[Future, State, Any]
+  val globalContext = Context[Future, State, Any]
   case class Todo(text: String, done: Boolean)
   object Todo {
     def apply(n: Int): Vector[Todo] = (0 to n).toVector map {

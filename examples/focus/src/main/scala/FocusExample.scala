@@ -7,13 +7,13 @@ import scala.concurrent.Future
 
 object FocusExample extends KorolevBlazeServer {
 
-  val applicationContext = ApplicationContext[Future, Boolean, Any]
+  val globalContext = Context[Future, Boolean, Any]
 
-  import applicationContext._
+  import globalContext._
   import symbolDsl._
 
   // Handler to input
-  val inputId = elementId
+  val inputId = elementId()
 
   val service = blazeService[Future, Boolean, Any] from KorolevServiceConfig[Future, Boolean, Any](
     stateStorage = StateStorage.default(false),
@@ -31,10 +31,8 @@ object FocusExample extends KorolevBlazeServer {
           ),
           'div(
             'button(
-              eventWithAccess('click) { access =>
-                deferredTransition {
-                  access.focus(inputId).map(_ => emptyTransition)
-                }
+              event('click) { access =>
+                access.focus(inputId)
               },
               "Click to focus"
             )

@@ -7,8 +7,8 @@ import scala.concurrent.Future
 
 object GameOfLife extends KorolevBlazeServer {
 
-  import Universe.applicationContext._
-  import Universe.applicationContext.symbolDsl._
+  import Universe.globalContext._
+  import Universe.globalContext.symbolDsl._
 
   val universeSize = 20
   val cellRadius = 10
@@ -27,8 +27,8 @@ object GameOfLife extends KorolevBlazeServer {
         'body(
           'div(
             'button(
-              event('click) {
-                immediateTransition { case state =>
+              event('click) { access =>
+                access.transition { case state =>
                   state.next
                 }
               },
@@ -53,8 +53,8 @@ object GameOfLife extends KorolevBlazeServer {
                     else "#EEEEEE"
                   },
                   // Generate actions when clicking checkboxes
-                  event('click) {
-                    immediateTransition { case state =>
+                  event('click) { access =>
+                    access.transition { case state =>
                       state.check(x, y)
                     }
                   }
@@ -128,7 +128,7 @@ case class Universe(cells: Vector[Universe.Cell], size: Int) {
 
 object Universe {
 
-  val applicationContext = ApplicationContext[Future, Universe, Any]
+  val globalContext = Context[Future, Universe, Any]
 
   case class Cell(x: Int, y: Int, alive: Boolean)
 

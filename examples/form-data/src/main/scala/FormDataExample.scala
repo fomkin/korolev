@@ -11,10 +11,10 @@ import scala.concurrent.Future
 
 object FormDataExample extends KorolevBlazeServer(BlazeServerConfig(maxRequestBodySize = 20 * 1024 * 1024)) {
 
-  import State.applicationContext._
-  import State.applicationContext.symbolDsl._
+  import State.globalContext._
+  import State.globalContext.symbolDsl._
 
-  val myForm = elementId
+  val myForm = elementId()
   val pictureFieldName = "picture"
 
   val service = blazeService[Future, State, Any] from KorolevServiceConfig[Future, State, Any](
@@ -64,39 +64,36 @@ object FormDataExample extends KorolevBlazeServer(BlazeServerConfig(maxRequestBo
               )
             ),
             myForm,
-            eventWithAccess('submit) { access =>
-              immediateTransition { case _ =>
-                InProgress(0, 100)
-              } deferredTransition {
-                access
+            event('submit) { access =>
+              for {
+                _ <- access.transition {
+                  case _ =>
+                    InProgress(0, 100)
+                }
+                formData <- access
                   .downloadFormData(myForm)
                   .onProgress { (loaded, total) =>
-                    transition {
-                      case _ =>
-                        InProgress(loaded, total)
-                    }
+                    { case _ => InProgress(loaded, total) }
                   }
                   .start()
-                  .map { formData =>
-                    transition { case _ =>
-                      val buffer = formData.bytes(pictureFieldName)
-                      val pictureBase64 = Base64.getEncoder.encodeToString(buffer.array())
-                      val parsedImage = ImageIO.read(new ByteArrayInputStream(buffer.array()))
+                _ <- access.transition { case _ =>
+                    val buffer = formData.bytes(pictureFieldName)
+                    val pictureBase64 = Base64.getEncoder.encodeToString(buffer.array())
+                    val parsedImage = ImageIO.read(new ByteArrayInputStream(buffer.array()))
 
-                      formData.contentType(pictureFieldName) match {
-                        case Some(mimeType) =>
-                          Complete(
-                            picture = pictureBase64,
-                            mimeType = mimeType,
-                            width = parsedImage.getWidth,
-                            height = parsedImage.getHeight
-                          )
-                        case None =>
-                          Error("Unknown image format")
-                      }
+                    formData.contentType(pictureFieldName) match {
+                      case Some(mimeType) =>
+                        Complete(
+                          picture = pictureBase64,
+                          mimeType = mimeType,
+                          width = parsedImage.getWidth,
+                          height = parsedImage.getHeight
+                        )
+                      case None =>
+                        Error("Unknown image format")
                     }
                   }
-              }
+                } yield ()
             }
           )
         )
@@ -136,5 +133,5 @@ case class Error(message: String) extends State
 
 object State {
   def empty: State = Initial
-  val applicationContext = ApplicationContext[Future, State, Any]
+  val globalContext = Context[Future, State, Any]
 }

@@ -7,13 +7,16 @@ import scala.concurrent.Future
 
 object WebComponentExample extends KorolevBlazeServer {
 
-  import State.applicationContext._
+  import State.globalContext._
   import symbolDsl._
 
-  def setLatLon(lat: Double, lon: Double) =
-    immediateTransition { case s =>
-      s.copy(lat = lat, lon = lon)
+  private def setLatLon(lat: Double, lon: Double): (Access => EventResult) = {
+    (access: Access) => {
+      access.transition { case s =>
+        s.copy(lat = lat, lon = lon)
+      }
     }
+  }
 
   val service = blazeService[Future, State, Any] from KorolevServiceConfig [Future, State, Any] (
     serverRouter = ServerRouter.empty[Future, State],
@@ -49,6 +52,6 @@ object WebComponentExample extends KorolevBlazeServer {
 case class State(lon: Double = 0, lat: Double = 0)
 
 object State {
-  val applicationContext = ApplicationContext[Future, State, Any]
+  val globalContext = Context[Future, State, Any]
 }
 

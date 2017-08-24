@@ -8,9 +8,9 @@ import scala.concurrent.duration._
 
 object DelayExample extends KorolevBlazeServer {
 
-  val applicationContext = ApplicationContext[Future, Option[Int], Any]
+  val globalContext = Context[Future, Option[Int], Any]
 
-  import applicationContext._
+  import globalContext._
   import symbolDsl._
 
   val service = blazeService[Future, Option[Int], Any] from KorolevServiceConfig[Future, Option[Int], Any](
@@ -18,13 +18,15 @@ object DelayExample extends KorolevBlazeServer {
     serverRouter = ServerRouter.empty[Future, Option[Int]],
     render = {
       case Some(n) => 'body(
-        delay(3.seconds) {
-          case _ => None
+        delay(3.seconds) { access =>
+          access.transition {
+            case _ => None
+          }
         },
         'button(
           "Push the button " + n,
-          event('click) {
-            immediateTransition {
+          event('click) { access =>
+            access.transition {
               case s => s.map(_ + 1)
             }
           }
@@ -33,8 +35,8 @@ object DelayExample extends KorolevBlazeServer {
       )
       case None => 'body(
         'button(
-          event('click) {
-            immediateTransition {
+          event('click) { access =>
+            access.transition {
               case _ => Some(1)
             }
           },
