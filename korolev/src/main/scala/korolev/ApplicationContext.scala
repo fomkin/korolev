@@ -1,6 +1,5 @@
 package korolev
 
-import korolev.execution.Scheduler
 import levsha.Document
 import levsha.events.EventPhase
 import Async._
@@ -13,7 +12,7 @@ import scala.reflect.ClassTag
   * @see [[Context]]
   * @deprecated
   */
-final class ApplicationContext[F[+ _]: Async: Scheduler, S, M] {
+final class ApplicationContext[F[+ _]: Async, S, M] {
 
   import Context._
   import ApplicationContext._
@@ -32,29 +31,8 @@ final class ApplicationContext[F[+ _]: Async: Scheduler, S, M] {
 
   def elementId = new Context.ElementId[F, S, M]()
 
-  /**
-    * Schedules the [[transition]] with [[delay]]. For example it can be useful
-    * when you want to hide something after timeout.
-    */
-  def delay(delay: FiniteDuration)(transition: Transition): Delay[F, S, M] = new Delay[F, S, M] {
-
-    @volatile private var handler = Option.empty[Scheduler.JobHandler[F, _]]
-    @volatile private var finished = false
-
-    def isFinished: Boolean = finished
-
-    def cancel(): Unit = {
-      handler.foreach(_.cancel())
-    }
-
-    def start(access: Context.Access[F, S, M]): Unit = {
-      handler = Some {
-        Scheduler[F].scheduleOnce(delay) {
-          access.transition(transition).runIgnoreResult
-        }
-      }
-    }
-  }
+  def delay(duration: FiniteDuration)(f: Transition): Delay[F, S, M] =
+    Delay(duration, access => access.transition(f))
 
   private def provideEventResult(ler: LegacyEventResult[F, S], access: Context.Access[F, S, M]) = {
     val effect = {
@@ -95,8 +73,7 @@ final class ApplicationContext[F[+ _]: Async: Scheduler, S, M] {
 object ApplicationContext {
 
   @deprecated("This is compatibility layer for old fashioned API. Use Context instead.", "0.6.0")
-  def apply[F[+_]: Async, S, M](implicit scheduler: Scheduler[F]) =
-    new ApplicationContext[F, S, M]()
+  def apply[F[+_]: Async, S, M] = new ApplicationContext[F, S, M]()
 
   case class LegacyEventResult[F[+ _]: Async, S](
       immediate: Option[Transition[S]] = None,

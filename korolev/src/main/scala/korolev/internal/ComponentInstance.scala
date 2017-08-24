@@ -3,6 +3,7 @@ package korolev.internal
 import korolev._
 import Context._
 import Async._
+import korolev.execution.Scheduler
 import levsha.Document.Node
 import levsha.{Id, StatefulRenderContext, XmlNs}
 import levsha.events.EventId
@@ -21,11 +22,14 @@ import scala.util.{Failure, Random, Success, Try}
   * 3. applyRenderContext()
   * 4. dropObsoleteMisc()
   */
-final class ComponentInstance[F[+ _]: Async, AS, M, CS, P, E](nodeId: Id,
-                                                              frontend: ClientSideApi[F],
-                                                              eventRegistry: EventRegistry[F],
-                                                              val component: Component[F, CS, P, E])
-  extends LazyLogging { self =>
+final class ComponentInstance[F[+ _]: Async: Scheduler, AS, M, CS, P, E](
+    nodeId: Id,
+    frontend: ClientSideApi[F],
+    eventRegistry: EventRegistry[F],
+    val component: Component[F, CS, P, E]
+) extends LazyLogging { self =>
+
+  import ComponentInstance._
 
   private val async = Async[F]
   private val miscLock = new Object()
@@ -34,7 +38,7 @@ final class ComponentInstance[F[+ _]: Async, AS, M, CS, P, E](nodeId: Id,
 
   private val markedDelays = mutable.Set.empty[Id] // Set of the delays which are should survive
   private val markedComponentInstances = mutable.Set.empty[Id]
-  private val delays = mutable.Map.empty[Id, Delay[F, CS, E]]
+  private val delays = mutable.Map.empty[Id, DelayInstance[F, CS, E]]
   private val elements = mutable.Map.empty[ElementId[F, CS, E], Id]
   private val events = mutable.Map.empty[EventId, Event[F, CS, E]]
   private val nestedComponents = mutable.Map.empty[Id, ComponentInstance[F, CS, E, _, _, _]]
@@ -177,14 +181,14 @@ final class ComponentInstance[F[+ _]: Async, AS, M, CS, P, E](nodeId: Id,
     val node =
       try {
         component.render(parameters, state)
-      }
-      catch {
-        case e: MatchError => Node[Effect[F, CS, E]] { rc =>
-          logger.error(s"Render is not defined for $state", e)
-          rc.openNode(XmlNs.html, "span")
-          rc.addTextNode("Render is not defined for the state")
-          rc.closeNode("span")
-        }
+      } catch {
+        case e: MatchError =>
+          Node[Effect[F, CS, E]] { rc =>
+            logger.error(s"Render is not defined for $state", e)
+            rc.openNode(XmlNs.html, "span")
+            rc.addTextNode("Render is not defined for the state")
+            rc.closeNode("span")
+          }
       }
     val proxy = new StatefulRenderContext[Effect[F, CS, E]] { proxy =>
       def currentId: Id = rc.currentId
@@ -207,8 +211,9 @@ final class ComponentInstance[F[+ _]: Async, AS, M, CS, P, E](nodeId: Id,
             val id = rc.currentContainerId
             markedDelays += id
             if (!delays.contains(id)) {
-              delays.put(id, delay)
-              delay.start(browserAccess)
+              val delayInstance = new DelayInstance(delay)
+              delays.put(id, delayInstance)
+              delayInstance.start(browserAccess)
             }
           case entry @ ComponentEntry(_, _: Any, _: ((Access[F, CS, E], Any) => F[Unit])) =>
             val id = rc.currentId
@@ -329,6 +334,33 @@ final class ComponentInstance[F[+ _]: Async, AS, M, CS, P, E](nodeId: Id,
           nested.handleFormDataProgress(descriptor, loaded, total)
         }
       case Some(f) => applyTransition(f(loaded.toInt, total.toInt))
+    }
+  }
+}
+
+private object ComponentInstance {
+
+  import Context.Access
+  import Context.Delay
+
+  final class DelayInstance[F[+ _]: Async: Scheduler, S, M](delay: Delay[F, S, M]) {
+
+    @volatile private var handler = Option.empty[Scheduler.JobHandler[F, _]]
+    @volatile private var finished = false
+
+    def isFinished: Boolean = finished
+
+    def cancel(): Unit = {
+      handler.foreach(_.cancel())
+    }
+
+    def start(access: Access[F, S, M]): Unit = {
+      handler = Some {
+        Scheduler[F].scheduleOnce(delay.duration) {
+          finished = true
+          delay.effect(access).runIgnoreResult
+        }
+      }
     }
   }
 }

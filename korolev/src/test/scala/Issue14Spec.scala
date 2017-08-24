@@ -7,7 +7,7 @@ import korolev.testExecution._
 
 class Issue14Spec extends FlatSpec with Matchers {
 
-  import Issue14Spec.applicationContext._
+  import Issue14Spec.context._
 
   "Korolev" should "ignore events from outdated DOM" in {
 
@@ -54,10 +54,10 @@ object Issue14Spec {
 
   type S = String
 
-  val applicationContext = Context[Future, Issue14Spec.S, Any]
+  val context = Context[Future, Issue14Spec.S, Any]
 
-  import applicationContext._
-  import applicationContext.symbolDsl._
+  import context._
+  import context.symbolDsl._
 
   def render(firstEvent: Event, secondEvent: Event): Render = {
     case "firstState" =>

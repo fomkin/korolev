@@ -1,7 +1,7 @@
 import com.typesafe.sbt.packager.archetypes.JavaAppPackaging
 import com.typesafe.sbt.packager.universal.UniversalPlugin
 
-val levshaVersion = "0.6.0"
+val levshaVersion = "0.6.1-SNAPSHOT"
 
 val unusedRepo = Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
 

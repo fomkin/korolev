@@ -1,14 +1,12 @@
 package korolev
 
-import korolev.execution.Scheduler
 import korolev.internal.{ClientSideApi, ComponentInstance, EventRegistry}
 import levsha._
 import levsha.events.EventPhase
-import Async._
 
 import scala.concurrent.duration.FiniteDuration
 
-final class Context[F[+_]: Async: Scheduler, S, M] {
+final class Context[F[+_]: Async, S, M] {
 
   import Context._
   import EventPhase._
@@ -31,26 +29,8 @@ final class Context[F[+_]: Async: Scheduler, S, M] {
     * Schedules the transition with delay. For example it can be useful
     * when you want to hide something after timeout.
     */
-  def delay(delay: FiniteDuration)(effect: Access[F, S, M] => F[Unit]): Delay[F, S, M] = new Delay[F, S, M] {
-
-    @volatile private var handler = Option.empty[Scheduler.JobHandler[F, _]]
-    @volatile private var finished = false
-
-    def isFinished: Boolean = finished
-
-    def cancel(): Unit = {
-      handler.foreach(_.cancel())
-    }
-
-    def start(access: Access[F, S, M]): Unit = {
-      handler = Some {
-        Scheduler[F].scheduleOnce(delay) {
-          finished = true
-          effect(access).runIgnoreResult
-        }
-      }
-    }
-  }
+  def delay(duration: FiniteDuration)(effect: Access[F, S, M] => F[Unit]): Delay[F, S, M] =
+    Delay(duration, effect)
 
   def event(name: Symbol, phase: EventPhase = Bubbling)(
       effect: Access[F, S, M] => EventResult[F, S]): Event =
@@ -84,8 +64,7 @@ object Context {
     * @tparam S State
     * @tparam M Message
     */
-  def apply[F[+_]: Async, S, M](implicit scheduler: Scheduler[F]) =
-    new Context[F, S, M]()
+  def apply[F[+_]: Async, S, M] = new Context[F, S, M]()
 
   abstract class Access[F[+_]: Async, S, M] {
 
@@ -166,12 +145,6 @@ object Context {
     def start(): F[FormData]
   }
 
-  abstract class Delay[F[+_]: Async, S, M] extends Effect[F, S, M] {
-    def start(access: Access[F, S, M]): Unit
-    def isFinished: Boolean
-    def cancel(): Unit
-  }
-
   final case class ComponentEntry[F[+_]: Async, AS, M, CS, P, E](component: Component[F, CS, P, E],
                                                                  parameters: P,
                                                                  eventHandler: (Access[F, AS, M], E) => F[Unit]) extends Effect[F, AS, M] {
@@ -185,6 +158,10 @@ object Context {
       `type`: Symbol,
       phase: EventPhase,
       effect: Access[F, S, M] => EventResult[F, S]) extends Effect[F, S, M]
+
+  final case class Delay[F[+_]: Async, S, M](
+      duration: FiniteDuration,
+      effect: Access[F, S, M] => F[Unit]) extends Effect[F, S, M]
 
   final class ElementId[F[+_]: Async, S, M] extends Effect[F, S, M]
 }

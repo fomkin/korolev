@@ -4,6 +4,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 import korolev.Context._
 import korolev.Async.AsyncOps
+import korolev.execution.Scheduler
 import korolev.{Async, Component, Router, StateReader}
 import levsha.events.calculateEventPropagation
 import levsha.impl.DiffRenderContext
@@ -12,7 +13,7 @@ import slogging.LazyLogging
 
 import scala.util.{Failure, Success}
 
-final class ApplicationInstance[F[+ _]: Async, S, M](
+final class ApplicationInstance[F[+ _]: Async: Scheduler, S, M](
     identifier: String,
     connection: Connection[F],
     stateReader: StateReader,
@@ -101,7 +102,7 @@ final class ApplicationInstance[F[+ _]: Async, S, M](
   )
 
   frontend.setRenderNum(0)
-  
+
   // Content should be created from scratch
   // Remove all element from document.body
   if (fromScratch)

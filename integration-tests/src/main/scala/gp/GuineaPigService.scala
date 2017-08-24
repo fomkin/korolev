@@ -181,8 +181,8 @@ object GuineaPigService {
             }
           ),
           'div(
-            TheComponent("label") { (_, _) =>
-              immediateTransition {
+            TheComponent("label") { (access, _) =>
+              access.transition {
                 case s => s.copy(eventFromComponentReceived = true)
               }
             },
