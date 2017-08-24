@@ -16,7 +16,7 @@ class Issue14Spec extends FlatSpec with Matchers {
     val connection = new Connection[Future]()
 
     new ApplicationInstance(
-      identifier = "",
+      sessionId = QualifiedSessionId("", ""),
       connection = connection,
       fromScratch = true,
       router = Router.empty[Future, String, String],

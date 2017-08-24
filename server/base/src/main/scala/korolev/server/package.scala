@@ -144,8 +144,8 @@ package object server extends LazyLogging {
 
         // Create Korolev with dynamic router
         val router = config.serverRouter.dynamic(deviceId, sessionId)
-        val sessionKey = makeSessionKey(deviceId, sessionId)
-        val korolev = new ApplicationInstance(sessionKey, connection, stateReader, config.render, router, fromScratch = isNew)
+        val qualifiedSessionId = QualifiedSessionId(deviceId, sessionId)
+        val korolev = new ApplicationInstance(qualifiedSessionId, connection, stateReader, config.render, router, fromScratch = isNew)
         val applyTransition = korolev.topLevelComponentInstance.applyTransition _ andThen Async[F].pureStrict _
         val env = config.envConfigurator(deviceId, sessionId, applyTransition)
         // Subscribe to events to publish them to env

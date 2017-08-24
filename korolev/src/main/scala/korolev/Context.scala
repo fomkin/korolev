@@ -152,6 +152,11 @@ object Context {
       * Applies transition to current state
       */
     def transition(f: Transition[S]): F[Unit]
+
+    /**
+      * Gives current session id
+      */
+    def sessionId: F[QualifiedSessionId]
   }
 
   sealed abstract class Effect[F[+_]: Async, S, M]
@@ -170,8 +175,8 @@ object Context {
                                                                  parameters: P,
                                                                  eventHandler: (Access[F, AS, M], E) => F[Unit]) extends Effect[F, AS, M] {
 
-    def createInstance(node: Id, frontend: ClientSideApi[F], eventRegistry: EventRegistry[F]): ComponentInstance[F, AS, M, CS, P, E] = {
-      new ComponentInstance(node, frontend, eventRegistry, component)
+    def createInstance(node: Id, sessionId: QualifiedSessionId, frontend: ClientSideApi[F], eventRegistry: EventRegistry[F]): ComponentInstance[F, AS, M, CS, P, E] = {
+      new ComponentInstance(node, sessionId, frontend, eventRegistry, component)
     }
   }
 

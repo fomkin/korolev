@@ -24,6 +24,7 @@ import scala.util.{Failure, Random, Success, Try}
   */
 final class ComponentInstance[F[+ _]: Async: Scheduler, AS, M, CS, P, E](
     nodeId: Id,
+    sessionId: QualifiedSessionId,
     frontend: ClientSideApi[F],
     eventRegistry: EventRegistry[F],
     val component: Component[F, CS, P, E]
@@ -91,6 +92,8 @@ final class ComponentInstance[F[+ _]: Async: Scheduler, AS, M, CS, P, E](
     }
 
     def state: F[CS] = async.pure(self.state)
+
+    def sessionId: F[QualifiedSessionId] = async.pure(self.sessionId)
 
     def transition(f: Transition[CS]): F[Unit] = {
       applyTransition(f)
@@ -225,7 +228,7 @@ final class ComponentInstance[F[+ _]: Async: Scheduler, AS, M, CS, P, E](
                 n.applyRenderContext(entry.parameters, proxy, stateReaderOpt)
               case _ =>
                 // Create new nested component instance
-                val n = entry.createInstance(id, frontend, eventRegistry)
+                val n = entry.createInstance(id, sessionId, frontend, eventRegistry)
                 markedComponentInstances += id
                 nestedComponents.put(id, n)
                 stateReaderOpt.foreach { stateReader =>

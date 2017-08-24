@@ -5,7 +5,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import korolev.Context._
 import korolev.Async.AsyncOps
 import korolev.execution.Scheduler
-import korolev.{Async, Component, Router, StateReader}
+import korolev._
 import levsha.events.calculateEventPropagation
 import levsha.impl.DiffRenderContext
 import levsha.{Document, Id, XmlNs}
@@ -14,7 +14,7 @@ import slogging.LazyLogging
 import scala.util.{Failure, Success}
 
 final class ApplicationInstance[F[+ _]: Async: Scheduler, S, M](
-    identifier: String,
+    sessionId: QualifiedSessionId,
     connection: Connection[F],
     stateReader: StateReader,
     render: PartialFunction[S, Document.Node[Effect[F, S, M]]],
@@ -22,7 +22,7 @@ final class ApplicationInstance[F[+ _]: Async: Scheduler, S, M](
     fromScratch: Boolean
 ) extends LazyLogging {
 
-  private val devMode = new DevMode.ForRenderContext(identifier, fromScratch)
+  private val devMode = new DevMode.ForRenderContext(sessionId.toString, fromScratch)
   private val currentRenderNum = new AtomicInteger(0)
   private val renderContext = DiffRenderContext[Effect[F, S, M]](savedBuffer = devMode.loadRenderContext())
   private val frontend = new ClientSideApi[F](connection)
@@ -43,7 +43,7 @@ final class ApplicationInstance[F[+ _]: Async: Scheduler, S, M](
         }
       }
     }
-    new ComponentInstance[F, S, M, S, Any, M](Id.TopLevel, frontend, eventRegistry, component)
+    new ComponentInstance[F, S, M, S, Any, M](Id.TopLevel, sessionId, frontend, eventRegistry, component)
   }
 
   private def onState(giveStateReader: Boolean) = renderContext.synchronized {
