@@ -31,9 +31,9 @@ object SimpleExample extends KorolevBlazeServer {
                     if (todo.done) 'checked /= "" else void,
                     // Generate transition when clicking checkboxes
                     event('click) { access =>
-                      access.transition { case tState =>
-                        val updated = tState.todos.updated(i, tState.todos(i).copy(done = !todo.done))
-                        tState.copy(todos = updated)
+                      access.transition { s =>
+                        val updated = s.todos.updated(i, s.todos(i).copy(done = !todo.done))
+                        s.copy(todos = updated)
                       }
                     }
                   ),
@@ -50,7 +50,7 @@ object SimpleExample extends KorolevBlazeServer {
                       'button('display @= "inline-block", "Save"),
                       event('submit) { access =>
                         access.property(editInputId, 'value) flatMap { value =>
-                          access.transition { case s =>
+                          access.transition { s =>
                             val updatedTodo = s.todos(i).copy(text = value)
                             val updatedTodos = s.todos.updated(i, updatedTodo)
                             s.copy(todos = updatedTodos, edit = None)
@@ -63,9 +63,7 @@ object SimpleExample extends KorolevBlazeServer {
                       if (todo.done) 'textDecoration @= "line-through" else void,
                       todo.text,
                       event('dblclick) { access =>
-                        access.transition {
-                          case s => s.copy(edit = Some(i))
-                        }
+                        access.transition(_.copy(edit = Some(i)))
                       }
                     )
                   }
@@ -79,9 +77,7 @@ object SimpleExample extends KorolevBlazeServer {
               prop.get('value) flatMap { value =>
                 prop.set('value, "") flatMap { _ =>
                   val todo = State.Todo(value, done = false)
-                  access.transition { case tState =>
-                    tState.copy(todos = tState.todos :+ todo)
-                  }
+                  access.transition(s => s.copy(todos = s.todos :+ todo))
                 }
               }
             },

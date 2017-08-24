@@ -33,9 +33,7 @@ object RoutingExample extends KorolevBlazeServer {
             state.todos.keys map { name =>
               'a(
                 event('click) { access =>
-                  access.transition { case s =>
-                    s.copy(selectedTab = name)
-                  }
+                  access.transition(_.copy(selectedTab = name))
                 },
                 'href /= "/" + name.toLowerCase, disableHref,
                 'marginLeft @= 10,
@@ -55,7 +53,7 @@ object RoutingExample extends KorolevBlazeServer {
                     },
                     // Generate transition when clicking checkboxes
                     event('click) { access =>
-                      access.transition { case s =>
+                      access.transition { s =>
                         val todos = s.todos(s.selectedTab)
                         val updated = todos.updated(i, todos(i).copy(done = !todo.done))
                         s.copy(todos = s.todos + (s.selectedTab -> updated))
@@ -72,7 +70,7 @@ object RoutingExample extends KorolevBlazeServer {
             event('submit) { access =>
               access.property(inputId, 'value) flatMap { value =>
                 val todo = State.Todo(value, done = false)
-                access.transition { case s =>
+                access.transition { s =>
                   s.copy(todos = s.todos + (s.selectedTab -> (s.todos(s.selectedTab) :+ todo)))
                 }
               }

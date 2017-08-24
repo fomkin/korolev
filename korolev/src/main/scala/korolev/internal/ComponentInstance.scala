@@ -251,9 +251,11 @@ final class ComponentInstance[F[+ _]: Async: Scheduler, AS, M, CS, P, E](
 
   def applyTransition(transition: Transition[CS]): Unit = {
     stateLock.synchronized {
-      transition.lift(state) match {
-        case Some(newState) => state = newState
-        case None           => ()
+      try {
+        state = transition(state)
+      } catch {
+        case e: MatchError => logger.warn("Transition doesn't fit the state", e)
+        case e: Throwable => logger.error("Exception happened when applying transition", e)
       }
     }
     stateChangeSubscribers.foreach { f =>
