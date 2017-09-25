@@ -85,6 +85,7 @@ final class ApplicationInstance[F[+ _]: Async: Scheduler, S, M](
         asyncState run {
           case Success(newState) =>
             topLevelComponentInstance.setState(newState)
+            onState(giveStateReader = false)
           case Failure(e) =>
             logger.error("Error occurred when updating state", e)
         }

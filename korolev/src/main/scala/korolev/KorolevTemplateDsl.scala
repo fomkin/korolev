@@ -26,7 +26,7 @@ final class KorolevTemplateDsl[F[+_]: Async, S, M] extends TemplateDsl[Effect[F,
   val disableHref = 'onclick /= "return false"
 
   implicit final class KorolevSymbolOps(s: Symbol) {
-    def @=(value: Int): Document.Attr[Effect[F, S, M]] =
+    def @=[T: Numeric](value: T): Document.Attr[Effect[F, S, M]] =
       @=(s"${value}px")
 
     def @=(value: String): Document.Attr[Effect[F, S, M]] = Document.Attr { rc =>

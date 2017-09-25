@@ -39,22 +39,19 @@ package object server extends LazyLogging {
       stateF.flatMap(config.stateStorage.write(deviceId, sessionId, Id.TopLevel, _)).map { state =>
         val dsl = new levsha.TemplateDsl[Context.Effect[F, S, M]]()
         val textRenderContext = new HtmlRenderContext[F, S, M]()
+        val rootPath = config.serverRouter.rootPath
+        val clw = {
+          val textRenderContext = new HtmlRenderContext[F, S, M]()
+          config.connectionLostWidget(textRenderContext)
+          textRenderContext.mkString
+        }
+
         import dsl._
 
         val document = 'html(
           'head(
-            'script('language /= "javascript",
-              s"""window['KorolevConfig'] = {
-                 |  'sessionId': '$sessionId',
-                 |  'serverRootPath': '${config.serverRouter.rootPath}',
-                 |  'connectionLostWidget': '${
-                   val textRenderContext = new HtmlRenderContext[F, S, M]()
-                   config.connectionLostWidget(textRenderContext)
-                   textRenderContext.mkString
-                 }'
-                 |};""".stripMargin
-            ),
-            'script('src /= "korolev-client.min.js"),
+            'script('language /= "javascript", s"window['kfg']={sid:'$sessionId',r:'${rootPath}',clw:'$clw'}"),
+            'script('src /= config.serverRouter.rootPath + "korolev-client.min.js"),
             config.head
           ),
           config.render(state)

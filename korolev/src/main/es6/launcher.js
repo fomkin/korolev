@@ -10,12 +10,12 @@ window['Bridge'] = {
 
 window.document.addEventListener("DOMContentLoaded", () => {
 
-  let config = window['KorolevConfig'];
-  let clw = new ConnectionLostWidget(config['connectionLostWidget']);
+  let config = window['kfg'];
+  let clw = new ConnectionLostWidget(config['clw']);
   let connection = new Connection(
     getCookie('device'),
-    config['sessionId'],
-    config['serverRootPath'],
+    config['sid'],
+    config['r'],
     window.location
   );
 

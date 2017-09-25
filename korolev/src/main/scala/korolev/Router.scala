@@ -28,11 +28,10 @@ object Router {
       }
       "/" + aux(Nil, this).mkString("/")
     }
-  }
-  case class /(prev: Path, value: String) extends Path
-  case object Root extends Path {
     def /(s: String): Path = Router./(this, s)
   }
+  case class /(prev: Path, value: String) extends Path
+  case object Root extends Path
 
   object Path {
     val fromString: String => Path = _.split("/")
