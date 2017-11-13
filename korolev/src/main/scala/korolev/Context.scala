@@ -1,6 +1,7 @@
 package korolev
 
 import korolev.internal.{ClientSideApi, ComponentInstance, EventRegistry}
+import korolev.state.{StateDeserializer, StateManager, StateSerializer}
 import levsha._
 import levsha.events.EventPhase
 
@@ -10,7 +11,7 @@ import scala.concurrent.duration.FiniteDuration
   * Provides DSLs and effects for application or component
   * @since 0.6.0
   */
-final class Context[F[+_]: Async, S, M] {
+final class Context[F[+_]: Async, S: StateSerializer: StateDeserializer, M] {
 
   import Context._
   import EventPhase._
@@ -52,7 +53,7 @@ final class Context[F[+_]: Async, S, M] {
       EventResult(effect, stopPropagation = true)
   }
 
-  implicit final class ComponentDsl[CS, P, E](component: Component[F, CS, P, E]) {
+  implicit final class ComponentDsl[CS: StateSerializer: StateDeserializer, P, E](component: Component[F, CS, P, E]) {
     def apply(parameters: P)(f: (Access, E) => F[Unit]): ComponentEntry[F, S, M, CS, P, E] =
       ComponentEntry(component, parameters, f)
 
@@ -70,7 +71,7 @@ object Context {
     * @tparam S Type of application state
     * @tparam M Type of events
     */
-  def apply[F[+_]: Async, S, M] = new Context[F, S, M]()
+  def apply[F[+_]: Async, S: StateSerializer: StateDeserializer, M] = new Context[F, S, M]()
 
   /**
     * Provides access to make side effects
@@ -171,12 +172,24 @@ object Context {
     def start(): F[FormData]
   }
 
-  final case class ComponentEntry[F[+_]: Async, AS, M, CS, P, E](component: Component[F, CS, P, E],
-                                                                 parameters: P,
-                                                                 eventHandler: (Access[F, AS, M], E) => F[Unit]) extends Effect[F, AS, M] {
+  final case class ComponentEntry
+    [
+      F[+_]: Async,
+      AS: StateSerializer: StateDeserializer, M,
+      CS: StateSerializer: StateDeserializer, P, E
+    ](
+      component: Component[F, CS, P, E],
+      parameters: P,
+      eventHandler: (Access[F, AS, M], E) => F[Unit]
+    )
+    extends Effect[F, AS, M] {
 
-    def createInstance(node: Id, sessionId: QualifiedSessionId, frontend: ClientSideApi[F], eventRegistry: EventRegistry[F]): ComponentInstance[F, AS, M, CS, P, E] = {
-      new ComponentInstance(node, sessionId, frontend, eventRegistry, component)
+    def createInstance(node: Id,
+                       sessionId: QualifiedSessionId,
+                       frontend: ClientSideApi[F],
+                       eventRegistry: EventRegistry[F],
+                       stateManager: StateManager[F]): ComponentInstance[F, AS, M, CS, P, E] = {
+      new ComponentInstance(node, sessionId, frontend, eventRegistry, stateManager, component)
     }
   }
 

@@ -36,7 +36,7 @@ class Issue14Spec extends FlatSpec with Matchers {
           }
         )
       },
-      stateReader = StateReader.withTopLevelState("firstState")
+      stateManager = StateReader.withTopLevelState("firstState")
     )
 
     def fireEvent(data: String) =

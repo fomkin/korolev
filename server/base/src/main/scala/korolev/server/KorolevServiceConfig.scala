@@ -1,12 +1,11 @@
 package korolev.server
 
 import korolev.server.KorolevServiceConfig.{ApplyTransition, Env, EnvConfigurator}
-import korolev.server.StateStorage.{DeviceId, SessionId}
 import korolev.{Context, Async, Transition}
 import levsha.{Document, TemplateDsl}
 
 case class KorolevServiceConfig[F[+_]: Async, S, M](
-  stateStorage: StateStorage[F, S],
+  stateStorage: korolev.state.StateStorage[F, S],
   serverRouter: ServerRouter[F, S],
   render: PartialFunction[S, Document.Node[Context.Effect[F, S, M]]],
   head: Seq[Document.Node[Context.Effect[F, S, M]]] = Seq.empty,
@@ -14,14 +13,14 @@ case class KorolevServiceConfig[F[+_]: Async, S, M](
     KorolevServiceConfig.defaultConnectionLostWidget[Context.Effect[F, S, M]],
   maxFormDataEntrySize: Int = 1024 * 1024 * 8,
   envConfigurator: EnvConfigurator[F, S, M] =
-    (_: DeviceId, _: SessionId, _: ApplyTransition[F, S]) =>
+    (_: String, _: String, _: ApplyTransition[F, S]) =>
       Env(onDestroy = () => (), PartialFunction.empty)
 )
 
 object KorolevServiceConfig {
   case class Env[M](onDestroy: () => Unit, onMessage: PartialFunction[M, Unit])
   type ApplyTransition[F[+_], S] = Transition[S] => F[Unit]
-  type EnvConfigurator[F[+_], S, M] = (DeviceId, SessionId, ApplyTransition[F, S]) => Env[M]
+  type EnvConfigurator[F[+_], S, M] = (String, String, ApplyTransition[F, S]) => Env[M]
 
   def defaultConnectionLostWidget[MiscType] = {
     val dsl = new TemplateDsl[MiscType]()

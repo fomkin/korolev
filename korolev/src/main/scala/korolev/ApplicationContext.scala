@@ -3,6 +3,7 @@ package korolev
 import levsha.Document
 import levsha.events.EventPhase
 import Async._
+import korolev.state.{StateDeserializer, StateSerializer}
 
 import scala.concurrent.duration.FiniteDuration
 import scala.reflect.ClassTag
@@ -12,7 +13,7 @@ import scala.reflect.ClassTag
   * @see [[Context]]
   * @deprecated
   */
-final class ApplicationContext[F[+ _]: Async, S, M] {
+final class ApplicationContext[F[+ _]: Async, S: StateSerializer: StateDeserializer, M] {
 
   import Context._
   import ApplicationContext._
@@ -73,7 +74,8 @@ final class ApplicationContext[F[+ _]: Async, S, M] {
 object ApplicationContext {
 
   @deprecated("This is compatibility layer for old fashioned API. Use Context instead.", "0.6.0")
-  def apply[F[+_]: Async, S, M] = new ApplicationContext[F, S, M]()
+  def apply[F[+_]: Async, S: StateSerializer: StateDeserializer, M] =
+    new ApplicationContext[F, S, M]()
 
   case class LegacyEventResult[F[+ _]: Async, S](
       immediate: Option[Transition[S]] = None,

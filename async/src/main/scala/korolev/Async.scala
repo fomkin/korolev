@@ -1,6 +1,7 @@
 package korolev
 
 import scala.annotation.implicitNotFound
+import scala.collection.generic.CanBuildFrom
 import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
@@ -16,7 +17,7 @@ trait Async[F[+_]] {
   def flatMap[A, B](m: F[A])(f: A => F[B]): F[B]
   def map[A, B](m: F[A])(f: A => B): F[B]
   def recover[A, U >: A](m: F[A])(f: PartialFunction[Throwable, U]): F[U]
-  def sequence[A](xs: Seq[F[A]]): F[Seq[A]]
+  def sequence[A, M[X] <: TraversableOnce[X]](in: M[F[A]])(implicit cbf: CanBuildFrom[M[F[A]], A, M[A]]): F[M[A]]
   def run[A, U](m: F[A])(f: Try[A] => U): Unit
 }
 
@@ -39,7 +40,8 @@ object Async {
     def map[A, B](m: Future[A])(f: (A) => B): Future[B] = m.map(f)
     def run[A, U](m: Future[A])(f: (Try[A]) => U): Unit = m.onComplete(f)
     def recover[A, U >: A](m: Future[A])(f: PartialFunction[Throwable, U]): Future[U] = m.recover(f)
-    def sequence[A](xs: Seq[Future[A]]): Future[Seq[A]] = Future.sequence(xs)
+    def sequence[A, M[X] <: TraversableOnce[X]](in: M[Future[A]])(implicit cbf: CanBuildFrom[M[Future[A]], A, M[A]]): Future[M[A]] =
+      Future.sequence(in)
     def promise[A]: Promise[Future, A] = {
       val promise = scala.concurrent.Promise[A]()
       Promise(promise.future, a => { promise.complete(a); () })
@@ -61,6 +63,11 @@ object Async {
     def flatMap[B](f: A => F[B]): F[B] = Async[F].flatMap(async)(f)
     def recover[U >: A](f: PartialFunction[Throwable, U]): F[U] = Async[F].recover[A, U](async)(f)
     def run[U](f: Try[A] => U): Unit = Async[F].run(async)(f)
+    def runOrReport[U](f: A => U)(implicit er: ErrorReporter = ErrorReporter.default): Unit =
+      Async[F].run(async) {
+        case Success(x) => f(x)
+        case Failure(e) => er.reportError(e)
+      }
     def runIgnoreResult(implicit er: ErrorReporter = ErrorReporter.default): Unit =
       Async[F].run(async) {
         case Success(_) => // do nothing

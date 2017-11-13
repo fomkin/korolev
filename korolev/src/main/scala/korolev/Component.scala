@@ -2,6 +2,7 @@ package korolev
 
 import korolev.Context._
 import korolev.execution.Scheduler
+import korolev.state.{StateDeserializer, StateSerializer}
 import levsha.Document.Node
 
 import scala.util.Random
@@ -17,8 +18,14 @@ import scala.util.Random
   * @tparam S State of the component
   * @tparam E Type of events produced by component
   */
-abstract class Component[F[+ _]: Async: Scheduler, S, P, E](val initialState: S,
-                                                            val id: String = Component.randomId()) {
+abstract class Component
+  [
+    F[+ _]: Async: Scheduler,
+    S: StateSerializer: StateDeserializer, P, E
+  ](
+    val initialState: S,
+    val id: String = Component.randomId()
+  ) {
 
   /**
     * Component context.
@@ -46,8 +53,9 @@ object Component {
     * @param f Component renderer
     * @see [[Component]]
     */
-  def apply[F[+ _]: Async: Scheduler, S, P, E](initialState: S, id: String = Component.randomId())(
-      f: Render[F, S, P, E]): Component[F, S, P, E] = {
+  def apply[F[+ _]: Async: Scheduler, S: StateSerializer: StateDeserializer, P, E]
+           (initialState: S, id: String = Component.randomId())
+           (f: Render[F, S, P, E]): Component[F, S, P, E] = {
     new Component[F, S, P, E](initialState, id) {
       def render(parameters: P, state: S): Node[Effect[F, S, E]] = f(context, parameters, state)
     }

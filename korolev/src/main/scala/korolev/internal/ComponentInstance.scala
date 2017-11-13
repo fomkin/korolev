@@ -4,6 +4,7 @@ import korolev._
 import Context._
 import Async._
 import korolev.execution.Scheduler
+import korolev.state.{StateDeserializer, StateManager, StateSerializer}
 import levsha.Document.Node
 import levsha.{Id, StatefulRenderContext, XmlNs}
 import levsha.events.EventId
@@ -22,19 +23,25 @@ import scala.util.{Failure, Random, Success, Try}
   * 3. applyRenderContext()
   * 4. dropObsoleteMisc()
   */
-final class ComponentInstance[F[+ _]: Async: Scheduler, AS, M, CS, P, E](
+final class ComponentInstance
+  [
+    F[+ _]: Async: Scheduler,
+    AS: StateSerializer: StateDeserializer, M,
+    CS: StateSerializer: StateDeserializer, P, E
+  ](
     nodeId: Id,
     sessionId: QualifiedSessionId,
     frontend: ClientSideApi[F],
     eventRegistry: EventRegistry[F],
+    stateManager: StateManager[F],
     val component: Component[F, CS, P, E]
-) extends LazyLogging { self =>
+  )
+  extends LazyLogging { self =>
 
   import ComponentInstance._
 
   private val async = Async[F]
   private val miscLock = new Object()
-  private val stateLock = new Object()
   private val subscriptionsLock = new Object()
 
   private val markedDelays = mutable.Set.empty[Id] // Set of the delays which are should survive
@@ -45,7 +52,6 @@ final class ComponentInstance[F[+ _]: Async: Scheduler, AS, M, CS, P, E](
   private val nestedComponents = mutable.Map.empty[Id, ComponentInstance[F, CS, E, _, _, _]]
   private val formDataPromises = mutable.Map.empty[String, Promise[F, FormData]]
   private val formDataProgressTransitions = mutable.Map.empty[String, (Int, Int) => Transition[CS]]
-  private var state = component.initialState
 
   private val stateChangeSubscribers = mutable.ArrayBuffer.empty[(Id, Any) => Unit]
   private var eventSubscription = Option.empty[E => _]
@@ -91,14 +97,13 @@ final class ComponentInstance[F[+ _]: Async: Scheduler, AS, M, CS, P, E](
       async.unit
     }
 
-    def state: F[CS] = async.pure(self.state)
+    def state: F[CS] = stateManager
+      .read[CS](nodeId)
+      .map(_.get)
 
     def sessionId: F[QualifiedSessionId] = async.pure(self.sessionId)
 
-    def transition(f: Transition[CS]): F[Unit] = {
-      applyTransition(f)
-      async.unit
-    }
+    def transition(f: Transition[CS]): F[Unit] = applyTransition(f)
 
     def downloadFormData(element: ElementId[F, CS, E]): FormDataDownloader[F, CS] = new FormDataDownloader[F, CS] {
       val descriptor = Random.alphanumeric.take(5).mkString
@@ -153,34 +158,10 @@ final class ComponentInstance[F[+ _]: Async: Scheduler, AS, M, CS, P, E](
     }
   }
 
-  /**
-    * Set state of the component from the outside.
-    */
-  def setState(newState: CS): Unit = stateLock.synchronized {
-    state = newState
-  }
-
-  /**
-    * Type-unsafe version of setState
-    */
-  def setStateUnsafe(newState: Any): Unit = {
-    setState(newState.asInstanceOf[CS])
-  }
-
-  def restoreState(stateReader: StateReader): Unit = {
-    stateReader.read[CS](nodeId) foreach { newState =>
-      setState(newState)
-    }
-  }
-
-  /**
-    * Gives current state of the component instance
-    */
-  def getState: CS = state
-
   def applyRenderContext(parameters: P,
                          rc: StatefulRenderContext[Effect[F, AS, M]],
-                         stateReaderOpt: Option[StateReader]): Unit = miscLock.synchronized {
+                         snapshot: StateManager.Snapshot): Unit = miscLock.synchronized {
+    val state = snapshot[CS](nodeId).getOrElse(component.initialState)
     val node =
       try {
         component.render(parameters, state)
@@ -225,17 +206,12 @@ final class ComponentInstance[F[+ _]: Async: Scheduler, AS, M, CS, P, E](
                 // Use nested component instance
                 markedComponentInstances += id
                 n.setEventsSubscription((e: Any) => entry.eventHandler(browserAccess, e).runIgnoreResult)
-                n.applyRenderContext(entry.parameters, proxy, stateReaderOpt)
+                n.applyRenderContext(entry.parameters, proxy, snapshot)
               case _ =>
                 // Create new nested component instance
-                val n = entry.createInstance(id, sessionId, frontend, eventRegistry)
+                val n = entry.createInstance(id, sessionId, frontend, eventRegistry, stateManager)
                 markedComponentInstances += id
                 nestedComponents.put(id, n)
-                stateReaderOpt.foreach { stateReader =>
-                  // If state reader is available then try to
-                  // to restore state for this nested component instance
-                  n.restoreState(stateReader)
-                }
                 n.subscribeStateChange { (id, state) =>
                   // Propagate nested component instance state change event
                   // to high-level component instance
@@ -244,7 +220,7 @@ final class ComponentInstance[F[+ _]: Async: Scheduler, AS, M, CS, P, E](
                   }
                 }
                 n.setEventsSubscription((e: Any) => entry.eventHandler(browserAccess, e).runIgnoreResult)
-                n.applyRenderContext(entry.parameters, proxy, stateReaderOpt)
+                n.applyRenderContext(entry.parameters, proxy, snapshot)
             }
         }
       }
@@ -252,24 +228,30 @@ final class ComponentInstance[F[+ _]: Async: Scheduler, AS, M, CS, P, E](
     node(proxy)
   }
 
-  def applyTransition(transition: Transition[CS]): Unit = {
-    stateLock.synchronized {
+  def applyTransition(transition: Transition[CS]): F[Unit] = {
+    stateManager.read[CS](nodeId) flatMap { maybeState =>
+      val state = maybeState.getOrElse(component.initialState)
       try {
-        state = transition(state)
+        val newState = transition(state)
+        stateChangeSubscribers.foreach(_.apply(nodeId, state))
+        stateManager.write(nodeId, newState)
       } catch {
-        case e: MatchError => logger.warn("Transition doesn't fit the state", e)
-        case e: Throwable => logger.error("Exception happened when applying transition", e)
+        case e: MatchError =>
+          logger.warn("Transition doesn't fit the state", e)
+          async.unit
+        case e: Throwable =>
+          logger.error("Exception happened when applying transition", e)
+          async.unit
       }
-    }
-    stateChangeSubscribers.foreach { f =>
-      f(nodeId, state)
     }
   }
 
   def applyEvent(eventId: EventId): Boolean = {
     events.get(eventId) match {
-      case Some(event: Event[F, CS, E]) => applyEventResult(event.effect(browserAccess))
+      case Some(event: Event[F, CS, E]) =>
+        applyEventResult(event.effect(browserAccess))
       case None =>
+        print("  ")
         nestedComponents.values.forall { nested =>
           nested.applyEvent(eventId)
         }
@@ -338,7 +320,9 @@ final class ComponentInstance[F[+ _]: Async: Scheduler, AS, M, CS, P, E](
         nestedComponents.values.foreach { nested =>
           nested.handleFormDataProgress(descriptor, loaded, total)
         }
-      case Some(f) => applyTransition(f(loaded.toInt, total.toInt))
+      case Some(f) =>
+        applyTransition(f(loaded.toInt, total.toInt))
+          .runIgnoreResult
     }
   }
 }
