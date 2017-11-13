@@ -171,7 +171,7 @@ object GuineaPigService {
           'div('id /= "delay-text",
             if (state.delayOn) "Wait a second" else "Click me",
             if (state.delayOn) {
-              delay(1.second) { access =>
+              delay(2.second) { access =>
                 access.transition {
                   case s => s.copy(delayOn = false)
                 }

@@ -301,10 +301,10 @@ export class Korolev {
     var formData = new FormData(form);
     var request = new XMLHttpRequest();
     var deviceId = getCookie('device');
-    var uri = self.config['serverRootPath'] +
+    var uri = self.config['r'] +
       'bridge' +
       '/' + deviceId +
-      '/' + self.config['sessionId'] +
+      '/' + self.config['sid'] +
       '/form-data' +
       '/' + descriptor;
     request.open("POST", uri, true);

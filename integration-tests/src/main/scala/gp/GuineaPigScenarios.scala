@@ -108,12 +108,12 @@ object GuineaPigScenarios {
     step("Delay should be performed") { wd =>
       val el = wd.findElement(By.id("delay-text"))
       el.click()
-      sleep(500.millis)
+      sleep(1000.millis)
       assert(
         "delay-text should be 'Wait a second'",
         el.getText == "Wait a second"
       )
-      sleep(3000.millis)
+      sleep(2000.millis)
       assert(
         "delay-text should be 'Click me'",
         el.getText == "Click me"
