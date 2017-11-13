@@ -88,9 +88,11 @@ object GuineaPigScenarios {
         val file = File.createTempFile("korolev-upload-test", "cow")
         new PrintWriter(file) {
           write(text)
+          flush()
           close()
         }
         wd.findElement(By.name("upload-input")).sendKeys(file.getAbsolutePath)
+        sleep(500.millis)
         wd.findElement(By.id("upload-button")).click()
         assert(s"upload-text.textContent should be $text", wait(wd).until(
           ExpectedConditions.textToBe(
@@ -106,12 +108,12 @@ object GuineaPigScenarios {
     step("Delay should be performed") { wd =>
       val el = wd.findElement(By.id("delay-text"))
       el.click()
-      sleep(200.millis)
+      sleep(1000.millis)
       assert(
         "delay-text should be 'Wait a second'",
         el.getText == "Wait a second"
       )
-      sleep(900.millis)
+      sleep(2000.millis)
       assert(
         "delay-text should be 'Click me'",
         el.getText == "Click me"

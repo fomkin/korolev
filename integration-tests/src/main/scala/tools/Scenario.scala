@@ -20,7 +20,7 @@ case class Scenario(name: String, steps: Seq[Step]) {
       Future {
 
         val capsDc = caps.desiredCapabilities
-        val scenarioName = s"'$name' for ${capsDc.getPlatform}/${capsDc.getBrowserName}"
+        val scenarioName = s"'$name' for ${capsDc.getPlatform}/${capsDc.getBrowserName}/${capsDc.getVersion}"
         val sb = StringBuilder.newBuilder
 
         // Show message immediately
@@ -84,6 +84,6 @@ case class Scenario(name: String, steps: Seq[Step]) {
 
     Future
       .sequence(resultFutures)
-      .map(_.forall(identity))
+      .map(_.reduce(_ && _))
   }
 }

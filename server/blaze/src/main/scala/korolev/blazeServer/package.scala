@@ -6,6 +6,7 @@ import java.nio.channels.AsynchronousChannelGroup
 
 import korolev.execution.Scheduler
 import korolev.server.{KorolevServiceConfig, MimeTypes, Request => KorolevRequest, Response => KorolevResponse}
+import korolev.state.{StateDeserializer, StateSerializer}
 import org.http4s.blaze.channel._
 import org.http4s.blaze.channel.nio2.NIO2SocketServerGroup
 import org.http4s.blaze.http.{HttpResponse, HttpService, Response, WSResponse}
@@ -18,13 +19,13 @@ import scala.concurrent.duration._
 
 package object blazeServer {
 
-  def blazeService[F[+_]: Async, S, M]: BlazeServiceBuilder[F, S, M] =
+  def blazeService[F[+_]: Async, S: StateSerializer: StateDeserializer, M]: BlazeServiceBuilder[F, S, M] =
     new BlazeServiceBuilder(server.mimeTypes)
 
-  def blazeService[F[+_]: Async, S, M](mimeTypes: MimeTypes): BlazeServiceBuilder[F, S, M] =
+  def blazeService[F[+_]: Async, S: StateSerializer: StateDeserializer, M](mimeTypes: MimeTypes): BlazeServiceBuilder[F, S, M] =
     new BlazeServiceBuilder(mimeTypes)
 
-  def blazeService[F[+_]: Async: Scheduler, S, M](
+  def blazeService[F[+_]: Async: Scheduler, S: StateSerializer: StateDeserializer, M](
     config: KorolevServiceConfig[F, S, M],
     mimeTypes: MimeTypes
   ): HttpService = {

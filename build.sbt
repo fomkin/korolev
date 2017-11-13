@@ -1,6 +1,3 @@
-import com.typesafe.sbt.packager.archetypes.JavaAppPackaging
-import com.typesafe.sbt.packager.universal.UniversalPlugin
-
 val levshaVersion = "0.6.1"
 
 val unusedRepo = Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
@@ -44,7 +41,6 @@ val publishSettings = Seq(
 )
 
 val commonSettings = publishSettings ++ Seq(
-  scalaVersion := "2.11.11", // Needed by IntelliJ
   organization := "com.github.fomkin",
   version := "0.6.0-RC2-SNAPSHOT",
   libraryDependencies ++= Seq(
@@ -155,29 +151,21 @@ lazy val `jcache-support` = project.
 val examples = file("examples")
 
 lazy val simpleExample = (project in examples / "simple").
-  enablePlugins(JavaAppPackaging).
-  enablePlugins(UniversalPlugin).
   settings(exampleSettings: _*).
   settings(mainClass := Some("SimpleExample")).
   dependsOn(`server-blaze`)
 
 lazy val routingExample = (project in examples / "routing").
-  enablePlugins(JavaAppPackaging).
-  enablePlugins(UniversalPlugin).
   settings(exampleSettings: _*).
   settings(mainClass := Some("RoutingExample")).
   dependsOn(`server-blaze`)
 
 lazy val gameOfLifeExample = (project in examples / "game-of-life").
-  enablePlugins(JavaAppPackaging).
-  enablePlugins(UniversalPlugin).
   settings(exampleSettings: _*).
   settings(mainClass := Some("GameOfLife")).
   dependsOn(`server-blaze`)
 
 lazy val jcacheExample = (project in examples / "jcache").
-  enablePlugins(JavaAppPackaging).
-  enablePlugins(UniversalPlugin).
   settings(exampleSettings: _*).
   settings(
     mainClass := Some("JCacheExample"),
@@ -186,43 +174,31 @@ lazy val jcacheExample = (project in examples / "jcache").
   dependsOn(`server-blaze`, `jcache-support`)
 
 lazy val formDataExample = (project in examples / "form-data").
-  enablePlugins(JavaAppPackaging).
-  enablePlugins(UniversalPlugin).
   settings(exampleSettings: _*).
   settings(mainClass := Some("FormDataExample")).
   dependsOn(`server-blaze`)
 
 lazy val delayExample = (project in examples / "delay").
-  enablePlugins(JavaAppPackaging).
-  enablePlugins(UniversalPlugin).
   settings(exampleSettings: _*).
   settings(mainClass := Some("DelayExample")).
   dependsOn(`server-blaze`)
 
 lazy val focusExample = (project in examples / "focus").
-  enablePlugins(JavaAppPackaging).
-  enablePlugins(UniversalPlugin).
   settings(exampleSettings: _*).
   settings(mainClass := Some("FocusExample")).
   dependsOn(`server-blaze`)
 
 lazy val webComponentExample = (project in examples / "web-component").
-  enablePlugins(JavaAppPackaging).
-  enablePlugins(UniversalPlugin).
   settings(exampleSettings: _*).
   settings(mainClass := Some("WebComponentExample")).
   dependsOn(`server-blaze`)
 
 lazy val componentExample = (project in examples / "component").
-  enablePlugins(JavaAppPackaging).
-  enablePlugins(UniversalPlugin).
   settings(exampleSettings: _*).
   settings(mainClass := Some("ComponentExample")).
   dependsOn(`server-blaze`)
 
 lazy val akkaHttpExample = (project in examples / "akka-http").
-  enablePlugins(JavaAppPackaging).
-  enablePlugins(UniversalPlugin).
   settings(exampleSettings: _*).
   settings(mainClass := Some("AkkaHttpExample")).
   dependsOn(`server-akkahttp`)
@@ -264,6 +240,6 @@ lazy val root = project.in(file(".")).
     `integration-tests`, `performance-benchmark`
   )
 
-crossScalaVersions := Seq("2.11.11", "2.12.3")
+crossScalaVersions := Seq("2.11.12", "2.12.4")
 
 dontPublishSettings

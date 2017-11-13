@@ -14,6 +14,7 @@ import akka.stream.scaladsl.{Flow, Sink}
 import korolev.akkahttp.util.{IncomingMessageHandler, OutgoingMessageWriter}
 import korolev.execution.defaultExecutor
 import korolev.server.{KorolevService, KorolevServiceConfig, MimeTypes, Request => KorolevRequest, Response => KorolevResponse}
+import korolev.state.{StateDeserializer, StateSerializer}
 
 import scala.concurrent.Future
 
@@ -21,10 +22,9 @@ package object akkahttp {
 
   type AkkaHttpService = AkkaHttpServerConfig => Route
 
-  def akkaHttpService[S, M](config: KorolevServiceConfig[Future, S, M],
-                            mimeTypes: MimeTypes = server.mimeTypes)
-                           (implicit actorSystem: ActorSystem,
-                                     materializer: Materializer): AkkaHttpService = { akkaHttpConfig =>
+  def akkaHttpService[S: StateSerializer: StateDeserializer, M]
+      (config: KorolevServiceConfig[Future, S, M], mimeTypes: MimeTypes = server.mimeTypes)
+      (implicit actorSystem: ActorSystem, materializer: Materializer): AkkaHttpService = { akkaHttpConfig =>
     val korolevServer = korolev.server.korolevService(mimeTypes, config)
 
     webSocketRoute(korolevServer, akkaHttpConfig) ~

@@ -6,6 +6,7 @@ import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 
 import korolev.Async._
 import korolev.internal.{ApplicationInstance, Connection}
+import korolev.state.{StateDeserializer, StateSerializer}
 import levsha.Id
 import slogging.LazyLogging
 
@@ -15,13 +16,21 @@ import scala.util.{Failure, Random, Success, Try}
 
 package object server extends LazyLogging {
 
+  type StateStorage[F[+_], S] = korolev.state.StateStorage[F, S]
+  val StateStorage = korolev.state.StateStorage
+
   type MimeTypes = String => Option[String]
   type KorolevService[F[+_]] = PartialFunction[Request, F[Response]]
 
-  def korolevService[F[+_]: Async, S, M](
-    mimeTypes: MimeTypes,
-    config: KorolevServiceConfig[F, S, M]
-  ): KorolevService[F] = {
+  def korolevService
+      [
+        F[+_]: Async,
+        S: StateSerializer: StateDeserializer,
+        M
+      ] (
+        mimeTypes: MimeTypes,
+        config: KorolevServiceConfig[F, S, M]
+      ): KorolevService[F] = {
 
     import misc._
 
@@ -35,8 +44,15 @@ package object server extends LazyLogging {
         .toState
         .lift(((), request.path))
         .getOrElse(config.stateStorage.createTopLevelState(deviceId))
+        .flatMap { state =>
+          config.stateStorage.create(deviceId, sessionId).flatMap { manager =>
+            manager.write(Id.TopLevel, state).map { _ =>
+              state
+            }
+          }
+        }
 
-      stateF.flatMap(config.stateStorage.write(deviceId, sessionId, Id.TopLevel, _)).map { state =>
+      stateF map { state =>
         val dsl = new levsha.TemplateDsl[Context.Effect[F, S, M]]()
         val textRenderContext = new HtmlRenderContext[F, S, M]()
         val rootPath = config.serverRouter.rootPath
@@ -130,28 +146,24 @@ package object server extends LazyLogging {
 
       val connection = new Connection[F]()
 
-      // Session storage access
-      config.stateStorage.readAll(deviceId, sessionId) flatMap {
-        case Some(stateReader) => Async[F].pure(false -> stateReader)
-        case None => config
-          .stateStorage
-          .createTopLevelState(deviceId)
-          .map(state => true -> StateReader.withTopLevelState(state))
-      } map { case (isNew, stateReader) =>
-
+      for {
+        maybeStateManager <- config.stateStorage.get(deviceId, sessionId)
+        stateManager <- maybeStateManager.fold(config.stateStorage.create(deviceId, sessionId))(Async[F].pure(_))
+        isNew = maybeStateManager.isEmpty
+        initialState <- config.stateStorage.createTopLevelState(deviceId)
+      } yield {
         // Create Korolev with dynamic router
         val router = config.serverRouter.dynamic(deviceId, sessionId)
         val qualifiedSessionId = QualifiedSessionId(deviceId, sessionId)
-        val korolev = new ApplicationInstance(qualifiedSessionId, connection, stateReader, config.render, router, fromScratch = isNew)
-        val applyTransition = korolev.topLevelComponentInstance.applyTransition _ andThen Async[F].pureStrict _
+        val korolev = new ApplicationInstance(
+          qualifiedSessionId, connection,
+          stateManager, initialState,
+          config.render, router, fromScratch = isNew
+        )
+        val applyTransition = korolev.topLevelComponentInstance.applyTransition _
         val env = config.envConfigurator(deviceId, sessionId, applyTransition)
         // Subscribe to events to publish them to env
         korolev.topLevelComponentInstance.setEventsSubscription(env.onMessage)
-
-        // Subscribe on state updates an push them to storage
-        korolev.topLevelComponentInstance.subscribeStateChange { (node, state) =>
-          config.stateStorage.write(deviceId, sessionId, node, state).runIgnoreResult
-        }
 
         new KorolevSession[F] {
 

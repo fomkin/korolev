@@ -12,53 +12,45 @@ import tools._
 
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
+import korolev.state.javaSerialization._
 
 object GuineaPigRunner extends App {
 
   val genericCaps = Seq(
-    Caps(DesiredCapabilities.chrome _)(
+    Caps(() => DesiredCapabilities.chrome)(
       "platform" -> "Windows 7",
       "version" -> "55.0",
       "chromedriverVersion" -> "2.27"
     ),
-    Caps(DesiredCapabilities.edge _)(
+    Caps(() => DesiredCapabilities.edge)(
       "platform" -> "Windows 10",
       "version" -> "14.14393"
     ),
-    Caps(DesiredCapabilities.internetExplorer _)(
+    Caps(() => DesiredCapabilities.internetExplorer)(
       "platform" -> "Windows 7",
       "version" -> "10.0"
     ),
-    Caps(DesiredCapabilities.internetExplorer _)(
+    Caps(() => DesiredCapabilities.internetExplorer)(
       "platform" -> "Windows 7",
       "version" -> "11"
     ),
-    Caps(DesiredCapabilities.firefox _)(
+    Caps(() => DesiredCapabilities.firefox)(
       "platform" -> "Linux",
       "version" -> "45.0",
       "seleniumVersion" -> "2.53.0"
     ),
-    Caps(DesiredCapabilities.android _)(
+    Caps(() => DesiredCapabilities.android)(
       "deviceName" ->  "Android Emulator" ,
       "deviceOrientation" ->   "portrait" ,
       "browserName" ->   "Browser" ,
       "platformVersion" -> "5.1" ,
       "platformName" ->  "Android"
     ),
-    Caps(DesiredCapabilities.safari _)(
+    Caps(() => DesiredCapabilities.safari)(
       "platform" -> "OS X 10.11",
       "version" -> "10.0"
     ),
-    Caps(DesiredCapabilities.iphone _)(
-      "appiumVersion" -> "1.5.3",
-      "deviceName" -> "iPhone 6 Simulator",
-      "deviceOrientation" -> "portrait",
-      "platformVersion" -> "8.4",
-      "platformName" -> "iOS",
-      "browserName" -> "Safari",
-      "autoAcceptAlerts" -> "true"
-    ),
-    Caps(DesiredCapabilities.iphone _)(
+    Caps(() => DesiredCapabilities.iphone)(
       "appiumVersion" -> "1.5.3",
       "deviceName" -> "iPhone 6 Simulator",
       "deviceOrientation" -> "portrait",
@@ -74,8 +66,7 @@ object GuineaPigRunner extends App {
   val servers = List(
     (scenario: () => Boolean) => {
       println("Starting Blaze server")
-      blazeService.from(GuineaPigService.service)
-      val service = blazeService.from(GuineaPigService.service)
+      val service = blazeService[Future, GuineaPigService.State, Any].from(GuineaPigService.service)
       val config = BlazeServerConfig(port = 8000, doNotBlockCurrentThread = true)
       val server = korolev.blazeServer.runServer(service, config)
       Future {
@@ -107,20 +98,19 @@ object GuineaPigRunner extends App {
       .map(_.run(genericCaps:_*))
     val resultFuture = Future
       .sequence[Boolean, Seq](resultFutures)
-      .map(_.forall(identity))
+      .map(_.reduce(_ && _))
     Await.result(resultFuture, 1.hour)
   }
 
 
-  def runSerial(futures: List[(() => Boolean) => Future[Boolean]]): Future[Boolean] = futures match {
-    case Nil => Future.successful(true)
+  def runSerial(acc: Boolean, futures: List[(() => Boolean) => Future[Boolean]]): Future[Boolean] = futures match {
+    case Nil => Future.successful(acc)
     case x :: xs => x(runScenario).flatMap { result =>
-      if (result) runSerial(xs)
-      else Future.successful(false)
+      runSerial(acc && result, xs)
     }
   }
 
-  runSerial(servers) foreach { result =>
+  runSerial(acc = true, servers) foreach { result =>
     if (result) System.exit(0)
     else System.exit(1)
   }

@@ -6,21 +6,27 @@ import korolev.Context._
 import korolev.Async.AsyncOps
 import korolev.execution.Scheduler
 import korolev._
+import korolev.state.{StateDeserializer, StateManager, StateSerializer}
 import levsha.events.calculateEventPropagation
 import levsha.impl.DiffRenderContext
 import levsha.{Document, Id, XmlNs}
 import slogging.LazyLogging
 
-import scala.util.{Failure, Success}
-
-final class ApplicationInstance[F[+ _]: Async: Scheduler, S, M](
+final class ApplicationInstance
+  [
+    F[+_]: Async: Scheduler,
+    S: StateSerializer: StateDeserializer,
+    M
+  ](
     sessionId: QualifiedSessionId,
     connection: Connection[F],
-    stateReader: StateReader,
+    stateManager: StateManager[F],
+    initialState: S,
     render: PartialFunction[S, Document.Node[Effect[F, S, M]]],
     router: Router[F, S, S],
     fromScratch: Boolean
-) extends LazyLogging {
+  )
+  extends LazyLogging {
 
   private val devMode = new DevMode.ForRenderContext(sessionId.toString, fromScratch)
   private val currentRenderNum = new AtomicInteger(0)
@@ -30,7 +36,6 @@ final class ApplicationInstance[F[+ _]: Async: Scheduler, S, M](
   val topLevelComponentInstance = {
     val renderer = render.lift
     val eventRegistry = new EventRegistry[F](frontend)
-    val initialState = stateReader.topLevel[S]
     val component = new Component[F, S, Any, M](initialState, Component.TopLevelComponentId) {
       def render(parameters: Any, state: S): Document.Node[Effect[F, S, M]] = {
         renderer(state).getOrElse {
@@ -43,53 +48,61 @@ final class ApplicationInstance[F[+ _]: Async: Scheduler, S, M](
         }
       }
     }
-    new ComponentInstance[F, S, M, S, Any, M](Id.TopLevel, sessionId, frontend, eventRegistry, component)
+    new ComponentInstance[F, S, M, S, Any, M](Id.TopLevel, sessionId, frontend, eventRegistry, stateManager, component)
   }
 
-  private def onState(giveStateReader: Boolean) = renderContext.synchronized {
-    // Set page url if router exists
-    router.fromState
-      .lift(topLevelComponentInstance.getState)
-      .foreach(path => frontend.changePageUrl(path))
+  private def onState(): F[Unit] = stateManager.snapshot.map { snapshot =>
+    renderContext.synchronized {
+      // Set page url if router exists
+      router.fromState
+        .lift(snapshot(Id.TopLevel).getOrElse(initialState))
+        .foreach(path => frontend.changePageUrl(path))
 
-    // Prepare render context
-    renderContext.swap()
+      // Prepare render context
+      renderContext.swap()
 
-    // Reset all event handlers delays and elements
-    topLevelComponentInstance.prepare()
+      // Reset all event handlers delays and elements
+      topLevelComponentInstance.prepare()
 
-    // Perform rendering
-    topLevelComponentInstance.applyRenderContext(
-      parameters = (), // Boxed unit as parameter. Top level component doesn't need parameters
-      stateReaderOpt = if (giveStateReader) Some(stateReader) else None,
-      rc = renderContext
-    )
+      // Perform rendering
+      topLevelComponentInstance.applyRenderContext(
+        parameters = (), // Boxed unit as parameter. Top level component doesn't need parameters
+        snapshot = snapshot,
+        rc = renderContext
+      )
 
-    // Infer changes
-    frontend.startDomChanges()
-    renderContext.diff(frontend)
-    frontend.flushDomChanges()
+      // Infer changes
+      frontend.startDomChanges()
+      renderContext.diff(frontend)
+      frontend.flushDomChanges()
 
-    if (devMode.isActive)
-      devMode.saveRenderContext(renderContext)
+      if (devMode.isActive)
+        devMode.saveRenderContext(renderContext)
 
-    // Make korolev ready to next render
-    topLevelComponentInstance.dropObsoleteMisc()
-    frontend.setRenderNum(currentRenderNum.incrementAndGet())
+      // Make korolev ready to next render
+      topLevelComponentInstance.dropObsoleteMisc()
+      frontend.setRenderNum(currentRenderNum.incrementAndGet())
+    }
   }
 
   frontend.setHandlers(
     onHistory = { path =>
-      val maybeState = router.toState.lift((topLevelComponentInstance.getState, path))
-      maybeState foreach { asyncState =>
-        asyncState run {
-          case Success(newState) =>
-            topLevelComponentInstance.setState(newState)
-            onState(giveStateReader = false)
-          case Failure(e) =>
-            logger.error("Error occurred when updating state", e)
+      stateManager
+        .read[S](Id.TopLevel)
+        .flatMap { maybeTopLevelState =>
+          router
+            .toState
+            .lift(maybeTopLevelState.getOrElse(initialState) -> path)
+            .fold(Async[F].pure(Option.empty[S]))(_.map(Some(_)))
         }
-      }
+        .flatMap {
+          case Some(newState) =>
+            stateManager.write(Id.TopLevel, newState)
+              .flatMap(_ => onState())
+          case None =>
+            Async[F].unit
+        }
+        .runIgnoreResult
     },
     onEvent = { (renderNum, target, tpe) =>
       if (currentRenderNum.get == renderNum) {
@@ -104,44 +117,46 @@ final class ApplicationInstance[F[+ _]: Async: Scheduler, S, M](
 
   frontend.setRenderNum(0)
 
-  // Content should be created from scratch
-  // Remove all element from document.body
-  if (fromScratch)
-    frontend.cleanRoot()
+  stateManager.snapshot runOrReport { snapshot =>
+    // Content should be created from scratch
+    // Remove all element from document.body
+    if (fromScratch)
+      frontend.cleanRoot()
 
-  // If dev mode is enabled and active
-  // CSS should be reloaded
-  if (devMode.isActive)
-    frontend.reloadCss()
+    // If dev mode is enabled and active
+    // CSS should be reloaded
+    if (devMode.isActive)
+      frontend.reloadCss()
 
-  // Perform initial rendering
-  if (fromScratch) {
-    renderContext.openNode(levsha.XmlNs.html, "body")
-    renderContext.closeNode("body")
-    renderContext.diff(DiffRenderContext.DummyChangesPerformer)
-  } else {
-
-    if (devMode.hasSavedRenderContext) {
-      renderContext.swap()
-      topLevelComponentInstance.applyRenderContext((), renderContext, Some(stateReader))
-      frontend.startDomChanges()
-      renderContext.diff(frontend)
-      frontend.flushDomChanges()
-      devMode.saveRenderContext(renderContext)
+    // Perform initial rendering
+    if (fromScratch) {
+      renderContext.openNode(levsha.XmlNs.html, "body")
+      renderContext.closeNode("body")
+      renderContext.diff(DiffRenderContext.DummyChangesPerformer)
     } else {
 
-      topLevelComponentInstance.applyRenderContext((), renderContext, Some(stateReader))
-      renderContext.diff(DiffRenderContext.DummyChangesPerformer)
-
-      if (devMode.isActive)
+      if (devMode.hasSavedRenderContext) {
+        renderContext.swap()
+        topLevelComponentInstance.applyRenderContext((), renderContext, snapshot)
+        frontend.startDomChanges()
+        renderContext.diff(frontend)
+        frontend.flushDomChanges()
         devMode.saveRenderContext(renderContext)
+      } else {
+
+        topLevelComponentInstance.applyRenderContext((), renderContext, snapshot)
+        renderContext.diff(DiffRenderContext.DummyChangesPerformer)
+
+        if (devMode.isActive)
+          devMode.saveRenderContext(renderContext)
+      }
     }
-  }
 
-  topLevelComponentInstance.subscribeStateChange { (_, _) =>
-    onState(giveStateReader = false)
-  }
+    topLevelComponentInstance.subscribeStateChange { (_, _) =>
+      onState().runIgnoreResult
+    }
 
-  if (fromScratch)
-    onState(giveStateReader = true)
+    if (fromScratch)
+      onState().runIgnoreResult
+  }
 }

@@ -6,6 +6,7 @@ import korolev._
 import korolev.blazeServer._
 import korolev.server._
 import korolev.execution._
+import korolev.state.javaSerialization._
 
 import scala.concurrent.Future
 
@@ -29,8 +30,8 @@ object FormDataExample extends KorolevBlazeServer(BlazeServerConfig(maxRequestBo
           'crossorigin /= "anonymous"
         ),
         'style("""
-        body { margin: 2em }
-      """),
+          body { margin: 2em }
+         """),
         'script(
           'src /= "https://code.jquery.com/jquery-3.1.1.slim.min.js",
           'integrity /= "sha384-A7FZj7v+d/sdmMqp/nOQwliLvUsJfDHW+k9Omg/a/EheAdgtzNs3hpfag6Ed950n",
@@ -52,6 +53,7 @@ object FormDataExample extends KorolevBlazeServer(BlazeServerConfig(maxRequestBo
       case Initial =>
         'body (
           'form ('class /= "card",
+            myForm,
             'div (
               'class /= "card-block",
               'legend ("FormData Example"),
@@ -63,20 +65,15 @@ object FormDataExample extends KorolevBlazeServer(BlazeServerConfig(maxRequestBo
                 'button ("Submit")
               )
             ),
-            myForm,
             event('submit) { access =>
               for {
-                _ <- access.transition {
-                  case _ =>
-                    InProgress(0, 100)
-                }
                 formData <- access
                   .downloadFormData(myForm)
-                  .onProgress { (loaded, total) =>
-                    { case _ => InProgress(loaded, total) }
-                  }
+                  .onProgress((loaded, total) => _ => InProgress(loaded, total))
                   .start()
-                _ <- access.transition { case _ =>
+
+                _ = println(formData)
+                _ <- access.transition { _ =>
                     val buffer = formData.bytes(pictureFieldName)
                     val pictureBase64 = Base64.getEncoder.encodeToString(buffer.array())
                     val parsedImage = ImageIO.read(new ByteArrayInputStream(buffer.array()))
@@ -93,7 +90,8 @@ object FormDataExample extends KorolevBlazeServer(BlazeServerConfig(maxRequestBo
                         Error("Unknown image format")
                     }
                   }
-                } yield ()
+              }
+              yield ()
             }
           )
         )

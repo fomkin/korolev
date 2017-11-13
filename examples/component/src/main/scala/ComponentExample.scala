@@ -2,6 +2,7 @@ import korolev._
 import korolev.server._
 import korolev.blazeServer._
 import korolev.execution._
+import korolev.state.javaSerialization._
 
 import scala.concurrent.Future
 import scala.util.Random
@@ -31,10 +32,8 @@ object ComponentExample extends KorolevBlazeServer {
       'borderColor @= s"rgb($r, $g, $b)",
       label,
       event('click) { access =>
-        access.publish(()).flatMap { _ =>
-          access.transition {
-            case _ => randomRgb()
-          }
+        access.transition(_ => randomRgb()) flatMap { _ =>
+          access.publish(())
         }
       }
     )
@@ -64,29 +63,23 @@ object ComponentExample extends KorolevBlazeServer {
     }
   }
 
-  val service = blazeService[Future, Int, Any] from KorolevServiceConfig[Future, Int, Any] (
-    serverRouter = ServerRouter.empty[Future, Int],
-    stateStorage = StateStorage.default(0),
+  val service = blazeService[Future, String, Any] from KorolevServiceConfig[Future, String, Any] (
+    serverRouter = ServerRouter.empty[Future, String],
+    stateStorage = StateStorage.default("a"),
     render = {
       case state =>
         'body(
-          s"Button clicked $state times",
+          s"State is $state",
           ComponentAsObject("Click me, i'm function") { (access, _) =>
-            access.transition {
-              case n => n + 1
-            }
+            access.transition(_ + Random.nextPrintableChar())
           },
           ComponentAsFunction("Click me, i'm object") { (access, _) =>
-            access.transition {
-              case n => n + 1
-            }
+            access.transition(_ + Random.nextPrintableChar())
           },
           'button(
             "Click me too",
             event('click) { access =>
-              access.transition {
-                case n => n + 1
-              }
+              access.transition(_ + Random.nextPrintableChar())
             }
           )
         )
@@ -95,6 +88,6 @@ object ComponentExample extends KorolevBlazeServer {
 }
 
 object State {
-  val globalContext = Context[Future, Int, Any]
+  val globalContext = Context[Future, String, Any]
 }
 

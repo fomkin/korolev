@@ -1,11 +1,13 @@
 import javax.cache.configuration.MutableConfiguration
 
 import com.hazelcast.cache.HazelcastCachingProvider
+
 import korolev._
 import korolev.server._
 import korolev.blazeServer._
 import korolev.execution._
-import korolev.server.cacheApiSupport.CachedStateStorage
+import korolev.state.javaSerialization._
+import korolev.state.cacheApiSupport.CachedStateStorage
 
 import scala.concurrent.Future
 
@@ -19,10 +21,10 @@ object JCacheExample extends KorolevBlazeServer {
     val cacheName = "default"
     val cachingProvider = new HazelcastCachingProvider()
     val cacheManager = cachingProvider.getCacheManager()
-    val cache = Option(cacheManager.getCache(cacheName, classOf[String], classOf[Any])) getOrElse {
-      val config = new MutableConfiguration[String, Any]()
-      config.setTypes(classOf[String], classOf[Any])
-      cacheManager.createCache[String, Any, config.type](cacheName, config)
+    val cache = Option(cacheManager.getCache(cacheName, classOf[String], classOf[Array[Byte]])) getOrElse {
+      val config = new MutableConfiguration[String, Array[Byte]]()
+      config.setTypes(classOf[String], classOf[Array[Byte]])
+      cacheManager.createCache[String, Array[Byte], config.type](cacheName, config)
     }
 
     CachedStateStorage[Future, State] (cache) { _ =>

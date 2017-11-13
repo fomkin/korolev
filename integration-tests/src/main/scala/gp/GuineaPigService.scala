@@ -3,6 +3,7 @@ package gp
 import korolev._
 import korolev.server._
 import korolev.execution._
+import korolev.state.javaSerialization._
 
 import org.slf4j.LoggerFactory
 
@@ -145,7 +146,10 @@ object GuineaPigService {
             )
           ),
           'div(
-            'div('id /= "upload-text", state.uploadedText),
+            state.uploadedText match {
+              case "" => void
+              case s => 'div('id /= "upload-text", s)
+            },
             'form(
               uploadFormId,
               'id /= "upload-form",
@@ -167,7 +171,7 @@ object GuineaPigService {
           'div('id /= "delay-text",
             if (state.delayOn) "Wait a second" else "Click me",
             if (state.delayOn) {
-              delay(1.second) { access =>
+              delay(2.second) { access =>
                 access.transition {
                   case s => s.copy(delayOn = false)
                 }
