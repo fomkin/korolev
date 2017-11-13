@@ -4,7 +4,7 @@ import java.io._
 
 object javaSerialization {
 
-  implicit def serializer[T <: Serializable]: StateSerializer[T] = new StateSerializer[T] {
+  implicit def serializer[T]: StateSerializer[T] = new StateSerializer[T] {
     def serialize(value: T): Array[Byte] = {
       val byteStream = new ByteArrayOutputStream()
       val objectStream = new ObjectOutputStream(byteStream)
@@ -19,7 +19,7 @@ object javaSerialization {
     }
   }
 
-  implicit def deserializer[T <: Serializable]: StateDeserializer[T] = new StateDeserializer[T] {
+  implicit def deserializer[T]: StateDeserializer[T] = new StateDeserializer[T] {
     def deserialize(data: Array[Byte]): Option[T] = {
       val byteStream = new ByteArrayInputStream(data)
       val objectStream = new ObjectInputStream(byteStream)
