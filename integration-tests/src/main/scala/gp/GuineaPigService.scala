@@ -146,7 +146,10 @@ object GuineaPigService {
             )
           ),
           'div(
-            'div('id /= "upload-text", state.uploadedText),
+            state.uploadedText match {
+              case "" => void
+              case s => 'div('id /= "upload-text", s)
+            },
             'form(
               uploadFormId,
               'id /= "upload-form",

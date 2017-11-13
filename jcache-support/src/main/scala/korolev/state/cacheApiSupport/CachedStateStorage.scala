@@ -45,7 +45,7 @@ final class CachedStateStorage[F[+_]: Async, S]
     (implicit val keysW: StateSerializer[Set[String]], val keysR: StateDeserializer[Set[String]])
   extends StateStorage[F, S] {
 
-  class CachedStateManager(deviceId: DeviceId, sessionId: SessionId) extends StateManager[F] {
+  private class CachedStateManager(deviceId: DeviceId, sessionId: SessionId) extends StateManager[F] {
 
     def snapshot: F[StateManager.Snapshot] = Async[F].fork {
       val keys = Option(cache.get(mkKeys(deviceId, sessionId)))
@@ -69,13 +69,15 @@ final class CachedStateStorage[F[+_]: Async, S]
       val data = implicitly[StateSerializer[T]].serialize(value)
       val key = mkKey(nodeId)
       cache.put(key, data)
-      cache.invoke(mkKeys(deviceId, sessionId), new EntryProcessor[String, Array[Byte], Unit] {
-        override def process(entry: MutableEntry[String, Array[Byte]], arguments: AnyRef*) = {
-          val data = if (entry.exists()) entry.getValue else emptyKeysData
-          val keys = keysR.deserialize(data).getOrElse(Set.empty)
-          entry.setValue(keysW.serialize(keys + key))
-        }
-      })
+      cache.invoke(mkKeys(deviceId, sessionId), new AddKeyProcessor(key))
+    }
+
+    private class AddKeyProcessor(key: String) extends EntryProcessor[String, Array[Byte], Unit] {
+      def process(entry: MutableEntry[String, Array[Byte]], arguments: AnyRef*): Unit = {
+        val data = if (entry.exists()) entry.getValue else emptyKeysData
+        val keys = keysR.deserialize(data).getOrElse(Set.empty)
+        entry.setValue(keysW.serialize(keys + key))
+      }
     }
 
     private def mkKey(nodeId: Id) = {
