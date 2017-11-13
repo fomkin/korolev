@@ -5,6 +5,7 @@ import korolev._
 import korolev.akkahttp._
 import korolev.execution._
 import korolev.server._
+import korolev.state.javaSerialization._
 
 import scala.concurrent.Future
 

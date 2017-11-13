@@ -12,6 +12,7 @@ import tools._
 
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
+import korolev.state.javaSerialization._
 
 object GuineaPigRunner extends App {
 
@@ -74,8 +75,7 @@ object GuineaPigRunner extends App {
   val servers = List(
     (scenario: () => Boolean) => {
       println("Starting Blaze server")
-      blazeService.from(GuineaPigService.service)
-      val service = blazeService.from(GuineaPigService.service)
+      val service = blazeService[Future, GuineaPigService.State, Any].from(GuineaPigService.service)
       val config = BlazeServerConfig(port = 8000, doNotBlockCurrentThread = true)
       val server = korolev.blazeServer.runServer(service, config)
       Future {

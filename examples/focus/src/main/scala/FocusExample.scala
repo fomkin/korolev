@@ -4,6 +4,7 @@ import korolev.execution._
 import korolev.server._
 
 import scala.concurrent.Future
+import korolev.state.javaSerialization._
 
 object FocusExample extends KorolevBlazeServer {
 

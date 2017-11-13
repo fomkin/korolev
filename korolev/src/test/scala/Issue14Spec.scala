@@ -1,6 +1,8 @@
 import korolev._
 import org.scalatest.{FlatSpec, Matchers}
 import korolev.internal.{ApplicationInstance, Connection}
+import korolev.state.StateStorage
+import korolev.state.javaSerialization._
 
 import scala.concurrent.Future
 import korolev.testExecution._
@@ -36,7 +38,8 @@ class Issue14Spec extends FlatSpec with Matchers {
           }
         )
       },
-      stateManager = StateReader.withTopLevelState("firstState")
+      stateManager = StateStorage.default("firstState").create("", "").value.get.get,
+      initialState = "firstState"
     )
 
     def fireEvent(data: String) =

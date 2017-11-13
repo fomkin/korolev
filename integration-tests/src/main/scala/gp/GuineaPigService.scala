@@ -3,6 +3,7 @@ package gp
 import korolev._
 import korolev.server._
 import korolev.execution._
+import korolev.state.javaSerialization._
 
 import org.slf4j.LoggerFactory
 

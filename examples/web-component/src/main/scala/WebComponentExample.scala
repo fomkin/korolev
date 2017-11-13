@@ -2,6 +2,7 @@ import korolev._
 import korolev.blazeServer._
 import korolev.execution._
 import korolev.server.{KorolevServiceConfig, ServerRouter, StateStorage}
+import korolev.state.javaSerialization._
 
 import scala.concurrent.Future
 

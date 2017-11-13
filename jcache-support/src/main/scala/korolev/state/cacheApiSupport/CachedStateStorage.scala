@@ -70,7 +70,7 @@ final class CachedStateStorage[F[+_]: Async, S]
       val key = mkKey(nodeId)
       cache.put(key, data)
       cache.invoke(mkKeys(deviceId, sessionId), new EntryProcessor[String, Array[Byte], Unit] {
-        def process(entry: MutableEntry[String, Array[Byte]], arguments: AnyRef*) = {
+        override def process(entry: MutableEntry[String, Array[Byte]], arguments: AnyRef*) = {
           val data = if (entry.exists()) entry.getValue else emptyKeysData
           val keys = keysR.deserialize(data).getOrElse(Set.empty)
           entry.setValue(keysW.serialize(keys + key))
