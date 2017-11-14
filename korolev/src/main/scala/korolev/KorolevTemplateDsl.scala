@@ -26,12 +26,17 @@ final class KorolevTemplateDsl[F[+_]: Async, S, M] extends TemplateDsl[Effect[F,
   val disableHref = 'onclick /= "return false"
 
   implicit final class KorolevSymbolOps(s: Symbol) {
+
+    /** define style attribute (for pixels) */
     def @=[T: Numeric](value: T): Document.Attr[Effect[F, S, M]] =
       @=(s"${value}px")
 
+    /** define style attribute */
     def @=(value: String): Document.Attr[Effect[F, S, M]] = Document.Attr { rc =>
       rc.setAttr(levsha.XmlNs.html, '*' + s.name, value)
     }
+
+    /** define property */
     def :=(value: String): Document.Attr[Effect[F, S, M]] = Document.Attr { rc =>
       rc.setAttr(levsha.XmlNs.html, HtmlUtil.camelCaseToSnakeCase(s.name, '^', 0), value)
     }

@@ -2,7 +2,7 @@
 
 OSNAME=`uname -s`
 OSARCH=`uname -m`
-SC_VERSION="4.4.7"
+SC_VERSION="4.4.10"
 
 mkdir target
 cd target
