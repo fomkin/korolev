@@ -237,8 +237,9 @@ final class ComponentInstance
       val state = maybeState.getOrElse(component.initialState)
       try {
         val newState = transition(state)
-        stateChangeSubscribers.foreach(_.apply(nodeId, state))
-        stateManager.write(nodeId, newState)
+        stateManager.write(nodeId, newState).map { _ =>
+          stateChangeSubscribers.foreach(_.apply(nodeId, state))
+        }
       } catch {
         case e: MatchError =>
           logger.warn("Transition doesn't fit the state", e)
