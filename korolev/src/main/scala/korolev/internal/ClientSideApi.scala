@@ -225,6 +225,11 @@ object ClientSideApi {
     case object FormDataProgress extends CallbackType(1) // `$descriptor:$loaded:$total`
     case object ExtractPropertyResponse extends CallbackType(2) // `$descriptor:$value`
     case object History extends CallbackType(3) // URL
+
+    final val All = Set(DomEvent, FormDataProgress, ExtractPropertyResponse, History)
+
+    def apply(n: Int): Option[CallbackType] =
+      All.find(_.code == n)
   }
 
   case class ClientSideException(message: String) extends Exception(message)

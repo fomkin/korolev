@@ -10,7 +10,6 @@ import akka.typed.scaladsl.adapter._
 import akka.util.ByteString
 import akka.{Done, actor}
 import korolev.internal.ClientSideApi
-import levsha.Id
 import pushka.Ast
 import pushka.json._
 
@@ -26,14 +25,24 @@ object KorolevConnection {
   object ToServer {
     case object Close extends ToServer
     case class Callback(tpe: ClientSideApi.CallbackType, data: String) extends ToServer
+    object Callback {
+      def apply(code: Int, data: String): Callback = {
+        new Callback(ClientSideApi.CallbackType(code).get, data)
+      }
+    }
   }
 
   sealed trait FromServer
 
   object FromServer {
-    case class Procedure(procedure: ClientSideApi.Procedure, nodeId: Id, args: List[String]) extends FromServer
+    case class Procedure(procedure: ClientSideApi.Procedure, args: List[Any]) extends FromServer
+    object Procedure {
+      def apply(code: Int, args: List[Any]): Procedure = {
+        new Procedure(ClientSideApi.Procedure(code).get, args)
+      }
+    }
     case class ErrorOccurred(error: Error) extends FromServer
-    case object Connected extends FromServer
+    case class Connected(ref: ActorRef[ToServer]) extends FromServer
     case object Closed extends FromServer
   }
 
@@ -91,13 +100,17 @@ object KorolevConnection {
           val incoming: Sink[Message, Future[Done]] = {
             def process(message: String): FromServer = {
               val json = read[List[Ast]](message)
-              val Ast.Num(procedureId) :: Ast.Str(node) :: argsAsts = json
+              val Ast.Num(procedureId) :: argsAsts = json
               val Some(procedure) = ClientSideApi.Procedure(procedureId.toInt)
               val args = argsAsts.collect {
                 case Ast.Str(s) => s
-                case Ast.Num(n) => n
+                case Ast.Num(n) if n.contains(".") => n.toDouble
+                case Ast.Num(n) => n.toInt
+                case Ast.False => false
+                case Ast.True => true
+                case Ast.Null => null
               }
-              FromServer.Procedure(procedure, Id(node), args)
+              FromServer.Procedure(procedure, args)
             }
             Sink.foreach[Message] {
               case message: TextMessage.Strict =>
@@ -133,7 +146,7 @@ object KorolevConnection {
       val worker = ctx.spawnAnonymous {
         Actor.immutable[Either[ToServer, Connection]] {
           case (_, Right(connection)) =>
-            receiver ! FromServer.Connected
+            receiver ! FromServer.Connected(ctx.self)
             connection.closed foreach { _ =>
               // Stop actor when connection closed by peer
               ctx.stop(ctx.self)
