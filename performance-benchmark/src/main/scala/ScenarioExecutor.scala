@@ -25,6 +25,7 @@ object ScenarioExecutor {
           await(System.nanoTime(), metrics, state, next.value, connection)
         case (state, None) =>
           reporter ! Report.Success(state.scenario, metrics)
+          connection ! ToServer.Close
           Actor.stopped
       }
     }
@@ -59,7 +60,8 @@ object ScenarioExecutor {
             reporter ! Report.CantRunScenario(scenario)
             Actor.stopped
         }
-      case (_, _) =>
+      case (_, message) =>
+        println(s"${Console.RED}$message${Console.RESET}")
         reporter ! Report.MessagesFromClosedConnection
         Actor.stopped
     } onSignal {

@@ -36,6 +36,23 @@ object KorolevConnection {
       implicit val untypedSystem: actor.ActorSystem = ctx.system.toUntyped
       implicit val materializer: ActorMaterializer = ActorMaterializer()
 
+      val bufferedReceiver = {
+        def aux(stash: List[FromServer]): Behavior[FromServer] = {
+          Actor.immutable[FromServer] {
+            case (_, FromServer.Closed) => aux(FromServer.Closed :: stash)
+            case (_, procedure: FromServer.Procedure) => aux(procedure :: stash)
+            case (_, message) =>
+              receiver ! message
+              stash.reverse.foreach(receiver ! _)
+              Actor.immutable { (_, message) =>
+                receiver ! message
+                Actor.same
+              }
+          }
+        }
+        ctx.spawnAnonymous(aux(Nil))
+      }
+
       def openPage(): Future[Either[Error, ConnectionInfo]] = {
         val protocol = if (ssl) "https" else "http"
         Http().singleRequest(HttpRequest(uri = s"$protocol://$host:$port$escapedPath")).flatMap {
@@ -68,12 +85,12 @@ object KorolevConnection {
             }
             Sink.foreach[Message] {
               case message: TextMessage.Strict =>
-                receiver ! process(message.text)
+                bufferedReceiver ! process(message.text)
               case message: TextMessage.Streamed => message
                 .textStream
                 .runFold("")(_ + _)
                 .map(process)
-                .foreach(receiver ! _)
+                .foreach(bufferedReceiver ! _)
               case _ =>
                 // ignore
             }
@@ -83,7 +100,7 @@ object KorolevConnection {
           val deviceId = connectionInfo.deviceId
           val sessionId = connectionInfo.sessionId
           val uri = s"$protocol://$host:$port${escapedPath}bridge/web-socket/$deviceId/$sessionId"
-          println(uri)
+
           Source.queue[Message](1024, OverflowStrategy.backpressure)
             .viaMat(Http().webSocketClientFlow(WebSocketRequest(uri)))(Keep.both)
             .viaMat(KillSwitches.single)(Keep.both)
@@ -100,7 +117,6 @@ object KorolevConnection {
       val worker = ctx.spawnAnonymous {
         Actor.immutable[Either[ToServer, Connection]] {
           case (_, Right(connection)) =>
-            receiver ! FromServer.Connected(ctx.self)
             connection.closed foreach { _ =>
               // Stop actor when connection closed by peer
               ctx.stop(ctx.self)
@@ -131,9 +147,11 @@ object KorolevConnection {
           case Left(error) => Future.successful(Left(error))
         }
         .onComplete {
-          case Success(Right(connection)) => worker ! Right(connection)
-          case Success(Left(error)) => receiver ! FromServer.ErrorOccurred(error)
-          case Failure(e) => receiver ! FromServer.ErrorOccurred(Error.ArbitraryThrowable(e))
+          case Success(Right(connection)) =>
+            bufferedReceiver ! FromServer.Connected(ctx.self)
+            worker ! Right(connection)
+          case Success(Left(error)) => bufferedReceiver ! FromServer.ErrorOccurred(error)
+          case Failure(e) => bufferedReceiver ! FromServer.ErrorOccurred(Error.ArbitraryThrowable(e))
         }
 
       Actor.immutable[ToServer] { (_, message) =>
