@@ -221,15 +221,21 @@ lazy val `performance-benchmark` = project.
   settings(dontPublishSettings:_*).
   settings(
     addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full),
+    scalaVersion := "2.12.4",
     fork in run := true,
     libraryDependencies ++= Seq(
-      "com.spinoco" %% "fs2-http" % "0.1.7",
+      "com.typesafe.akka" %% "akka-http" % "10.0.10",
+      "com.typesafe.akka" %% "akka-stream" % "2.5.6",
+      "com.typesafe.akka" %% "akka-actor"  % "2.5.6",
+      "com.typesafe.akka" %% "akka-typed" % "2.5.6",
       "com.github.fomkin" %% "pushka-json" % "0.8.0"
     )
-  )
+  ).
+  dependsOn(korolev)
 
 lazy val root = project.in(file(".")).
   settings(dontPublishSettings:_*).
+  settings(crossScalaVersions := Seq("2.11.12", "2.12.4")).
   aggregate(
     korolev, async,
     server, `server-blaze`, `server-akkahttp`,
@@ -237,9 +243,7 @@ lazy val root = project.in(file(".")).
     simpleExample, routingExample, gameOfLifeExample,
     jcacheExample, formDataExample, delayExample, focusExample,
     webComponentExample, componentExample, akkaHttpExample,
-    `integration-tests`, `performance-benchmark`
+    `integration-tests`
   )
-
-crossScalaVersions := Seq("2.11.12", "2.12.4")
 
 dontPublishSettings
