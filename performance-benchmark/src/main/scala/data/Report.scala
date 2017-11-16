@@ -1,7 +1,5 @@
 package data
 
-import ScenarioExecutor.ScenarioState
-
 sealed trait Report
 
 object Report {

@@ -9,11 +9,9 @@ import akka.typed.scaladsl.Actor
 import akka.typed.scaladsl.adapter._
 import akka.util.ByteString
 import akka.{Done, actor}
-import korolev.internal.ClientSideApi
+import data._
 import pushka.Ast
 import pushka.json._
-
-import data._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -66,17 +64,7 @@ object KorolevConnection {
           val incoming: Sink[Message, Future[Done]] = {
             def process(message: String): FromServer = {
               val json = read[List[Ast]](message)
-              val Ast.Num(procedureId) :: argsAsts = json
-              val Some(procedure) = ClientSideApi.Procedure(procedureId.toInt)
-              val args = argsAsts.collect {
-                case Ast.Str(s) => s
-                case Ast.Num(n) if n.contains(".") => n.toDouble
-                case Ast.Num(n) => n.toInt
-                case Ast.False => false
-                case Ast.True => true
-                case Ast.Null => null
-              }
-              FromServer.Procedure(procedure, args)
+              FromServer.Procedure.fromJson(json).right.get
             }
             Sink.foreach[Message] {
               case message: TextMessage.Strict =>
