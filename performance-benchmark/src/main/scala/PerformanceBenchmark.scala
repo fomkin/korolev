@@ -2,6 +2,7 @@ import KorolevConnection.{FromServer, ToServer}
 import ScenarioExecutor.{Scenario, ScenarioStep}
 import akka.actor.ActorSystem
 import akka.typed.scaladsl.adapter._
+import data.Scenario
 
 object PerformanceBenchmark extends App {
 

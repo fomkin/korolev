@@ -1,43 +1,8 @@
-import KorolevConnection.{FromServer, ToServer}
 import akka.typed.scaladsl.Actor
 import akka.typed.{ActorRef, Behavior, Terminated}
+import data._
 
 object ScenarioExecutor {
-
-  case class Scenario(name: String, steps: Vector[ScenarioStep]) {
-    def newState: ScenarioState = ScenarioState(this, 0)
-  }
-
-  case class ScenarioState(scenario: Scenario, step: Int) {
-
-    def current: Option[ScenarioStep] =
-      if (endReached) None
-      else Some(scenario.steps(step))
-
-    def next: ScenarioState =
-      if (endReached) this
-      else copy(step = step + 1)
-
-    def endReached: Boolean =
-      step == scenario.steps.length
-  }
-
-  sealed trait ScenarioStep
-
-  object ScenarioStep {
-    case class Send(name: Option[String], value: ToServer) extends ScenarioStep
-    case class Expect(name: Option[String], value: FromServer) extends ScenarioStep
-  }
-
-  sealed trait Report
-
-  object Report {
-    case class Unexpected(state: ScenarioState, expected: FromServer, gotten: FromServer) extends Report
-    case class Success(scenario: Scenario, metrics: Map[Int, Long]) extends Report
-    case class CantRunScenario(scenario: Scenario) extends Report
-    case object MessagesFromClosedConnection extends Report
-    case object SuddenlyClosed extends Report
-  }
 
   def apply(scenario: Scenario)(reporter: ActorRef[Report]): Behavior[FromServer] = {
 

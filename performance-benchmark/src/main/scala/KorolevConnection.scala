@@ -13,6 +13,8 @@ import korolev.internal.ClientSideApi
 import pushka.Ast
 import pushka.json._
 
+import data._
+
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.matching.Regex
@@ -20,42 +22,6 @@ import scala.util.{Failure, Success}
 
 object KorolevConnection {
 
-  sealed trait ToServer
-
-  object ToServer {
-    case object Close extends ToServer
-    case class Callback(tpe: ClientSideApi.CallbackType, data: String) extends ToServer
-    object Callback {
-      def apply(code: Int, data: String): Callback = {
-        new Callback(ClientSideApi.CallbackType(code).get, data)
-      }
-    }
-  }
-
-  sealed trait FromServer
-
-  object FromServer {
-    case class Procedure(procedure: ClientSideApi.Procedure, args: List[Any]) extends FromServer
-    object Procedure {
-      def apply(code: Int, args: List[Any]): Procedure = {
-        new Procedure(ClientSideApi.Procedure(code).get, args)
-      }
-    }
-    case class ErrorOccurred(error: Error) extends FromServer
-    case class Connected(ref: ActorRef[ToServer]) extends FromServer
-    case object Closed extends FromServer
-  }
-
-  sealed trait Error
-
-  object Error {
-    case class ArbitraryThrowable(e: Throwable) extends Error
-    case class InvalidHttpStatusCodeForPage(code: Int) extends Error
-    case class InvalidHttpStatusCodeForWS(code: Int) extends Error
-    case object SessionIdNotDefined extends Error
-    case object DeviceIdNotDefined extends Error
-  }
-  
   def apply(host: String,
             port: Int,
             maybePath: Option[String],
