@@ -14,9 +14,13 @@ object PerformanceBenchmark extends App {
         ctx.spawnAnonymous {
           ScenarioExecutor(scenario) {
             ctx.spawnAnonymous {
-              Actor.immutable[Report] { (_, message) =>
-                println(message)
-                Actor.same
+              Actor.immutable[Report] {
+                case (_, Report.Unexpected(state, expected, gotten)) =>
+                  println(s"${state.scenario.name}:${state.step + 1}: $expected expected, but $gotten gotten")
+                  Actor.same
+                case (_, message) =>
+                  println(message)
+                  Actor.same
               }
             }
           }

@@ -1,5 +1,7 @@
 package korolev.internal
 
+import java.util.concurrent.atomic.AtomicInteger
+
 import korolev.{Async, Router}
 import korolev.Async._
 import korolev.Router.Path
@@ -9,7 +11,7 @@ import slogging.LazyLogging
 
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
-import scala.util.{Failure, Random, Success}
+import scala.util.{Failure, Success}
 
 /**
   * Typed interface to client side
@@ -19,6 +21,7 @@ final class ClientSideApi[F[+ _]: Async](connection: Connection[F])
 
   import ClientSideApi._
 
+  private val lastDescriptor = new AtomicInteger(0)
   private val async = Async[F]
   private val promises = TrieMap.empty[String, Promise[F, String]]
   private val domChangesBuffer = mutable.ArrayBuffer.empty[Any]
@@ -59,7 +62,7 @@ final class ClientSideApi[F[+ _]: Async](connection: Connection[F])
     connection.send(Procedure.Focus.code, id.mkString)
 
   def extractProperty(id: Id, name: String): F[String] = {
-    val descriptor = Random.alphanumeric.take(6).mkString
+    val descriptor = lastDescriptor.getAndIncrement().toString
     val promise = async.promise[String]
     promises.put(descriptor, promise)
     connection.send(Procedure.ExtractProperty.code, descriptor, id.mkString, name)
