@@ -2,8 +2,10 @@ import java.io.File
 
 import akka.actor.ActorSystem
 import akka.typed.scaladsl.adapter._
-import data.{Report, Scenario, ToServer}
+import data.{FromServer, Report, Scenario, ToServer}
+
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
 
 object PerformanceBenchmark extends App {
 
@@ -23,15 +25,27 @@ object PerformanceBenchmark extends App {
             val max = ts.max / 1000000d
             println(s"avg: $avg, mean: $mean in [$min, $max]")
             Actor.same
+          case (_, Report.MessagesFromClosedConnection(message)) =>
+            message match {
+              case FromServer.ErrorOccurred(data.Error.ArbitraryThrowable(e)) =>
+                print(Console.RED)
+                println(s"${e.getMessage}, ${e.getCause}")
+                e.getStackTrace.foreach { s =>
+                  print(Console.RED)
+                  println("  " + s)
+                }
+              case _ => println(message)
+            }
+            Actor.same
           case (_, message) =>
             println(message)
             Actor.same
         }
       }
       def behavior(i: Int) = KorolevConnection("localhost", 8080, None, ssl = false) {
-        ctx.spawn(ScenarioExecutor(scenario)(reporter), s"executor-$i")
+        ctx.spawn(ScenarioExecutor(scenario, reporter, Some(1.seconds)), s"executor-$i")
       }
-      for (i <- 1 to 512) {
+      for (i <- 1 to 1024) {
         ctx.spawn(behavior(i), s"bench-$i")
       }
       Actor.ignore

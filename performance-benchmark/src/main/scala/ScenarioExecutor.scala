@@ -2,9 +2,13 @@ import akka.typed.scaladsl.Actor
 import akka.typed.{ActorRef, Behavior, Terminated}
 import data._
 
+import scala.concurrent.duration.FiniteDuration
+
 object ScenarioExecutor {
 
-  def apply(scenario: Scenario)(reporter: ActorRef[Report]): Behavior[FromServer] = {
+  def apply(scenario: Scenario,
+            reporter: ActorRef[Report],
+            delay: Option[FiniteDuration] = None): Behavior[FromServer] = {
 
     def sendUntilExpect(state: ScenarioState,
       connection: ActorRef[ToServer]): (ScenarioState, Option[ScenarioStep.Expect]) = {
@@ -49,20 +53,42 @@ object ScenarioExecutor {
 
     Actor.immutable[FromServer] {
       case (ctx, FromServer.Connected(connection)) =>
-        ctx.watch(connection)
         val state = scenario.newState
+        val connectionWithDelay = delay.fold(connection) { delay =>
+          ctx.spawnAnonymous {
+            Actor.deferred[ToServer] { ctx =>
+              val internal = ctx.spawnAnonymous {
+                Actor.withTimers[Either[Unit, ToServer]] { scheduler =>
+                  def aux(buffer: List[ToServer]): Behavior[Either[Unit, ToServer]] = Actor.immutable {
+                    case (_, Left(_)) =>
+                      buffer.reverse.foreach(connection ! _)
+                      aux(Nil)
+                    case (_, Right(message)) =>
+                      aux(message :: buffer)
+                  }
+                  scheduler.startPeriodicTimer("default", Left(()), delay)
+                  aux(Nil)
+                }
+              }
+              Actor.immutable[ToServer] { (ctx, message) =>
+                internal ! Right(message)
+                Actor.same
+              }
+            }
+          }
+        }
+        ctx.watch(connection)
         state.current match {
           case Some(ScenarioStep.Expect(_, expect)) =>
-            await(System.nanoTime(), Map(), state, expect, connection)
+            await(System.nanoTime(), Map(), state, expect, connectionWithDelay)
           case Some(_: ScenarioStep.Send) =>
-            sendUntilExpectAndReport(state, Map.empty, connection)
+            sendUntilExpectAndReport(state, Map.empty, connectionWithDelay)
           case None =>
             reporter ! Report.CantRunScenario(scenario)
             Actor.stopped
         }
       case (_, message) =>
-        println(s"${Console.RED}$message${Console.RESET}")
-        reporter ! Report.MessagesFromClosedConnection
+        reporter ! Report.MessagesFromClosedConnection(message)
         Actor.stopped
     } onSignal {
       case (_, Terminated(_)) ⇒
