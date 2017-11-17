@@ -20,6 +20,7 @@ From server to the client
 6. ChangePageUrl(path)
 7. UploadForm(id, descriptor)
 8. ReloadCss()
+9. ExtractEventData(descriptor, renderNum)
 
 ### Modify dom commands
 
@@ -60,3 +61,4 @@ From the client to the server
 1. FormData progress. Data: `$descriptor:$loaded:$total` 
 2. ExtractProperty response. Data:`$descriptor:$type:$value`
 3. History Event. Data: URL 
+4. ExtractEventData response. Data: `$descriptor:$dataJson`

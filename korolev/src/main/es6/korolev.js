@@ -5,9 +5,11 @@ export const CallbackType = {
   DOM_EVENT: 0, // `$renderNum:$elementId:$eventType`
   FORM_DATA_PROGRESS: 1, // `$descriptor:$loaded:$total`
   EXTRACT_PROPERTY_RESPONSE: 2, // `$descriptor:$value`
-  HISTORY: 3  // URL
+  HISTORY: 3, // URL
+  EXTRACT_EVENT_DATA_RESPONSE: 4 // `$descriptor:$dataJson`
 }
 
+/** @enum {number} */
 export const PropertyType = {
   STRING: 0,
   NUMBER: 1,
@@ -39,6 +41,8 @@ export class Korolev {
     this.initialPath = window.location.pathname;
     /** @type {function(CallbackType, string)} */
     this.callback = callback;
+    /** @type {Array} */
+    this.eventData = [];
 
     this.listenRoot = (name, preventDefault) => {
       var listener = (event) => {
@@ -46,6 +50,7 @@ export class Korolev {
           if (preventDefault) {
             event.preventDefault();
           }
+          this.eventData[this.renderNum] = event;
           this.callback(CallbackType.DOM_EVENT, this.renderNum + ':' + event.target.vId + ':' + event.type);
         }
       };
@@ -72,6 +77,8 @@ export class Korolev {
   
   /** @param {number} n */
   setRenderNum(n) {
+    // Remove obsolete event data
+    delete this.eventData[n - 2];
     this.renderNum = n;
   }
 
@@ -322,5 +329,23 @@ export class Korolev {
       if (link.getAttribute("rel") === "stylesheet")
         link.href = link.href + "?refresh=" + new Date().getMilliseconds();
     }
+  }
+
+  extractEventData(descriptor, renderNum) {
+    let data = this.eventData[renderNum];
+    let result = {};
+    for (propertyName in data) {
+      let value = data[propertyName];
+      switch (typeof value) {
+        case 'string':
+        case 'number':
+        case 'boolean': result[propertyName] = value; break;          break;
+        default: // do nothing
+      }
+    }
+    this.callback(
+      CallbackType.EXTRACT_EVENT_DATA_RESPONSE,
+      `${descriptor}:${JSON.stringify(result)}`
+    );
   }
 }

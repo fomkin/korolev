@@ -158,6 +158,14 @@ object Context {
       * Gives current session id
       */
     def sessionId: F[QualifiedSessionId]
+
+    /**
+      * Gives json with string, number and boolean fields of
+      * object of the event happened in current render phase.
+      * Note that is expensive operation which requires
+      * network round trip.
+      */
+    def eventData: F[String]
   }
 
   sealed abstract class Effect[F[+_]: Async, S, M]
