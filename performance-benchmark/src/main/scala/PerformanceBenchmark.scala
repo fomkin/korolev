@@ -1,163 +1,79 @@
-import Execution._
-import KorolevIncomingMessage._
-import Reaction._
-import fs2._
-import fs2.async.mutable.Signal
-import pushka.Ast
-import scodec.bits.ByteVector
-import spinoco.fs2.http
-import spinoco.fs2.http._
-import spinoco.fs2.http.websocket._
-import spinoco.protocol.http._
-import spinoco.protocol.http.header._
+import java.io.File
 
+import akka.actor.ActorSystem
+import akka.typed.scaladsl.adapter._
+import data.{FromServer, Report, Scenario, ToServer}
+
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.util.Random
 
 object PerformanceBenchmark extends App {
 
-  val host = "localhost"
-  val port = 8080
-  val concurrentClientsNum = 30
-  val actionsNumber = 50
-  def actionDelay = (0.5 + Random.nextDouble * 1).seconds
-
-  final val SessionIdPattern = """(?s).*var KorolevSessionId = '(\w+)';.*""".r
-
-  case class KorolevSession(deviceId: String, sessionId: String)
-  case class Report(minT: Long = Long.MaxValue, maxT: Long = Long.MinValue, ts: List[Long] = List.empty)
-
-  sealed trait ScenarioPhase
-  case object Init extends ScenarioPhase
-  case class TabClick(tabNum: Int, started: Long) extends ScenarioPhase
-
-  def currentTime: Long = System.currentTimeMillis
-
-  def pipeline(jobNum: Int, reports: Signal[Task, List[Report]]): Pipe[Task, Frame[String], Frame[String]] = { inboundStream =>
-    val state = for {
-      queue     <- async.unboundedQueue[Task, Frame[String]]
-      phase     <- async.signalOf[Task, ScenarioPhase](Init)
-      eventCb   <- async.signalOf[Task, String]("")
-      report    <- async.signalOf[Task, Report](Report())
-    } yield {
-      (queue, phase, eventCb, report)
-    }
-    Stream.eval(state) flatMap {
-      case (outboundQueue, phase, eventCb, report) =>
-        // Send message to server
-        def send(xs: Any*) = {
-          val s = encodeKorolevMessage(xs:_*)
-          outboundQueue.enqueue1(Frame.Text(s))
+  def setup(scenario: Scenario) = {
+    import akka.typed.scaladsl.Actor
+    Actor.deferred[ToServer] { ctx =>
+      val reporter = ctx.spawnAnonymous {
+        Actor.immutable[Report] {
+          case (_, Report.Unexpected(state, expected, gotten)) =>
+            println(s"${state.scenario.name}:${state.step + 1}: $expected expected, but $gotten gotten")
+            Actor.same
+          case (_, Report.Success(_, metrics)) =>
+            val ts = metrics.values.toVector
+            val avg = (ts.sum / ts.length) / 1000000d
+            val mean = ts.sorted.apply(ts.length / 2) / 1000000d
+            val min = ts.min / 1000000d
+            val max = ts.max / 1000000d
+            println(s"avg: $avg, mean: $mean in [$min, $max]")
+            Actor.same
+          case (_, Report.MessagesFromClosedConnection(message)) =>
+            message match {
+              case FromServer.ErrorOccurred(data.Error.ArbitraryThrowable(e)) =>
+                print(Console.RED)
+                println(s"${e.getMessage}, ${e.getCause}")
+                e.getStackTrace.foreach { s =>
+                  print(Console.RED)
+                  println("  " + s)
+                }
+              case _ => println(message)
+            }
+            Actor.same
+          case (_, message) =>
+            println(message)
+            Actor.same
         }
-        inboundStream
-          // Parse message from server
-          .collect { case Frame.Text(s) => s }
-          .map(s => decodeKorolevMessage(s))
-          .flatMap(Stream.apply(_:_*))
-          // Reaction on server messages
-          .evalMap { message =>
-            phase.get flatMap {
-              case Init =>
-                reaction(message) {
-                  case FunctionCall(id, _, "RegisterGlobalEventHandler", Ast.Str(link) :: Nil) =>
-                    eventCb
-                      .set(link.stripPrefix("@link:"))
-                      .map(_ => Seq(id, true, "@unit"))
-                  case FunctionCall(id, _, "ListenEvent", Ast.Str("click") :: _) =>
-                    eventCb.get flatMap { cb =>
-                      phase
-                        .set(TabClick(1, currentTime))
-                        .flatMap(_ => send(-1, cb, "0:1_2_2:click"))
-                        .map(_ => Seq(id, true, "@unit"))
-                    }
-                }
-              case TabClick(tabNum, startTime) =>
-                reaction(message) {
-                  case FunctionCall(id, _, "SetRenderNum", Ast.Num(rNum) :: Nil) =>
-                    val nextTabNum = tabNum match {
-                      case 0 => 1
-                      case 1 => 2
-                      case 2 => 0
-                    }
-                    val dt = currentTime - startTime
-                    for {
-                      _ <- report.modify { r =>
-                        r.copy(
-                          minT = Math.min(r.minT, dt),
-                          maxT = Math.max(r.maxT, dt),
-                          ts = dt :: r.ts
-                        )
-                      }
-                      cb <- eventCb.get
-                      _ <- Task.schedule((), actionDelay)
-                      _ <- send(-1, cb, s"$rNum:1_2_${nextTabNum + 1}:click")
-                      _ <- phase.set(TabClick(nextTabNum, currentTime))
-                    } yield Seq(id, true, "@unit")
-                }
-            }
-          }
-          // Push messages to server
-          .evalMap(send(_:_*))
-          // Combine input and output
-          .mergeDrainL(outboundQueue.dequeue)
-          .interruptWhen(report.map(_.ts.length > actionsNumber))
-          .onFinalize {
-            report.get flatMap { r =>
-              reports
-                .modify(r :: _)
-                .map(_ => println(s"job #$jobNum finished"))
-            }
-          }
-    }
-  }
-
-  def runTest(jobNum: Int, reports: Signal[Task, List[Report]], client: HttpClient[Task]) = {
-    println(s"job #$jobNum started")
-    val request = HttpRequest.get[Task](Uri.http(host, port, "/"))
-    client.request(request).flatMap { response =>
-      response.body
-        .fold(ByteVector.empty)(_ :+ _)
-        .map(_.decodeUtf8) flatMap {
-        case Right(body) =>
-          val sessionOpt = response.header.headers.collectFirst {
-            case `Set-Cookie`(cookie) if cookie.name == "device" =>
-              val SessionIdPattern(sessionId) = body
-              KorolevSession(cookie.content, sessionId)
-          }
-          sessionOpt.fold(Stream.empty[Task, Unit]) {
-            case KorolevSession(deviceId, sessionId) =>
-              val request = WebSocketRequest.ws(host, port, s"/bridge/web-socket/$deviceId/$sessionId")
-              client
-                .websocket(request, pipeline(jobNum, reports))
-                .map(_ => ())
-          }
-        case Left(exception) => throw exception
       }
-    }.runLog
+      def behavior(i: Int) = KorolevConnection("localhost", 8080, None, ssl = false) {
+        ctx.spawn(ScenarioExecutor(scenario, reporter, Some(1.seconds)), s"executor-$i")
+      }
+      for (i <- 1 to 1024) {
+        ctx.spawn(behavior(i), s"bench-$i")
+      }
+      Actor.ignore
+    }
   }
 
-  val mainTask = for {
-    reportsSignal <- async.signalOf[Task, List[Report]](List.empty)
-    client  <- http.client[Task]()
-    _ <- Task.parallelTraverse(1 to concurrentClientsNum)(n => runTest(n, reportsSignal, client))
-    reports <- reportsSignal.get
-  } yield {
-    println("Report aggregation...")
-    val summary = reports.foldLeft(Report()) {
-      case (reportAcc, nextReport) =>
-        reportAcc.copy(
-          minT = Math.min(reportAcc.minT, nextReport.minT),
-          maxT = Math.max(reportAcc.maxT, nextReport.maxT),
-          ts = nextReport.ts ::: reportAcc.ts
-        )
-    }
-    val median = {
-      val xs = summary.ts.sorted
-      xs(xs.length / 2)
-    }
-    s"min: ${summary.minT}, max: ${summary.maxT}, median: $median"
+  args match {
+    case Array(fileName) =>
+      val file = new File(fileName)
+      if (file.isDirectory) {
+        println(s"$fileName is a directory")
+        sys.exit(1)
+      }
+      if (!file.exists()) {
+        println("Given file doesn't exist")
+        sys.exit(1)
+      } else {
+        val system = ActorSystem("performance-benchmark")
+        ScenarioLoader.fromFile(file) foreach {
+          case Left(errors) =>
+            system.terminate()
+            errors.foreach(println)
+          case Right(scenario) =>
+            system.spawn(setup(scenario), "connection")
+        }
+      }
+    case _ =>
+      println("No file given")
+      sys.exit(1)
   }
-
-  println(mainTask.unsafeRun())
-  System.exit(0)
 }

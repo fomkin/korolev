@@ -1,5 +1,7 @@
 package korolev.internal
 
+import java.util.concurrent.atomic.AtomicInteger
+
 import korolev._
 import Context._
 import Async._
@@ -11,7 +13,7 @@ import levsha.events.EventId
 import slogging.LazyLogging
 
 import scala.collection.mutable
-import scala.util.{Failure, Random, Success, Try}
+import scala.util.{Failure, Success, Try}
 
 /**
   * Component state holder and effects performer
@@ -43,6 +45,7 @@ final class ComponentInstance
   private val async = Async[F]
   private val miscLock = new Object()
   private val subscriptionsLock = new Object()
+  private val lastFromId = new AtomicInteger(0)
 
   private val markedDelays = mutable.Set.empty[Id] // Set of the delays which are should survive
   private val markedComponentInstances = mutable.Set.empty[Id]
@@ -106,7 +109,8 @@ final class ComponentInstance
     def transition(f: Transition[CS]): F[Unit] = applyTransition(f)
 
     def downloadFormData(element: ElementId[F, CS, E]): FormDataDownloader[F, CS] = new FormDataDownloader[F, CS] {
-      val descriptor = Random.alphanumeric.take(5).mkString
+
+      private val descriptor = nodeId.mkString + lastFromId.getAndIncrement()
 
       def start(): F[FormData] = getId(element) flatMap { id =>
         val promise = async.promise[FormData]
@@ -233,8 +237,9 @@ final class ComponentInstance
       val state = maybeState.getOrElse(component.initialState)
       try {
         val newState = transition(state)
-        stateChangeSubscribers.foreach(_.apply(nodeId, state))
-        stateManager.write(nodeId, newState)
+        stateManager.write(nodeId, newState).map { _ =>
+          stateChangeSubscribers.foreach(_.apply(nodeId, state))
+        }
       } catch {
         case e: MatchError =>
           logger.warn("Transition doesn't fit the state", e)
