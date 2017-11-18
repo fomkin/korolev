@@ -2,6 +2,10 @@ val levshaVersion = "0.6.1"
 
 val unusedRepo = Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
 
+val crossVersionSettings = Seq(
+  crossScalaVersions := Seq("2.11.12", "2.12.4")
+)
+
 val dontPublishSettings = Seq(
   publish := {},
   publishTo := unusedRepo,
@@ -42,7 +46,7 @@ val publishSettings = Seq(
 
 val commonSettings = publishSettings ++ Seq(
   organization := "com.github.fomkin",
-  version := "0.6.0-RC2-SNAPSHOT",
+  version := "0.6.0",
   libraryDependencies ++= Seq(
     "org.scalatest" %% "scalatest" % "3.0.1" % Test
   ),
@@ -71,6 +75,7 @@ lazy val serverOsgiSettings = osgiSettings ++ Seq(
 )
 
 lazy val server = (project in file("server") / "base").
+  settings(crossVersionSettings).
   settings(commonSettings: _*).
   settings(
     normalizedName := "korolev-server",
@@ -83,6 +88,7 @@ lazy val serverBlazeOsgiSettings = osgiSettings ++ Seq(
 )
 lazy val `server-blaze` = (project in file("server") / "blaze").
   settings(commonSettings: _*).
+  settings(crossVersionSettings).
   settings(
     normalizedName := "korolev-server-blaze",
     libraryDependencies ++= Seq("org.http4s" %% "blaze-http" % "0.12.4")
@@ -93,7 +99,9 @@ lazy val `server-blaze` = (project in file("server") / "blaze").
 lazy val serverAkkaHttpOsgiSettings = osgiSettings ++ Seq(
   OsgiKeys.exportPackage := Seq("korolev.akkahttp.*;version=${Bundle-Version}")
 )
+
 lazy val `server-akkahttp` = (project in file("server") / "akkahttp").
+  settings(crossVersionSettings).
   settings(commonSettings: _*).
   settings(
     normalizedName := "korolev-server-akkahttp",
@@ -107,6 +115,7 @@ lazy val asyncOsgiSettings = osgiSettings ++ Seq(
 )
 
 lazy val async = project.
+  settings(crossVersionSettings).
   settings(commonSettings: _*).
   settings(normalizedName := "korolev-async").
   enablePlugins(SbtOsgi).settings(asyncOsgiSettings:_*)
@@ -116,6 +125,7 @@ lazy val korolevOsgiSettings = osgiSettings ++ Seq(
 )
 
 lazy val korolev = project.
+  settings(crossVersionSettings).
   settings(commonSettings: _*).
   settings(
     normalizedName := "korolev",
@@ -137,6 +147,7 @@ lazy val korolev = project.
   enablePlugins(SbtOsgi).settings(korolevOsgiSettings:_*)
 
 lazy val `jcache-support` = project.
+  settings(crossVersionSettings).
   enablePlugins(SbtOsgi).
   settings(commonSettings: _*).
   settings(osgiSettings: _*).
@@ -151,21 +162,25 @@ lazy val `jcache-support` = project.
 val examples = file("examples")
 
 lazy val simpleExample = (project in examples / "simple").
+  settings(crossVersionSettings).
   settings(exampleSettings: _*).
   settings(mainClass := Some("SimpleExample")).
   dependsOn(`server-blaze`)
 
 lazy val routingExample = (project in examples / "routing").
+  settings(crossVersionSettings).
   settings(exampleSettings: _*).
   settings(mainClass := Some("RoutingExample")).
   dependsOn(`server-blaze`)
 
 lazy val gameOfLifeExample = (project in examples / "game-of-life").
+  settings(crossVersionSettings).
   settings(exampleSettings: _*).
   settings(mainClass := Some("GameOfLife")).
   dependsOn(`server-blaze`)
 
 lazy val jcacheExample = (project in examples / "jcache").
+  settings(crossVersionSettings).
   settings(exampleSettings: _*).
   settings(
     mainClass := Some("JCacheExample"),
@@ -174,36 +189,43 @@ lazy val jcacheExample = (project in examples / "jcache").
   dependsOn(`server-blaze`, `jcache-support`)
 
 lazy val formDataExample = (project in examples / "form-data").
+  settings(crossVersionSettings).
   settings(exampleSettings: _*).
   settings(mainClass := Some("FormDataExample")).
   dependsOn(`server-blaze`)
 
 lazy val delayExample = (project in examples / "delay").
+  settings(crossVersionSettings).
   settings(exampleSettings: _*).
   settings(mainClass := Some("DelayExample")).
   dependsOn(`server-blaze`)
 
 lazy val focusExample = (project in examples / "focus").
+  settings(crossVersionSettings).
   settings(exampleSettings: _*).
   settings(mainClass := Some("FocusExample")).
   dependsOn(`server-blaze`)
 
 lazy val webComponentExample = (project in examples / "web-component").
+  settings(crossVersionSettings).
   settings(exampleSettings: _*).
   settings(mainClass := Some("WebComponentExample")).
   dependsOn(`server-blaze`)
 
 lazy val componentExample = (project in examples / "component").
+  settings(crossVersionSettings).
   settings(exampleSettings: _*).
   settings(mainClass := Some("ComponentExample")).
   dependsOn(`server-blaze`)
 
 lazy val akkaHttpExample = (project in examples / "akka-http").
+  settings(crossVersionSettings).
   settings(exampleSettings: _*).
   settings(mainClass := Some("AkkaHttpExample")).
   dependsOn(`server-akkahttp`)
 
 lazy val `integration-tests` = project.
+  settings(crossVersionSettings).
   settings(commonSettings).
   settings(dontPublishSettings:_*).
   settings(
@@ -234,8 +256,8 @@ lazy val `performance-benchmark` = project.
   dependsOn(korolev)
 
 lazy val root = project.in(file(".")).
+  settings(crossVersionSettings).
   settings(dontPublishSettings:_*).
-  settings(crossScalaVersions := Seq("2.11.12", "2.12.4")).
   aggregate(
     korolev, async,
     server, `server-blaze`, `server-akkahttp`,
