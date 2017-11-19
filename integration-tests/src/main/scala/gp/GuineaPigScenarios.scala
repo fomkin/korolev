@@ -68,6 +68,15 @@ object GuineaPigScenarios {
       val value = wd.findElement(By.id("todo-input")).getAttribute("value")
       assert("Field should be empty", value == "property value")
     },
+    step("keydown event should be handled") { implicit wd =>
+      val input = wd.findElement(By.id("todo-input"))
+      input.scrollTo()
+      input.sendKeys("k")
+      sleep(1000.millis)
+      assert(s"theKey should contain 'd'", wait(wd).until(
+        ExpectedConditions.textToBe(By.id("theKey"), "k")
+      ))
+    },
     step("Uploaded text file should be displayed") { wd =>
       val shouldRun = wd match {
         case r: RemoteWebDriver =>

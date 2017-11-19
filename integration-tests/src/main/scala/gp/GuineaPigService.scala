@@ -10,6 +10,9 @@ import org.slf4j.LoggerFactory
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
+import pushka.json._
+import pushka.Ast
+
 object GuineaPigService {
 
   case class State(
@@ -21,7 +24,8 @@ object GuineaPigService {
     ),
     uploadedText: String = "",
     delayOn: Boolean = false,
-    eventFromComponentReceived: Boolean = false
+    eventFromComponentReceived: Boolean = false,
+    key: Option[String] = None
   )
 
   object State {
@@ -138,7 +142,17 @@ object GuineaPigService {
               inputId,
               'id /= "todo-input",
               'type /= "text",
-              'placeholder /= "What should be done?"
+              'placeholder /= "What should be done?",
+              event('keydown) { access =>
+                access.eventData.flatMap { jsonString =>
+                  val data = read[Map[String, Ast]](jsonString)
+                  data.get("key")
+                    .collect { case Ast.Str(s) => s }
+                    .fold(Future.successful(())) { key =>
+                      access.transition(_.copy(key = Some(key)))
+                    }
+                }
+              }
             ),
             'button(
               'id /= "todo-submit-button",
@@ -184,11 +198,10 @@ object GuineaPigService {
               }
             }
           ),
+          'span('id /= "theKey", state.key.fold("<no key>")(identity)),
           'div(
             TheComponent("label") { (access, _) =>
-              access.transition {
-                case s => s.copy(eventFromComponentReceived = true)
-              }
+              access.transition(_.copy(eventFromComponentReceived = true))
             },
             'span('id /= "from-component",
               if (state.eventFromComponentReceived) "Cat"
@@ -201,7 +214,7 @@ object GuineaPigService {
       ServerRouter(
         dynamic = (_, _) => Router(
           fromState = {
-            case State(tab, _, _, _, _) =>
+            case State(tab, _, _, _, _, _) =>
               Root / tab.toLowerCase
           },
           toState = {
