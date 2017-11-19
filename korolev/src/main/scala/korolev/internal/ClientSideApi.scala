@@ -94,6 +94,14 @@ final class ClientSideApi[F[+ _]: Async](connection: Connection[F])
   def reloadCss(): Unit =
     connection.send(Procedure.ReloadCss.code)
 
+  def extractEventData(renderNum: Int): F[String] = {
+    val descriptor = lastDescriptor.getAndIncrement().toString
+    val promise = async.promise[String]
+    promises.put(descriptor, promise)
+    connection.send(Procedure.ExtractEventData.code, descriptor, renderNum)
+    promise.future
+  }
+
   def startDomChanges(): Unit = {
     domChangesBuffer.append(Procedure.ModifyDom.code)
   }
@@ -168,6 +176,10 @@ final class ClientSideApi[F[+ _]: Async](connection: Connection[F])
           promises
             .remove(descriptor)
             .foreach(_.complete(result))
+        case CallbackType.ExtractEventDataResponse.code =>
+          val Array(descriptor, value) = args.split(":", 2)
+          val unescapedValue = value.replaceAll("""\\"""", """"""")
+          promises.remove(descriptor).foreach(_.complete(Success(unescapedValue)))
         case CallbackType.History.code =>
           onHistory(Router.Path.fromString(args))
         case CallbackType.EvalJsResponse.code =>
@@ -211,10 +223,12 @@ object ClientSideApi {
     case object ReloadCss extends Procedure(8) // ()
     case object KeepAlive extends Procedure(9) // ()
     case object EvalJs extends Procedure(10) // (code)
+    case object ExtractEventData extends Procedure(11) // (descriptor, renderNum)
 
     val All = Set(
       SetRenderNum, CleanRoot, ListenEvent, ExtractProperty,
-      ModifyDom, Focus, ChangePageUrl, UploadForm, ReloadCss
+      ModifyDom, Focus, ChangePageUrl, UploadForm, ReloadCss,
+      KeepAlive, EvalJs, ExtractEventData
     )
 
     def apply(n: Int): Option[Procedure] =
@@ -258,8 +272,9 @@ object ClientSideApi {
     case object ExtractPropertyResponse extends CallbackType(2) // `$descriptor:$value`
     case object History extends CallbackType(3) // URL
     case object EvalJsResponse extends CallbackType(4) // `$descriptor:$status:$value`
+    case object ExtractEventDataResponse extends CallbackType(5) // `$descriptor:$dataJson`
 
-    final val All = Set(DomEvent, FormDataProgress, ExtractPropertyResponse, History)
+    final val All = Set(DomEvent, FormDataProgress, ExtractPropertyResponse, History, EvalJsResponse, ExtractEventDataResponse)
 
     def apply(n: Int): Option[CallbackType] =
       All.find(_.code == n)

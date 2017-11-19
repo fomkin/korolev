@@ -220,7 +220,11 @@ lazy val monixExample = (project in examples / "monix").
   settings(mainClass := Some("MonixExample")).
   dependsOn(`monix-support`, `server-akkahttp`)
 
-// Tests
+lazy val eventDataExample = (project in examples / "event-data").
+  settings(crossVersionSettings).
+  settings(exampleSettings: _*).
+  settings(mainClass := Some("EventDataExample")).
+  dependsOn(`server-blaze`)
 
 lazy val `integration-tests` = project.
   settings(crossVersionSettings).
@@ -263,7 +267,7 @@ lazy val root = project.in(file(".")).
     simpleExample, routingExample, gameOfLifeExample,
     jcacheExample, formDataExample, delayExample, focusExample,
     webComponentExample, componentExample, akkaHttpExample,
-    `integration-tests`
+    eventDataExample, `integration-tests`
   )
 
 dontPublishSettings
