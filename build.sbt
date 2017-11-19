@@ -238,7 +238,8 @@ lazy val `integration-tests` = project.
     fork in run := true,
     libraryDependencies ++= Seq(
       "org.slf4j" % "slf4j-simple" % "1.7.+",
-      "org.seleniumhq.selenium" % "selenium-java" % "2.53.1"
+      "org.seleniumhq.selenium" % "selenium-java" % "2.53.1",
+      "com.github.fomkin" %% "pushka-json" % "0.8.0"
     )
   ).
   dependsOn(`server-blaze`).
