@@ -219,7 +219,7 @@ val renderAuthorized: Render = ???
 val render = renderAnonymous orElse renderAuthorized
 -----------------------------------
 
-Event gives you an access to information from the client side. In this case, it it is values of the input fields.
+Event gives you an access to information from the client side. In this case, it it is values of the input fields. Also you can get data from event object using `access.eventData` function`.
 
 Event handlers should return F[Unit] which will be implicitly converted to `EventResult`.
 
