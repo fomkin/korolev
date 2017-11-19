@@ -46,7 +46,7 @@ export class Bridge {
       case 6: k.changePageUrl.apply(k, commands); break;
       case 7: k.uploadForm.apply(k, commands); break;
       case 8: k.reloadCss.apply(k, commands); break;
-      case 9: k.extractEventData(k, commands); break;
+      case 9: k.extractEventData.apply(k, commands); break;
       default: console.error(`Procedure ${pCode} is undefined`);
     }
   }

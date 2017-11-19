@@ -334,7 +334,7 @@ export class Korolev {
   extractEventData(descriptor, renderNum) {
     let data = this.eventData[renderNum];
     let result = {};
-    for (propertyName in data) {
+    for (var propertyName in data) {
       let value = data[propertyName];
       switch (typeof value) {
         case 'string':

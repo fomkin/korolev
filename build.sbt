@@ -224,6 +224,12 @@ lazy val akkaHttpExample = (project in examples / "akka-http").
   settings(mainClass := Some("AkkaHttpExample")).
   dependsOn(`server-akkahttp`)
 
+lazy val eventDataExample = (project in examples / "event-data").
+  settings(crossVersionSettings).
+  settings(exampleSettings: _*).
+  settings(mainClass := Some("EventDataExample")).
+  dependsOn(`server-blaze`)
+
 lazy val `integration-tests` = project.
   settings(crossVersionSettings).
   settings(commonSettings).

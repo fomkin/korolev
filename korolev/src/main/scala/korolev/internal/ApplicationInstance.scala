@@ -33,7 +33,7 @@ final class ApplicationInstance
   private val renderContext = DiffRenderContext[Effect[F, S, M]](savedBuffer = devMode.loadRenderContext())
   private val frontend = new ClientSideApi[F](connection)
 
-  val topLevelComponentInstance = {
+  val topLevelComponentInstance: ComponentInstance[F, S, M, S, Any, M] = {
     val renderer = render.lift
     val eventRegistry = new EventRegistry[F](frontend)
     val component = new Component[F, S, Any, M](initialState, Component.TopLevelComponentId) {
@@ -48,7 +48,10 @@ final class ApplicationInstance
         }
       }
     }
-    new ComponentInstance[F, S, M, S, Any, M](Id.TopLevel, sessionId, frontend, eventRegistry, stateManager, component)
+    new ComponentInstance[F, S, M, S, Any, M](
+      Id.TopLevel, sessionId, frontend, eventRegistry,
+      stateManager, () => currentRenderNum.get(), component
+    )
   }
 
   private def onState(): F[Unit] = stateManager.snapshot.map { snapshot =>
