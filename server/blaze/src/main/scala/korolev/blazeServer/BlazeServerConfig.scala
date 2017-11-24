@@ -26,6 +26,9 @@ case class BlazeServerConfig(
 
 object BlazeServerConfig {
 
+  def empty(implicit executionContext: ExecutionContextExecutorService) =
+    BlazeServerConfig()
+
   def bogusSslContext: SSLContext = {
     val ksStream = BogusKeystore.asInputStream()
     assert(ksStream != null)

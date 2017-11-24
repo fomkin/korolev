@@ -146,6 +146,15 @@ lazy val korolev = project.
   dependsOn(async).
   enablePlugins(SbtOsgi).settings(korolevOsgiSettings:_*)
 
+lazy val `java-dsl` = project.
+  settings(commonSettings: _*).
+  settings(
+    normalizedName := "korolev-java-dsl",
+    scalaVersion := "2.12.4",
+    crossPaths := false
+  ).
+  dependsOn(server)
+
 lazy val `jcache-support` = project.
   settings(crossVersionSettings).
   enablePlugins(SbtOsgi).
@@ -224,6 +233,17 @@ lazy val akkaHttpExample = (project in examples / "akka-http").
   settings(mainClass := Some("AkkaHttpExample")).
   dependsOn(`server-akkahttp`)
 
+lazy val javaDslExample = (project in examples / "java-dsl-example").
+  settings(exampleSettings: _*).
+  settings(
+    mainClass := Some("JavaDslExample"),
+    libraryDependencies ++= Seq(
+      "org.projectlombok" % "lombok" % "1.16.16",
+      "io.vavr" % "vavr" % "0.9.0"
+    )
+  ).
+  dependsOn(`server-blaze`, `java-dsl`)
+
 lazy val `integration-tests` = project.
   settings(crossVersionSettings).
   settings(commonSettings).
@@ -259,12 +279,12 @@ lazy val root = project.in(file(".")).
   settings(crossVersionSettings).
   settings(dontPublishSettings:_*).
   aggregate(
-    korolev, async,
+    korolev, async, `java-dsl`,
     server, `server-blaze`, `server-akkahttp`,
     `jcache-support`,
     simpleExample, routingExample, gameOfLifeExample,
     jcacheExample, formDataExample, delayExample, focusExample,
-    webComponentExample, componentExample, akkaHttpExample,
+    webComponentExample, componentExample, akkaHttpExample, javaDslExample,
     `integration-tests`
   )
 

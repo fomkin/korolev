@@ -1,7 +1,7 @@
 package korolev.server
 
-import korolev.server.KorolevServiceConfig.{ApplyTransition, Env, EnvConfigurator}
-import korolev.{Context, Async, Transition}
+import korolev.server.KorolevServiceConfig.EnvConfigurator
+import korolev.{Async, Context, Transition}
 import levsha.{Document, TemplateDsl}
 
 case class KorolevServiceConfig[F[+_]: Async, S, M](
@@ -13,8 +13,7 @@ case class KorolevServiceConfig[F[+_]: Async, S, M](
     KorolevServiceConfig.defaultConnectionLostWidget[Context.Effect[F, S, M]],
   maxFormDataEntrySize: Int = 1024 * 1024 * 8,
   envConfigurator: EnvConfigurator[F, S, M] =
-    (_: String, _: String, _: ApplyTransition[F, S]) =>
-      Env(onDestroy = () => (), PartialFunction.empty)
+    KorolevServiceConfig.defaultEnvironmentConfigurator[F, S, M]
 )
 
 object KorolevServiceConfig {
@@ -29,5 +28,10 @@ object KorolevServiceConfig {
                    "background-color: yellow; border-bottom: 1px solid black; padding: 10px;",
       "Connection lost. Waiting to resume."
     )
+  }
+
+  def defaultEnvironmentConfigurator[F[+_], S, M]: EnvConfigurator[F, S, M] = {
+    (_: String, _: String, _: ApplyTransition[F, S]) =>
+      Env(onDestroy = () => (), PartialFunction.empty)
   }
 }
