@@ -105,7 +105,11 @@ lazy val `server-akkahttp` = (project in file("server") / "akkahttp").
   settings(commonSettings: _*).
   settings(
     normalizedName := "korolev-server-akkahttp",
-    libraryDependencies ++= Seq("com.typesafe.akka" %% "akka-http" % "10.0.9")
+    libraryDependencies ++= Seq(
+      "com.typesafe.akka" %% "akka-actor" % "2.5.6",
+      "com.typesafe.akka" %% "akka-stream" % "2.5.6",
+      "com.typesafe.akka" %% "akka-http" % "10.0.9"
+    )
   ).
   dependsOn(server).
   enablePlugins(SbtOsgi).settings(serverAkkaHttpOsgiSettings:_*)

@@ -11,7 +11,7 @@ import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Flow, Sink}
-import korolev.akkahttp.util.{IncomingMessageHandler, OutgoingMessageWriter}
+import korolev.akkahttp.util.{IncomingMessageHandler, WSSubscriptionStage}
 import korolev.execution.defaultExecutor
 import korolev.server.{KorolevService, KorolevServiceConfig, MimeTypes, Request => KorolevRequest, Response => KorolevResponse}
 import korolev.state.{StateDeserializer, StateSerializer}
@@ -42,18 +42,14 @@ package object akkahttp {
 
         onSuccess(korolevServer(korolevRequest)) {
           case KorolevResponse.WebSocket(publish, subscribe, destroy) =>
-            val messageWriter = new OutgoingMessageWriter()
-            val out = messageWriter.asSource
-            subscribe(messageWriter.write)
-
             val messageHandler = new IncomingMessageHandler(
               publish,
               () => {
-                messageWriter.close()
                 destroy()
               }
             )
             val in = inFlow(akkaHttpConfig.maxRequestBodySize, publish).to(messageHandler.asSink)
+            val out = WSSubscriptionStage.source(subscribe)
 
             complete(upgrade.handleMessagesWithSinkSource(in, out))
           case _ =>
