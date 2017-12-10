@@ -155,6 +155,11 @@ object Context {
     def transition(f: Transition[S]): F[Unit]
 
     /**
+      * Applies transition to current state.
+      */
+    def maybeTransition(f: PartialFunction[S, S]): F[Unit] = transition(f)
+
+    /**
       * Gives current session id
       */
     def sessionId: F[QualifiedSessionId]
