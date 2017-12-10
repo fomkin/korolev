@@ -1,5 +1,6 @@
 package korolev.internal
 
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicInteger
 
 import korolev._
@@ -57,7 +58,10 @@ final class ComponentInstance
   private val formDataProgressTransitions = mutable.Map.empty[String, (Int, Int) => Transition[CS]]
 
   private val stateChangeSubscribers = mutable.ArrayBuffer.empty[(Id, Any) => Unit]
-  private var eventSubscription = Option.empty[E => _]
+  private val pendingTransitions = new ConcurrentLinkedQueue[(Transition[CS], Promise[F, Unit])]()
+
+  @volatile private var eventSubscription = Option.empty[E => _]
+  @volatile private var transitionInProgress = false
 
   private object browserAccess extends Access[F, CS, E] {
 
@@ -233,22 +237,36 @@ final class ComponentInstance
   }
 
   def applyTransition(transition: Transition[CS]): F[Unit] = {
-    stateManager.read[CS](nodeId) flatMap { maybeState =>
-      val state = maybeState.getOrElse(component.initialState)
-      try {
-        val newState = transition(state)
-        stateManager.write(nodeId, newState).map { _ =>
-          stateChangeSubscribers.foreach(_.apply(nodeId, state))
+    def runTransition(transition: Transition[CS], promise: Promise[F, Unit]): Unit = {
+      transitionInProgress = true
+      stateManager.read[CS](nodeId) flatMap { maybeState =>
+        val state = maybeState.getOrElse(component.initialState)
+        try {
+          val newState = transition(state)
+          stateManager.write(nodeId, newState).map { _ =>
+            stateChangeSubscribers.foreach(_.apply(nodeId, state))
+          }
+        } catch {
+          case e: MatchError =>
+            logger.warn("Transition doesn't fit the state", e)
+            async.unit
+          case e: Throwable =>
+            logger.error("Exception happened when applying transition", e)
+            async.unit
         }
-      } catch {
-        case e: MatchError =>
-          logger.warn("Transition doesn't fit the state", e)
-          async.unit
-        case e: Throwable =>
-          logger.error("Exception happened when applying transition", e)
-          async.unit
+      } runOrReport { _ =>
+        promise.complete(Success(()))
+        Option(pendingTransitions.poll()) match {
+          case Some((t, p)) => runTransition(t, p)
+          case None => transitionInProgress = false
+        }
       }
     }
+
+    val promise = async.promise[Unit]
+    if (transitionInProgress) pendingTransitions.offer((transition, promise))
+    else runTransition(transition, promise)
+    promise.future
   }
 
   def applyEvent(eventId: EventId): Boolean = {
