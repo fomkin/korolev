@@ -129,7 +129,7 @@ val render: Render = {
     )
   case Authorized(_, User(name, friends)) =>
     'body(
-      'div(s"Your name is $name. This is your frinds"),
+      'div(s"Your name is $name. Your friends:"),
       'ul(
         // Look at that. You just map data to view
         friends map { friend =>
