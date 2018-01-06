@@ -15,11 +15,11 @@ Our project supports static page rendering so that search engines could index pa
 
 === Principles
 
-1. Thin client. Let's be honest, modern JavaScript applications are too greedy. Every JavaScript developer thinks that his page is special. But the user has a different opinion. He opens dozens of tabs. Each tab contains a ton of code, and this works very slowly. So we make our JavaScript bridge as lightweight as possible.
+1. **Thin client.** Let's be honest, modern JavaScript applications are too greedy. Every JavaScript developer thinks that his page is special. But the user has a different opinion. He opens dozens of tabs. Each tab contains a ton of code, and this works very slowly. So we made our JavaScript bridge as lightweight as possible.
 
-2. Immutable and pure. Really, we don't need mutability even on the frontend. Especially on the frontend. The majority of modern JavaScript frameworks try to be functional. So we do.
+2. **Immutable and pure.** Really, we don't need mutability even on the frontend. Especially on the frontend. The majority of modern JavaScript frameworks try to be functional. So we do.
 
-3. Lack of dependencies. Korolev does not impose to use cats, scalaz, Akka, or futures from the standard library. Use what you want. Korolev tries to give a way to integrate itself into any environment.
+3. **Lack of dependencies.** Korolev does not impose to use cats, scalaz, Akka, or futures from the standard library. Use what you want. Korolev gives a way to integrate itself into any environment.
 
 === Quick start
 
@@ -39,7 +39,7 @@ Ok, now you are ready to start hacking with Korolev.
 
 === Template DSL
 
-Korolev uses https://github.com/fomkin/levsha[Levsha] as DSL (domain specific language) for templating. DSL allows to declare DOM inside Scala code remain within Scala syntax. Take a look.
+Korolev uses https://github.com/fomkin/levsha[Levsha] as DSL (domain specific language) for templating. The levsha DSL allows to declare DOM using Scala code. Take a look.
 
 [source,scala]
 -----------------------------------
@@ -73,13 +73,13 @@ Style keys are camelCased in order to be consistent with accessing the propertie
 
 === Device and Session
 
-When a user opens your application the first time, Korolev sets a cookie named `device` with the unique identifier. After that, you can identify the user by `deviceId`.
+When a user opens Korolev application the first time, it sets a cookie named `device` with a unique identifier. After that, you can identify the user by `deviceId`.
 
-A session is created when the user opens a page. Every session has the unique identifier `sessionId`. Korolev has a _State_ for every session.
+A session is created when the user opens a page. Every session has a unique identifier `sessionId`. Korolev has a separate _State_ for every session.
 
 === State
 
-The only source of data to render a page. If you have something you want to display, it should be stored in state. State is always immutable.
+State is the only source of data needed to render a page. If you have something you want to display, it should be stored in state. State is always immutable.
 
 [source,scala]
 -----------------------------------
@@ -110,11 +110,11 @@ StateStorage[Future, MyState].forDeviceId { deviceId =>
 }
 -----------------------------------
 
-The only way to modify the State is by applying a transition (see below).
+The only way to modify the State is by applying a *transition* (see below).
 
 === Render
 
-Render is a view of the state. Render is a function which takes state as the argument and returns DOM. Korolev has its own DSL to define templates using Scala code. Do not be afraid, you will quickly get used to it.
+Render is a view of the state. Render is a function which takes state as an argument and returns a DOM. Korolev has its own DSL to define templates using Scala code. Do not be afraid, you will quickly get used to it.
 
 [source,scala]
 -----------------------------------
@@ -129,7 +129,7 @@ val render: Render = {
     )
   case Authorized(_, User(name, friends)) =>
     'body(
-      'div(s"Your name is $name. This is your frinds"),
+      'div(s"Your name is $name. Your friends:"),
       'ul(
         // Look at that. You just map data to view
         friends map { friend =>
@@ -146,7 +146,7 @@ Render is called for each new state. It's important to understand that render pr
 
 === Transitions
 
-Transition is a function that applies to current state and produces a new state. Consider a transition which adds a new friend to the friends list.
+Transition is a function that applies to the current state and produces a new state. Consider a transition which adds a new friend to the friends list.
 
 [source,scala]
 --------------------------------------------------------------
@@ -186,7 +186,7 @@ val renderAnonymous: Render = {
 }
 --------------------------------------------------------------
 
-When "Increment" button will be clicked, `i` will be incremented by 1. Let's consider a more complex situation. Do you remember render example? Did you have a feeling that something was missing? Let's complement it with the events!
+When "Increment" button will be clicked, `i` will be incremented by 1. Let's consider a more complex situation. Do you remember render example? Did you have a feeling that something was missing? Let's complement it with events!
 
 [source,scala]
 -----------------------------------
@@ -207,7 +207,7 @@ val renderAnonymous: Render = {
             user <- authService.authorize(login, password)
             _ <- access.transition {
               case Anonymous(deviceId) =>
-                 Authorized(deviceId, user)
+                Authorized(deviceId, user)
             }
           } yield ()
         }
@@ -225,7 +225,7 @@ Event handlers should return F[Unit] which will be implicitly converted to `Even
 
 === Stateful components
 
-In the world of front-end development people often name every thing that has HTML-like markup a "component". Until version 0.6, Korolev didn't have components support (except WebComponents on a client side). When we say "component" we mean something that has its own state. In Korolev case, components also dispatch events to other components up in the hierarchy or to the application on the top.
+In the world of front-end development people often call every thing that has HTML-like markup a "component". Until version 0.6, Korolev didn't have components support (except WebComponents on client side). When we say "component" we mean something that has its own state. In Korolev case, components also dispatch events to other components up in the hierarchy or to the application on the top.
 
 Worth to note that application is a component too, so you can consider Korolev's components system as a system composed of applications. Korolev components are not lightweight, so if you can implement a feature without components, do it so. Use components only when they are really necessary.
 
@@ -319,7 +319,7 @@ Also you can use shortcut `valueOf` for get values from elements.
 
 === FormData
 
-Above, we considered a method allowing to read values and update from inputs. The flaw of this is a need of reading input one-by-one and lack of files uploading. FormData attended to solve these problems.
+Above, we considered a method allowing to read values and update form inputs. The flaw of this is the need of reading input one-by-one and lack of files uploading. FormData attended to solve these problems.
 
 In contrast to `property`, FormData works with form tag, not with input tag.
 
@@ -388,7 +388,7 @@ https://github.com/fomkin/korolev/blob/v0.6.0/examples/delay/src/main/scala/Dela
 
 === Environment configurator
 
-Korolev is not just request-response, but push. One of big advantages of Korolev is ability to display server side events without additional code. Consider example where we have a page with some sort of notification list.
+Korolev is not just request-response, but also push. One of the big advantages of Korolev is the ability to display server side events without additional code. Consider example where we have a page with some sort of notifications list.
 
 [source,scala]
 -----------------------------------
@@ -404,7 +404,7 @@ var render: Render = {
 }
 -----------------------------------
 
-Also we have a message queue which has a topic with notifications for current user. The topic has identifier based on `deviceId` of a client. Lets try to bind an application state with messages from the queue.
+Also, we have a message queue which has a topic with notifications for current user. The topic has identifier based on `deviceId` of a client. Lets try to bind an application state with messages from the queue.
 
 [source,scala]
 -------------------------------------------------------------------------------
@@ -432,9 +432,9 @@ the transition which will prepend new notification to the state. Render will be 
 
 === Routing
 
-Router allows to integrate browser navigation to you app. In the router you define bidirectional mapping between the state and the URL.
+Router allows to integrate browser navigation into you app. In the router you define bidirectional mapping between the state and the URL.
 
-Let's pretends that you application is a blogging platform
+Let's pretends that your application is a blogging platform.
 
 [source,scala]
 -------------------------------------------------------------------------------
@@ -457,8 +457,8 @@ KorolevServiceConfig(
     // with any url but "/".
     static = (deviceId) => Router(
       toState = {
-        case (_, Root / author / article) => articleServrice.load(author, article)
-        case _ => articleServrice.defaultArticle
+        case (_, Root / author / article) => articleService.load(author, article)
+        case _ => articleService.defaultArticle
       }
     ),
     dynamic = (device, session) => Router(
@@ -485,7 +485,7 @@ https://github.com/fomkin/korolev/blob/v0.6.0/examples/routing/src/main/scala/Ro
 
 === Web Components
 
-Usually when we say "components" we mean an UI element with its own state. Korolev doesn't support components by design, cause it leads to multiple states and breaks the simplicity which we want to reach. However you still can use https://www.w3.org/standards/techs/components[WebComponents].
+Usually when we say "components" we mean a UI element with its own state. Korolev doesn't support components by design, cause it leads to multiple states and breaks the simplicity which we want to reach. However you still can use https://www.w3.org/standards/techs/components[WebComponents].
 
 [NOTE]
 ============
@@ -503,27 +503,29 @@ Developer mode provides "hot reload" experience. Run your application with `koro
 re-start --- -Dkorolev.dev=true
 -------------------------------------------------------------------------------
 
-Make a change in the source code of your app. Save the file. Switch to a browser and wait for changes to deliver. Developer mode does not work with custom `StateStorage`.
+Make a change to your app source code and save the file. Switch to the browser and wait for changes to deliver.
+
+Notice that developer mode does not work with custom `StateStorage`.
 
 [NOTE]
 ============
-Ensure that everything is stateless except Korolev part of the application. For example, if you have models which hold state in hash maps they will be not saved. It will lead to inconsistency.
+Ensure that everything is stateless except Korolev part of the application. For example, if you keep some state outside of Korolev state, it won't be saved and will lead to inconsistency.
 ============
 
 === Serve files from resource directory
 
-Everything that placed in directory named `static` (in the classpath of the application) will be served from the root of the application endpoint. It may be useful when you want to distribute some small images or CSS with the app.
+Everything placed in directory named `static` (in the classpath of the application) will be served from the root of the application endpoint. It may be useful when you want to distribute some small images or CSS with the app.
 
 [WARNING]
 ============
-Korolev is not some sort of CDN node. Avoid to serve a lot of large files using this feature.
+Korolev is not some sort of CDN node. Avoid serving lots of large files using this feature.
 ============
 
 == Integrations
 
 === JCache
 
-For large applications, when one node can't serve all clients, you need a way to scale application to multiple nodes. Although Korolev usually use permanent connections, a case when a client connects to a wrong node is possible. First, it may happen when reconnect. Second, it may happen when the client downgrades his connection from WebSocket to long polling for some reason. It means that every node in a cluster should have access to all user states (sessions).
+For large applications, when one node can't serve all clients, you need a way to scale application to multiple nodes. Although Korolev usually use persistent connections, a case when a client connects to a wrong node is possible. First, it may happen after reconnect. Secondly, it may happen when the client downgrades his connection from WebSocket to long polling for some reason. It means that every node in a cluster should have access to all user states (sessions).
 
 To fix this, you can apply any in-memory storage compatible with https://github.com/jsr107/jsr107spec[JCache]. Just add a dependency to your SBT configuration.
 
