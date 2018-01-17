@@ -17,6 +17,7 @@ import korolev.server.{KorolevService, KorolevServiceConfig, MimeTypes, Request 
 import korolev.state.{StateDeserializer, StateSerializer}
 
 import scala.concurrent.{Future, Promise}
+import scala.concurrent.duration._
 
 package object akkahttp {
 
@@ -32,6 +33,9 @@ package object akkahttp {
       httpPostRoute(korolevServer)
   }
 
+  private val KeepAliveInterval = 5.seconds
+  private val KeepAliveMessage = TextMessage("[9]")
+
   private def webSocketRoute[F[+_]: Async](korolevServer: KorolevService[F],
                                            akkaHttpConfig: AkkaHttpServerConfig)
                                           (implicit actorSystem: ActorSystem,
@@ -44,7 +48,7 @@ package object akkahttp {
           case KorolevResponse.WebSocket(publish, subscribe, destroy) =>
             val messageHandler = new IncomingMessageHandler(publish, () => destroy())
             val in = inFlow(akkaHttpConfig.maxRequestBodySize, publish).to(messageHandler.asSink)
-            val out = WSSubscriptionStage.source(subscribe)
+            val out = WSSubscriptionStage.source(subscribe).keepAlive(KeepAliveInterval, () => KeepAliveMessage)
 
             complete(upgrade.handleMessagesWithSinkSource(in, out))
           case _ =>
