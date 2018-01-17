@@ -48,7 +48,7 @@ val commonSettings = publishSettings ++ Seq(
   organization := "com.github.fomkin",
   version := "0.6.1",
   libraryDependencies ++= Seq(
-    "org.scalatest" %% "scalatest" % "3.0.1" % Test
+    "org.scalatest" %% "scalatest" % "3.0.4" % Test
   ),
   scalacOptions ++= Seq(
     "-deprecation",
@@ -106,9 +106,9 @@ lazy val `server-akkahttp` = (project in file("server") / "akkahttp").
   settings(
     normalizedName := "korolev-server-akkahttp",
     libraryDependencies ++= Seq(
-      "com.typesafe.akka" %% "akka-actor" % "2.5.6",
-      "com.typesafe.akka" %% "akka-stream" % "2.5.6",
-      "com.typesafe.akka" %% "akka-http" % "10.0.9"
+      "com.typesafe.akka" %% "akka-actor" % "2.5.8",
+      "com.typesafe.akka" %% "akka-stream" % "2.5.8",
+      "com.typesafe.akka" %% "akka-http" % "10.0.11"
     )
   ).
   dependsOn(server).
