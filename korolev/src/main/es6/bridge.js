@@ -13,8 +13,8 @@ export class Bridge {
   constructor(config, connection) {
     this._korolev = new Korolev(config, this._onCallback.bind(this));
     this._korolev.registerRoot(document.body);
-    this._connection = connection
-    this._messageHandler = this._onMessage.bind(this)
+    this._connection = connection;
+    this._messageHandler = this._onMessage.bind(this);
 
     connection.dispatcher.addEventListener("message", this._messageHandler);
   }
@@ -24,7 +24,7 @@ export class Bridge {
    * @param {string} args
    */
   _onCallback(type, args) {
-    let message = JSON.stringify([type, args])
+    let message = JSON.stringify([type, args]);
     if (protocolDebugEnabled)
       console.log('<-', message);
     this._connection.send(message);
@@ -46,6 +46,7 @@ export class Bridge {
       case 6: k.changePageUrl.apply(k, commands); break;
       case 7: k.uploadForm.apply(k, commands); break;
       case 8: k.reloadCss.apply(k, commands); break;
+      case 9: break;
       default: console.error(`Procedure ${pCode} is undefined`);
     }
   }
