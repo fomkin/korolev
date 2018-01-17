@@ -16,14 +16,14 @@ import korolev.execution.defaultExecutor
 import korolev.server.{KorolevService, KorolevServiceConfig, MimeTypes, Request => KorolevRequest, Response => KorolevResponse}
 import korolev.state.{StateDeserializer, StateSerializer}
 
-import scala.concurrent.Future
+import scala.concurrent.{Future, Promise}
 
 package object akkahttp {
 
   type AkkaHttpService = AkkaHttpServerConfig => Route
 
-  def akkaHttpService[S: StateSerializer: StateDeserializer, M]
-      (config: KorolevServiceConfig[Future, S, M], mimeTypes: MimeTypes = server.mimeTypes)
+  def akkaHttpService[F[+_]: Async, S: StateSerializer: StateDeserializer, M]
+      (config: KorolevServiceConfig[F, S, M], mimeTypes: MimeTypes = server.mimeTypes)
       (implicit actorSystem: ActorSystem, materializer: Materializer): AkkaHttpService = { akkaHttpConfig =>
     val korolevServer = korolev.server.korolevService(mimeTypes, config)
 
@@ -32,28 +32,23 @@ package object akkahttp {
       httpPostRoute(korolevServer)
   }
 
-  private def webSocketRoute(korolevServer: KorolevService[Future],
-                             akkaHttpConfig: AkkaHttpServerConfig)
-                            (implicit actorSystem: ActorSystem,
-                                      materializer: Materializer): Route =
+  private def webSocketRoute[F[+_]: Async](korolevServer: KorolevService[F],
+                                           akkaHttpConfig: AkkaHttpServerConfig)
+                                          (implicit actorSystem: ActorSystem,
+                                                    materializer: Materializer): Route =
     extractRequest { request =>
       extractUpgradeToWebSocket { upgrade =>
         val korolevRequest = mkKorolevRequest(request)
 
-        onSuccess(korolevServer(korolevRequest)) {
+        onSuccess(asyncToFuture(korolevServer(korolevRequest))) {
           case KorolevResponse.WebSocket(publish, subscribe, destroy) =>
-            val messageHandler = new IncomingMessageHandler(
-              publish,
-              () => {
-                destroy()
-              }
-            )
+            val messageHandler = new IncomingMessageHandler(publish, () => destroy())
             val in = inFlow(akkaHttpConfig.maxRequestBodySize, publish).to(messageHandler.asSink)
             val out = WSSubscriptionStage.source(subscribe)
 
             complete(upgrade.handleMessagesWithSinkSource(in, out))
           case _ =>
-              throw new RuntimeException // cannot happen
+            throw new RuntimeException // cannot happen
         }
       }
     }
@@ -73,7 +68,7 @@ package object akkahttp {
       }
       .collect { case Some(body) => body }
 
-  private def httpGetRoute(korolevServer: KorolevService[Future]): Route =
+  private def httpGetRoute[F[+_]: Async](korolevServer: KorolevService[F]): Route =
     get {
       extractRequest { request =>
         parameterMap { params =>
@@ -84,7 +79,7 @@ package object akkahttp {
       }
     }
 
-  private def httpPostRoute(korolevServer: KorolevService[Future]): Route =
+  private def httpPostRoute[F[+_]: Async](korolevServer: KorolevService[F]): Route =
     post {
       extractRequest { request =>
         parameterMap { params =>
@@ -114,9 +109,9 @@ package object akkahttp {
       body = body.fold(ByteBuffer.allocate(0))(ByteBuffer.wrap)
     )
 
-  private def handleHttpResponse(korolevServer: KorolevService[Future],
-                                 korolevRequest: KorolevRequest): Future[HttpResponse] =
-    korolevServer(korolevRequest).map {
+  private def handleHttpResponse[F[+_]: Async](korolevServer: KorolevService[F],
+                                               korolevRequest: KorolevRequest): Future[HttpResponse] =
+    asyncToFuture(korolevServer(korolevRequest)).map {
       case KorolevResponse.Http(status, streamOpt, responseHeaders) =>
         val (contentTypeOpt, otherHeaders) = getContentTypeAndResponseHeaders(responseHeaders)
         val array = streamOpt.getOrElse(Array.empty)
@@ -138,10 +133,15 @@ package object akkahttp {
       }
     }
     val (contentTypeHeaders, otherHeaders) = headers.partition(_.lowercaseName() == "content-type")
-    val contentTypeOpt =
-      contentTypeHeaders.headOption.flatMap(h => ContentType.parse(h.value()).right.toOption)
+    val contentTypeOpt = contentTypeHeaders.headOption.flatMap(h => ContentType.parse(h.value()).right.toOption)
 
     (contentTypeOpt, otherHeaders.toList)
+  }
+
+  private def asyncToFuture[F[+_]: Async, T](f: F[T]): Future[T] = {
+    val p = Promise[T]()
+    Async[F].run(f)(p.complete)
+    p.future
   }
 
 }
