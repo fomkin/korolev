@@ -274,7 +274,6 @@ final class ComponentInstance
       case Some(event: Event[F, CS, E]) =>
         applyEventResult(event.effect(browserAccess))
       case None =>
-        print("  ")
         nestedComponents.values.forall { nested =>
           nested.applyEvent(eventId)
         }

@@ -9,15 +9,15 @@ import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
-import akka.stream.Materializer
-import akka.stream.scaladsl.{Flow, Sink}
-import korolev.akkahttp.util.{IncomingMessageHandler, WSSubscriptionStage}
+import akka.stream.scaladsl.{Flow, Sink, Source}
+import akka.stream.{Materializer, OverflowStrategy}
+import korolev.akkahttp.util.IncomingMessageHandler
 import korolev.execution.defaultExecutor
 import korolev.server.{KorolevService, KorolevServiceConfig, MimeTypes, Request => KorolevRequest, Response => KorolevResponse}
 import korolev.state.{StateDeserializer, StateSerializer}
 
-import scala.concurrent.{Future, Promise}
 import scala.concurrent.duration._
+import scala.concurrent.{Future, Promise}
 
 package object akkahttp {
 
@@ -48,7 +48,16 @@ package object akkahttp {
           case KorolevResponse.WebSocket(publish, subscribe, destroy) =>
             val messageHandler = new IncomingMessageHandler(publish, () => destroy())
             val in = inFlow(akkaHttpConfig.maxRequestBodySize, publish).to(messageHandler.asSink)
-            val out = WSSubscriptionStage.source(subscribe).keepAlive(KeepAliveInterval, () => KeepAliveMessage)
+
+            val out =
+              Source
+                .actorRef[TextMessage](akkaHttpConfig.outputBufferSize, OverflowStrategy.fail)
+                .mapMaterializedValue[Unit] { actorRef =>
+                  subscribe { message =>
+                    actorRef ! TextMessage(message)
+                  }
+                }
+                .keepAlive(KeepAliveInterval, () => KeepAliveMessage)
 
             complete(upgrade.handleMessagesWithSinkSource(in, out))
           case _ =>
