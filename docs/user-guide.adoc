@@ -144,6 +144,11 @@ Render is called for each new state. It's important to understand that render pr
 
 `Render` is a type alias for `PartialFunction[S, Document.Node]` where `S` is a type of your state.
 
+[NOTE]
+==========================
+Currently, top-level render method must wrap its content into `body` element. This limitation will be removed in a future version.
+==========================
+
 === Transitions
 
 Transition is a function that applies to the current state and produces a new state. Consider a transition which adds a new friend to the friends list.
