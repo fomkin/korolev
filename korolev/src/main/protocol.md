@@ -20,6 +20,7 @@ From server to the client
 6. ChangePageUrl(path)
 7. UploadForm(id, descriptor)
 8. ReloadCss()
+9. Keep-alive message from server (noop)
 
 ### Modify dom commands
 
