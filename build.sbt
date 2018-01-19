@@ -173,7 +173,7 @@ lazy val `monix-support` = project.
   settings(
     normalizedName := "korolev-monix-support",
     libraryDependencies += "io.monix" %% "monix-eval" % "3.0.0-M3",
-    OsgiKeys.exportPackage := Seq("korolev.monixsupport.*;version=${Bundle-Version}")
+    OsgiKeys.exportPackage := Seq("korolev.monixSupport.*;version=${Bundle-Version}")
   ).
   dependsOn(async)
 
