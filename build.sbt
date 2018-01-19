@@ -173,7 +173,7 @@ lazy val `monix-support` = project.
   settings(
     normalizedName := "korolev-monix-support",
     libraryDependencies += "io.monix" %% "monix-eval" % "3.0.0-M3",
-    OsgiKeys.exportPackage := Seq("korolev.monix.*;version=${Bundle-Version}")
+    OsgiKeys.exportPackage := Seq("korolev.monixsupport.*;version=${Bundle-Version}")
   ).
   dependsOn(async)
 
@@ -242,6 +242,14 @@ lazy val akkaHttpExample = (project in examples / "akka-http").
   settings(exampleSettings: _*).
   settings(mainClass := Some("AkkaHttpExample")).
   dependsOn(`server-akkahttp`)
+
+lazy val monixExample = (project in examples / "monix").
+  settings(crossVersionSettings).
+  settings(exampleSettings: _*).
+  settings(mainClass := Some("MonixExample")).
+  dependsOn(`monix-support`, `server-akkahttp`)
+
+// Tests
 
 lazy val `integration-tests` = project.
   settings(crossVersionSettings).

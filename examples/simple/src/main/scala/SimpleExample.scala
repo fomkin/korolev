@@ -99,7 +99,7 @@ object SimpleExample extends KorolevBlazeServer {
 }
 
 case class State(
-  todos: Vector[State.Todo] = (0 to 20).toVector.map(i => State.Todo(s"This is TODO #$i", done = false)),
+  todos: Vector[State.Todo] = (0 to 9).toVector.map(i => State.Todo(s"This is TODO #$i", done = false)),
   edit: Option[Int] = None
 )
 

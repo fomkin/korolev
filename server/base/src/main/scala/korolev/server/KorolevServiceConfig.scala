@@ -22,7 +22,7 @@ object KorolevServiceConfig {
   type ApplyTransition[F[+_], S] = Transition[S] => F[Unit]
   type EnvConfigurator[F[+_], S, M] = (String, String, ApplyTransition[F, S]) => Env[M]
 
-  def defaultConnectionLostWidget[MiscType] = {
+  def defaultConnectionLostWidget[MiscType]: Document.Node[MiscType] = {
     val dsl = new TemplateDsl[MiscType]()
     import dsl._
     'div('style /= "position: absolute; top: 0; left: 0; right: 0;" +
