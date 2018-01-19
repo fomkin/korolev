@@ -1,7 +1,8 @@
 package korolev.server
 
 import korolev.server.KorolevServiceConfig.{ApplyTransition, Env, EnvConfigurator}
-import korolev.{Context, Async, Transition}
+import korolev.state.IdGenerator
+import korolev.{Async, Context, Transition}
 import levsha.{Document, TemplateDsl}
 
 case class KorolevServiceConfig[F[+_]: Async, S, M](
@@ -14,7 +15,8 @@ case class KorolevServiceConfig[F[+_]: Async, S, M](
   maxFormDataEntrySize: Int = 1024 * 1024 * 8,
   envConfigurator: EnvConfigurator[F, S, M] =
     (_: String, _: String, _: ApplyTransition[F, S]) =>
-      Env(onDestroy = () => (), PartialFunction.empty)
+      Env(onDestroy = () => (), PartialFunction.empty),
+  idGenerator: IdGenerator[F] = IdGenerator.default[F]()
 )
 
 object KorolevServiceConfig {

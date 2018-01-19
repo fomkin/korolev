@@ -10,26 +10,23 @@ import scala.collection.concurrent.TrieMap
 
 abstract class StateStorage[F[+_]: Async, S] {
 
-  def createTopLevelState: String => F[S]
+  def createTopLevelState: DeviceId => F[S]
 
   /**
     * Initialize a new state for a new session under the device
     * @param deviceId Identifier of device
     * @return Future with new state
     */
-  def create(deviceId: String, sessionId: String): F[StateManager[F]]
+  def create(deviceId: DeviceId, sessionId: SessionId): F[StateManager[F]]
 
   /**
     * Restore session from storage
     * @return Future with result if session already exists
     */
-  def get(deviceId: String, sessionId: String): F[Option[StateManager[F]]]
+  def get(deviceId: DeviceId, sessionId: SessionId): F[Option[StateManager[F]]]
 }
 
 object StateStorage {
-
-  type DeviceId = String
-  type SessionId = String
 
   /**
     * Initializes a simple in-memory storage (based on TrieMap)
@@ -48,7 +45,7 @@ object StateStorage {
     * with initial state based on deviceId
     *
     * {{{
-    * case class MyState(deviceId: String, ...)
+    * case class MyState(deviceId: DeviceId, ...)
     *
     * StateStorage forDeviceId { deviceId =>
     *   MyStorage.getStateByDeviceId(deviceId) map {
@@ -71,16 +68,15 @@ object StateStorage {
 
     val cache = TrieMap.empty[String, StateManager[F]]
 
-
-    def mkKey(deviceId: String, sessionId: String) = {
+    def mkKey(deviceId: DeviceId, sessionId: SessionId): String = {
       s"$deviceId-$sessionId"
     }
 
-    def get(deviceId: String, sessionId: String): F[Option[StateManager[F]]] = {
+    def get(deviceId: DeviceId, sessionId: SessionId): F[Option[StateManager[F]]] = {
       Async[F].pure(cache.get(mkKey(deviceId, sessionId)))
     }
 
-    def create(deviceId: String, sessionId: String): F[StateManager[F]] = {
+    def create(deviceId: DeviceId, sessionId: SessionId): F[StateManager[F]] = {
       val key = mkKey(deviceId, sessionId)
       val sm = if (DevMode.isActive) {
         val directory = new File(DevMode.sessionsDirectory, key)

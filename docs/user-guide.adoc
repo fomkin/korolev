@@ -86,10 +86,10 @@ State is the only source of data needed to render a page. If you have something 
 sealed trait MyState
 
 case class Anonymous(
-  deviceId: String) extends MyState
+  deviceId: DeviceId) extends MyState
 
 case class Authorized(
-  deviceId: String,
+  deviceId: DeviceId,
   user: User) extends MyState
 
 case class User(

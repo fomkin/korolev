@@ -10,6 +10,7 @@ import akka.typed.scaladsl.adapter._
 import akka.util.ByteString
 import akka.{Done, actor}
 import data._
+import korolev.state.{DeviceId, SessionId}
 import pushka.Ast
 import pushka.json._
 
@@ -163,6 +164,6 @@ object KorolevConnection {
 
   val SessionIdExtractor: Regex = """(?s).*window\['kfg'\]=\{sid:'(.+)',r.*""".r
 
-  case class ConnectionInfo(deviceId: String, sessionId: String)
+  case class ConnectionInfo(deviceId: DeviceId, sessionId: SessionId)
   case class Connection(outgoing: SourceQueue[Message], killSwitch: KillSwitch, closed: Future[_])
 }
