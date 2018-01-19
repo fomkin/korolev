@@ -9,7 +9,7 @@ import org.http4s.blaze.util.BogusKeystore
 import scala.concurrent.ExecutionContextExecutorService
 
 /**
-  * @param sslContext Standard Java SSL context. Use [[BlazeServerConfig.bogusSslContext]] for tests
+  * @param sslContext Standard Java SSL context. Use [[BlazeServerConfig#bogusSslContext]] for tests
   */
 case class BlazeServerConfig(
   port: Int = 8080,

@@ -1,6 +1,6 @@
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import akka.stream.ActorMaterializer
+import akka.stream.{ActorMaterializer, Materializer}
 import korolev._
 import korolev.akkahttp._
 import korolev.execution._
@@ -10,6 +10,9 @@ import korolev.state.javaSerialization._
 import scala.concurrent.Future
 
 object AkkaHttpExample extends App {
+
+  private implicit val actorSystem: ActorSystem = ActorSystem()
+  private implicit val materializer: Materializer = ActorMaterializer()
 
   val applicationContext = Context[Future, Boolean, Any]
 
@@ -21,9 +24,6 @@ object AkkaHttpExample extends App {
     serverRouter = ServerRouter.empty[Future, Boolean],
     render = { case _ => 'div("Hello akka-http") }
   )
-
-  private implicit val actorSystem = ActorSystem()
-  private implicit val materializer = ActorMaterializer()
 
   private val route = akkaHttpService(config).apply(AkkaHttpServerConfig())
 

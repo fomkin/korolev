@@ -46,7 +46,6 @@ val publishSettings = Seq(
 
 val commonSettings = publishSettings ++ Seq(
   organization := "com.github.fomkin",
-  version := "0.6.1",
   libraryDependencies ++= Seq(
     "org.scalatest" %% "scalatest" % "3.0.4" % Test
   ),
@@ -150,7 +149,10 @@ lazy val korolev = project.
   dependsOn(async).
   enablePlugins(SbtOsgi).settings(korolevOsgiSettings:_*)
 
+// Contribs
+
 lazy val `jcache-support` = project.
+  in(file("contrib/jcache")).
   settings(crossVersionSettings).
   enablePlugins(SbtOsgi).
   settings(commonSettings: _*).
@@ -161,6 +163,19 @@ lazy val `jcache-support` = project.
     OsgiKeys.exportPackage := Seq("korolev.server.jcache.*;version=${Bundle-Version}")
   ).
   dependsOn(server)
+
+lazy val `monix-support` = project.
+  in(file("contrib/monix")).
+  settings(crossVersionSettings).
+  enablePlugins(SbtOsgi).
+  settings(commonSettings: _*).
+  settings(osgiSettings: _*).
+  settings(
+    normalizedName := "korolev-monix-support",
+    libraryDependencies += "io.monix" %% "monix-eval" % "3.0.0-M3",
+    OsgiKeys.exportPackage := Seq("korolev.monixsupport.*;version=${Bundle-Version}")
+  ).
+  dependsOn(async)
 
 // Examples
 val examples = file("examples")
@@ -228,6 +243,14 @@ lazy val akkaHttpExample = (project in examples / "akka-http").
   settings(mainClass := Some("AkkaHttpExample")).
   dependsOn(`server-akkahttp`)
 
+lazy val monixExample = (project in examples / "monix").
+  settings(crossVersionSettings).
+  settings(exampleSettings: _*).
+  settings(mainClass := Some("MonixExample")).
+  dependsOn(`monix-support`, `server-akkahttp`)
+
+// Tests
+
 lazy val `integration-tests` = project.
   settings(crossVersionSettings).
   settings(commonSettings).
@@ -250,10 +273,10 @@ lazy val `performance-benchmark` = project.
     scalaVersion := "2.12.4",
     fork in run := true,
     libraryDependencies ++= Seq(
-      "com.typesafe.akka" %% "akka-http" % "10.0.10",
-      "com.typesafe.akka" %% "akka-stream" % "2.5.6",
-      "com.typesafe.akka" %% "akka-actor"  % "2.5.6",
-      "com.typesafe.akka" %% "akka-typed" % "2.5.6",
+      "com.typesafe.akka" %% "akka-http" % "10.0.11",
+      "com.typesafe.akka" %% "akka-stream" % "2.5.8",
+      "com.typesafe.akka" %% "akka-actor"  % "2.5.8",
+      "com.typesafe.akka" %% "akka-typed" % "2.5.8",
       "com.github.fomkin" %% "pushka-json" % "0.8.0"
     )
   ).
@@ -265,7 +288,7 @@ lazy val root = project.in(file(".")).
   aggregate(
     korolev, async,
     server, `server-blaze`, `server-akkahttp`,
-    `jcache-support`,
+    `jcache-support`, `monix-support`,
     simpleExample, routingExample, gameOfLifeExample,
     jcacheExample, formDataExample, delayExample, focusExample,
     webComponentExample, componentExample, akkaHttpExample,
