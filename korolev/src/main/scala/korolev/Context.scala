@@ -23,7 +23,7 @@ final class Context[F[+_]: Async, S: StateSerializer: StateDeserializer, M] {
   type Render = PartialFunction[S, Document.Node[Effect]]
   type ElementId = Context.ElementId[F, S, M]
   type Access = Context.Access[F, S, M]
-  type EventResult = korolev.EventResult[F, S]
+  type EventResult = F[Unit]
 
   val symbolDsl = new KorolevTemplateDsl[F, S, M]()
 
@@ -40,18 +40,10 @@ final class Context[F[+_]: Async, S: StateSerializer: StateDeserializer, M] {
     Delay(duration, effect)
 
   def event(name: Symbol, phase: EventPhase = Bubbling)(
-      effect: Access => EventResult): Event =
+      effect: Access => F[Unit]): Event =
     Event(name, phase, effect)
 
   val emptyTransition: PartialFunction[S, S] = { case x => x }
-
-  implicit def effectToEventResult(effect: F[Unit]): EventResult =
-    EventResult(effect, stopPropagation = false)
-
-  implicit final class EffectOps(effect: F[Unit]) {
-    def stopPropagation: EventResult =
-      EventResult(effect, stopPropagation = true)
-  }
 
   implicit final class ComponentDsl[CS: StateSerializer: StateDeserializer, P, E](component: Component[F, CS, P, E]) {
     def apply(parameters: P)(f: (Access, E) => F[Unit]): ComponentEntry[F, S, M, CS, P, E] =
@@ -201,7 +193,7 @@ object Context {
   final case class Event[F[+_]: Async, S, M](
       `type`: Symbol,
       phase: EventPhase,
-      effect: Access[F, S, M] => EventResult[F, S]) extends Effect[F, S, M]
+      effect: Access[F, S, M] => F[Unit]) extends Effect[F, S, M]
 
   final case class Delay[F[+_]: Async, S, M](
       duration: FiniteDuration,
