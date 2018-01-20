@@ -6,13 +6,13 @@ import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 
 import korolev.Async._
 import korolev.internal.{ApplicationInstance, Connection}
-import korolev.state.{StateDeserializer, StateSerializer}
+import korolev.state.{DeviceId, SessionId, StateDeserializer, StateSerializer}
 import levsha.Id
 import slogging.LazyLogging
 
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
-import scala.util.{Failure, Random, Success, Try}
+import scala.util.{Failure, Success, Try}
 
 package object server extends LazyLogging {
 
@@ -36,23 +36,23 @@ package object server extends LazyLogging {
 
     val sessions = TrieMap.empty[String, KorolevSession[F]]
 
-    def renderStatic(request: Request): F[Response] = {
-      val (_, deviceId) = deviceFromRequest(request)
-      val sessionId = Random.alphanumeric.take(6).mkString
-      val stateF = config.serverRouter
-        .static(deviceId)
-        .toState
-        .lift(((), request.path))
-        .getOrElse(config.stateStorage.createTopLevelState(deviceId))
-        .flatMap { state =>
-          config.stateStorage.create(deviceId, sessionId).flatMap { manager =>
-            manager.write(Id.TopLevel, state).map { _ =>
-              state
+    def renderStatic(request: Request): F[Response] =
+      for {
+        deviceId <- deviceFromRequest(request)
+        sessionId <- config.idGenerator.generateSessionId()
+        state <- config.serverRouter
+          .static(deviceId)
+          .toState
+          .lift(((), request.path))
+          .getOrElse(config.stateStorage.createTopLevelState(deviceId))
+          .flatMap { state =>
+            config.stateStorage.create(deviceId, sessionId).flatMap { manager =>
+              manager.write(Id.TopLevel, state).map { _ =>
+                state
+              }
             }
           }
-        }
-
-      stateF map { state =>
+      } yield {
         val dsl = new levsha.TemplateDsl[Context.Effect[F, S, M]]()
         val textRenderContext = new HtmlRenderContext[F, S, M]()
         val rootPath = config.serverRouter.rootPath
@@ -66,7 +66,7 @@ package object server extends LazyLogging {
 
         val document = 'html(
           'head(
-            'script('language /= "javascript", s"window['kfg']={sid:'$sessionId',r:'${rootPath}',clw:'$clw'}"),
+            'script('language /= "javascript", s"window['kfg']={sid:'$sessionId',r:'$rootPath',clw:'$clw'}"),
             'script('src /= config.serverRouter.rootPath + "korolev-client.min.js"),
             config.head
           ),
@@ -80,7 +80,7 @@ package object server extends LazyLogging {
           status = Response.Status.Ok,
           headers = Seq(
             "content-type" -> htmlContentType,
-            "set-cookie" -> s"device=$deviceId"
+            "set-cookie" -> s"${Cookies.DeviceId}=$deviceId"
           ),
           body = Some {
             val sb = mutable.StringBuilder.newBuilder
@@ -93,7 +93,6 @@ package object server extends LazyLogging {
           }
         )
       }
-    }
 
     object matchStatic {
 
@@ -132,17 +131,16 @@ package object server extends LazyLogging {
       }
     }
 
-    def deviceFromRequest(request: Request): (Boolean, String) = {
-      request.cookie("device") match {
-        case None => true -> Random.alphanumeric.take(6).mkString
-        case Some(deviceId) => false -> deviceId
+    def deviceFromRequest(request: Request): F[DeviceId] =
+      request.cookie(Cookies.DeviceId) match {
+        case None => config.idGenerator.generateDeviceId()
+        case Some(deviceId) => Async[F].pure(deviceId)
       }
-    }
 
-    def makeSessionKey(deviceId: String, sessionId: String): String =
+    def makeSessionKey(deviceId: DeviceId, sessionId: SessionId): String =
       s"$deviceId-$sessionId"
 
-    def createSession(deviceId: String, sessionId: String): F[KorolevSession[F]] = {
+    def createSession(deviceId: DeviceId, sessionId: SessionId): F[KorolevSession[F]] = {
 
       val connection = new Connection[F]()
 

@@ -1,6 +1,6 @@
 package korolev.server
 
-import korolev.server.StateStorage.{DeviceId, SessionId}
+import korolev.state.{DeviceId, SessionId}
 import korolev.{Async, Router}
 
 case class ServerRouter[F[+_]: Async, S](

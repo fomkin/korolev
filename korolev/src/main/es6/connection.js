@@ -5,7 +5,7 @@ const MAX_RECONNECT_TIMEOUT = 5000;
 export const ConnectionType = {
   WEB_SOCKET: 0,
   LONG_POLLING: 1
-}
+};
 
 /**
  * Reconnectable WebSocket connection
@@ -64,7 +64,7 @@ export class Connection {
   _connectUsingConnectionType(connectionType) {
     switch (connectionType) {
       case ConnectionType.LONG_POLLING:
-        this._connectUsingLongPolling()
+        this._connectUsingLongPolling();
         break;
       case ConnectionType.WEB_SOCKET:
         this._webSocketsSupported
@@ -126,7 +126,7 @@ export class Connection {
       request.addEventListener('readystatechange', onReadyStateChange);
       request.open('GET', uriPrefix + 'subscribe', true);
       request.send('');
-    }
+    };
 
     /** @type {function(string)} */
     let publish = (data) => {
@@ -141,7 +141,7 @@ export class Connection {
             this._onError();
             break;
         }
-      }
+      };
 
       let request = new XMLHttpRequest();
 
@@ -162,7 +162,7 @@ export class Connection {
   _onOpen() {
     console.log("Connection opened");
     let event = this._createEvent('open');
-    this._wasConnected = true
+    this._wasConnected = true;
     this._reconnectTimeout = MIN_RECONNECT_TIMEOUT;
     this._selectedConnectionType = this._connectionType;
     this._dispatcher.dispatchEvent(event);
@@ -178,7 +178,7 @@ export class Connection {
   /** @private */
   _onClose() {
     console.log('Connection closed');
-    let event = this._createEvent('close')
+    let event = this._createEvent('close');
     this._dispatcher.dispatchEvent(event);
   }
 

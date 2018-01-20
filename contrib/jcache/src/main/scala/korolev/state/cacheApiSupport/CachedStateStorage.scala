@@ -1,14 +1,13 @@
 package korolev.state.cacheApiSupport
 
-import scala.collection.JavaConverters._
-
 import javax.cache.Cache
 import javax.cache.processor.{EntryProcessor, MutableEntry}
 
 import korolev.Async
-import korolev.state.{StateDeserializer, StateManager, StateSerializer, StateStorage}
-import korolev.state.StateStorage.{DeviceId, SessionId}
+import korolev.state._
 import levsha.Id
+
+import scala.collection.JavaConverters._
 
 /**
   * State storage based on
@@ -53,7 +52,7 @@ final class CachedStateStorage[F[+_]: Async, S]
         .getOrElse(Set.empty)
       new StateManager.Snapshot {
         val snapshotData = cache.getAll(keys.asJava).asScala
-        def apply[T: StateDeserializer](nodeId: Id) = snapshotData
+        def apply[T: StateDeserializer](nodeId: Id): Option[T] = snapshotData
           .get(mkKey(nodeId))
           .flatMap(implicitly[StateDeserializer[T]].deserialize)
       }
@@ -101,7 +100,7 @@ final class CachedStateStorage[F[+_]: Async, S]
     new CachedStateManager(deviceId, sessionId)
   }
 
-  private def mkKeys(deviceId: String, sessionId: String) = {
+  private def mkKeys(deviceId: DeviceId, sessionId: SessionId) = {
     s"$deviceId-$sessionId"
   }
 }

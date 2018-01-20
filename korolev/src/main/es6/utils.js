@@ -1,7 +1,11 @@
+export function getDeviceId() {
+  return getCookie('deviceId');
+}
+
 /** @param {string} name */
-export function getCookie(name) {
+function getCookie(name) {
   var matches = document.cookie.match(new RegExp(
-    "(?:^|; )" + name.replace(/([\.$?*|{}\(\)\[\]\\\/\+^])/g, '\\$1') + "=([^;]*)"
+    "(?:^|; )" + name.replace(/([.$?*|{}()\[\]\\\/+^])/g, '\\$1') + "=([^;]*)"
   ));
   return matches ? decodeURIComponent(matches[1]) : undefined;
 }
