@@ -130,14 +130,12 @@ final class ComponentInstance
     }
   }
 
-  private def applyEventResult(eventResult: EventResult[F, CS]): Boolean = {
+  private def applyEventResult(effect: F[Unit]): Unit = {
     // Run effect
-    eventResult.effect.run {
+    effect.run {
       case Failure(e) => logger.error("Exception during applying transition", e)
       case Success(_) => ()
     }
-    // Continue propagation
-    !eventResult.stopPropagation
   }
 
   private def createUnsubscribe[T](from: mutable.Buffer[T], that: T) = { () =>
@@ -273,6 +271,7 @@ final class ComponentInstance
     events.get(eventId) match {
       case Some(event: Event[F, CS, E]) =>
         applyEventResult(event.effect(browserAccess))
+        false
       case None =>
         nestedComponents.values.forall { nested =>
           nested.applyEvent(eventId)
