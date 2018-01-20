@@ -486,6 +486,19 @@ KorolevServiceConfig(
 
 https://github.com/fomkin/korolev/blob/v0.6.1/examples/routing/src/main/scala/RoutingExample.scala#L93[See full example]
 
+==== Running at a nested path
+
+If Korolev is running at a nested path, e.g. `/ui/`, router's `rootPath` parameter should be set to a desired value:
+
+[source,scala]
+-------------------------------------------------------------------------------
+serverRouter = ServerRouter(
+  static = ...,
+  dynamic = ...,
+  rootPath = "/ui/"
+)
+-------------------------------------------------------------------------------
+
 == Productivity
 
 === Web Components
