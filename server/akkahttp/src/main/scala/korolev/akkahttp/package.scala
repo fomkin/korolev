@@ -41,27 +41,29 @@ package object akkahttp {
                                           (implicit actorSystem: ActorSystem,
                                                     materializer: Materializer): Route =
     extractRequest { request =>
-      extractUpgradeToWebSocket { upgrade =>
-        val korolevRequest = mkKorolevRequest(request)
+      extractUnmatchedPath { path =>
+        extractUpgradeToWebSocket { upgrade =>
+          val korolevRequest = mkKorolevRequest(request, path.toString)
 
-        onSuccess(asyncToFuture(korolevServer(korolevRequest))) {
-          case KorolevResponse.WebSocket(publish, subscribe, destroy) =>
-            val messageHandler = new IncomingMessageHandler(publish, () => destroy())
-            val in = inFlow(akkaHttpConfig.maxRequestBodySize, publish).to(messageHandler.asSink)
+          onSuccess(asyncToFuture(korolevServer(korolevRequest))) {
+            case KorolevResponse.WebSocket(publish, subscribe, destroy) =>
+              val messageHandler = new IncomingMessageHandler(publish, () => destroy())
+              val in = inFlow(akkaHttpConfig.maxRequestBodySize, publish).to(messageHandler.asSink)
 
-            val out =
-              Source
-                .actorRef[TextMessage](akkaHttpConfig.outputBufferSize, OverflowStrategy.fail)
-                .mapMaterializedValue[Unit] { actorRef =>
-                  subscribe { message =>
-                    actorRef ! TextMessage(message)
+              val out =
+                Source
+                  .actorRef[TextMessage](akkaHttpConfig.outputBufferSize, OverflowStrategy.fail)
+                  .mapMaterializedValue[Unit] { actorRef =>
+                    subscribe { message =>
+                      actorRef ! TextMessage(message)
+                    }
                   }
-                }
-                .keepAlive(KeepAliveInterval, () => KeepAliveMessage)
+                  .keepAlive(KeepAliveInterval, () => KeepAliveMessage)
 
-            complete(upgrade.handleMessagesWithSinkSource(in, out))
-          case _ =>
-            throw new RuntimeException // cannot happen
+              complete(upgrade.handleMessagesWithSinkSource(in, out))
+            case _ =>
+              throw new RuntimeException // cannot happen
+          }
         }
       }
     }
@@ -84,20 +86,9 @@ package object akkahttp {
   private def httpGetRoute[F[+_]: Async](korolevServer: KorolevService[F]): Route =
     get {
       extractRequest { request =>
-        parameterMap { params =>
-          val korolevRequest = mkKorolevRequest(request, params)
-          val responseF = handleHttpResponse(korolevServer, korolevRequest)
-          complete(responseF)
-        }
-      }
-    }
-
-  private def httpPostRoute[F[+_]: Async](korolevServer: KorolevService[F]): Route =
-    post {
-      extractRequest { request =>
-        parameterMap { params =>
-          entity(as[Array[Byte]]) { body =>
-            val korolevRequest = mkKorolevRequest(request, params, Some(body))
+        extractUnmatchedPath { path =>
+          parameterMap { params =>
+            val korolevRequest = mkKorolevRequest(request, path.toString, params)
             val responseF = handleHttpResponse(korolevServer, korolevRequest)
             complete(responseF)
           }
@@ -105,19 +96,35 @@ package object akkahttp {
       }
     }
 
+  private def httpPostRoute[F[+_]: Async](korolevServer: KorolevService[F]): Route =
+    post {
+      extractRequest { request =>
+        extractUnmatchedPath { path =>
+          parameterMap { params =>
+            entity(as[Array[Byte]]) { body =>
+              val korolevRequest = mkKorolevRequest(request, path.toString, params, Some(body))
+              val responseF = handleHttpResponse(korolevServer, korolevRequest)
+              complete(responseF)
+            }
+          }
+        }
+      }
+    }
+
   private def mkKorolevRequest(request: HttpRequest,
+                               path: String,
                                params: Map[String, String] = Map.empty,
                                body: Option[Array[Byte]] = None): KorolevRequest =
     KorolevRequest(
-      path = Router.Path.fromString(request.uri.path.toString()),
+      path = Router.Path.fromString(path),
       params,
       cookie = key => request.cookies.find(_.name == key).map(_.value),
       headers = {
         val contentType = request.entity.contentType
-        val contentTypeHeaderSeq =
+        val contentTypeHeaders =
           if (contentType.mediaType.isMultipart) Seq("content-type" -> contentType.toString) else Seq.empty
 
-        request.headers.map(h => (h.name(), h.value())) ++ contentTypeHeaderSeq
+        request.headers.map(h => (h.name(), h.value())) ++ contentTypeHeaders
       },
       body = body.fold(ByteBuffer.allocate(0))(ByteBuffer.wrap)
     )
