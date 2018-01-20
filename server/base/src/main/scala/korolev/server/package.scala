@@ -66,7 +66,7 @@ package object server extends LazyLogging {
 
         val document = 'html(
           'head(
-            'script('language /= "javascript", s"window['kfg']={sid:'$sessionId',r:'${rootPath}',clw:'$clw'}"),
+            'script('language /= "javascript", s"window['kfg']={sid:'$sessionId',r:'$rootPath',clw:'$clw'}"),
             'script('src /= config.serverRouter.rootPath + "korolev-client.min.js"),
             config.head
           ),
@@ -80,7 +80,7 @@ package object server extends LazyLogging {
           status = Response.Status.Ok,
           headers = Seq(
             "content-type" -> htmlContentType,
-            "set-cookie" -> s"device=$deviceId"
+            "set-cookie" -> s"${Cookies.DeviceId}=$deviceId"
           ),
           body = Some {
             val sb = mutable.StringBuilder.newBuilder
@@ -132,7 +132,7 @@ package object server extends LazyLogging {
     }
 
     def deviceFromRequest(request: Request): F[DeviceId] =
-      request.cookie("device") match {
+      request.cookie(Cookies.DeviceId) match {
         case None => config.idGenerator.generateDeviceId()
         case Some(deviceId) => Async[F].pure(deviceId)
       }

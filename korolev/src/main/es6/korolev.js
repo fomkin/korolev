@@ -1,4 +1,4 @@
-import { getCookie } from './utils.js';
+import { getDeviceId } from './utils.js';
 
 /** @enum {number} */
 export const CallbackType = {
@@ -6,7 +6,7 @@ export const CallbackType = {
   FORM_DATA_PROGRESS: 1, // `$descriptor:$loaded:$total`
   EXTRACT_PROPERTY_RESPONSE: 2, // `$descriptor:$value`
   HISTORY: 3  // URL
-}
+};
 
 export const PropertyType = {
   STRING: 0,
@@ -14,7 +14,7 @@ export const PropertyType = {
   BOOLEAN: 2,
   OBJECT: 3,
   ERROR: 4
-}
+};
 
 export class Korolev {
 
@@ -58,7 +58,7 @@ export class Korolev {
     this.historyHandler = (/** @type {Event} */ event) => {
       if (event.state === null) callback(CallbackType.HISTORY, this.initialPath);
       else callback(CallbackType.HISTORY, event.state);
-    }
+    };
 
     window.addEventListener('popstate', this.historyHandler);
   }
@@ -300,7 +300,7 @@ export class Korolev {
     var form = self.els[id];
     var formData = new FormData(form);
     var request = new XMLHttpRequest();
-    var deviceId = getCookie('device');
+    var deviceId = getDeviceId();
     var uri = self.config['r'] +
       'bridge' +
       '/' + deviceId +

@@ -1,6 +1,6 @@
 import { Connection } from './connection.js';
 import { Bridge, setProtocolDebugEnabled } from './bridge.js';
-import { ConnectionLostWidget, getCookie } from './utils.js';
+import { ConnectionLostWidget, getDeviceId } from './utils.js';
 
 // Export `setProtocolDebugEnabled` function
 // to global scope
@@ -13,7 +13,7 @@ window.document.addEventListener("DOMContentLoaded", () => {
   let config = window['kfg'];
   let clw = new ConnectionLostWidget(config['clw']);
   let connection = new Connection(
-    getCookie('device'),
+    getDeviceId(),
     config['sid'],
     config['r'],
     window.location
@@ -28,7 +28,7 @@ window.document.addEventListener("DOMContentLoaded", () => {
       connection
         .dispatcher
         .removeEventListener('close', closeHandler);
-    }
+    };
     connection
       .dispatcher
       .addEventListener('close', closeHandler);
