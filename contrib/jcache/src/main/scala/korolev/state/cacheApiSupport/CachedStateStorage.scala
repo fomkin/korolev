@@ -40,9 +40,12 @@ import scala.collection.JavaConverters._
   * @see <a href="https://jcp.org/aboutJava/communityprocess/implementations/jsr107/index.html">List of JSR-107 implementations</a>
   */
 final class CachedStateStorage[F[+_]: Async, S]
-    (cache: Cache[String, Array[Byte]], val createTopLevelState: DeviceId => F[S])
+    (cache: Cache[String, Array[Byte]], _createTopLevelState: DeviceId => F[S])
     (implicit val keysW: StateSerializer[Set[String]], val keysR: StateDeserializer[Set[String]])
   extends StateStorage[F, S] {
+
+  def createTopLevelState(deviceId: DeviceId, sessionId: SessionId): F[S] =
+    _createTopLevelState(deviceId)
 
   private class CachedStateManager(deviceId: DeviceId, sessionId: SessionId) extends StateManager[F] {
 

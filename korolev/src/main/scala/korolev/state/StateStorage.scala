@@ -10,7 +10,7 @@ import scala.collection.concurrent.TrieMap
 
 abstract class StateStorage[F[+_]: Async, S] {
 
-  def createTopLevelState: DeviceId => F[S]
+  def createTopLevelState(deviceId: DeviceId, sessionId: SessionId): F[S]
 
   /**
     * Initialize a new state for a new session under the device
@@ -37,7 +37,7 @@ object StateStorage {
     * @return The state storage
     */
   def default[F[+_]: Async, S: StateSerializer](initialState: => S): StateStorage[F, S] = {
-    new DefaultStateStorage(_ => Async[F].pure(initialState))
+    new DefaultStateStorage((_, _) => Async[F].pure(initialState))
   }
 
   /**
@@ -59,12 +59,15 @@ object StateStorage {
     * @tparam S Type of state
     * @return The state storage
     */
-  def forDeviceId[F[+_]: Async, S: StateSerializer](initialState: String => F[S]): StateStorage[F, S] = {
+  def forDeviceId[F[+_]: Async, S: StateSerializer](initialState: (DeviceId, SessionId) => F[S]): StateStorage[F, S] = {
     new DefaultStateStorage(initialState)
   }
 
   private class DefaultStateStorage[F[+_]: Async, S: StateSerializer]
-      (val createTopLevelState: String => F[S]) extends StateStorage[F, S] {
+      (_createTopLevelState: (DeviceId, SessionId) => F[S]) extends StateStorage[F, S] {
+
+    def createTopLevelState(deviceId: DeviceId, sessionId: SessionId): F[S] =
+      _createTopLevelState(deviceId, sessionId)
 
     val cache = TrieMap.empty[String, StateManager[F]]
 
