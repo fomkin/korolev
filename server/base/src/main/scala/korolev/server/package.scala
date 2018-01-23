@@ -41,10 +41,10 @@ package object server extends LazyLogging {
         deviceId <- deviceFromRequest(request)
         sessionId <- config.idGenerator.generateSessionId()
         state <- config.serverRouter
-          .static(deviceId)
+          .static(deviceId, sessionId)
           .toState
           .lift(((), request.path))
-          .getOrElse(config.stateStorage.createTopLevelState(deviceId))
+          .getOrElse(config.stateStorage.createTopLevelState(deviceId, sessionId))
           .flatMap { state =>
             config.stateStorage.create(deviceId, sessionId).flatMap { manager =>
               manager.write(Id.TopLevel, state).map { _ =>
@@ -148,18 +148,20 @@ package object server extends LazyLogging {
         maybeStateManager <- config.stateStorage.get(deviceId, sessionId)
         stateManager <- maybeStateManager.fold(config.stateStorage.create(deviceId, sessionId))(Async[F].pure(_))
         isNew = maybeStateManager.isEmpty
-        initialState <- config.stateStorage.createTopLevelState(deviceId)
-      } yield {
-        // Create Korolev with dynamic router
-        val router = config.serverRouter.dynamic(deviceId, sessionId)
-        val qualifiedSessionId = QualifiedSessionId(deviceId, sessionId)
-        val korolev = new ApplicationInstance(
+        initialState <- config.stateStorage.createTopLevelState(deviceId, sessionId)
+        router = config.serverRouter.dynamic(deviceId, sessionId)
+        qualifiedSessionId = QualifiedSessionId(deviceId, sessionId)
+        korolev = new ApplicationInstance(
           qualifiedSessionId, connection,
           stateManager, initialState,
           config.render, router, fromScratch = isNew
         )
-        val applyTransition = korolev.topLevelComponentInstance.applyTransition _
-        val env = config.envConfigurator(deviceId, sessionId, applyTransition)
+        applyTransition = korolev.topLevelComponentInstance.applyTransition _
+        env <- config.envConfigurator.configure(deviceId, sessionId, applyTransition)
+      } yield {
+        // Create Korolev with dynamic router
+
+
         // Subscribe to events to publish them to env
         korolev.topLevelComponentInstance.setEventsSubscription(env.onMessage)
 
@@ -189,10 +191,12 @@ package object server extends LazyLogging {
               currentPromise.get() foreach { promise =>
                 promise.complete(Failure(new SessionDestroyedException("Session has been closed")))
               }
-              env.onDestroy()
-              sessions.remove(sessionKey)
+              env.onDestroy().map { _ =>
+                sessions.remove(sessionKey)
+                ()
+              }
             }
-            Async[F].unit
+            else Async[F].unit
           }
         }
       }

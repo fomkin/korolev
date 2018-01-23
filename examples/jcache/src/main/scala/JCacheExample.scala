@@ -122,12 +122,12 @@ object JCacheExample extends KorolevBlazeServer {
               Future.successful(key.fold(s)(k => s.copy(selectedTab = k)))
           }
         ),
-        static = (deviceId) => Router(
+        static = (deviceId, sessionId) => Router(
           toState = {
             case (_, Root) =>
-              storage.createTopLevelState(deviceId)
+              storage.createTopLevelState(deviceId, sessionId)
             case (_, Root / name) =>
-              storage.createTopLevelState(deviceId) map { s =>
+              storage.createTopLevelState(deviceId, sessionId) map { s =>
                 val key = s.todos.keys.find(_.toLowerCase == name)
                 key.fold(s)(k => s.copy(selectedTab = k))
               }
