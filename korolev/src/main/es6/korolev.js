@@ -1,13 +1,14 @@
-import { getCookie } from './utils.js';
+import { getDeviceId } from './utils.js';
 
 /** @enum {number} */
 export const CallbackType = {
   DOM_EVENT: 0, // `$renderNum:$elementId:$eventType`
   FORM_DATA_PROGRESS: 1, // `$descriptor:$loaded:$total`
-  EXTRACT_PROPERTY_RESPONSE: 2, // `$descriptor:$value`
+  EXTRACT_PROPERTY_RESPONSE: 2, // `$descriptor:$propertyType:$value`
   HISTORY: 3, // URL
-  EXTRACT_EVENT_DATA_RESPONSE: 4 // `$descriptor:$dataJson`
-}
+  EVALJS_RESPONSE: 4, // `$descriptor:$status:$value`
+  EXTRACT_EVENT_DATA_RESPONSE: 5 // `$descriptor:$dataJson`
+};
 
 /** @enum {number} */
 export const PropertyType = {
@@ -16,7 +17,7 @@ export const PropertyType = {
   BOOLEAN: 2,
   OBJECT: 3,
   ERROR: 4
-}
+};
 
 export class Korolev {
 
@@ -63,7 +64,7 @@ export class Korolev {
     this.historyHandler = (/** @type {Event} */ event) => {
       if (event.state === null) callback(CallbackType.HISTORY, this.initialPath);
       else callback(CallbackType.HISTORY, event.state);
-    }
+    };
 
     window.addEventListener('popstate', this.historyHandler);
   }
@@ -307,7 +308,7 @@ export class Korolev {
     var form = self.els[id];
     var formData = new FormData(form);
     var request = new XMLHttpRequest();
-    var deviceId = getCookie('device');
+    var deviceId = getDeviceId();
     var uri = self.config['r'] +
       'bridge' +
       '/' + deviceId +
@@ -331,10 +332,30 @@ export class Korolev {
     }
   }
 
+  /**
+   * @param {string} descriptor
+   * @param {string} code
+   */
+  evalJs(descriptor, code) {
+    let result;
+    let status = 0;
+    try {
+      result = JSON.stringify(eval(code));
+    } catch (e) {
+      console.error(`Error evaluating code ${code}`, e);
+      status = 1;
+    }
+
+    this.callback(
+      CallbackType.EVALJS_RESPONSE,
+      `${descriptor}:${status}:${result}`
+    );
+  }
+
   extractEventData(descriptor, renderNum) {
     let data = this.eventData[renderNum];
     let result = {};
-    for (var propertyName in data) {
+    for (let propertyName in data) {
       let value = data[propertyName];
       switch (typeof value) {
         case 'string':

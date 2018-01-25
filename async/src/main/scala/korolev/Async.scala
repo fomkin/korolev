@@ -49,8 +49,8 @@ object Async {
   }
 
   /**
-    * Gives an instance of Async for Future type.
-    * Physically one instance for every execution context
+    * Creates an Async instance for Future type.
+    * Physically one instance per execution context is maintained.
     */
   implicit def futureAsync(implicit ec: ExecutionContext): Async[Future] = {
     futureInstanceCache.synchronized {

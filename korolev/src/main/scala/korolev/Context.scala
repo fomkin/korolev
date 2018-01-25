@@ -23,7 +23,7 @@ final class Context[F[+_]: Async, S: StateSerializer: StateDeserializer, M] {
   type Render = PartialFunction[S, Document.Node[Effect]]
   type ElementId = Context.ElementId[F, S, M]
   type Access = Context.Access[F, S, M]
-  type EventResult = korolev.EventResult[F, S]
+  type EventResult = F[Unit]
 
   val symbolDsl = new KorolevTemplateDsl[F, S, M]()
 
@@ -40,18 +40,10 @@ final class Context[F[+_]: Async, S: StateSerializer: StateDeserializer, M] {
     Delay(duration, effect)
 
   def event(name: Symbol, phase: EventPhase = Bubbling)(
-      effect: Access => EventResult): Event =
+      effect: Access => F[Unit]): Event =
     Event(name, phase, effect)
 
   val emptyTransition: PartialFunction[S, S] = { case x => x }
-
-  implicit def effectToEventResult(effect: F[Unit]): EventResult =
-    EventResult(effect, stopPropagation = false)
-
-  implicit final class EffectOps(effect: F[Unit]) {
-    def stopPropagation: EventResult =
-      EventResult(effect, stopPropagation = true)
-  }
 
   implicit final class ComponentDsl[CS: StateSerializer: StateDeserializer, P, E](component: Component[F, CS, P, E]) {
     def apply(parameters: P)(f: (Access, E) => F[Unit]): ComponentEntry[F, S, M, CS, P, E] =
@@ -100,16 +92,16 @@ object Context {
     def property(id: ElementId[F, S, M]): PropertyHandler[F]
 
     /**
-      * Shortcut for `property(id).get(proName)`
+      * Shortcut for `property(id).get(proName)`.
       * @since 0.6.0
       */
-    def property(id: ElementId[F, S, M], propName: Symbol): F[String]
+    final def property(id: ElementId[F, S, M], propName: Symbol): F[String] = property(id).get(propName)
 
     /**
-      * Shortcut for `property(id).get('value)`
+      * Shortcut for `property(id).get('value)`.
       * @since 0.6.0
       */
-    def valueOf(id: ElementId[F, S, M]): F[String] = property(id, 'value)
+    final def valueOf(id: ElementId[F, S, M]): F[String] = property(id, 'value)
 
     /**
       * Makes focus on the element
@@ -117,7 +109,7 @@ object Context {
     def focus(id: ElementId[F, S, M]): F[Unit]
 
     /**
-      * Publish message to environment
+      * Publish message to environment.
       */
     def publish(message: M): F[Unit]
 
@@ -145,7 +137,7 @@ object Context {
     def downloadFormData(id: ElementId[F, S, M]): FormDataDownloader[F, S]
 
     /**
-      * Gives current state
+      * Gives current state.
       */
     def state: F[S]
 
@@ -155,15 +147,27 @@ object Context {
     def transition(f: Transition[S]): F[Unit]
 
     /**
-      * Gives current session id
+      * Applies transition to current state.
+      */
+    def maybeTransition(f: PartialFunction[S, S]): F[Unit] = transition(f)
+
+    /**
+      * Gives current session id.
       */
     def sessionId: F[QualifiedSessionId]
 
     /**
-      * Gives json with string, number and boolean fields of
-      * object of the event happened in current render phase.
-      * Note that is expensive operation which requires
-      * network round trip.
+      * Execute arbitrary JavaScript code on client and get stringified JSON back.
+      * {{{
+      * access.evalJs("new Date().getTimezoneOffset()").map(offset => ...)
+      * }}}
+      */
+    def evalJs(code: String): F[String]
+
+    /**
+      * Access JSON object carrying string, number and boolean fields
+      * of the object event happened in current render phase.
+      * Note that is expensive operation which requires network round trip.
       */
     def eventData: F[String]
   }
@@ -205,7 +209,7 @@ object Context {
   final case class Event[F[+_]: Async, S, M](
       `type`: Symbol,
       phase: EventPhase,
-      effect: Access[F, S, M] => EventResult[F, S]) extends Effect[F, S, M]
+      effect: Access[F, S, M] => F[Unit]) extends Effect[F, S, M]
 
   final case class Delay[F[+_]: Async, S, M](
       duration: FiniteDuration,

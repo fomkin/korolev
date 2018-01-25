@@ -46,9 +46,8 @@ val publishSettings = Seq(
 
 val commonSettings = publishSettings ++ Seq(
   organization := "com.github.fomkin",
-  version := "0.6.0",
   libraryDependencies ++= Seq(
-    "org.scalatest" %% "scalatest" % "3.0.1" % Test
+    "org.scalatest" %% "scalatest" % "3.0.4" % Test
   ),
   scalacOptions ++= Seq(
     "-deprecation",
@@ -70,59 +69,41 @@ val exampleSettings = commonSettings ++ dontPublishSettings ++ Seq(
   libraryDependencies += "org.slf4j" % "slf4j-simple" % "1.7.+"
 )
 
-lazy val serverOsgiSettings = osgiSettings ++ Seq(
-  OsgiKeys.exportPackage := Seq("korolev.server.*;version=${Bundle-Version}")
-)
-
 lazy val server = (project in file("server") / "base").
   settings(crossVersionSettings).
   settings(commonSettings: _*).
   settings(
     normalizedName := "korolev-server",
-    libraryDependencies += "biz.enef" %% "slogging-slf4j" % "0.5.2"
+    libraryDependencies += "biz.enef" %% "slogging-slf4j" % "0.6.0"
   ).
   dependsOn(korolev)
 
-lazy val serverBlazeOsgiSettings = osgiSettings ++ Seq(
-  OsgiKeys.exportPackage := Seq("korolev.blazeServer.*;version=${Bundle-Version}")
-)
 lazy val `server-blaze` = (project in file("server") / "blaze").
   settings(commonSettings: _*).
   settings(crossVersionSettings).
   settings(
     normalizedName := "korolev-server-blaze",
-    libraryDependencies ++= Seq("org.http4s" %% "blaze-http" % "0.12.4")
+    libraryDependencies ++= Seq("org.http4s" %% "blaze-http" % "0.12.11")
   ).
-  dependsOn(server).
-  enablePlugins(SbtOsgi).settings(serverBlazeOsgiSettings:_*)
-
-lazy val serverAkkaHttpOsgiSettings = osgiSettings ++ Seq(
-  OsgiKeys.exportPackage := Seq("korolev.akkahttp.*;version=${Bundle-Version}")
-)
+  dependsOn(server)
 
 lazy val `server-akkahttp` = (project in file("server") / "akkahttp").
   settings(crossVersionSettings).
   settings(commonSettings: _*).
   settings(
     normalizedName := "korolev-server-akkahttp",
-    libraryDependencies ++= Seq("com.typesafe.akka" %% "akka-http" % "10.0.9")
+    libraryDependencies ++= Seq(
+      "com.typesafe.akka" %% "akka-actor" % "2.5.8",
+      "com.typesafe.akka" %% "akka-stream" % "2.5.8",
+      "com.typesafe.akka" %% "akka-http" % "10.0.11"
+    )
   ).
-  dependsOn(server).
-  enablePlugins(SbtOsgi).settings(serverAkkaHttpOsgiSettings:_*)
-
-lazy val asyncOsgiSettings = osgiSettings ++ Seq(
-  OsgiKeys.exportPackage := Seq("korolev.*;version=${Bundle-Version}")
-)
+  dependsOn(server)
 
 lazy val async = project.
   settings(crossVersionSettings).
   settings(commonSettings: _*).
-  settings(normalizedName := "korolev-async").
-  enablePlugins(SbtOsgi).settings(asyncOsgiSettings:_*)
-
-lazy val korolevOsgiSettings = osgiSettings ++ Seq(
-  OsgiKeys.exportPackage := Seq("korolev.*;version=${Bundle-Version}")
-)
+  settings(normalizedName := "korolev-async")
 
 lazy val korolev = project.
   settings(crossVersionSettings).
@@ -130,7 +111,7 @@ lazy val korolev = project.
   settings(
     normalizedName := "korolev",
     libraryDependencies ++= Seq(
-      "biz.enef" %% "slogging" % "0.5.2",
+      "biz.enef" %% "slogging" % "0.6.0",
       "com.github.fomkin" %% "levsha-core" % levshaVersion,
       "com.github.fomkin" %% "levsha-events" % levshaVersion
     ),
@@ -143,20 +124,29 @@ lazy val korolev = project.
       }
       .taskValue
   ).
-  dependsOn(async).
-  enablePlugins(SbtOsgi).settings(korolevOsgiSettings:_*)
+  dependsOn(async)
+
+// Contribs
 
 lazy val `jcache-support` = project.
+  in(file("contrib/jcache")).
   settings(crossVersionSettings).
-  enablePlugins(SbtOsgi).
   settings(commonSettings: _*).
-  settings(osgiSettings: _*).
   settings(
     normalizedName := "korolev-jcache-support",
-    libraryDependencies += "javax.cache" % "cache-api" % "1.0.0",
-    OsgiKeys.exportPackage := Seq("korolev.server.jcache.*;version=${Bundle-Version}")
+    libraryDependencies += "javax.cache" % "cache-api" % "1.0.0"
   ).
   dependsOn(server)
+
+lazy val `monix-support` = project.
+  in(file("contrib/monix")).
+  settings(crossVersionSettings).
+  settings(commonSettings: _*).
+  settings(
+    normalizedName := "korolev-monix-support",
+    libraryDependencies += "io.monix" %% "monix-eval" % "3.0.0-M3"
+  ).
+  dependsOn(async)
 
 // Examples
 val examples = file("examples")
@@ -224,11 +214,19 @@ lazy val akkaHttpExample = (project in examples / "akka-http").
   settings(mainClass := Some("AkkaHttpExample")).
   dependsOn(`server-akkahttp`)
 
+lazy val monixExample = (project in examples / "monix").
+  settings(crossVersionSettings).
+  settings(exampleSettings: _*).
+  settings(mainClass := Some("MonixExample")).
+  dependsOn(`monix-support`, `server-akkahttp`)
+
 lazy val eventDataExample = (project in examples / "event-data").
   settings(crossVersionSettings).
   settings(exampleSettings: _*).
   settings(mainClass := Some("EventDataExample")).
   dependsOn(`server-blaze`)
+
+// Tests
 
 lazy val `integration-tests` = project.
   settings(crossVersionSettings).
@@ -253,10 +251,10 @@ lazy val `performance-benchmark` = project.
     scalaVersion := "2.12.4",
     fork in run := true,
     libraryDependencies ++= Seq(
-      "com.typesafe.akka" %% "akka-http" % "10.0.10",
-      "com.typesafe.akka" %% "akka-stream" % "2.5.6",
-      "com.typesafe.akka" %% "akka-actor"  % "2.5.6",
-      "com.typesafe.akka" %% "akka-typed" % "2.5.6",
+      "com.typesafe.akka" %% "akka-http" % "10.0.11",
+      "com.typesafe.akka" %% "akka-stream" % "2.5.8",
+      "com.typesafe.akka" %% "akka-actor"  % "2.5.8",
+      "com.typesafe.akka" %% "akka-typed" % "2.5.8",
       "com.github.fomkin" %% "pushka-json" % "0.8.0"
     )
   ).
@@ -268,7 +266,7 @@ lazy val root = project.in(file(".")).
   aggregate(
     korolev, async,
     server, `server-blaze`, `server-akkahttp`,
-    `jcache-support`,
+    `jcache-support`, `monix-support`,
     simpleExample, routingExample, gameOfLifeExample,
     jcacheExample, formDataExample, delayExample, focusExample,
     webComponentExample, componentExample, akkaHttpExample,

@@ -24,7 +24,7 @@ Korolev runs a single-page application on the server side, keeping in the browse
 ## Documentation
 
 * [User guide](https://fomkin.org/korolev/user-guide.html) [(download PDF)](https://fomkin.org/korolev/user-guide.pdf)
-* [API overview](https://www.javadoc.io/doc/com.github.fomkin/korolev_2.12/0.6.0) 
+* [API overview](https://www.javadoc.io/doc/com.github.fomkin/korolev_2.12/0.7.0) 
 
 ## Tools
 

@@ -1,5 +1,6 @@
 package korolev.internal
 
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicInteger
 
 import korolev._
@@ -58,7 +59,10 @@ final class ComponentInstance
   private val formDataProgressTransitions = mutable.Map.empty[String, (Int, Int) => Transition[CS]]
 
   private val stateChangeSubscribers = mutable.ArrayBuffer.empty[(Id, Any) => Unit]
-  private var eventSubscription = Option.empty[E => _]
+  private val pendingTransitions = new ConcurrentLinkedQueue[(Transition[CS], Promise[F, Unit])]()
+
+  @volatile private var eventSubscription = Option.empty[E => _]
+  @volatile private var transitionInProgress = false
 
   private object browserAccess extends Access[F, CS, E] {
 
@@ -86,9 +90,6 @@ final class ComponentInstance
         }
       }
     }
-
-    def property(element: ElementId[F, CS, E], propName: Symbol): F[String] =
-      property(element).get(propName)
 
     def focus(element: ElementId[F, CS, E]): F[Unit] =
       getId(element).flatMap { id =>
@@ -126,19 +127,17 @@ final class ComponentInstance
       }
     }
 
-    def eventData: F[String] = {
-      frontend.extractEventData(getRenderNum())
-    }
+    def evalJs(code: String): F[String] = frontend.evalJs(code)
+
+    def eventData: F[String] = frontend.extractEventData(getRenderNum())
   }
 
-  private def applyEventResult(eventResult: EventResult[F, CS]): Boolean = {
+  private def applyEventResult(effect: F[Unit]): Unit = {
     // Run effect
-    eventResult.effect.run {
+    effect.run {
       case Failure(e) => logger.error("Exception during applying transition", e)
       case Success(_) => ()
     }
-    // Continue propagation
-    !eventResult.stopPropagation
   }
 
   private def createUnsubscribe[T](from: mutable.Buffer[T], that: T) = { () =>
@@ -238,30 +237,44 @@ final class ComponentInstance
   }
 
   def applyTransition(transition: Transition[CS]): F[Unit] = {
-    stateManager.read[CS](nodeId) flatMap { maybeState =>
-      val state = maybeState.getOrElse(component.initialState)
-      try {
-        val newState = transition(state)
-        stateManager.write(nodeId, newState).map { _ =>
-          stateChangeSubscribers.foreach(_.apply(nodeId, state))
+    def runTransition(transition: Transition[CS], promise: Promise[F, Unit]): Unit = {
+      transitionInProgress = true
+      stateManager.read[CS](nodeId) flatMap { maybeState =>
+        val state = maybeState.getOrElse(component.initialState)
+        try {
+          val newState = transition(state)
+          stateManager.write(nodeId, newState).map { _ =>
+            stateChangeSubscribers.foreach(_.apply(nodeId, state))
+          }
+        } catch {
+          case e: MatchError =>
+            logger.warn("Transition doesn't fit the state", e)
+            async.unit
+          case e: Throwable =>
+            logger.error("Exception happened when applying transition", e)
+            async.unit
         }
-      } catch {
-        case e: MatchError =>
-          logger.warn("Transition doesn't fit the state", e)
-          async.unit
-        case e: Throwable =>
-          logger.error("Exception happened when applying transition", e)
-          async.unit
+      } runOrReport { _ =>
+        promise.complete(Success(()))
+        Option(pendingTransitions.poll()) match {
+          case Some((t, p)) => runTransition(t, p)
+          case None => transitionInProgress = false
+        }
       }
     }
+
+    val promise = async.promise[Unit]
+    if (transitionInProgress) pendingTransitions.offer((transition, promise))
+    else runTransition(transition, promise)
+    promise.future
   }
 
   def applyEvent(eventId: EventId): Boolean = {
     events.get(eventId) match {
       case Some(event: Event[F, CS, E]) =>
         applyEventResult(event.effect(browserAccess))
+        false
       case None =>
-        print("  ")
         nestedComponents.values.forall { nested =>
           nested.applyEvent(eventId)
         }

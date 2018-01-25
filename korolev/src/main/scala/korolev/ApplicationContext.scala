@@ -36,13 +36,10 @@ final class ApplicationContext[F[+ _]: Async, S: StateSerializer: StateDeseriali
     Delay(duration, access => access.transition(f))
 
   private def provideEventResult(ler: LegacyEventResult[F, S], access: Context.Access[F, S, M]) = {
-    val effect = {
-      for {
-        _ <- ler.immediate.fold(Async[F].unit)(access.transition)
-        _ <- ler.deferred.map(_.flatMap(access.transition)).getOrElse(Async[F].unit)
-      } yield ()
-    }
-    EventResult[F, S](effect, ler.shouldStopPropagation)
+    for {
+      _ <- ler.immediate.fold(Async[F].unit)(access.transition)
+      _ <- ler.deferred.map(_.flatMap(access.transition)).getOrElse(Async[F].unit)
+    } yield ()
   }
 
   def eventWithAccess(name: Symbol, phase: EventPhase = Bubbling)(f: Access => LegacyEventResult[F, S]): Event = {
