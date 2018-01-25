@@ -415,25 +415,24 @@ Also, we have a message queue which has a topic with notifications for current u
 -------------------------------------------------------------------------------
 KorolevServiceConfig(
   ...
-  envConfigurator = (deviceId, sessionId, applyTransition) => {
-    val subscribtion = messageQueue.subscribe(s"notifications-$deviceId") { notifiation =>
+  envConfigurator = EnvConfigurator { (deviceId, sessionId, applyTransition) =>
+    messageQueue.subscribe(deviceId, sessionId).map { subscription =>
       applyTransition {
         case state: MyState =>
-          state.copy(
-            notifiations = notifiation :: state.notifiations
-          )
+          state.copy(notifications = notification :: state.notifications)
       }
+
+      KorolevServiceConfig.Env(
+        onDestroy = () => subscription.unsubscribe(),
+        onMessage = {
+          case message => subscription.send(message)
+        }
+      )
     }
-    KorolevServiceConfig.Env(
-      onDestroy = () => subscribtion.unsubscribe(),
-      onMessage = PartialFunction.empty
-    )
-  }
 )
 -------------------------------------------------------------------------------
 
-That's all. Now every invocation of lambda which was passed to `messageQueue.subscribe` will run
-the transition which will prepend new notification to the state. Render will be invoked automatically and user will get the notification on his page.
+Now you can use `Access.publish(message)` to send messages to the queue and every invocation of lambda which was passed to `messageQueue.subscribe` will run the transition which will prepend notifications to the state. Render will be invoked automatically and user will get his page updated.
 
 === Routing
 
