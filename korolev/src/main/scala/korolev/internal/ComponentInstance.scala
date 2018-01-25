@@ -90,9 +90,6 @@ final class ComponentInstance
       }
     }
 
-    def property(element: ElementId[F, CS, E], propName: Symbol): F[String] =
-      property(element).get(propName)
-
     def focus(element: ElementId[F, CS, E]): F[Unit] =
       getId(element).flatMap { id =>
         frontend.focus(id)
@@ -128,6 +125,8 @@ final class ComponentInstance
         this
       }
     }
+
+    def evalJs(code: String): F[String] = frontend.evalJs(code)
   }
 
   private def applyEventResult(effect: F[Unit]): Unit = {

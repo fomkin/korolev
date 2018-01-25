@@ -14,13 +14,14 @@ From server to the client
 0. SetRenderNum(n)
 1. CleanRoot()
 2. ListenEvent(type, preventDefault)
-3. ExtractProperty(id, propertyName, descriptor)
+3. ExtractProperty(descriptor, id, propertyName)
 4. ModifyDOM(commands)
 5. Focus(id) {
 6. ChangePageUrl(path)
 7. UploadForm(id, descriptor)
 8. ReloadCss()
 9. Keep-alive message from server (noop)
+10. EvalJs(descriptor, code)
 
 ### Modify dom commands
 
