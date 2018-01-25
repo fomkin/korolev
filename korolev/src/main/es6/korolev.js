@@ -4,8 +4,9 @@ import { getDeviceId } from './utils.js';
 export const CallbackType = {
   DOM_EVENT: 0, // `$renderNum:$elementId:$eventType`
   FORM_DATA_PROGRESS: 1, // `$descriptor:$loaded:$total`
-  EXTRACT_PROPERTY_RESPONSE: 2, // `$descriptor:$value`
-  HISTORY: 3  // URL
+  EXTRACT_PROPERTY_RESPONSE: 2, // `$descriptor:$propertyType:$value`
+  HISTORY: 3, // URL
+  EVALJS_RESPONSE: 4 // `$descriptor:$status:$value`
 };
 
 export const PropertyType = {
@@ -322,5 +323,25 @@ export class Korolev {
       if (link.getAttribute("rel") === "stylesheet")
         link.href = link.href + "?refresh=" + new Date().getMilliseconds();
     }
+  }
+
+  /**
+   * @param {string} descriptor
+   * @param {string} code
+   */
+  evalJs(descriptor, code) {
+    var result;
+    var status = 0;
+    try {
+      result = JSON.stringify(eval(code));
+    } catch (e) {
+      console.error(`Error evaluating code ${code}`, e);
+      status = 1;
+    }
+
+    this.callback(
+      CallbackType.EVALJS_RESPONSE,
+      `${descriptor}:${status}:${result}`
+    );
   }
 }

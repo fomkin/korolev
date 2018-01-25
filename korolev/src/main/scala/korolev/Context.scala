@@ -92,16 +92,16 @@ object Context {
     def property(id: ElementId[F, S, M]): PropertyHandler[F]
 
     /**
-      * Shortcut for `property(id).get(proName)`
+      * Shortcut for `property(id).get(proName)`.
       * @since 0.6.0
       */
-    def property(id: ElementId[F, S, M], propName: Symbol): F[String]
+    final def property(id: ElementId[F, S, M], propName: Symbol): F[String] = property(id).get(propName)
 
     /**
-      * Shortcut for `property(id).get('value)`
+      * Shortcut for `property(id).get('value)`.
       * @since 0.6.0
       */
-    def valueOf(id: ElementId[F, S, M]): F[String] = property(id, 'value)
+    final def valueOf(id: ElementId[F, S, M]): F[String] = property(id, 'value)
 
     /**
       * Makes focus on the element
@@ -109,7 +109,7 @@ object Context {
     def focus(id: ElementId[F, S, M]): F[Unit]
 
     /**
-      * Publish message to environment
+      * Publish message to environment.
       */
     def publish(message: M): F[Unit]
 
@@ -137,7 +137,7 @@ object Context {
     def downloadFormData(id: ElementId[F, S, M]): FormDataDownloader[F, S]
 
     /**
-      * Gives current state
+      * Gives current state.
       */
     def state: F[S]
 
@@ -152,9 +152,17 @@ object Context {
     def maybeTransition(f: PartialFunction[S, S]): F[Unit] = transition(f)
 
     /**
-      * Gives current session id
+      * Gives current session id.
       */
     def sessionId: F[QualifiedSessionId]
+
+    /**
+      * Execute arbitrary JavaScript code on client and get stringified JSON back.
+      * {{{
+      * access.evalJs("new Date().getTimezoneOffset()").map(offset => ...)
+      * }}}
+      */
+    def evalJs(code: String): F[String]
   }
 
   sealed abstract class Effect[F[+_]: Async, S, M]

@@ -74,6 +74,14 @@ final class ClientSideApi[F[+ _]: Async](connection: Connection[F])
     connection.send(Procedure.ModifyDom.code, ModifyDomProcedure.SetAttr.code, id.mkString, 0, name.name, value, true)
   }
 
+  def evalJs(code: String): F[String] = {
+    val descriptor = lastDescriptor.getAndIncrement().toString
+    val promise = async.promise[String]
+    promises.put(descriptor, promise)
+    connection.send(Procedure.EvalJs.code, descriptor, code)
+    promise.future
+  }
+
   def changePageUrl(path: Path): Unit =
     connection.send(Procedure.ChangePageUrl.code, path.toString)
 
@@ -162,6 +170,18 @@ final class ClientSideApi[F[+ _]: Async](connection: Connection[F])
             .foreach(_.complete(result))
         case CallbackType.History.code =>
           onHistory(Router.Path.fromString(args))
+        case CallbackType.EvalJsResponse.code =>
+          val Array(descriptor, status, json) = args.split(":", 3)
+          promises
+            .remove(descriptor)
+            .foreach { promise =>
+              status.toInt match {
+                case EvalJsStatus.Success.code =>
+                  promise.complete(Success(json))
+                case EvalJsStatus.Failure.code =>
+                  promise.complete(Failure(ClientSideException("JavaScript evaluation error")))
+              }
+            }
       }
       onReceive()
     case Failure(e) =>
@@ -189,6 +209,8 @@ object ClientSideApi {
     case object ChangePageUrl extends Procedure(6) // (path)
     case object UploadForm extends Procedure(7) // (id, descriptor)
     case object ReloadCss extends Procedure(8) // ()
+    case object KeepAlive extends Procedure(9) // ()
+    case object EvalJs extends Procedure(10) // (code)
 
     val All = Set(
       SetRenderNum, CleanRoot, ListenEvent, ExtractProperty,
@@ -212,13 +234,20 @@ object ClientSideApi {
   }
 
   sealed abstract class PropertyType(final val code: Int)
-  
+
   object PropertyType {
     case object String extends PropertyType(0)
     case object Number extends PropertyType(1)
     case object Boolean extends PropertyType(2)
     case object Object extends PropertyType(3)
     case object Error extends PropertyType(4)
+  }
+
+  sealed abstract class EvalJsStatus(final val code: Int)
+
+  object EvalJsStatus {
+    case object Success extends EvalJsStatus(0)
+    case object Failure extends EvalJsStatus(1)
   }
 
   sealed abstract class CallbackType(final val code: Int)
@@ -228,6 +257,7 @@ object ClientSideApi {
     case object FormDataProgress extends CallbackType(1) // `$descriptor:$loaded:$total`
     case object ExtractPropertyResponse extends CallbackType(2) // `$descriptor:$value`
     case object History extends CallbackType(3) // URL
+    case object EvalJsResponse extends CallbackType(4) // `$descriptor:$status:$value`
 
     final val All = Set(DomEvent, FormDataProgress, ExtractPropertyResponse, History)
 
