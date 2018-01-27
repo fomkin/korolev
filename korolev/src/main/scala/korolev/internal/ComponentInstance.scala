@@ -193,10 +193,10 @@ final class ComponentInstance
       def addTextNode(text: String): Unit = rc.addTextNode(text)
       def addMisc(misc: Effect[F, CS, E]): Unit = {
         misc match {
-          case event @ Event(eventType, phase, _) =>
+          case event @ Event(eventType, phase, _, preventDefault) =>
             val id = rc.currentContainerId
             events.put(EventId(id, eventType.name, phase), event)
-            eventRegistry.registerEventType(event.`type`)
+            eventRegistry.registerEventType(eventType, preventDefault)
           case element: ElementId[F, CS, E] =>
             val id = rc.currentContainerId
             elements.put(element, id)
