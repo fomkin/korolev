@@ -37,6 +37,7 @@ final class ComponentInstance
     frontend: ClientSideApi[F],
     eventRegistry: EventRegistry[F],
     stateManager: StateManager[F],
+    getRenderNum: () => Int,
     val component: Component[F, CS, P, E]
   )
   extends LazyLogging { self =>
@@ -127,6 +128,10 @@ final class ComponentInstance
     }
 
     def evalJs(code: String): F[String] = frontend.evalJs(code)
+    
+    def eventData: F[String] = {
+      frontend.extractEventData(getRenderNum())
+    }
   }
 
   private def applyEventResult(effect: F[Unit]): Unit = {
@@ -214,7 +219,7 @@ final class ComponentInstance
                 n.applyRenderContext(entry.parameters, proxy, snapshot)
               case _ =>
                 // Create new nested component instance
-                val n = entry.createInstance(id, sessionId, frontend, eventRegistry, stateManager)
+                val n = entry.createInstance(id, sessionId, frontend, eventRegistry, stateManager, getRenderNum)
                 markedComponentInstances += id
                 nestedComponents.put(id, n)
                 n.subscribeStateChange { (id, state) =>
