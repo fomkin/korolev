@@ -48,6 +48,7 @@ export class Bridge {
       case 8: k.reloadCss.apply(k, commands); break;
       case 9: break;
       case 10: k.evalJs.apply(k, commands); break;
+      case 11: k.extractEventData.apply(k, commands); break;
       default: console.error(`Procedure ${pCode} is undefined`);
     }
   }

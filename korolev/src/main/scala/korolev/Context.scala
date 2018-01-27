@@ -163,6 +163,14 @@ object Context {
       * }}}
       */
     def evalJs(code: String): F[String]
+
+    /**
+      * Gives json with string, number and boolean fields of
+      * object of the event happened in current render phase.
+      * Note that is expensive operation which requires
+      * network round trip.
+      */
+    def eventData: F[String]
   }
 
   sealed abstract class Effect[F[+_]: Async, S, M]
@@ -193,8 +201,9 @@ object Context {
                        sessionId: QualifiedSessionId,
                        frontend: ClientSideApi[F],
                        eventRegistry: EventRegistry[F],
-                       stateManager: StateManager[F]): ComponentInstance[F, AS, M, CS, P, E] = {
-      new ComponentInstance(node, sessionId, frontend, eventRegistry, stateManager, component)
+                       stateManager: StateManager[F],
+                       getRenderNum: () => Int): ComponentInstance[F, AS, M, CS, P, E] = {
+      new ComponentInstance(node, sessionId, frontend, eventRegistry, stateManager, getRenderNum, component)
     }
   }
 
