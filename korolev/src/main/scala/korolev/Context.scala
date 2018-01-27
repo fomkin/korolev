@@ -39,9 +39,9 @@ final class Context[F[+_]: Async, S: StateSerializer: StateDeserializer, M] {
   def delay(duration: FiniteDuration)(effect: Access => F[Unit]): Delay[F, S, M] =
     Delay(duration, effect)
 
-  def event(name: Symbol, phase: EventPhase = Bubbling)(
+  def event(name: Symbol, phase: EventPhase = Bubbling, preventDefault: Boolean = false)(
       effect: Access => F[Unit]): Event =
-    Event(name, phase, effect)
+    Event(name, phase, effect, preventDefault)
 
   val emptyTransition: PartialFunction[S, S] = { case x => x }
 
@@ -210,7 +210,8 @@ object Context {
   final case class Event[F[+_]: Async, S, M](
       `type`: Symbol,
       phase: EventPhase,
-      effect: Access[F, S, M] => F[Unit]) extends Effect[F, S, M]
+      effect: Access[F, S, M] => F[Unit],
+      preventDefault: Boolean) extends Effect[F, S, M]
 
   final case class Delay[F[+_]: Async, S, M](
       duration: FiniteDuration,

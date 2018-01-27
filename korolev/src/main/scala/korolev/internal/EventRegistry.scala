@@ -17,10 +17,10 @@ final class EventRegistry[F[+ _]: Async](frontend: ClientSideApi[F]) {
     * all events of the type. If event already listening
     * on the client side, client will be not notified again.
     */
-  def registerEventType(`type`: Symbol): Unit = knownEventTypes.synchronized {
+  def registerEventType(`type`: Symbol, preventDefault: Boolean): Unit = knownEventTypes.synchronized {
     if (!knownEventTypes.contains(`type`)) {
       knownEventTypes += `type`
-      frontend.listenEvent(`type`.name, preventDefault = false)
+      frontend.listenEvent(`type`.name, preventDefault)
     }
   }
 }

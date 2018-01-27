@@ -360,7 +360,7 @@ export class Korolev {
       switch (typeof value) {
         case 'string':
         case 'number':
-        case 'boolean': result[propertyName] = value; break;          break;
+        case 'boolean': result[propertyName] = value; break;
         default: // do nothing
       }
     }
