@@ -23,7 +23,7 @@ final class ApplicationInstance
     stateManager: StateManager[F],
     initialState: S,
     render: PartialFunction[S, Document.Node[Effect[F, S, M]]],
-    router: Router[F, S, S],
+    router: Router[F, S, Option[S]],
     fromScratch: Boolean
   )
   extends LazyLogging {
@@ -95,7 +95,7 @@ final class ApplicationInstance
         .flatMap { maybeTopLevelState =>
           router
             .toState
-            .lift(maybeTopLevelState.getOrElse(initialState) -> path)
+            .lift(Some(maybeTopLevelState.getOrElse(initialState)) -> path)
             .fold(Async[F].pure(Option.empty[S]))(_.map(Some(_)))
         }
         .flatMap {

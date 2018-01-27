@@ -16,7 +16,7 @@ object SimpleExample extends KorolevBlazeServer {
   val editInputId = elementId()
 
   val service = blazeService[Future, State, Any] from KorolevServiceConfig [Future, State, Any] (
-    serverRouter = ServerRouter.empty[Future, State],
+    router = emptyRouter,
     stateStorage = StateStorage.default(State()),
     render = {
       case state =>

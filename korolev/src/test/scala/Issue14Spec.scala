@@ -21,7 +21,7 @@ class Issue14Spec extends FlatSpec with Matchers {
       sessionId = QualifiedSessionId("", ""),
       connection = connection,
       fromScratch = true,
-      router = Router.empty[Future, String, String],
+      router = Router.empty[Future, String, Option[String]],
       render = {
         Issue14Spec.render(
           firstEvent = event('mousedown) { access =>

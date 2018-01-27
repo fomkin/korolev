@@ -40,10 +40,9 @@ package object server extends LazyLogging {
       for {
         deviceId <- deviceFromRequest(request)
         sessionId <- config.idGenerator.generateSessionId()
-        state <- config.serverRouter
-          .static(deviceId)
+        state <- config.router(deviceId, None)
           .toState
-          .lift(((), request.path))
+          .lift((None, request.path))
           .getOrElse(config.stateStorage.createTopLevelState(deviceId))
           .flatMap { state =>
             config.stateStorage.create(deviceId, sessionId).flatMap { manager =>
@@ -55,7 +54,7 @@ package object server extends LazyLogging {
       } yield {
         val dsl = new levsha.TemplateDsl[Context.Effect[F, S, M]]()
         val textRenderContext = new HtmlRenderContext[F, S, M]()
-        val rootPath = config.serverRouter.rootPath
+        val rootPath = config.rootPath
         val clw = {
           val textRenderContext = new HtmlRenderContext[F, S, M]()
           config.connectionLostWidget(textRenderContext)
@@ -67,7 +66,7 @@ package object server extends LazyLogging {
         val document = 'html(
           'head(
             'script('language /= "javascript", s"window['kfg']={sid:'$sessionId',r:'$rootPath',clw:'$clw'}"),
-            'script('src /= config.serverRouter.rootPath + "korolev-client.min.js"),
+            'script('src /= config.rootPath + "korolev-client.min.js"),
             config.head
           ),
           config.render(state)
@@ -151,7 +150,7 @@ package object server extends LazyLogging {
         initialState <- config.stateStorage.createTopLevelState(deviceId)
 
         // Create Korolev with dynamic router
-        router = config.serverRouter.dynamic(deviceId, sessionId)
+        router = config.router(deviceId, Some(sessionId))
         qualifiedSessionId = QualifiedSessionId(deviceId, sessionId)
         korolev = new ApplicationInstance(
           qualifiedSessionId, connection,
@@ -294,6 +293,9 @@ package object server extends LazyLogging {
 
     service
   }
+
+  def emptyRouter[F[+_]: Async, S]: (DeviceId, Option[SessionId]) => Router[F, S, Option[S]] =
+    (_, _) => Router.empty[F, S, Option[S]]
 
   private[server] object misc {
     val htmlContentType = "text/html; charset=utf-8"

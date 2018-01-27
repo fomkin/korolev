@@ -20,7 +20,7 @@ object FormDataExample extends KorolevBlazeServer(BlazeServerConfig(maxRequestBo
 
   val service = blazeService[Future, State, Any] from KorolevServiceConfig[Future, State, Any](
     stateStorage = StateStorage.default(State.empty),
-    serverRouter = ServerRouter.empty,
+    router = emptyRouter,
     head = {
       Seq(
         'link(

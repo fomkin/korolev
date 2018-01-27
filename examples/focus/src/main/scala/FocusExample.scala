@@ -18,7 +18,7 @@ object FocusExample extends KorolevBlazeServer {
 
   val service = blazeService[Future, Boolean, Any] from KorolevServiceConfig[Future, Boolean, Any](
     stateStorage = StateStorage.default(false),
-    serverRouter = ServerRouter.empty[Future, Boolean],
+    router = emptyRouter,
     render = {
       case _ =>
         'body(

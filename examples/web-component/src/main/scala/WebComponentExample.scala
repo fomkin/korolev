@@ -1,7 +1,7 @@
 import korolev._
 import korolev.blazeServer._
 import korolev.execution._
-import korolev.server.{KorolevServiceConfig, ServerRouter, StateStorage}
+import korolev.server._
 import korolev.state.javaSerialization._
 
 import scala.concurrent.Future
@@ -20,7 +20,7 @@ object WebComponentExample extends KorolevBlazeServer {
   }
 
   val service = blazeService[Future, State, Any] from KorolevServiceConfig [Future, State, Any] (
-    serverRouter = ServerRouter.empty[Future, State],
+    router = emptyRouter,
     stateStorage = StateStorage.default(State()),
     head = {
       Seq(

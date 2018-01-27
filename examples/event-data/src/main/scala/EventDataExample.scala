@@ -14,7 +14,7 @@ object EventDataExample extends KorolevBlazeServer {
   import symbolDsl._
 
   val service = blazeService[Future, String, Any] from KorolevServiceConfig [Future, String, Any] (
-    serverRouter = ServerRouter.empty[Future, String],
+    router = emptyRouter,
     stateStorage = StateStorage.default("nothing"),
     render = {
       case json =>

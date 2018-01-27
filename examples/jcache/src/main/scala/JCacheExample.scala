@@ -106,35 +106,7 @@ object JCacheExample extends KorolevBlazeServer {
           )
         )
     },
-    serverRouter = {
-      ServerRouter(
-        dynamic = (_, _) => Router(
-          fromState = {
-            case State(tab, _) =>
-              Root / tab.toLowerCase
-          },
-          toState = {
-            case (s, Root) =>
-              val u = s.copy(selectedTab = s.todos.keys.head)
-              Future.successful(u)
-            case (s, Root / name) =>
-              val key = s.todos.keys.find(_.toLowerCase == name)
-              Future.successful(key.fold(s)(k => s.copy(selectedTab = k)))
-          }
-        ),
-        static = (deviceId) => Router(
-          toState = {
-            case (_, Root) =>
-              storage.createTopLevelState(deviceId)
-            case (_, Root / name) =>
-              storage.createTopLevelState(deviceId) map { s =>
-                val key = s.todos.keys.find(_.toLowerCase == name)
-                key.fold(s)(k => s.copy(selectedTab = k))
-              }
-          }
-        )
-      )
-    }
+    router = emptyRouter
   )
 }
 

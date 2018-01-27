@@ -16,7 +16,7 @@ object DelayExample extends KorolevBlazeServer {
 
   val service = blazeService[Future, Option[Int], Any] from KorolevServiceConfig[Future, Option[Int], Any](
     stateStorage = StateStorage.default(Option.empty[Int]),
-    serverRouter = ServerRouter.empty[Future, Option[Int]],
+    router = emptyRouter,
     render = {
       case Some(n) => 'body(
         delay(3.seconds) { access =>
