@@ -149,17 +149,19 @@ package object server extends LazyLogging {
         stateManager <- maybeStateManager.fold(config.stateStorage.create(deviceId, sessionId))(Async[F].pure(_))
         isNew = maybeStateManager.isEmpty
         initialState <- config.stateStorage.createTopLevelState(deviceId)
-      } yield {
+
         // Create Korolev with dynamic router
-        val router = config.serverRouter.dynamic(deviceId, sessionId)
-        val qualifiedSessionId = QualifiedSessionId(deviceId, sessionId)
-        val korolev = new ApplicationInstance(
+        router = config.serverRouter.dynamic(deviceId, sessionId)
+        qualifiedSessionId = QualifiedSessionId(deviceId, sessionId)
+        korolev = new ApplicationInstance(
           qualifiedSessionId, connection,
           stateManager, initialState,
           config.render, router, fromScratch = isNew
         )
-        val applyTransition = korolev.topLevelComponentInstance.applyTransition _
-        val env = config.envConfigurator(deviceId, sessionId, applyTransition)
+        applyTransition = korolev.topLevelComponentInstance.applyTransition _
+        env <- config.envConfigurator.configure(deviceId, sessionId, applyTransition)
+      } yield {
+
         // Subscribe to events to publish them to env
         korolev.topLevelComponentInstance.setEventsSubscription(env.onMessage)
 

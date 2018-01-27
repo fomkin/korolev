@@ -1,8 +1,7 @@
 package korolev.server
 
-import korolev.server.KorolevServiceConfig.{ApplyTransition, Env, EnvConfigurator}
-import korolev.state.IdGenerator
-import korolev.{Async, Context, Transition}
+import korolev.state.{EnvConfigurator, IdGenerator}
+import korolev.{Async, Context}
 import levsha.{Document, TemplateDsl}
 
 case class KorolevServiceConfig[F[+_]: Async, S, M](
@@ -13,17 +12,11 @@ case class KorolevServiceConfig[F[+_]: Async, S, M](
   connectionLostWidget: Document.Node[Context.Effect[F, S, M]] =
     KorolevServiceConfig.defaultConnectionLostWidget[Context.Effect[F, S, M]],
   maxFormDataEntrySize: Int = 1024 * 1024 * 8,
-  envConfigurator: EnvConfigurator[F, S, M] =
-    (_: String, _: String, _: ApplyTransition[F, S]) =>
-      Env(onDestroy = () => (), PartialFunction.empty),
+  envConfigurator: EnvConfigurator[F, S, M] = EnvConfigurator.default[F, S, M],
   idGenerator: IdGenerator[F] = IdGenerator.default[F]()
 )
 
 object KorolevServiceConfig {
-  case class Env[M](onDestroy: () => Unit, onMessage: PartialFunction[M, Unit])
-  type ApplyTransition[F[+_], S] = Transition[S] => F[Unit]
-  type EnvConfigurator[F[+_], S, M] = (String, String, ApplyTransition[F, S]) => Env[M]
-
   def defaultConnectionLostWidget[MiscType]: Document.Node[MiscType] = {
     val dsl = new TemplateDsl[MiscType]()
     import dsl._
