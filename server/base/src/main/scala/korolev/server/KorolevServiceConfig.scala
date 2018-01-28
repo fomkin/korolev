@@ -1,12 +1,13 @@
 package korolev.server
 
-import korolev.state.{EnvConfigurator, IdGenerator}
-import korolev.{Async, Context}
+import korolev.state.{DeviceId, EnvConfigurator, IdGenerator, SessionId}
+import korolev.{Async, Context, Router}
 import levsha.{Document, TemplateDsl}
 
 case class KorolevServiceConfig[F[+_]: Async, S, M](
   stateStorage: korolev.state.StateStorage[F, S],
-  serverRouter: ServerRouter[F, S],
+  router: (DeviceId, Option[SessionId]) => Router[F, S, Option[S]],
+  rootPath: String = "/",
   render: PartialFunction[S, Document.Node[Context.Effect[F, S, M]]],
   head: Seq[Document.Node[Context.Effect[F, S, M]]] = Seq.empty,
   connectionLostWidget: Document.Node[Context.Effect[F, S, M]] =

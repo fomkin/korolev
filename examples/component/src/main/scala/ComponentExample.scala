@@ -64,7 +64,7 @@ object ComponentExample extends KorolevBlazeServer {
   }
 
   val service = blazeService[Future, String, Any] from KorolevServiceConfig[Future, String, Any] (
-    serverRouter = ServerRouter.empty[Future, String],
+    router = emptyRouter,
     stateStorage = StateStorage.default("a"),
     render = {
       case state =>

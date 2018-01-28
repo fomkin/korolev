@@ -22,7 +22,7 @@ object GameOfLife extends KorolevBlazeServer {
 
   val service = blazeService[Future, Universe, Any] from KorolevServiceConfig(
     stateStorage = StateStorage.default(Universe(universeSize)),
-    serverRouter = ServerRouter.empty,
+    router = emptyRouter,
     render = {
       case universe =>
         'body(
