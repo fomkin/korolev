@@ -37,17 +37,23 @@ final class ApplicationContext[F[+ _]: Async, S: StateSerializer: StateDeseriali
 
   private def provideEventResult(ler: LegacyEventResult[F, S], access: Context.Access[F, S, M]) = {
     for {
-      _ <- ler.immediate.fold(Async[F].unit)(access.transition)
-      _ <- ler.deferred.map(_.flatMap(access.transition)).getOrElse(Async[F].unit)
+      _ <- ler.immediate.fold(Async[F].unit)(access.transition(_))
+      _ <- ler.deferred.map(_.flatMap(access.transition(_))).getOrElse(Async[F].unit)
     } yield ()
   }
 
-  def eventWithAccess(name: Symbol, phase: EventPhase = Bubbling)(f: Access => LegacyEventResult[F, S]): Event = {
-    Event(name, phase, access => provideEventResult(f(new LegacyAccess[F, S, M](access)), access))
+  def eventWithAccess(name: Symbol,
+                      phase: EventPhase = Bubbling,
+                      policy: Event.Policy = Event.Policy.Default)
+                     (f: Access => LegacyEventResult[F, S]): Event = {
+    Event(name, phase, access => provideEventResult(f(new LegacyAccess[F, S, M](access)), access), policy)
   }
 
-  def event(name: Symbol, phase: EventPhase = Bubbling)(ler: => LegacyEventResult[F, S]): Event = {
-    Event(name, phase, access => provideEventResult(ler, access))
+  def event(name: Symbol,
+            phase: EventPhase = Bubbling,
+            policy: Event.Policy = Event.Policy.Default)
+           (ler: => LegacyEventResult[F, S]): Event = {
+    Event(name, phase, access => provideEventResult(ler, access), policy)
   }
 
   def immediateTransition(transition: Transition): LegacyEventResult[F, S] =
@@ -59,9 +65,7 @@ final class ApplicationContext[F[+ _]: Async, S: StateSerializer: StateDeseriali
   /**
     * This is an immediateTransition return same state
     */
-  def noTransition: LegacyEventResult[F, S] = immediateTransition {
-    case anyState => anyState
-  }
+  def noTransition: LegacyEventResult[F, S] = immediateTransition(identity)
 
   val emptyTransition: PartialFunction[S, S] = { case x => x }
 

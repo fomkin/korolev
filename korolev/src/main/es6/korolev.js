@@ -45,21 +45,41 @@ export class Korolev {
     /** @type {Array} */
     this.eventData = [];
 
-    this.listenRoot = (name, preventDefault) => {
+    this.listenRoot = (name, prevent) => {
       var listener = (event) => {
-        if (event.target.vId) {
+        var classMatches = !prevent['class'] || event.target.classList.contains(prevent['class']);
+
+        if (classMatches && event.target.vId) {
+
+          var isPrevented = (preventProp) => {
+            var predicateBody = prevent[preventProp];
+            if (predicateBody) {
+              var predicate = eval(`event => ${predicateBody}`);
+              return predicate(event);
+            } else {
+              return false;
+            }
+          };
+
+          var preventDefault = isPrevented('preventDefault');
+          var preventSend = isPrevented('preventSend');
+
           if (preventDefault) {
             event.preventDefault();
           }
+
           this.eventData[this.renderNum] = event;
-          this.callback(CallbackType.DOM_EVENT, this.renderNum + ':' + event.target.vId + ':' + event.type);
+
+          if (!preventSend) {
+            this.callback(CallbackType.DOM_EVENT, this.renderNum + ':' + event.target.vId + ':' + event.type);
+          }
         }
       };
       this.root.addEventListener(name, listener);
       this.rootListeners.push({ 'listener': listener, 'type': name });
     };
 
-    this.listenRoot('submit', true);
+    this.listenRoot('submit', {});
 
     this.historyHandler = (/** @type {Event} */ event) => {
       if (event.state === null) callback(CallbackType.HISTORY, this.initialPath);
@@ -108,10 +128,10 @@ export class Korolev {
 
    /**
     * @param {string} type
-    * @param {boolean} preventDefault
+    * @param {string} prevent
     */
-  listenEvent(type, preventDefault) {
-    this.listenRoot(type, preventDefault);
+  listenEvent(type, prevent) {
+    this.listenRoot(type, JSON.parse(prevent));
   }
 
   /**
@@ -360,7 +380,7 @@ export class Korolev {
       switch (typeof value) {
         case 'string':
         case 'number':
-        case 'boolean': result[propertyName] = value; break;          break;
+        case 'boolean': result[propertyName] = value; break;
         default: // do nothing
       }
     }

@@ -108,7 +108,7 @@ final class ComponentInstance
 
     def sessionId: F[QualifiedSessionId] = async.pure(self.sessionId)
 
-    def transition(f: Transition[CS]): F[Unit] = applyTransition(f)
+    def transition(f: Transition[CS], silent: Boolean): F[Unit] = applyTransition(f, silent)
 
     def downloadFormData(element: ElementId[F, CS, E]): FormDataDownloader[F, CS] = new FormDataDownloader[F, CS] {
 
@@ -193,10 +193,10 @@ final class ComponentInstance
       def addTextNode(text: String): Unit = rc.addTextNode(text)
       def addMisc(misc: Effect[F, CS, E]): Unit = {
         misc match {
-          case event @ Event(eventType, phase, _) =>
+          case event @ Event(eventType, phase, _, policy) =>
             val id = rc.currentContainerId
             events.put(EventId(id, eventType.name, phase), event)
-            eventRegistry.registerEventType(event.`type`)
+            eventRegistry.registerEventType(eventType, policy)
           case element: ElementId[F, CS, E] =>
             val id = rc.currentContainerId
             elements.put(element, id)
@@ -238,7 +238,7 @@ final class ComponentInstance
     node(proxy)
   }
 
-  def applyTransition(transition: Transition[CS]): F[Unit] = {
+  def applyTransition(transition: Transition[CS], silent: Boolean = false): F[Unit] = {
     def runTransition(transition: Transition[CS], promise: Promise[F, Unit]): Unit = {
       transitionInProgress = true
       stateManager.read[CS](nodeId) flatMap { maybeState =>
@@ -246,7 +246,9 @@ final class ComponentInstance
         try {
           val newState = transition(state)
           stateManager.write(nodeId, newState).map { _ =>
-            stateChangeSubscribers.foreach(_.apply(nodeId, state))
+            if (!silent) {
+              stateChangeSubscribers.foreach(_.apply(nodeId, state))
+            }
           }
         } catch {
           case e: MatchError =>

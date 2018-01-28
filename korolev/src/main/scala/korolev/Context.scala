@@ -5,6 +5,7 @@ import korolev.state.{StateDeserializer, StateManager, StateSerializer}
 import levsha._
 import levsha.events.EventPhase
 
+import scala.collection.mutable
 import scala.concurrent.duration.FiniteDuration
 
 /**
@@ -39,9 +40,11 @@ final class Context[F[+_]: Async, S: StateSerializer: StateDeserializer, M] {
   def delay(duration: FiniteDuration)(effect: Access => F[Unit]): Delay[F, S, M] =
     Delay(duration, effect)
 
-  def event(name: Symbol, phase: EventPhase = Bubbling)(
+  def event(name: Symbol,
+            phase: EventPhase = Bubbling,
+            policy: Event.Policy = Event.Policy.Default)(
       effect: Access => F[Unit]): Event =
-    Event(name, phase, effect)
+    Event(name, phase, effect, policy)
 
   val emptyTransition: PartialFunction[S, S] = { case x => x }
 
@@ -144,12 +147,12 @@ object Context {
     /**
       * Applies transition to current state
       */
-    def transition(f: Transition[S]): F[Unit]
+    def transition(f: Transition[S], silent: Boolean = false): F[Unit]
 
     /**
       * Applies transition to current state.
       */
-    def maybeTransition(f: PartialFunction[S, S]): F[Unit] = transition(f)
+    def maybeTransition(f: PartialFunction[S, S], silent: Boolean = false): F[Unit] = transition(f, silent)
 
     /**
       * Gives current session id.
@@ -210,7 +213,78 @@ object Context {
   final case class Event[F[+_]: Async, S, M](
       `type`: Symbol,
       phase: EventPhase,
-      effect: Access[F, S, M] => F[Unit]) extends Effect[F, S, M]
+      effect: Access[F, S, M] => F[Unit],
+      policy: Event.Policy) extends Effect[F, S, M]
+
+  object Event {
+
+    /**
+      * Event handling policy.
+      * @param className if set, will apply only for events whose targets contain class;
+      *                  required to apply different policies for same event type,
+      *                  otherwise the first registered policy will be used
+      * @param preventDefault DOM event `preventDefault` setting
+      * @param preventSend DOM event server notification setting
+      */
+    case class Policy(className: Option[String] = None,
+                      preventDefault: Prevent = Prevent.False,
+                      preventSend: Prevent = Prevent.False) {
+
+      def serialize: String = {
+        val b = new mutable.ListBuffer[String]
+
+        className.foreach { className =>
+          b += s""""class":"$className""""
+        }
+
+        if (preventDefault != Prevent.Static(false)) {
+          b += s""""preventDefault":"${preventDefault.serialize}""""
+        }
+
+        if (preventSend != Prevent.Static(false)) {
+          b.append(s""""preventSend":"${preventSend.serialize}"""")
+        }
+
+        b.mkString("{", ",", "}")
+      }
+    }
+
+    object Policy {
+      val Default = Policy()
+    }
+
+    /**
+      * Event prevention.
+      * Can specify statically or dynamically (by applying to event object on client-side),
+      * whether a specific event should be prevented.
+      */
+    sealed trait Prevent {
+
+      def serialize: String =
+        fold(_.toString, identity)
+
+      def fold[T](onStatic: Boolean => T, onDynamic: String => T): T =
+        this match {
+          case Prevent.Static(prevent) => onStatic(prevent)
+          case Prevent.Dynamic(jsPredicate) => onDynamic(jsPredicate)
+        }
+
+    }
+
+    object Prevent {
+      val True = Static(true)
+      val False = Static(false)
+
+      case class Static(prevent: Boolean) extends Prevent
+
+      /**
+        * Determine whether event should be prevented dynamically.
+        * @param jsPredicate JavaScript code of a predicate body from `event` to boolean value,
+        *                    e.g. `event.key === 'Enter'`
+        */
+      case class Dynamic(jsPredicate: String) extends Prevent
+    }
+  }
 
   final case class Delay[F[+_]: Async, S, M](
       duration: FiniteDuration,
