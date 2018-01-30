@@ -68,8 +68,8 @@ export class Korolev {
 
     this.windowHandler = (/** @type {Event} */ event) => {
       // 1 - event for top level element only ('body)
-      this.eventData[1] = event.target;
-      callback(CallbackType.DOM_EVENT, '1:1:' + event.type);
+      this.eventData[this.renderNum] = event.target;
+      callback(CallbackType.DOM_EVENT, this.renderNum + ':' + 1 + ':' + event.type);
     };
 
     window.addEventListener('popstate', this.historyHandler);
