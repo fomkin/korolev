@@ -66,7 +66,14 @@ export class Korolev {
       else callback(CallbackType.HISTORY, event.state);
     };
 
+    this.windowHandler = (/** @type {Event} */ event) => {
+      // 1 - event for top level element only ('body)
+      this.eventData[this.renderNum] = event.target;
+      callback(CallbackType.DOM_EVENT, this.renderNum + ':' + 1 + ':' + event.type);
+    };
+
     window.addEventListener('popstate', this.historyHandler);
+    window.addEventListener('resize', this.windowHandler);
   }
   
   destroy() {
@@ -74,6 +81,7 @@ export class Korolev {
     this.rootListeners.forEach((o) => this.root.removeEventListener(o.type, o.listener));
     // Remove popstate handler
     window.removeEventListener('popstate', this.historyHandler);
+    window.removeEventListener('resize', this.windowHandler);
   }
   
   /** @param {number} n */
