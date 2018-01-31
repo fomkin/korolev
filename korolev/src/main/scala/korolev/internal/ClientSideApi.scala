@@ -4,6 +4,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 import korolev.{Async, Router}
 import korolev.Async._
+import korolev.Context.Event
 import korolev.Router.Path
 import levsha.Id
 import levsha.impl.DiffRenderContext.ChangesPerformer
@@ -52,8 +53,8 @@ final class ClientSideApi[F[+ _]: Async](connection: Connection[F])
     this.onFormDataProgress = onFormDataProgress
   }
 
-  def listenEvent(name: String, preventDefault: Boolean): Unit =
-    connection.send(Procedure.ListenEvent.code, name, preventDefault)
+  def listenEvent(name: String, policy: Event.Policy): Unit =
+    connection.send(Procedure.ListenEvent.code, name, policy.serialize)
 
   def uploadForm(id: Id, descriptor: String): Unit =
     connection.send(Procedure.UploadForm.code, id.mkString, descriptor)

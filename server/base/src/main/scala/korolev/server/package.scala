@@ -157,7 +157,7 @@ package object server extends LazyLogging {
           stateManager, initialState,
           config.render, router, fromScratch = isNew
         )
-        applyTransition = korolev.topLevelComponentInstance.applyTransition _
+        applyTransition = korolev.topLevelComponentInstance.applyTransition(_: Transition[S])
         env <- config.envConfigurator.configure(deviceId, sessionId, applyTransition)
       } yield {
 
