@@ -56,6 +56,7 @@ package object server extends LazyLogging {
         val dsl = new levsha.TemplateDsl[Context.Effect[F, S, M]]()
         val textRenderContext = new HtmlRenderContext[F, S, M]()
         val rootPath = config.serverRouter.rootPath
+        val heartbeatPeriod = config.heartbeatPeriod
         val clw = {
           val textRenderContext = new HtmlRenderContext[F, S, M]()
           config.connectionLostWidget(textRenderContext)
@@ -64,9 +65,10 @@ package object server extends LazyLogging {
 
         import dsl._
 
+        val kfg = s"window['kfg']={sid:'$sessionId',r:'$rootPath',clw:'$clw',heartbeatPeriod:$heartbeatPeriod}"
         val document = 'html(
           'head(
-            'script('language /= "javascript", s"window['kfg']={sid:'$sessionId',r:'$rootPath',clw:'$clw'}"),
+            'script('language /= "javascript", kfg),
             'script('src /= config.serverRouter.rootPath + "korolev-client.min.js"),
             config.head
           ),

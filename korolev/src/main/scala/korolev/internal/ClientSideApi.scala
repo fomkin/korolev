@@ -162,6 +162,8 @@ final class ClientSideApi[F[+ _]: Async](connection: Connection[F])
             .foreach(_.complete(result))
         case CallbackType.History.code =>
           onHistory(Router.Path.fromString(args))
+        case CallbackType.Heartbeat.code =>
+          // Client is still alive, keep working hard
       }
       onReceive()
     case Failure(e) =>
@@ -228,8 +230,9 @@ object ClientSideApi {
     case object FormDataProgress extends CallbackType(1) // `$descriptor:$loaded:$total`
     case object ExtractPropertyResponse extends CallbackType(2) // `$descriptor:$value`
     case object History extends CallbackType(3) // URL
+    case object Heartbeat extends CallbackType(4) // Client side keep-alive messages
 
-    final val All = Set(DomEvent, FormDataProgress, ExtractPropertyResponse, History)
+    final val All = Set(DomEvent, FormDataProgress, ExtractPropertyResponse, History, Heartbeat)
 
     def apply(n: Int): Option[CallbackType] =
       All.find(_.code == n)

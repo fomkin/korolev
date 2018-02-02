@@ -16,7 +16,8 @@ case class KorolevServiceConfig[F[+_]: Async, S, M](
   envConfigurator: EnvConfigurator[F, S, M] =
     (_: String, _: String, _: ApplyTransition[F, S]) =>
       Env(onDestroy = () => (), PartialFunction.empty),
-  idGenerator: IdGenerator[F] = IdGenerator.default[F]()
+  idGenerator: IdGenerator[F] = IdGenerator.default[F](),
+  heartbeatPeriod: Int = 5000
 )
 
 object KorolevServiceConfig {

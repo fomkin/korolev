@@ -5,7 +5,8 @@ export const CallbackType = {
   DOM_EVENT: 0, // `$renderNum:$elementId:$eventType`
   FORM_DATA_PROGRESS: 1, // `$descriptor:$loaded:$total`
   EXTRACT_PROPERTY_RESPONSE: 2, // `$descriptor:$value`
-  HISTORY: 3  // URL
+  HISTORY: 3, // URL
+  HEARTBEAT: 4 // Client side keep-alive messages
 };
 
 export const PropertyType = {
