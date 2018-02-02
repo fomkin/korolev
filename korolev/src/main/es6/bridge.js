@@ -17,6 +17,15 @@ export class Bridge {
     this._messageHandler = this._onMessage.bind(this);
 
     connection.dispatcher.addEventListener("message", this._messageHandler);
+
+    !function(cn, ping, cfg) {
+      var period = parseInt(cfg['heartbeatPeriod'], 10)
+      if (period > 0) {
+        setInterval(function () {
+          ping(CallbackType.HEARTBEAT, "beep")
+        }, period)
+      }
+    }(this._connection, this._onCallback.bind(this), config)
   }
 
   /**
