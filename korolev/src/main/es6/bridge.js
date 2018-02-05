@@ -17,6 +17,12 @@ export class Bridge {
     this._messageHandler = this._onMessage.bind(this);
 
     connection.dispatcher.addEventListener("message", this._messageHandler);
+
+    let interval = parseInt(config['heartbeatInterval'], 10);
+
+    if (interval > 0) {
+      setInterval(() => this._onCallback(CallbackType.HEARTBEAT, "beep"), interval)
+    }
   }
 
   /**

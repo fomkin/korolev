@@ -273,8 +273,9 @@ object ClientSideApi {
     case object History extends CallbackType(3) // URL
     case object EvalJsResponse extends CallbackType(4) // `$descriptor:$status:$value`
     case object ExtractEventDataResponse extends CallbackType(5) // `$descriptor:$dataJson`
+    case object Heartbeat extends CallbackType(6) // `$descriptor:$anyvalue`
 
-    final val All = Set(DomEvent, FormDataProgress, ExtractPropertyResponse, History, EvalJsResponse, ExtractEventDataResponse)
+    final val All = Set(DomEvent, FormDataProgress, ExtractPropertyResponse, History, EvalJsResponse, ExtractEventDataResponse, Heartbeat)
 
     def apply(n: Int): Option[CallbackType] =
       All.find(_.code == n)

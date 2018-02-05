@@ -15,7 +15,6 @@ import org.http4s.blaze.pipeline.{Command, LeafBuilder}
 import org.http4s.websocket.WebsocketBits._
 
 import scala.concurrent.Promise
-import scala.concurrent.duration._
 
 package object blazeServer {
 
@@ -75,7 +74,7 @@ package object blazeServer {
           HttpResponse(status.code, status.phrase, responseHeaders, ByteBuffer.wrap(body))
         case KorolevResponse.WebSocket(publish, subscribe, destroy) =>
           val stage = new WebSocketStage {
-            val stopHeartbeat = Scheduler[F].schedule(5.seconds) {
+            val stopHeartbeat = Scheduler[F].schedule(config.heartbeatInterval) {
               channelWrite(Ping())
             }
             def destroyAndStopTimer(): Unit = {

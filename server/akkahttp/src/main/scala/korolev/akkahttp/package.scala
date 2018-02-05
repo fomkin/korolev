@@ -16,7 +16,6 @@ import korolev.execution.defaultExecutor
 import korolev.server.{KorolevService, KorolevServiceConfig, MimeTypes, Request => KorolevRequest, Response => KorolevResponse}
 import korolev.state.{StateDeserializer, StateSerializer}
 
-import scala.concurrent.duration._
 import scala.concurrent.{Future, Promise}
 
 package object akkahttp {
@@ -28,18 +27,18 @@ package object akkahttp {
       (implicit actorSystem: ActorSystem, materializer: Materializer): AkkaHttpService = { akkaHttpConfig =>
     val korolevServer = korolev.server.korolevService(mimeTypes, config)
 
-    webSocketRoute(korolevServer, akkaHttpConfig) ~
+    webSocketRoute(korolevServer, akkaHttpConfig, config) ~
       httpGetRoute(korolevServer) ~
       httpPostRoute(korolevServer)
   }
 
-  private val KeepAliveInterval = 5.seconds
   private val KeepAliveMessage = TextMessage("[9]")
 
-  private def webSocketRoute[F[+_]: Async](korolevServer: KorolevService[F],
-                                           akkaHttpConfig: AkkaHttpServerConfig)
-                                          (implicit actorSystem: ActorSystem,
-                                                    materializer: Materializer): Route =
+  private def webSocketRoute[F[+_]: Async, S: StateSerializer: StateDeserializer, M]
+      (korolevServer: KorolevService[F],
+       akkaHttpConfig: AkkaHttpServerConfig,
+       korolevServiceConfig: KorolevServiceConfig[F, S, M])
+      (implicit actorSystem: ActorSystem, materializer: Materializer): Route =
     extractRequest { request =>
       extractUnmatchedPath { path =>
         extractUpgradeToWebSocket { upgrade =>
@@ -58,7 +57,7 @@ package object akkahttp {
                       actorRef ! TextMessage(message)
                     }
                   }
-                  .keepAlive(KeepAliveInterval, () => KeepAliveMessage)
+                  .keepAlive(korolevServiceConfig.heartbeatInterval, () => KeepAliveMessage)
 
               complete(upgrade.handleMessagesWithSinkSource(in, out))
             case _ =>
