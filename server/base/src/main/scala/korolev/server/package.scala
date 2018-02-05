@@ -60,12 +60,14 @@ package object server extends LazyLogging {
           config.connectionLostWidget(textRenderContext)
           textRenderContext.mkString
         }
+        val heartbeatInterval = config.heartbeatInterval.toMillis
 
         import dsl._
 
+        val kfg = s"window['kfg']={sid:'$sessionId',r:'$rootPath',clw:'$clw',heartbeatInterval:$heartbeatInterval}"
         val document = 'html(
           'head(
-            'script('language /= "javascript", s"window['kfg']={sid:'$sessionId',r:'$rootPath',clw:'$clw'}"),
+            'script('language /= "javascript", kfg),
             'script('src /= config.rootPath + "korolev-client.min.js"),
             config.head
           ),

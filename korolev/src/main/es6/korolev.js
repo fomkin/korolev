@@ -7,7 +7,8 @@ export const CallbackType = {
   EXTRACT_PROPERTY_RESPONSE: 2, // `$descriptor:$propertyType:$value`
   HISTORY: 3, // URL
   EVALJS_RESPONSE: 4, // `$descriptor:$status:$value`
-  EXTRACT_EVENT_DATA_RESPONSE: 5 // `$descriptor:$dataJson`
+  EXTRACT_EVENT_DATA_RESPONSE: 5, // `$descriptor:$dataJson`
+  HEARTBEAT: 6 // `$descriptor:$anyvalue`
 };
 
 /** @enum {number} */
