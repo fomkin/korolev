@@ -56,7 +56,7 @@ package object server extends LazyLogging {
         val dsl = new levsha.TemplateDsl[Context.Effect[F, S, M]]()
         val textRenderContext = new HtmlRenderContext[F, S, M]()
         val rootPath = config.serverRouter.rootPath
-        val heartbeatPeriod = config.heartbeatPeriod
+        val keepAliveInterval = config.keepAliveInterval.toMillis
         val clw = {
           val textRenderContext = new HtmlRenderContext[F, S, M]()
           config.connectionLostWidget(textRenderContext)
@@ -65,7 +65,7 @@ package object server extends LazyLogging {
 
         import dsl._
 
-        val kfg = s"window['kfg']={sid:'$sessionId',r:'$rootPath',clw:'$clw',heartbeatPeriod:$heartbeatPeriod}"
+        val kfg = s"window['kfg']={sid:'$sessionId',r:'$rootPath',clw:'$clw',keepAliveInterval:$keepAliveInterval}"
         val document = 'html(
           'head(
             'script('language /= "javascript", kfg),

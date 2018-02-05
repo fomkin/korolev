@@ -4,6 +4,7 @@ import korolev.server.KorolevServiceConfig.{ApplyTransition, Env, EnvConfigurato
 import korolev.state.IdGenerator
 import korolev.{Async, Context, Transition}
 import levsha.{Document, TemplateDsl}
+import scala.concurrent.duration._
 
 case class KorolevServiceConfig[F[+_]: Async, S, M](
   stateStorage: korolev.state.StateStorage[F, S],
@@ -17,7 +18,7 @@ case class KorolevServiceConfig[F[+_]: Async, S, M](
     (_: String, _: String, _: ApplyTransition[F, S]) =>
       Env(onDestroy = () => (), PartialFunction.empty),
   idGenerator: IdGenerator[F] = IdGenerator.default[F](),
-  heartbeatPeriod: Int = 5000
+  keepAliveInterval: FiniteDuration = 5.seconds
 )
 
 object KorolevServiceConfig {

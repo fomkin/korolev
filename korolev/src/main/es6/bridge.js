@@ -18,14 +18,14 @@ export class Bridge {
 
     connection.dispatcher.addEventListener("message", this._messageHandler);
 
-    !function(cn, ping, cfg) {
-      var period = parseInt(cfg['heartbeatPeriod'], 10)
+    ((cn, ping, cfg) => {
+      const period = parseInt(cfg['keepAliveInterval'], 10)
       if (period > 0) {
-        setInterval(function () {
+        setInterval(() => {
           ping(CallbackType.HEARTBEAT, "beep")
         }, period)
       }
-    }(this._connection, this._onCallback.bind(this), config)
+    })(this._connection, this._onCallback.bind(this), config)
   }
 
   /**
