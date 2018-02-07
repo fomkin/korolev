@@ -59,9 +59,7 @@ final class ApplicationContext[F[+ _]: Async, S: StateSerializer: StateDeseriali
   /**
     * This is an immediateTransition return same state
     */
-  def noTransition: LegacyEventResult[F, S] = immediateTransition {
-    case anyState => anyState
-  }
+  def noTransition: LegacyEventResult[F, S] = immediateTransition(identity)
 
   val emptyTransition: PartialFunction[S, S] = { case x => x }
 

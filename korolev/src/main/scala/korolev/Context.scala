@@ -65,10 +65,7 @@ object Context {
     */
   def apply[F[+_]: Async, S: StateSerializer: StateDeserializer, M] = new Context[F, S, M]()
 
-  /**
-    * Provides access to make side effects
-    */
-  abstract class Access[F[+_]: Async, S, M] {
+  trait BaseAccess[F[+_], S, M] {
 
     /**
       * Extracts property of element from client-side DOM.
@@ -164,6 +161,10 @@ object Context {
       */
     def evalJs(code: String): F[String]
 
+  }
+
+  trait EventAccess[F[+_], S, M] {
+
     /**
       * Gives json with string, number and boolean fields of
       * object of the event happened in current render phase.
@@ -171,7 +172,13 @@ object Context {
       * network round trip.
       */
     def eventData: F[String]
+
   }
+
+  /**
+    * Provides access to make side effects
+    */
+  abstract class Access[F[+_]: Async, S, M] extends BaseAccess[F, S, M] with EventAccess[F, S, M]
 
   sealed abstract class Effect[F[+_]: Async, S, M]
 

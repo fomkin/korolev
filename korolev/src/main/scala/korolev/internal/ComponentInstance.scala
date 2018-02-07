@@ -64,7 +64,7 @@ final class ComponentInstance
   @volatile private var eventSubscription = Option.empty[E => _]
   @volatile private var transitionInProgress = false
 
-  private object browserAccess extends Access[F, CS, E] {
+  private[korolev] object browserAccess extends Access[F, CS, E] {
 
     private def noElementException[T]: F[T] = {
       val exception = new Exception("No element matched for accessor")

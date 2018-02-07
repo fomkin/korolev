@@ -1,11 +1,11 @@
 package korolev.state
 
 import korolev.state.EnvConfigurator.Env
-import korolev.{Async, Transition}
+import korolev.{Async, Context}
 
 trait EnvConfigurator[F[+_], S, M] {
 
-  def configure(deviceId: DeviceId, sessionId: SessionId, applyTransition: Transition[S] => F[Unit])
+  def configure(access: Context.BaseAccess[F, S, M])
                (implicit F: Async[F]): F[Env[F, M]]
 
 }
@@ -18,19 +18,15 @@ object EnvConfigurator {
   def default[F[+_], S, M]: EnvConfigurator[F, S, M] =
     new DefaultEnvConfigurator
 
-  def apply[F[+_], S, M](f: (DeviceId, SessionId, Transition[S] => F[Unit]) => F[Env[F, M]]): EnvConfigurator[F, S, M] =
+  def apply[F[+_], S, M](f: Context.BaseAccess[F, S, M] => F[Env[F, M]]): EnvConfigurator[F, S, M] =
     new EnvConfigurator[F, S, M] {
-      override def configure(deviceId: DeviceId,
-                             sessionId: SessionId,
-                             applyTransition: Transition[S] => F[Unit])
+      override def configure(access: Context.BaseAccess[F, S, M])
                             (implicit F: Async[F]): F[Env[F, M]] =
-        f(deviceId, sessionId, applyTransition)
+        f(access)
     }
 
   private class DefaultEnvConfigurator[F[+_], S, M] extends EnvConfigurator[F, S, M] {
-    override def configure(deviceId: DeviceId,
-                           sessionId: SessionId,
-                           applyTransition: Transition[S] => F[Unit])
+    override def configure(access: Context.BaseAccess[F, S, M])
                           (implicit F: Async[F]): F[Env[F, M]] =
       Async[F].pure(Env(onDestroy = () => Async[F].unit, PartialFunction.empty))
   }
