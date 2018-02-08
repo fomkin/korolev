@@ -155,11 +155,14 @@ final class ClientSideApi[F[+ _]: Async](connection: Connection[F])
 
   private def onReceive(): Unit = connection.received.run {
     case Success(json) =>
-      val Array(callbackType, dirtyArgs) = json
+      val tokens = json
         .substring(1, json.length - 1) // remove brackets
         .split(",", 2) // split to tokens
-      val args = dirtyArgs
-        .substring(1, dirtyArgs.length - 1) // remove ""
+      val callbackType = tokens(0)
+      val args =
+        if (tokens.length > 1) tokens(1).substring(1, tokens(1).length - 1) // remove ""
+        else ""
+
       callbackType.toInt match {
         case CallbackType.DomEvent.code =>
           val Array(renderNum, target, tpe) = args.split(':')

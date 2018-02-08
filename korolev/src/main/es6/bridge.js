@@ -21,16 +21,16 @@ export class Bridge {
     let interval = parseInt(config['heartbeatInterval'], 10);
 
     if (interval > 0) {
-      setInterval(() => this._onCallback(CallbackType.HEARTBEAT, "beep"), interval)
+      setInterval(() => this._onCallback(CallbackType.HEARTBEAT), interval);
     }
   }
 
   /**
    * @param {CallbackType} type
-   * @param {string} args
+   * @param {string} [args]
    */
   _onCallback(type, args) {
-    let message = JSON.stringify([type, args]);
+    let message = JSON.stringify(args !== undefined ? [type, args] : [type]);
     if (protocolDebugEnabled)
       console.log('<-', message);
     this._connection.send(message);

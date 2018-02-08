@@ -62,5 +62,7 @@ From the client to the server
 0. DOM Event. Data: `$renderNum:$elementId:$eventType`
 1. FormData progress. Data: `$descriptor:$loaded:$total` 
 2. ExtractProperty response. Data:`$descriptor:$type:$value`
-3. History Event. Data: URL 
-4. ExtractEventData response. Data: `$descriptor:$dataJson`
+3. History Event. Data: URL
+4. EvalJs response. Data: `$descriptor:$dataJson` 
+5. ExtractEventData response. Data: `$descriptor:$dataJson`
+6. Heartbeat. Data: `$descriptor` 

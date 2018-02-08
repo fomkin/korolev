@@ -8,7 +8,7 @@ export const CallbackType = {
   HISTORY: 3, // URL
   EVALJS_RESPONSE: 4, // `$descriptor:$status:$value`
   EXTRACT_EVENT_DATA_RESPONSE: 5, // `$descriptor:$dataJson`
-  HEARTBEAT: 6 // `$descriptor:$anyvalue`
+  HEARTBEAT: 6 // `$descriptor`
 };
 
 /** @enum {number} */
