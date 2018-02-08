@@ -30,7 +30,7 @@ final class ApplicationContext[F[+ _]: Async, S: StateSerializer: StateDeseriali
   val symbolDsl = new KorolevTemplateDsl[F, S, M]()
   val modern = new Context[F, S, M]()
 
-  def elementId = new Context.ElementId[F, S, M]()
+  def elementId(name: Option[String] = None) = new Context.ElementId[F, S, M](name)
 
   def delay(duration: FiniteDuration)(f: Transition): Delay[F, S, M] =
     Delay(duration, access => access.transition(f))

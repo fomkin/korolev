@@ -144,7 +144,7 @@ object StateStorage {
 
     val snapshot: F[StateManager.Snapshot] = Async[F].pureStrict {
       new StateManager.Snapshot {
-        def apply[T: StateDeserializer](nodeId: Id) =           try {
+        def apply[T: StateDeserializer](nodeId: Id): Option[T] = try {
           cache
             .get(nodeId)
             .asInstanceOf[Option[T]]

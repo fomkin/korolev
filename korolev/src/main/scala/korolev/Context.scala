@@ -30,7 +30,7 @@ final class Context[F[+_]: Async, S: StateSerializer: StateDeserializer, M] {
   @deprecated("This is compatibility layer for old fashioned API. Use Context instead.", "0.6.0")
   lazy val legacy = new ApplicationContext[F, S, M]
 
-  def elementId(): ElementId = new Context.ElementId[F, S, M]()
+  def elementId(name: Option[String] = None): ElementId = new Context.ElementId[F, S, M](name)
 
   /**
     * Schedules the transition with delay. For example it can be useful
@@ -139,7 +139,7 @@ object Context {
     def state: F[S]
 
     /**
-      * Applies transition to current state
+      * Applies transition to current state.
       */
     def transition(f: Transition[S]): F[Unit]
 
@@ -223,5 +223,12 @@ object Context {
       duration: FiniteDuration,
       effect: Access[F, S, M] => F[Unit]) extends Effect[F, S, M]
 
-  final class ElementId[F[+_]: Async, S, M] extends Effect[F, S, M]
+  final class ElementId[F[+_]: Async, S, M](val name: Option[String]) extends Effect[F, S, M] {
+    override def equals(obj: Any): Boolean = obj match {
+      case other: ElementId[F, S, M] => if (name.isDefined) name == other.name else super.equals(other)
+      case _ => false
+    }
+
+    override def hashCode(): Int = if (name.isDefined) name.hashCode() else super.hashCode()
+  }
 }
