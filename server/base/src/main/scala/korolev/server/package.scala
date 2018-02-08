@@ -6,7 +6,7 @@ import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 
 import korolev.Async._
 import korolev.internal.{ApplicationInstance, Connection}
-import korolev.state.{DeviceId, SessionId, StateDeserializer, StateSerializer}
+import korolev.state._
 import levsha.Id
 import slogging.LazyLogging
 
@@ -36,6 +36,12 @@ package object server extends LazyLogging {
 
     val sessions = TrieMap.empty[String, KorolevSession[F]]
 
+    def getOrCreateStateManager(deviceId: DeviceId, sessionId: SessionId): F[(StateManager[F], Boolean)] =
+      for {
+        maybeStateManager <- config.stateStorage.get(deviceId, sessionId)
+        stateManager <- maybeStateManager.fold(config.stateStorage.create(deviceId, sessionId))(Async[F].pure(_))
+      } yield (stateManager, maybeStateManager.isEmpty)
+
     def renderStatic(request: Request): F[Response] =
       for {
         deviceId <- deviceFromRequest(request)
@@ -45,10 +51,8 @@ package object server extends LazyLogging {
           .lift((None, request.path))
           .getOrElse(config.stateStorage.createTopLevelState(deviceId))
           .flatMap { state =>
-            config.stateStorage.create(deviceId, sessionId).flatMap { manager =>
-              manager.write(Id.TopLevel, state).map { _ =>
-                state
-              }
+            getOrCreateStateManager(deviceId, sessionId).map(_._1).flatMap { manager =>
+              manager.write(Id.TopLevel, state).map(_ => state)
             }
           }
       } yield {
@@ -146,9 +150,8 @@ package object server extends LazyLogging {
       val connection = new Connection[F]()
 
       for {
-        maybeStateManager <- config.stateStorage.get(deviceId, sessionId)
-        stateManager <- maybeStateManager.fold(config.stateStorage.create(deviceId, sessionId))(Async[F].pure(_))
-        isNew = maybeStateManager.isEmpty
+        stateManagerIsNew <- getOrCreateStateManager(deviceId, sessionId)
+        (stateManager, isNew) = stateManagerIsNew
         initialState <- config.stateStorage.createTopLevelState(deviceId)
 
         // Create Korolev with dynamic router
@@ -187,14 +190,24 @@ package object server extends LazyLogging {
           }
 
           def destroy(): F[Unit] = {
-            if (aliveRef.getAndSet(false)) {
-              currentPromise.get() foreach { promise =>
-                promise.complete(Failure(new SessionDestroyedException("Session has been closed")))
-              }
+            if (aliveRef.getAndSet(false))
               env.onDestroy()
-              sessions.remove(sessionKey)
-            }
-            Async[F].unit
+                .recover {
+                  case ex: Throwable =>
+                    logger.error("Error destroying environment", ex)
+                    ()
+                }
+                .map { _ =>
+                  currentPromise.get() foreach { promise =>
+                    promise.complete(Failure(new SessionDestroyedException("Session has been closed")))
+                  }
+
+                  config.stateStorage.remove(deviceId, sessionId)
+                  sessions.remove(sessionKey)
+
+                  ()
+                }
+            else Async[F].unit
           }
         }
       }

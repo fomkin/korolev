@@ -24,6 +24,8 @@ abstract class StateStorage[F[+_]: Async, S] {
     * @return Future with result if session already exists
     */
   def get(deviceId: DeviceId, sessionId: SessionId): F[Option[StateManager[F]]]
+
+  def remove(deviceId: DeviceId, sessionId: SessionId): Unit
 }
 
 object StateStorage {
@@ -66,7 +68,7 @@ object StateStorage {
   private class DefaultStateStorage[F[+_]: Async, S: StateSerializer]
       (val createTopLevelState: String => F[S]) extends StateStorage[F, S] {
 
-    val cache = TrieMap.empty[String, StateManager[F]]
+    private val cache = TrieMap.empty[String, StateManager[F]]
 
     def mkKey(deviceId: DeviceId, sessionId: SessionId): String = {
       s"$deviceId-$sessionId"
@@ -87,6 +89,11 @@ object StateStorage {
       }
       cache.put(key, sm)
       Async[F].pure(sm)
+    }
+
+    override def remove(deviceId: DeviceId, sessionId: SessionId): Unit = {
+      cache.remove(mkKey(deviceId, sessionId))
+      ()
     }
   }
 
