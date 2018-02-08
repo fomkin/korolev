@@ -159,8 +159,7 @@ package object server extends LazyLogging {
           stateManager, initialState,
           config.render, router, fromScratch = isNew
         )
-        applyTransition = korolev.topLevelComponentInstance.applyTransition _
-        env <- config.envConfigurator.configure(deviceId, sessionId, applyTransition)
+        env <- config.envConfigurator.configure(korolev.topLevelComponentInstance.browserAccess)
       } yield {
 
         // Subscribe to events to publish them to env

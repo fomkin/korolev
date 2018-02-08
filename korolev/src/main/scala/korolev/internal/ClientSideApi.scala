@@ -194,6 +194,8 @@ final class ClientSideApi[F[+ _]: Async](connection: Connection[F])
                   promise.complete(Failure(ClientSideException("JavaScript evaluation error")))
               }
             }
+        case CallbackType.Heartbeat.code =>
+          // ignore
       }
       onReceive()
     case Failure(e) =>

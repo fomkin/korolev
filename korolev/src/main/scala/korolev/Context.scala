@@ -30,7 +30,7 @@ final class Context[F[+_]: Async, S: StateSerializer: StateDeserializer, M] {
   @deprecated("This is compatibility layer for old fashioned API. Use Context instead.", "0.6.0")
   lazy val legacy = new ApplicationContext[F, S, M]
 
-  def elementId(): ElementId = new Context.ElementId[F, S, M]()
+  def elementId(name: Option[String] = None): ElementId = new Context.ElementId[F, S, M](name)
 
   /**
     * Schedules the transition with delay. For example it can be useful
@@ -65,10 +65,7 @@ object Context {
     */
   def apply[F[+_]: Async, S: StateSerializer: StateDeserializer, M] = new Context[F, S, M]()
 
-  /**
-    * Provides access to make side effects
-    */
-  abstract class Access[F[+_]: Async, S, M] {
+  trait BaseAccess[F[+_], S, M] {
 
     /**
       * Extracts property of element from client-side DOM.
@@ -142,7 +139,7 @@ object Context {
     def state: F[S]
 
     /**
-      * Applies transition to current state
+      * Applies transition to current state.
       */
     def transition(f: Transition[S]): F[Unit]
 
@@ -164,6 +161,10 @@ object Context {
       */
     def evalJs(code: String): F[String]
 
+  }
+
+  trait EventAccess[F[+_], S, M] {
+
     /**
       * Gives json with string, number and boolean fields of
       * object of the event happened in current render phase.
@@ -171,7 +172,13 @@ object Context {
       * network round trip.
       */
     def eventData: F[String]
+
   }
+
+  /**
+    * Provides access to make side effects
+    */
+  abstract class Access[F[+_]: Async, S, M] extends BaseAccess[F, S, M] with EventAccess[F, S, M]
 
   sealed abstract class Effect[F[+_]: Async, S, M]
 
@@ -216,5 +223,12 @@ object Context {
       duration: FiniteDuration,
       effect: Access[F, S, M] => F[Unit]) extends Effect[F, S, M]
 
-  final class ElementId[F[+_]: Async, S, M] extends Effect[F, S, M]
+  final class ElementId[F[+_]: Async, S, M](val name: Option[String]) extends Effect[F, S, M] {
+    override def equals(obj: Any): Boolean = obj match {
+      case other: ElementId[F, S, M] => if (name.isDefined) name == other.name else super.equals(other)
+      case _ => false
+    }
+
+    override def hashCode(): Int = if (name.isDefined) name.hashCode() else super.hashCode()
+  }
 }
