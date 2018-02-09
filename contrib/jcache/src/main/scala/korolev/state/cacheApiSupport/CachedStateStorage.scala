@@ -100,6 +100,12 @@ final class CachedStateStorage[F[+_]: Async, S]
     new CachedStateManager(deviceId, sessionId)
   }
 
+
+  def remove(deviceId: DeviceId, sessionId: SessionId): Unit = {
+    cache.remove(mkKeys(deviceId, sessionId))
+    ()
+  }
+
   private def mkKeys(deviceId: DeviceId, sessionId: SessionId) = {
     s"$deviceId-$sessionId"
   }

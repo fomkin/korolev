@@ -102,9 +102,11 @@ final class ComponentInstance
       async.unit
     }
 
-    def state: F[CS] = stateManager
-      .read[CS](nodeId)
-      .map(_.get)
+    def state: F[CS] = {
+      val state = stateManager.read[CS](nodeId)
+
+      state.map(_.getOrElse(throw new RuntimeException("State is empty")))
+    }
 
     def sessionId: F[QualifiedSessionId] = async.pure(self.sessionId)
 
