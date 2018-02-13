@@ -294,7 +294,7 @@ Let's use our component in the application.
 )
 -----------------------------------
 
-https://github.com/fomkin/korolev/blob/v0.7.0/examples/component/src/main/scala/ComponentExample.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.8.0/examples/component/src/main/scala/ComponentExample.scala[See full example]
 
 === Access element properties
 
@@ -361,7 +361,7 @@ val pictureFieldName = "picture"
 
 Use `onProgress` callback to handle progress of the form downloading. Function `start` return a `FormData`. Look API documentation for more details.
 
-https://github.com/fomkin/korolev/blob/v0.7.0/examples/form-data/src/main/scala/FormDataExample.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.8.0/examples/form-data/src/main/scala/FormDataExample.scala[See full example]
 
 === Delays
 
@@ -389,7 +389,7 @@ val render: Render = {
 }
 -----------------------------------
 
-https://github.com/fomkin/korolev/blob/v0.7.0/examples/delay/src/main/scala/DelayExample.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.8.0/examples/delay/src/main/scala/DelayExample.scala[See full example]
 
 === Environment configurator
 
@@ -483,7 +483,7 @@ KorolevServiceConfig(
 )
 -------------------------------------------------------------------------------
 
-https://github.com/fomkin/korolev/blob/v0.7.0/examples/routing/src/main/scala/RoutingExample.scala#L93[See full example]
+https://github.com/fomkin/korolev/blob/v0.8.0/examples/routing/src/main/scala/RoutingExample.scala#L93[See full example]
 
 ==== Running at a nested path
 
@@ -509,7 +509,7 @@ Usually when we say "components" we mean a UI element with its own state. Korole
 Korolev doesn't have any specific code to support WebComponents. WebComponent (Custom Elements + Shadow DOM) by design should behave as regular HTML tags. There is no difference between, for example, input or textarea, and any custom element.
 ============
 
-https://github.com/fomkin/korolev/blob/v0.7.0/examples/web-component/src/main/scala/WebComponentExample.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.8.0/examples/web-component/src/main/scala/WebComponentExample.scala[See full example]
 
 === Developer mode and "hot reload"
 
@@ -551,7 +551,7 @@ To fix this, you can apply any in-memory storage compatible with https://github.
 libraryDependencies += "com.github.fomkin" %% "korolev-jcache-support" % "0.6.1"
 ------------------------------
 
-https://github.com/fomkin/korolev/blob/v0.7.0/examples/jcache/src/main/scala/JCacheExample.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.8.0/examples/jcache/src/main/scala/JCacheExample.scala[See full example]
 
 === Akka HTTP
 
@@ -577,7 +577,7 @@ val korolevRoute = akkaHttpService(config).apply(AkkaHttpServerConfig())
 
 Then embed the route into your Akka HTTP routes structure.
 
-https://github.com/fomkin/korolev/blob/v0.7.0/examples/akka-http/src/main/scala/AkkaHttpExample.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.8.0/examples/akka-http/src/main/scala/AkkaHttpExample.scala[See full example]
 
 === Monix
 
@@ -601,4 +601,4 @@ val config = KorolevServiceConfig[Task, Boolean, Any](
 )
 ------------------------------
 
-https://github.com/fomkin/korolev/blob/v0.7.0/examples/monix/src/main/scala/MonixExample.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.8.0/examples/monix/src/main/scala/MonixExample.scala[See full example]
