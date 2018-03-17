@@ -166,7 +166,9 @@ package object server extends LazyLogging {
       } yield {
 
         // Subscribe to events to publish them to env
-        korolev.topLevelComponentInstance.setEventsSubscription(env.onMessage)
+        korolev.topLevelComponentInstance.setEventsSubscription { message: M =>
+          env.onMessage(message).runIgnoreResult
+        }
 
         new KorolevSession[F] {
 
