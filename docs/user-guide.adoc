@@ -456,7 +456,7 @@ KorolevServiceConfig(
       'div(text)
     )
   },
-  serverRouter = ServerRouter(
+  router = Router(
     // Static router works when user enters
     // with any url but "/".
     static = (deviceId) => Router(
@@ -491,7 +491,7 @@ If Korolev is running at a nested path, e.g. `/ui/`, router's `rootPath` paramet
 
 [source,scala]
 -------------------------------------------------------------------------------
-serverRouter = ServerRouter(
+router = Router(
   static = ...,
   dynamic = ...,
   rootPath = "/ui/"
@@ -568,7 +568,7 @@ And create Korolev route:
 ------------------------------
 val config = KorolevServiceConfig[Future, Boolean, Any](
   stateStorage = StateStorage.default(false),
-  serverRouter = ServerRouter.empty[Future, Boolean],
+  router = Router.empty[Future, Boolean],
   render = { case _ => 'div("Hello akka-http") }
 )
 
@@ -596,7 +596,7 @@ import monix.eval.Task
 
 val config = KorolevServiceConfig[Task, Boolean, Any](
   stateStorage = StateStorage.default(false),
-  serverRouter = ServerRouter.empty[Task, Boolean],
+  router = Router.empty[Task, Boolean],
   render = { case _ => 'div("Hello Monix Task") }
 )
 ------------------------------
