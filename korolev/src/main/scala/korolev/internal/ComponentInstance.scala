@@ -212,7 +212,13 @@ final class ComponentInstance
               delayInstance.start(browserAccess)
             }
           case entry @ ComponentEntry(_, _: Any, _: ((Access[F, CS, E], Any) => F[Unit])) =>
-            val id = rc.currentId
+            val id = {
+              // FIXME very diry hack. should be fixed in Levsha
+              val s = rc.currentId.mkString
+              val i = s.lastIndexOf('_')
+              val n = s.substring(i + 1).toInt
+              Id(s"${s.substring(0, i)}_${n + 1}")
+            }
             nestedComponents.get(id) match {
               case Some(n: ComponentInstance[F, CS, E, Any, Any, Any]) if n.component.id == entry.component.id =>
                 // Use nested component instance
@@ -299,7 +305,10 @@ final class ComponentInstance
     }
     nestedComponents foreach {
       case (id, nested) =>
-        if (!markedComponentInstances.contains(id)) nestedComponents.remove(id)
+        if (!markedComponentInstances.contains(id)) {
+          nestedComponents.remove(id)
+          stateManager.delete(id).runIgnoreResult
+        }
         else nested.dropObsoleteMisc()
     }
   }
