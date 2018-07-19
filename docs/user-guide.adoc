@@ -302,7 +302,7 @@ In the scope of an event, you can access the element properties if an element wa
 
 [source,scala]
 -----------------------------------
-val loginField = elementId
+val loginField = elementId()
 
 ...
 
@@ -330,7 +330,7 @@ In contrast to `property`, FormData works with form tag, not with input tag.
 
 [source,scala]
 -----------------------------------
-val myForm = elementId
+val myForm = elementId()
 val pictureFieldName = "picture"
 
 'form(
@@ -569,7 +569,7 @@ And create Korolev route:
 val config = KorolevServiceConfig[Future, Boolean, Any](
   stateStorage = StateStorage.default(false),
   serverRouter = ServerRouter.empty[Future, Boolean],
-  render = { case _ => 'div("Hello akka-http") }
+  render = { case _ => 'body('div("Hello akka-http")) }
 )
 
 val korolevRoute = akkaHttpService(config).apply(AkkaHttpServerConfig())
@@ -597,7 +597,7 @@ import monix.eval.Task
 val config = KorolevServiceConfig[Task, Boolean, Any](
   stateStorage = StateStorage.default(false),
   serverRouter = ServerRouter.empty[Task, Boolean],
-  render = { case _ => 'div("Hello Monix Task") }
+  render = { case _ => 'body('div("Hello Monix Task")) }
 )
 ------------------------------
 
