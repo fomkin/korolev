@@ -111,8 +111,8 @@ object StateStorage {
       new StateManager.Snapshot {
 
         val cache = directory
-          .list()
-          .map { name => Id(name) -> readFile(new File(name)) }
+          .listFiles()
+          .map { file => Id(file.getName) -> readFile(file) }
           .toMap
 
         def apply[T: StateDeserializer](nodeId: Id): Option[T] = {
@@ -132,6 +132,11 @@ object StateStorage {
 
     def write[T: StateSerializer](nodeId: Id, value: T): F[Unit] = Async[F].fork {
       val file = getStateFile(nodeId)
+      if (!file.exists()) {
+        file.getParentFile.mkdirs()
+        file.createNewFile()
+      }
+
       val outputStream = new FileOutputStream(file)
       val data = implicitly[StateSerializer[T]].serialize(value)
       outputStream.write(data)
