@@ -2,12 +2,12 @@ package korolev.state.cacheApiSupport
 
 import javax.cache.Cache
 import javax.cache.processor.{EntryProcessor, MutableEntry}
-
 import korolev.Async
 import korolev.state._
 import levsha.Id
 
 import scala.collection.JavaConverters._
+import scala.collection.mutable
 
 /**
   * State storage based on
@@ -46,12 +46,17 @@ final class CachedStateStorage[F[+_]: Async, S]
 
   private class CachedStateManager(deviceId: DeviceId, sessionId: SessionId) extends StateManager[F] {
 
+    def delete(nodeId: Id): F[Unit] = {
+      Async[F].run(Async[F].fork(cache.remove(mkKey(nodeId))))(_ => ())
+      Async[F].unit
+    }
+
     def snapshot: F[StateManager.Snapshot] = Async[F].fork {
       val keys = Option(cache.get(mkKeys(deviceId, sessionId)))
         .flatMap(keysR.deserialize)
         .getOrElse(Set.empty)
       new StateManager.Snapshot {
-        val snapshotData = cache.getAll(keys.asJava).asScala
+        val snapshotData: mutable.Map[String, Array[Byte]] = cache.getAll(keys.asJava).asScala
         def apply[T: StateDeserializer](nodeId: Id): Option[T] = snapshotData
           .get(mkKey(nodeId))
           .flatMap(implicitly[StateDeserializer[T]].deserialize)
@@ -64,11 +69,15 @@ final class CachedStateStorage[F[+_]: Async, S]
       }
     }
 
-    def write[T: StateSerializer](nodeId: Id, value: T): F[Unit] = Async[F].fork {
-      val data = implicitly[StateSerializer[T]].serialize(value)
-      val key = mkKey(nodeId)
-      cache.put(key, data)
-      cache.invoke(mkKeys(deviceId, sessionId), new AddKeyProcessor(key))
+    def write[T: StateSerializer](nodeId: Id, value: T): F[Unit] = {
+      val job = Async[F].fork {
+        val data = implicitly[StateSerializer[T]].serialize(value)
+        val key = mkKey(nodeId)
+        cache.put(key, data)
+        cache.invoke(mkKeys(deviceId, sessionId), new AddKeyProcessor(key))
+      }
+      Async[F].run(job)(_ => ())
+      Async[F].unit
     }
 
     private class AddKeyProcessor(key: String) extends EntryProcessor[String, Array[Byte], Unit] {

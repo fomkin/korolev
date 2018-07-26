@@ -6,6 +6,7 @@ import levsha.Id
 abstract class StateManager[F[+_]: Async] {
   def snapshot: F[StateManager.Snapshot]
   def read[T: StateDeserializer](nodeId: Id): F[Option[T]]
+  def delete(nodeId: Id): F[Unit]
   def write[T: StateSerializer](nodeId: Id, value: T): F[Unit]
 }
 

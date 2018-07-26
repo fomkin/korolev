@@ -130,6 +130,13 @@ object StateStorage {
       }
     }
 
+
+    def delete(nodeId: Id): F[Unit] = Async[F].fork {
+      val file = getStateFile(nodeId)
+      file.delete()
+      ()
+    }
+
     def write[T: StateSerializer](nodeId: Id, value: T): F[Unit] = Async[F].fork {
       val file = getStateFile(nodeId)
       if (!file.exists()) {
@@ -169,6 +176,11 @@ object StateStorage {
 
     def read[T: StateDeserializer](nodeId: Id): F[Option[T]] =
       Async[F].map(snapshot)(_.apply(nodeId))
+
+    def delete(nodeId: Id): F[Unit] = {
+      cache.remove(nodeId)
+      Async[F].unit
+    }
 
     def write[T: StateSerializer](nodeId: Id, value: T): F[Unit] = {
       cache.put(nodeId, value)

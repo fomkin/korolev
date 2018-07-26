@@ -56,7 +56,7 @@ package object server extends LazyLogging {
             }
           }
       } yield {
-        val dsl = new levsha.TemplateDsl[Context.Effect[F, S, M]]()
+        val dsl = new levsha.dsl.SymbolDsl[Context.Effect[F, S, M]]()
         val textRenderContext = new HtmlRenderContext[F, S, M]()
         val rootPath = config.rootPath
         val clw = {

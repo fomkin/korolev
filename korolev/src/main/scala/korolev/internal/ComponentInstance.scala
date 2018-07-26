@@ -187,6 +187,7 @@ final class ComponentInstance
           }
       }
     val proxy = new StatefulRenderContext[Effect[F, CS, E]] { proxy =>
+      def subsequentId: Id = rc.subsequentId
       def currentId: Id = rc.currentId
       def currentContainerId: Id = rc.currentContainerId
       def openNode(xmlNs: XmlNs, name: String): Unit = rc.openNode(xmlNs, name)
@@ -212,7 +213,7 @@ final class ComponentInstance
               delayInstance.start(browserAccess)
             }
           case entry @ ComponentEntry(_, _: Any, _: ((Access[F, CS, E], Any) => F[Unit])) =>
-            val id = rc.currentId
+            val id = rc.subsequentId
             nestedComponents.get(id) match {
               case Some(n: ComponentInstance[F, CS, E, Any, Any, Any]) if n.component.id == entry.component.id =>
                 // Use nested component instance
@@ -299,7 +300,10 @@ final class ComponentInstance
     }
     nestedComponents foreach {
       case (id, nested) =>
-        if (!markedComponentInstances.contains(id)) nestedComponents.remove(id)
+        if (!markedComponentInstances.contains(id)) {
+          nestedComponents.remove(id)
+          stateManager.delete(id).runIgnoreResult
+        }
         else nested.dropObsoleteMisc()
     }
   }

@@ -1,4 +1,4 @@
-val levshaVersion = "0.6.1"
+val levshaVersion = "0.7.1"
 
 val unusedRepo = Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
 
