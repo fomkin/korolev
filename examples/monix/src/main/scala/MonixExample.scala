@@ -25,7 +25,7 @@ object MonixExample extends App {
 
   private val config = KorolevServiceConfig[Task, State, Any](
     stateStorage = StateStorage.default(State()),
-    serverRouter = ServerRouter.empty[Task, State],
+    router = emptyRouter,
     render = { case state =>
       'body(
         'div("Super TODO tracker"),

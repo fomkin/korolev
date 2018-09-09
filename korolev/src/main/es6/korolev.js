@@ -7,7 +7,8 @@ export const CallbackType = {
   EXTRACT_PROPERTY_RESPONSE: 2, // `$descriptor:$propertyType:$value`
   HISTORY: 3, // URL
   EVALJS_RESPONSE: 4, // `$descriptor:$status:$value`
-  EXTRACT_EVENT_DATA_RESPONSE: 5 // `$descriptor:$dataJson`
+  EXTRACT_EVENT_DATA_RESPONSE: 5, // `$descriptor:$dataJson`
+  HEARTBEAT: 6 // `$descriptor`
 };
 
 /** @enum {number} */
@@ -359,16 +360,23 @@ export class Korolev {
       `${descriptor}:${status}:${result}`
     );	    
   }
-	    
+
   extractEventData(descriptor, renderNum) {
     let data = this.eventData[renderNum];
     let result = {};
-    for (var propertyName in data) {
+    for (let propertyName in data) {
       let value = data[propertyName];
       switch (typeof value) {
         case 'string':
         case 'number':
-        case 'boolean': result[propertyName] = value; break;          break;
+        case 'boolean':
+          result[propertyName] = value;
+          break;
+        case 'object':
+          if (propertyName === 'detail') {
+            result[propertyName] = value;
+          }
+          break;
         default: // do nothing
       }
     }

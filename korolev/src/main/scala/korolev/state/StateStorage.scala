@@ -24,6 +24,8 @@ abstract class StateStorage[F[+_]: Async, S] {
     * @return Future with result if session already exists
     */
   def get(deviceId: DeviceId, sessionId: SessionId): F[Option[StateManager[F]]]
+
+  def remove(deviceId: DeviceId, sessionId: SessionId): Unit
 }
 
 object StateStorage {
@@ -66,7 +68,7 @@ object StateStorage {
   private class DefaultStateStorage[F[+_]: Async, S: StateSerializer]
       (val createTopLevelState: String => F[S]) extends StateStorage[F, S] {
 
-    val cache = TrieMap.empty[String, StateManager[F]]
+    private val cache = TrieMap.empty[String, StateManager[F]]
 
     def mkKey(deviceId: DeviceId, sessionId: SessionId): String = {
       s"$deviceId-$sessionId"
@@ -88,6 +90,11 @@ object StateStorage {
       cache.put(key, sm)
       Async[F].pure(sm)
     }
+
+    override def remove(deviceId: DeviceId, sessionId: SessionId): Unit = {
+      cache.remove(mkKey(deviceId, sessionId))
+      ()
+    }
   }
 
   private final class DevModeStateManager[F[+_]: Async](directory: File) extends StateManager[F] {
@@ -104,8 +111,8 @@ object StateStorage {
       new StateManager.Snapshot {
 
         val cache = directory
-          .list()
-          .map { name => Id(name) -> readFile(new File(name)) }
+          .listFiles()
+          .map { file => Id(file.getName) -> readFile(file) }
           .toMap
 
         def apply[T: StateDeserializer](nodeId: Id): Option[T] = {
@@ -123,8 +130,20 @@ object StateStorage {
       }
     }
 
+
+    def delete(nodeId: Id): F[Unit] = Async[F].fork {
+      val file = getStateFile(nodeId)
+      file.delete()
+      ()
+    }
+
     def write[T: StateSerializer](nodeId: Id, value: T): F[Unit] = Async[F].fork {
       val file = getStateFile(nodeId)
+      if (!file.exists()) {
+        file.getParentFile.mkdirs()
+        file.createNewFile()
+      }
+
       val outputStream = new FileOutputStream(file)
       val data = implicitly[StateSerializer[T]].serialize(value)
       outputStream.write(data)
@@ -144,7 +163,7 @@ object StateStorage {
 
     val snapshot: F[StateManager.Snapshot] = Async[F].pureStrict {
       new StateManager.Snapshot {
-        def apply[T: StateDeserializer](nodeId: Id) =           try {
+        def apply[T: StateDeserializer](nodeId: Id): Option[T] = try {
           cache
             .get(nodeId)
             .asInstanceOf[Option[T]]
@@ -157,6 +176,11 @@ object StateStorage {
 
     def read[T: StateDeserializer](nodeId: Id): F[Option[T]] =
       Async[F].map(snapshot)(_.apply(nodeId))
+
+    def delete(nodeId: Id): F[Unit] = {
+      cache.remove(nodeId)
+      Async[F].unit
+    }
 
     def write[T: StateSerializer](nodeId: Id, value: T): F[Unit] = {
       cache.put(nodeId, value)

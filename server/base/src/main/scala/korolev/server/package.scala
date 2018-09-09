@@ -6,7 +6,7 @@ import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 
 import korolev.Async._
 import korolev.internal.{ApplicationInstance, Connection}
-import korolev.state.{DeviceId, SessionId, StateDeserializer, StateSerializer}
+import korolev.state._
 import levsha.Id
 import slogging.LazyLogging
 
@@ -36,6 +36,12 @@ package object server extends LazyLogging {
 
     val sessions = TrieMap.empty[String, KorolevSession[F]]
 
+    def getOrCreateStateManager(deviceId: DeviceId, sessionId: SessionId): F[(StateManager[F], Boolean)] =
+      for {
+        maybeStateManager <- config.stateStorage.get(deviceId, sessionId)
+        stateManager <- maybeStateManager.fold(config.stateStorage.create(deviceId, sessionId))(Async[F].pure(_))
+      } yield (stateManager, maybeStateManager.isEmpty)
+
     def renderStatic(request: Request): F[Response] =
       for {
         deviceId <- deviceFromRequest(request)
@@ -45,14 +51,12 @@ package object server extends LazyLogging {
           .lift((None, request.path))
           .getOrElse(config.stateStorage.createTopLevelState(deviceId))
           .flatMap { state =>
-            config.stateStorage.create(deviceId, sessionId).flatMap { manager =>
-              manager.write(Id.TopLevel, state).map { _ =>
-                state
-              }
+            getOrCreateStateManager(deviceId, sessionId).map(_._1).flatMap { manager =>
+              manager.write(Id.TopLevel, state).map(_ => state)
             }
           }
       } yield {
-        val dsl = new levsha.TemplateDsl[Context.Effect[F, S, M]]()
+        val dsl = new levsha.dsl.SymbolDsl[Context.Effect[F, S, M]]()
         val textRenderContext = new HtmlRenderContext[F, S, M]()
         val rootPath = config.rootPath
         val clw = {
@@ -60,12 +64,14 @@ package object server extends LazyLogging {
           config.connectionLostWidget(textRenderContext)
           textRenderContext.mkString
         }
+        val heartbeatInterval = config.heartbeatInterval.toMillis
 
         import dsl._
 
+        val kfg = s"window['kfg']={sid:'$sessionId',r:'$rootPath',clw:'$clw',heartbeatInterval:$heartbeatInterval}"
         val document = 'html(
           'head(
-            'script('language /= "javascript", s"window['kfg']={sid:'$sessionId',r:'$rootPath',clw:'$clw'}"),
+            'script('language /= "javascript", kfg),
             'script('src /= config.rootPath + "korolev-client.min.js"),
             config.head
           ),
@@ -144,9 +150,8 @@ package object server extends LazyLogging {
       val connection = new Connection[F]()
 
       for {
-        maybeStateManager <- config.stateStorage.get(deviceId, sessionId)
-        stateManager <- maybeStateManager.fold(config.stateStorage.create(deviceId, sessionId))(Async[F].pure(_))
-        isNew = maybeStateManager.isEmpty
+        stateManagerIsNew <- getOrCreateStateManager(deviceId, sessionId)
+        (stateManager, isNew) = stateManagerIsNew
         initialState <- config.stateStorage.createTopLevelState(deviceId)
 
         // Create Korolev with dynamic router
@@ -157,12 +162,13 @@ package object server extends LazyLogging {
           stateManager, initialState,
           config.render, router, fromScratch = isNew
         )
-        applyTransition = korolev.topLevelComponentInstance.applyTransition _
-        env <- config.envConfigurator.configure(deviceId, sessionId, applyTransition)
+        env <- config.envConfigurator.configure(korolev.topLevelComponentInstance.browserAccess)
       } yield {
 
         // Subscribe to events to publish them to env
-        korolev.topLevelComponentInstance.setEventsSubscription(env.onMessage)
+        korolev.topLevelComponentInstance.setEventsSubscription { message: M =>
+          env.onMessage(message).runIgnoreResult
+        }
 
         new KorolevSession[F] {
 
@@ -186,14 +192,24 @@ package object server extends LazyLogging {
           }
 
           def destroy(): F[Unit] = {
-            if (aliveRef.getAndSet(false)) {
-              currentPromise.get() foreach { promise =>
-                promise.complete(Failure(new SessionDestroyedException("Session has been closed")))
-              }
+            if (aliveRef.getAndSet(false))
               env.onDestroy()
-              sessions.remove(sessionKey)
-            }
-            Async[F].unit
+                .recover {
+                  case ex: Throwable =>
+                    logger.error("Error destroying environment", ex)
+                    ()
+                }
+                .map { _ =>
+                  currentPromise.get() foreach { promise =>
+                    promise.complete(Failure(new SessionDestroyedException("Session has been closed")))
+                  }
+
+                  config.stateStorage.remove(deviceId, sessionId)
+                  sessions.remove(sessionKey)
+
+                  ()
+                }
+            else Async[F].unit
           }
         }
       }

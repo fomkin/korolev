@@ -64,7 +64,7 @@ final class ComponentInstance
   @volatile private var eventSubscription = Option.empty[E => _]
   @volatile private var transitionInProgress = false
 
-  private object browserAccess extends Access[F, CS, E] {
+  private[korolev] object browserAccess extends Access[F, CS, E] {
 
     private def noElementException[T]: F[T] = {
       val exception = new Exception("No element matched for accessor")
@@ -102,9 +102,11 @@ final class ComponentInstance
       async.unit
     }
 
-    def state: F[CS] = stateManager
-      .read[CS](nodeId)
-      .map(_.get)
+    def state: F[CS] = {
+      val state = stateManager.read[CS](nodeId)
+
+      state.map(_.getOrElse(throw new RuntimeException("State is empty")))
+    }
 
     def sessionId: F[QualifiedSessionId] = async.pure(self.sessionId)
 
@@ -185,6 +187,7 @@ final class ComponentInstance
           }
       }
     val proxy = new StatefulRenderContext[Effect[F, CS, E]] { proxy =>
+      def subsequentId: Id = rc.subsequentId
       def currentId: Id = rc.currentId
       def currentContainerId: Id = rc.currentContainerId
       def openNode(xmlNs: XmlNs, name: String): Unit = rc.openNode(xmlNs, name)
@@ -210,7 +213,7 @@ final class ComponentInstance
               delayInstance.start(browserAccess)
             }
           case entry @ ComponentEntry(_, _: Any, _: ((Access[F, CS, E], Any) => F[Unit])) =>
-            val id = rc.currentId
+            val id = rc.subsequentId
             nestedComponents.get(id) match {
               case Some(n: ComponentInstance[F, CS, E, Any, Any, Any]) if n.component.id == entry.component.id =>
                 // Use nested component instance
@@ -297,7 +300,10 @@ final class ComponentInstance
     }
     nestedComponents foreach {
       case (id, nested) =>
-        if (!markedComponentInstances.contains(id)) nestedComponents.remove(id)
+        if (!markedComponentInstances.contains(id)) {
+          nestedComponents.remove(id)
+          stateManager.delete(id).runIgnoreResult
+        }
         else nested.dropObsoleteMisc()
     }
   }
