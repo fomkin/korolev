@@ -1,50 +1,32 @@
+import xerial.sbt.Sonatype._
+
 val levshaVersion = "0.7.1"
 
 val unusedRepo = Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
 
 val crossVersionSettings = Seq(
-  crossScalaVersions := Seq("2.11.12", "2.12.6")
+  crossScalaVersions := Seq("2.11.12", "2.12.7")
 )
 
 val dontPublishSettings = Seq(
   publish := {},
   publishTo := unusedRepo,
-  publishArtifact := false
+  publishArtifact := false,
+  headerLicense := None
 )
 
 val publishSettings = Seq(
   publishMavenStyle := true,
   publishArtifact in Test := false,
   pomIncludeRepository := { _ => false },
-  publishTo := {
-    val nexus = "https://oss.sonatype.org/"
-    if (isSnapshot.value) Some("snapshots" at s"${nexus}content/repositories/snapshots")
-    else Some("releases" at s"${nexus}service/local/staging/deploy/maven2")
-  },
-  pomExtra := {
-    <url>https://github.com/fomkin/korolev</url>
-    <licenses>
-      <license>
-        <name>Apache License, Version 2.0</name>
-        <url>http://apache.org/licenses/LICENSE-2.0</url>
-        <distribution>repo</distribution>
-      </license>
-    </licenses>
-    <scm>
-      <url>git@github.com:fomkin/korolev.git</url>
-      <connection>scm:git:git@github.com:fomkin/korolev.git</connection>
-    </scm>
-    <developers>
-      <developer>
-        <id>fomkin</id>
-        <name>Aleksey Fomkin</name>
-        <email>aleksey.fomkin@gmail.com</email>
-      </developer>
-    </developers>
-  }
+  publishTo := sonatypePublishTo.value,
+  sonatypeProjectHosting := Some(GitHubHosting("fomkin", "korolev", "Aleksey Fomkin", "aleksey.fomkin@gmail.com")),
+  headerLicense := Some(HeaderLicense.ALv2("2017-2018", "Aleksey Fomkin")),
+  licenses := Seq("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.txt")),
 )
 
 val commonSettings = publishSettings ++ Seq(
+  git.useGitDescribe := true,
   organization := "com.github.fomkin",
   libraryDependencies ++= Seq(
     "org.scalatest" %% "scalatest" % "3.0.4" % Test
@@ -70,6 +52,7 @@ val exampleSettings = commonSettings ++ dontPublishSettings ++ Seq(
 )
 
 lazy val server = (project in file("server") / "base").
+  enablePlugins(GitVersioning).
   settings(crossVersionSettings).
   settings(commonSettings: _*).
   settings(
@@ -79,6 +62,7 @@ lazy val server = (project in file("server") / "base").
   dependsOn(korolev)
 
 lazy val `server-blaze` = (project in file("server") / "blaze").
+  enablePlugins(GitVersioning).
   settings(commonSettings: _*).
   settings(crossVersionSettings).
   settings(
@@ -88,6 +72,7 @@ lazy val `server-blaze` = (project in file("server") / "blaze").
   dependsOn(server)
 
 lazy val `server-akkahttp` = (project in file("server") / "akkahttp").
+  enablePlugins(GitVersioning).
   settings(crossVersionSettings).
   settings(commonSettings: _*).
   settings(
@@ -101,11 +86,13 @@ lazy val `server-akkahttp` = (project in file("server") / "akkahttp").
   dependsOn(server)
 
 lazy val async = project.
+  enablePlugins(GitVersioning).
   settings(crossVersionSettings).
   settings(commonSettings: _*).
   settings(normalizedName := "korolev-async")
 
 lazy val korolev = project.
+  enablePlugins(GitVersioning).
   settings(crossVersionSettings).
   settings(commonSettings: _*).
   settings(
@@ -129,6 +116,7 @@ lazy val korolev = project.
 // Contribs
 
 lazy val `jcache-support` = project.
+  enablePlugins(GitVersioning).
   in(file("contrib/jcache")).
   settings(crossVersionSettings).
   settings(commonSettings: _*).
@@ -139,6 +127,7 @@ lazy val `jcache-support` = project.
   dependsOn(server)
 
 lazy val `monix-support` = project.
+  enablePlugins(GitVersioning).
   in(file("contrib/monix")).
   settings(crossVersionSettings).
   settings(commonSettings: _*).
@@ -152,24 +141,28 @@ lazy val `monix-support` = project.
 val examples = file("examples")
 
 lazy val simpleExample = (project in examples / "simple").
+  disablePlugins(HeaderPlugin).
   settings(crossVersionSettings).
   settings(exampleSettings: _*).
   settings(mainClass := Some("SimpleExample")).
   dependsOn(`server-blaze`)
 
 lazy val routingExample = (project in examples / "routing").
+  disablePlugins(HeaderPlugin).
   settings(crossVersionSettings).
   settings(exampleSettings: _*).
   settings(mainClass := Some("RoutingExample")).
   dependsOn(`server-blaze`)
 
 lazy val gameOfLifeExample = (project in examples / "game-of-life").
+  disablePlugins(HeaderPlugin).
   settings(crossVersionSettings).
   settings(exampleSettings: _*).
   settings(mainClass := Some("GameOfLife")).
   dependsOn(`server-blaze`)
 
 lazy val jcacheExample = (project in examples / "jcache").
+  disablePlugins(HeaderPlugin).
   settings(crossVersionSettings).
   settings(exampleSettings: _*).
   settings(
@@ -179,54 +172,63 @@ lazy val jcacheExample = (project in examples / "jcache").
   dependsOn(`server-blaze`, `jcache-support`)
 
 lazy val formDataExample = (project in examples / "form-data").
+  disablePlugins(HeaderPlugin).
   settings(crossVersionSettings).
   settings(exampleSettings: _*).
   settings(mainClass := Some("FormDataExample")).
   dependsOn(`server-blaze`)
 
 lazy val delayExample = (project in examples / "delay").
+  disablePlugins(HeaderPlugin).
   settings(crossVersionSettings).
   settings(exampleSettings: _*).
   settings(mainClass := Some("DelayExample")).
   dependsOn(`server-blaze`)
 
 lazy val focusExample = (project in examples / "focus").
+  disablePlugins(HeaderPlugin).
   settings(crossVersionSettings).
   settings(exampleSettings: _*).
   settings(mainClass := Some("FocusExample")).
   dependsOn(`server-blaze`)
 
 lazy val webComponentExample = (project in examples / "web-component").
+  disablePlugins(HeaderPlugin).
   settings(crossVersionSettings).
   settings(exampleSettings: _*).
   settings(mainClass := Some("WebComponentExample")).
   dependsOn(`server-blaze`)
 
 lazy val componentExample = (project in examples / "component").
+  disablePlugins(HeaderPlugin).
   settings(crossVersionSettings).
   settings(exampleSettings: _*).
   settings(mainClass := Some("ComponentExample")).
   dependsOn(`server-blaze`)
 
 lazy val akkaHttpExample = (project in examples / "akka-http").
+  disablePlugins(HeaderPlugin).
   settings(crossVersionSettings).
   settings(exampleSettings: _*).
   settings(mainClass := Some("AkkaHttpExample")).
   dependsOn(`server-akkahttp`)
 
 lazy val monixExample = (project in examples / "monix").
+  disablePlugins(HeaderPlugin).
   settings(crossVersionSettings).
   settings(exampleSettings: _*).
   settings(mainClass := Some("MonixExample")).
   dependsOn(`monix-support`, `server-akkahttp`)
 
 lazy val eventDataExample = (project in examples / "event-data").
+  disablePlugins(HeaderPlugin).
   settings(crossVersionSettings).
   settings(exampleSettings: _*).
   settings(mainClass := Some("EventDataExample")).
   dependsOn(`server-blaze`)
 
 lazy val `integration-tests` = project.
+  disablePlugins(HeaderPlugin).
   settings(crossVersionSettings).
   settings(commonSettings).
   settings(dontPublishSettings:_*).
@@ -242,6 +244,7 @@ lazy val `integration-tests` = project.
   dependsOn(`server-akkahttp`)
 
 lazy val `performance-benchmark` = project.
+  disablePlugins(HeaderPlugin).
   settings(commonSettings).
   settings(dontPublishSettings:_*).
   settings(
@@ -252,7 +255,7 @@ lazy val `performance-benchmark` = project.
       "com.typesafe.akka" %% "akka-http" % "10.1.5",
       "com.typesafe.akka" %% "akka-stream" % "2.5.16",
       "com.typesafe.akka" %% "akka-actor"  % "2.5.16",
-      "com.typesafe.akka" %% "akka-typed" % "2.5.16",
+      "com.typesafe.akka" %% "akka-typed" % "2.5.8",
       "com.github.fomkin" %% "pushka-json" % "0.8.0"
     )
   ).
@@ -260,6 +263,7 @@ lazy val `performance-benchmark` = project.
 
 lazy val root = project.in(file(".")).
   settings(crossVersionSettings).
+  disablePlugins(HeaderPlugin).
   settings(dontPublishSettings:_*).
   aggregate(
     korolev, async,
