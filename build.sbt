@@ -1,9 +1,9 @@
-val levshaVersion = "0.6.1"
+val levshaVersion = "0.7.1"
 
 val unusedRepo = Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
 
 val crossVersionSettings = Seq(
-  crossScalaVersions := Seq("2.11.12", "2.12.4")
+  crossScalaVersions := Seq("2.11.12", "2.12.6")
 )
 
 val dontPublishSettings = Seq(
@@ -93,9 +93,9 @@ lazy val `server-akkahttp` = (project in file("server") / "akkahttp").
   settings(
     normalizedName := "korolev-server-akkahttp",
     libraryDependencies ++= Seq(
-      "com.typesafe.akka" %% "akka-actor" % "2.5.8",
-      "com.typesafe.akka" %% "akka-stream" % "2.5.8",
-      "com.typesafe.akka" %% "akka-http" % "10.0.11"
+      "com.typesafe.akka" %% "akka-actor" % "2.5.16",
+      "com.typesafe.akka" %% "akka-stream" % "2.5.16",
+      "com.typesafe.akka" %% "akka-http" % "10.1.5"
     )
   ).
   dependsOn(server)
@@ -249,10 +249,10 @@ lazy val `performance-benchmark` = project.
     scalaVersion := "2.12.4",
     fork in run := true,
     libraryDependencies ++= Seq(
-      "com.typesafe.akka" %% "akka-http" % "10.0.11",
-      "com.typesafe.akka" %% "akka-stream" % "2.5.8",
-      "com.typesafe.akka" %% "akka-actor"  % "2.5.8",
-      "com.typesafe.akka" %% "akka-typed" % "2.5.8",
+      "com.typesafe.akka" %% "akka-http" % "10.1.5",
+      "com.typesafe.akka" %% "akka-stream" % "2.5.16",
+      "com.typesafe.akka" %% "akka-actor"  % "2.5.16",
+      "com.typesafe.akka" %% "akka-typed" % "2.5.16",
       "com.github.fomkin" %% "pushka-json" % "0.8.0"
     )
   ).
