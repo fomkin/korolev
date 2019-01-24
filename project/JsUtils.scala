@@ -3,7 +3,6 @@ import java.util
 
 import sbt.{File, IO, Logger}
 import com.google.javascript.jscomp.{AbstractCommandLineRunner, CompilationLevel, Compiler, CompilerOptions, SourceFile, SourceMap}
-import SourceMap.LocationMapping
 import com.google.javascript.jscomp.CompilerOptions.LanguageMode
 
 import scala.collection.JavaConverters._
@@ -35,7 +34,7 @@ object JsUtils {
         options.setLanguageIn(LanguageMode.ECMASCRIPT_2015)
         options.setLanguageOut(LanguageMode.ECMASCRIPT5_STRICT)
         options.setSourceMapIncludeSourcesContent(true)
-        options.setSourceMapLocationMappings(List(new LocationMapping(source.getAbsolutePath, "korolev/es6")).asJava)
+        options.setSourceMapLocationMappings(List(new SourceMap.PrefixLocationMapping(source.getAbsolutePath, "korolev/es6")).asJava)
         options.setSourceMapOutputPath(sourceMapOutputFile.getName)
         options.setEnvironment(CompilerOptions.Environment.BROWSER)
 

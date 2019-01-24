@@ -8,4 +8,4 @@ addSbtPlugin("com.typesafe.sbt" % "sbt-git" % "1.0.0")
 
 addSbtPlugin("de.heikoseeberger" % "sbt-header" % "5.0.0")
 
-libraryDependencies += "com.google.javascript" % "closure-compiler" % "v20170626"
+libraryDependencies += "com.google.javascript" % "closure-compiler" % "v20190106"

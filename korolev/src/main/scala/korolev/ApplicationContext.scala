@@ -29,7 +29,7 @@ import scala.reflect.ClassTag
   * @see [[Context]]
   * @deprecated
   */
-final class ApplicationContext[F[+ _]: Async, S: StateSerializer: StateDeserializer, M] {
+final class ApplicationContext[F[_]: Async, S: StateSerializer: StateDeserializer, M] {
 
   import Context._
   import ApplicationContext._
@@ -85,10 +85,10 @@ final class ApplicationContext[F[+ _]: Async, S: StateSerializer: StateDeseriali
 object ApplicationContext {
 
   @deprecated("This is compatibility layer for old fashioned API. Use Context instead.", "0.6.0")
-  def apply[F[+_]: Async, S: StateSerializer: StateDeserializer, M] =
+  def apply[F[_]: Async, S: StateSerializer: StateDeserializer, M] =
     new ApplicationContext[F, S, M]()
 
-  case class LegacyEventResult[F[+ _]: Async, S](
+  case class LegacyEventResult[F[_]: Async, S](
       immediate: Option[Transition[S]] = None,
       deferred: Option[F[Transition[S]]] = None,
       shouldStopPropagation: Boolean = false
@@ -105,7 +105,7 @@ object ApplicationContext {
 
   import Context._
 
-  class LegacyPropertyHandler[F[+_]: Async, T: ClassTag](propertyHandler: PropertyHandler[F]) {
+  class LegacyPropertyHandler[F[_]: Async, T: ClassTag](propertyHandler: PropertyHandler[F]) {
 
     import reflect.classTag
 
@@ -126,7 +126,7 @@ object ApplicationContext {
     }
   }
 
-  final class LegacyAccess[F[+_]: Async, S, M](access: Access[F, S, M]) {
+  final class LegacyAccess[F[_]: Async, S, M](access: Access[F, S, M]) {
 
     def property[T: ClassTag](id: ElementId[F, S, M]): LegacyPropertyHandler[F, T] =
       new LegacyPropertyHandler(access.property(id))

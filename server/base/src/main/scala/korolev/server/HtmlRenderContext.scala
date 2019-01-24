@@ -24,7 +24,7 @@ import levsha.impl.{AbstractTextRenderContext, TextPrettyPrintingConfig}
 
 import scala.collection.mutable
 
-final class HtmlRenderContext[F[+_]: Async, S, M] extends AbstractTextRenderContext[Effect[F, S, M]] {
+final class HtmlRenderContext[F[_]: Async, S, M] extends AbstractTextRenderContext[Effect[F, S, M]] {
 
   import HtmlRenderContext._
 

@@ -19,7 +19,7 @@ package korolev.state
 import korolev.Async
 import levsha.Id
 
-abstract class StateManager[F[+_]: Async] {
+abstract class StateManager[F[_]: Async] {
   def snapshot: F[StateManager.Snapshot]
   def read[T: StateDeserializer](nodeId: Id): F[Option[T]]
   def delete(nodeId: Id): F[Unit]

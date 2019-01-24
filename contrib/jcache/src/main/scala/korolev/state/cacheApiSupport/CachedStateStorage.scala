@@ -55,7 +55,7 @@ import scala.collection.mutable
   * @see <a href="https://jcp.org/aboutJava/communityprocess/final/jsr107/index.html">JSR-107 Specification</a>
   * @see <a href="https://jcp.org/aboutJava/communityprocess/implementations/jsr107/index.html">List of JSR-107 implementations</a>
   */
-final class CachedStateStorage[F[+_]: Async, S]
+final class CachedStateStorage[F[_]: Async, S]
     (cache: Cache[String, Array[Byte]], val createTopLevelState: DeviceId => F[S])
     (implicit val keysW: StateSerializer[Set[String]], val keysR: StateDeserializer[Set[String]])
   extends StateStorage[F, S] {
@@ -137,7 +137,7 @@ final class CachedStateStorage[F[+_]: Async, S]
 }
 
 object CachedStateStorage {
-  def apply[F[+_]: Async, T]
+  def apply[F[_]: Async, T]
       (cache: Cache[String, Array[Byte]])
       (initialState: DeviceId => F[T])
       (implicit keysW: StateSerializer[Set[String]], keysR: StateDeserializer[Set[String]]): CachedStateStorage[F, T] =

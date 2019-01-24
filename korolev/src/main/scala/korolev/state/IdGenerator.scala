@@ -20,7 +20,7 @@ import java.security.SecureRandom
 
 import korolev.Async
 
-trait IdGenerator[F[+_]] {
+trait IdGenerator[F[_]] {
   def generateDeviceId()(implicit F: Async[F]): F[DeviceId]
   def generateSessionId()(implicit F: Async[F]): F[SessionId]
 }
@@ -30,11 +30,11 @@ object IdGenerator {
   val DefaultDeviceIdLength = 64
   val DefaultSessionIdLength = 64
 
-  def default[F[+_]](deviceIdLength: Int = DefaultDeviceIdLength,
+  def default[F[_]](deviceIdLength: Int = DefaultDeviceIdLength,
                      sessionIdLength: Int = DefaultSessionIdLength): IdGenerator[F] =
     new DefaultIdGenerator[F](DefaultDeviceIdLength, DefaultSessionIdLength)
 
-  private class DefaultIdGenerator[F[+_]](deviceIdLength: Int,
+  private class DefaultIdGenerator[F[_]](deviceIdLength: Int,
                                           sessionIdLength: Int) extends IdGenerator[F] {
     def generateDeviceId()(implicit F: Async[F]): F[DeviceId] =
       Async[F].pure {

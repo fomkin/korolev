@@ -38,7 +38,7 @@ package object akkahttp {
 
   type AkkaHttpService = AkkaHttpServerConfig => Route
 
-  def akkaHttpService[F[+_]: Async, S: StateSerializer: StateDeserializer, M]
+  def akkaHttpService[F[_]: Async, S: StateSerializer: StateDeserializer, M]
       (config: KorolevServiceConfig[F, S, M], mimeTypes: MimeTypes = server.mimeTypes)
       (implicit actorSystem: ActorSystem, materializer: Materializer): AkkaHttpService = { akkaHttpConfig =>
     val korolevServer = korolev.server.korolevService(mimeTypes, config)
@@ -50,7 +50,7 @@ package object akkahttp {
 
   private val KeepAliveMessage = TextMessage("[9]")
 
-  private def webSocketRoute[F[+_]: Async, S: StateSerializer: StateDeserializer, M]
+  private def webSocketRoute[F[_]: Async, S: StateSerializer: StateDeserializer, M]
       (korolevServer: KorolevService[F],
        akkaHttpConfig: AkkaHttpServerConfig,
        korolevServiceConfig: KorolevServiceConfig[F, S, M])
@@ -98,7 +98,7 @@ package object akkahttp {
       }
       .collect { case Some(body) => body }
 
-  private def httpGetRoute[F[+_]: Async](korolevServer: KorolevService[F]): Route =
+  private def httpGetRoute[F[_]: Async](korolevServer: KorolevService[F]): Route =
     get {
       extractRequest { request =>
         extractUnmatchedPath { path =>
@@ -111,7 +111,7 @@ package object akkahttp {
       }
     }
 
-  private def httpPostRoute[F[+_]: Async](korolevServer: KorolevService[F]): Route =
+  private def httpPostRoute[F[_]: Async](korolevServer: KorolevService[F]): Route =
     post {
       extractRequest { request =>
         extractUnmatchedPath { path =>
@@ -144,7 +144,7 @@ package object akkahttp {
       body = body.fold(ByteBuffer.allocate(0))(ByteBuffer.wrap)
     )
 
-  private def handleHttpResponse[F[+_]: Async](korolevServer: KorolevService[F],
+  private def handleHttpResponse[F[_]: Async](korolevServer: KorolevService[F],
                                                korolevRequest: KorolevRequest): Future[HttpResponse] =
     asyncToFuture(korolevServer(korolevRequest)).map {
       case KorolevResponse.Http(status, streamOpt, responseHeaders) =>
@@ -173,7 +173,7 @@ package object akkahttp {
     (contentTypeOpt, otherHeaders.toList)
   }
 
-  private def asyncToFuture[F[+_]: Async, T](f: F[T]): Future[T] = {
+  private def asyncToFuture[F[_]: Async, T](f: F[T]): Future[T] = {
     val p = Promise[T]()
     Async[F].run(f)(p.complete)
     p.future

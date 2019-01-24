@@ -23,7 +23,7 @@ import levsha.dsl.SymbolDsl
 
 import scala.concurrent.duration._
 
-case class KorolevServiceConfig[F[+_]: Async, S, M](
+case class KorolevServiceConfig[F[_]: Async, S, M](
   stateStorage: korolev.state.StateStorage[F, S],
   router: (DeviceId, Option[SessionId]) => Router[F, S, Option[S]],
   rootPath: String = "/",

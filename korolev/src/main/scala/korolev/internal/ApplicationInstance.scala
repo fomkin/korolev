@@ -30,7 +30,7 @@ import slogging.LazyLogging
 
 final class ApplicationInstance
   [
-    F[+_]: Async: Scheduler,
+    F[_]: Async: Scheduler,
     S: StateSerializer: StateDeserializer,
     M
   ](

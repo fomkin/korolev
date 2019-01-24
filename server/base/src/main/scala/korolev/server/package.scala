@@ -32,15 +32,15 @@ import scala.util.{Failure, Success, Try}
 
 package object server extends LazyLogging {
 
-  type StateStorage[F[+_], S] = korolev.state.StateStorage[F, S]
+  type StateStorage[F[_], S] = korolev.state.StateStorage[F, S]
   val StateStorage = korolev.state.StateStorage
 
   type MimeTypes = String => Option[String]
-  type KorolevService[F[+_]] = PartialFunction[Request, F[Response]]
+  type KorolevService[F[_]] = PartialFunction[Request, F[Response]]
 
   def korolevService
       [
-        F[+_]: Async,
+        F[_]: Async,
         S: StateSerializer: StateDeserializer,
         M
       ] (
@@ -326,7 +326,7 @@ package object server extends LazyLogging {
     service
   }
 
-  def emptyRouter[F[+_]: Async, S]: (DeviceId, Option[SessionId]) => Router[F, S, Option[S]] =
+  def emptyRouter[F[_]: Async, S]: (DeviceId, Option[SessionId]) => Router[F, S, Option[S]] =
     (_, _) => Router.empty[F, S, Option[S]]
 
   private[server] object misc {

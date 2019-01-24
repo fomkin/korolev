@@ -32,7 +32,7 @@ import scala.util.{Failure, Success}
 /**
   * Typed interface to client side
   */
-final class ClientSideApi[F[+ _]: Async](connection: Connection[F])
+final class ClientSideApi[F[_]: Async](connection: Connection[F])
   extends ChangesPerformer with LazyLogging {
 
   import ClientSideApi._

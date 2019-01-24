@@ -44,7 +44,7 @@ import scala.util.{Failure, Success, Try}
   */
 final class ComponentInstance
   [
-    F[+ _]: Async: Scheduler,
+    F[_]: Async: Scheduler,
     AS: StateSerializer: StateDeserializer, M,
     CS: StateSerializer: StateDeserializer, P, E
   ](
@@ -379,7 +379,7 @@ private object ComponentInstance {
   import Context.Access
   import Context.Delay
 
-  final class DelayInstance[F[+ _]: Async: Scheduler, S, M](delay: Delay[F, S, M]) {
+  final class DelayInstance[F[_]: Async: Scheduler, S, M](delay: Delay[F, S, M]) {
 
     @volatile private var handler = Option.empty[Scheduler.JobHandler[F, _]]
     @volatile private var finished = false

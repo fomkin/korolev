@@ -24,7 +24,7 @@ import korolev.Async._
 import scala.annotation.switch
 import scala.util.Success
 
-final class Connection[F[+ _] : Async] {
+final class Connection[F[_] : Async] {
 
   import Connection._
 
@@ -82,7 +82,7 @@ final class Connection[F[+ _] : Async] {
 object Connection {
 
   /** Channel with only one consumer */
-  final class Channel[F[+ _] : Async, T] {
+  final class Channel[F[_] : Async, T] {
 
     private val queue = new ConcurrentLinkedQueue[T]()
     private var promise = Option.empty[Promise[F, T]]

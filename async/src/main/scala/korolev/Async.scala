@@ -23,7 +23,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
 @implicitNotFound("Instance of Async for ${F} is not found. If you want Future, ensure that execution context is passed to the scope (import korolev.execution.defaultExecutor)")
-trait Async[F[+_]] {
+trait Async[F[_]] {
   def pureStrict[A](value: A): F[A]
   def pure[A](value: => A): F[A]
   def fork[A](value: => A): F[A]
@@ -42,9 +42,9 @@ object Async {
   private val futureInstanceCache =
     mutable.Map.empty[ExecutionContext, Async[Future]]
 
-  case class Promise[F[+_], A](future: F[A], complete: Try[A] => Unit)
+  case class Promise[F[_], A](future: F[A], complete: Try[A] => Unit)
 
-  def apply[F[+_]: Async]: Async[F] = implicitly[Async[F]]
+  def apply[F[_]: Async]: Async[F] = implicitly[Async[F]]
 
   private final class FutureAsync(implicit ec: ExecutionContext) extends Async[Future] {
     val unit: Future[Unit] = Future.successful(())
@@ -52,9 +52,9 @@ object Async {
     def pure[A](value: => A): Future[A] = Future.successful(value)
     def fork[A](value: => A): Future[A] = Future(value)
     def fromTry[A](value: => Try[A]): Future[A] = Future.fromTry(value)
-    def flatMap[A, B](m: Future[A])(f: (A) => Future[B]): Future[B] = m.flatMap(f)
-    def map[A, B](m: Future[A])(f: (A) => B): Future[B] = m.map(f)
-    def run[A, U](m: Future[A])(f: (Try[A]) => U): Unit = m.onComplete(f)
+    def flatMap[A, B](m: Future[A])(f: A => Future[B]): Future[B] = m.flatMap(f)
+    def map[A, B](m: Future[A])(f: A => B): Future[B] = m.map(f)
+    def run[A, U](m: Future[A])(f: Try[A] => U): Unit = m.onComplete(f)
     def recover[A, U >: A](m: Future[A])(f: PartialFunction[Throwable, U]): Future[U] = m.recover(f)
     def sequence[A, M[X] <: TraversableOnce[X]](in: M[Future[A]])(implicit cbf: CanBuildFrom[M[Future[A]], A, M[A]]): Future[M[A]] =
       Future.sequence(in)
@@ -74,7 +74,7 @@ object Async {
     }
   }
 
-  implicit final class AsyncOps[F[+_]: Async, +A](async: => F[A]) {
+  implicit final class AsyncOps[F[_]: Async, +A](async: => F[A]) {
     def map[B](f: A => B): F[B] = Async[F].map(async)(f)
     def flatMap[B](f: A => F[B]): F[B] = Async[F].flatMap(async)(f)
     def recover[U >: A](f: PartialFunction[Throwable, U]): F[U] = Async[F].recover[A, U](async)(f)
@@ -99,7 +99,7 @@ object Async {
     def apply(f: Throwable => Unit): ErrorReporter = new ErrorReporter {
       def reportError(error: Throwable): Unit = f(error)
     }
-    val default = new ErrorReporter {
+    val default: ErrorReporter = new ErrorReporter {
       def reportError(error: Throwable): Unit = {
         error.printStackTrace()
       }

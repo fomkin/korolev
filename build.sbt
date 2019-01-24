@@ -5,7 +5,7 @@ val levshaVersion = "0.7.1"
 val unusedRepo = Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
 
 val crossVersionSettings = Seq(
-  crossScalaVersions := Seq("2.11.12", "2.12.7")
+  crossScalaVersions := Seq("2.11.12", "2.12.8")
 )
 
 val dontPublishSettings = Seq(
@@ -29,7 +29,7 @@ val commonSettings = publishSettings ++ Seq(
   git.useGitDescribe := true,
   organization := "com.github.fomkin",
   libraryDependencies ++= Seq(
-    "org.scalatest" %% "scalatest" % "3.0.4" % Test
+    "org.scalatest" %% "scalatest" % "3.0.5" % Test
   ),
   scalacOptions ++= Seq(
     "-deprecation",
@@ -78,9 +78,9 @@ lazy val `server-akkahttp` = (project in file("server") / "akkahttp").
   settings(
     normalizedName := "korolev-server-akkahttp",
     libraryDependencies ++= Seq(
-      "com.typesafe.akka" %% "akka-actor" % "2.5.16",
-      "com.typesafe.akka" %% "akka-stream" % "2.5.16",
-      "com.typesafe.akka" %% "akka-http" % "10.1.5"
+      "com.typesafe.akka" %% "akka-actor" % "2.5.19",
+      "com.typesafe.akka" %% "akka-stream" % "2.5.19",
+      "com.typesafe.akka" %% "akka-http" % "10.1.6"
     )
   ).
   dependsOn(server)
@@ -133,7 +133,7 @@ lazy val `monix-support` = project.
   settings(commonSettings: _*).
   settings(
     normalizedName := "korolev-monix-support",
-    libraryDependencies += "io.monix" %% "monix-eval" % "3.0.0-M3"
+    libraryDependencies += "io.monix" %% "monix-eval" % "3.0.0-RC2"
   ).
   dependsOn(async)
 
@@ -249,12 +249,12 @@ lazy val `performance-benchmark` = project.
   settings(dontPublishSettings:_*).
   settings(
     addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full),
-    scalaVersion := "2.12.4",
+    scalaVersion := "2.12.8",
     fork in run := true,
     libraryDependencies ++= Seq(
-      "com.typesafe.akka" %% "akka-http" % "10.1.5",
-      "com.typesafe.akka" %% "akka-stream" % "2.5.16",
-      "com.typesafe.akka" %% "akka-actor"  % "2.5.16",
+      "com.typesafe.akka" %% "akka-http" % "10.1.6",
+      "com.typesafe.akka" %% "akka-stream" % "2.5.19",
+      "com.typesafe.akka" %% "akka-actor"  % "2.5.19",
       "com.typesafe.akka" %% "akka-typed" % "2.5.8",
       "com.github.fomkin" %% "pushka-json" % "0.8.0"
     )
