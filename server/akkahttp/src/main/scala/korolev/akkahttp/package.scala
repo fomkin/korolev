@@ -23,7 +23,7 @@ import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
-import akka.stream.scaladsl.{Flow, Sink, Source}
+import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import akka.stream.{Materializer, OverflowStrategy}
 import korolev.akkahttp.util.{IncomingMessageHandler, LoggingReporter}
 import korolev.execution.defaultExecutor
@@ -61,7 +61,7 @@ package object akkahttp {
     extractRequest { request =>
       extractUnmatchedPath { path =>
         extractUpgradeToWebSocket { upgrade =>
-          val korolevRequest = mkKorolevRequest(request, path.toString)
+          val korolevRequest = mkKorolevRequest(request, path.toString, Map.empty, KorolevRequest.emptyBody)
 
           onSuccess(asyncToFuture(korolevServer(korolevRequest))) {
             case KorolevResponse.WebSocket(publish, subscribe, destroy) =>
@@ -106,7 +106,7 @@ package object akkahttp {
       extractRequest { request =>
         extractUnmatchedPath { path =>
           parameterMap { params =>
-            val korolevRequest = mkKorolevRequest(request, path.toString, params)
+            val korolevRequest = mkKorolevRequest(request, path.toString, params, KorolevRequest.emptyBody)
             val responseF = handleHttpResponse(korolevServer, korolevRequest)
             complete(responseF)
           }
@@ -114,13 +114,25 @@ package object akkahttp {
       }
     }
 
-  private def httpPostRoute[F[_]: Async](korolevServer: KorolevService[F]): Route =
+  private def httpPostRoute[F[_]](korolevServer: KorolevService[F])(implicit mat: Materializer, async: Async[F]): Route =
     post {
       extractRequest { request =>
         extractUnmatchedPath { path =>
           parameterMap { params =>
-            entity(as[Array[Byte]]) { body =>
-              val korolevRequest = mkKorolevRequest(request, path.toString, params, Some(body))
+            extractRequest { request =>
+              val queue = request
+                .entity
+                .dataBytes
+                .map(_.toArray)
+                .toMat(Sink.queue[Array[Byte]])(Keep.right)
+                .run()
+              val body = { () =>
+                val future = queue.pull()
+                val promise = async.promise[Option[Array[Byte]]]
+                future.onComplete(promise.complete)
+                promise.future
+              }
+              val korolevRequest = mkKorolevRequest(request, path.toString, params, body)
               val responseF = handleHttpResponse(korolevServer, korolevRequest)
               complete(responseF)
             }
@@ -131,8 +143,8 @@ package object akkahttp {
 
   private def mkKorolevRequest[F[_]](request: HttpRequest,
                                             path: String,
-                                            params: Map[String, String] = Map.empty,
-                                            body: Option[Array[Byte]] = None)
+                                            params: Map[String, String],
+                                            body: () => F[Option[Array[Byte]]])
                                     (implicit async: Async[F]): KorolevRequest[F] =
     KorolevRequest(
       path = Router.Path.fromString(path),
@@ -145,10 +157,7 @@ package object akkahttp {
 
         request.headers.map(h => (h.name(), h.value())) ++ contentTypeHeaders
       },
-      body = body match {
-        case Some(bytes) => () => async.pure(bytes)
-        case None => () => async.pure(Array.empty[Byte])
-      }
+      body = body
     )
 
   private def handleHttpResponse[F[_]: Async](korolevServer: KorolevService[F],
@@ -180,10 +189,11 @@ package object akkahttp {
     (contentTypeOpt, otherHeaders.toList)
   }
 
-  private def asyncToFuture[F[_]: Async, T](f: F[T]): Future[T] = {
-    val p = Promise[T]()
-    Async[F].run(f)(p.complete)
-    p.future
-  }
-
+  private def asyncToFuture[F[_]: Async, T](f: F[T]): Future[T] =
+    if (f.isInstanceOf[Future[_]]: @unchecked) f.asInstanceOf[Future[T]]
+    else {
+      val p = Promise[T]()
+      Async[F].run(f)(p.complete)
+      p.future
+    }
 }

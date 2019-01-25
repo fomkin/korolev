@@ -28,14 +28,14 @@ final case class Request[F[_]](
   params: Map[String, String],
   cookie: String => Option[String],
   headers: Seq[(String, String)],
-  body: () => F[Array[Byte]]
+  body: () => F[Option[Array[Byte]]]
 )(implicit async: Async[F]) {
 
   def strictBody(): F[Array[Byte]] = {
-    def aux(acc: List[Array[Byte]], b: F[Array[Byte]]): F[List[Array[Byte]]] = {
-      async.flatMap(b) { bytes =>
-        if (bytes.isEmpty) async.pure(acc)
-        else aux(bytes :: acc, body())
+    def aux(acc: List[Array[Byte]], b: F[Option[Array[Byte]]]): F[List[Array[Byte]]] = {
+      async.flatMap(b) {
+        case Some(bytes) => aux(bytes :: acc, body())
+        case None => async.pure(acc)
       }
     }
     async.map(aux(Nil, body())) { xs =>
@@ -43,4 +43,12 @@ final case class Request[F[_]](
       xs.foldRight(ByteBuffer.allocate(length))((a, b) => b.put(a)).array()
     }
   }
+}
+
+object Request {
+  def emptyBody[F[_]](implicit async: Async[F]): () => F[Option[Array[Byte]]] = {
+    val it = async.pure(Option.empty[Array[Byte]])
+    () => it
+  }
+
 }
