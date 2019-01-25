@@ -18,7 +18,7 @@ package korolev.execution
 
 import java.util.{Timer, TimerTask}
 
-import korolev.Async
+import korolev.{Async, Reporter}
 import korolev.Async.AsyncOps
 
 import scala.concurrent.duration.FiniteDuration
@@ -31,7 +31,7 @@ final class JavaTimerScheduler[F[_]: Async] extends Scheduler[F] {
   private val timer = new Timer()
   private val async = Async[F]
 
-  def scheduleOnce[T](delay: FiniteDuration)(job: => T): JobHandler[F, T] = {
+  def scheduleOnce[T](delay: FiniteDuration)(job: => T)(implicit r: Reporter): JobHandler[F, T] = {
     val promise = Async[F].promise[T]
     val task = new TimerTask {
       def run(): Unit = {
@@ -39,7 +39,7 @@ final class JavaTimerScheduler[F[_]: Async] extends Scheduler[F] {
           val result = job // Execute a job
           promise.complete(Success(result))
         }
-        task.runIgnoreResult()
+        task.runIgnoreResult
       }
     }
     timer.schedule(task, delay.toMillis)
@@ -49,9 +49,9 @@ final class JavaTimerScheduler[F[_]: Async] extends Scheduler[F] {
     )
   }
 
-  def schedule[U](interval: FiniteDuration)(job: => U): Cancel = {
+  def schedule[U](interval: FiniteDuration)(job: => U)(implicit r: Reporter): Cancel = {
     val task = new TimerTask {
-      def run(): Unit = async.fork(job).runIgnoreResult()
+      def run(): Unit = async.fork(job).runIgnoreResult
     }
     val millis = interval.toMillis
     timer.schedule(task, millis, millis)

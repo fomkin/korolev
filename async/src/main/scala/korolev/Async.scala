@@ -79,30 +79,15 @@ object Async {
     def flatMap[B](f: A => F[B]): F[B] = Async[F].flatMap(async)(f)
     def recover[U >: A](f: PartialFunction[Throwable, U]): F[U] = Async[F].recover[A, U](async)(f)
     def run[U](f: Try[A] => U): Unit = Async[F].run(async)(f)
-    def runOrReport[U](f: A => U)(implicit er: ErrorReporter = ErrorReporter.default): Unit =
+    def runOrReport[U](f: A => U)(implicit er: Reporter): Unit =
       Async[F].run(async) {
         case Success(x) => f(x)
-        case Failure(e) => er.reportError(e)
+        case Failure(e) => er.error("Unhandled error", e)
       }
-    def runIgnoreResult(implicit er: ErrorReporter = ErrorReporter.default): Unit =
+    def runIgnoreResult(implicit er: Reporter): Unit =
       Async[F].run(async) {
         case Success(_) => // do nothing
-        case Failure(e) => er.reportError(e)
+        case Failure(e) => er.error("Unhandled error", e)
       }
-  }
-
-  trait ErrorReporter {
-    def reportError(error: Throwable): Unit
-  }
-
-  object ErrorReporter {
-    def apply(f: Throwable => Unit): ErrorReporter = new ErrorReporter {
-      def reportError(error: Throwable): Unit = f(error)
-    }
-    val default: ErrorReporter = new ErrorReporter {
-      def reportError(error: Throwable): Unit = {
-        error.printStackTrace()
-      }
-    }
   }
 }

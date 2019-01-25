@@ -3,16 +3,15 @@ package gp
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.stream.ActorMaterializer
-import korolev.execution._
-import korolev.blazeServer._
 import korolev.akkahttp._
+import korolev.blazeServer._
+import korolev.execution._
+import korolev.state.javaSerialization._
 import org.openqa.selenium.remote.DesiredCapabilities
-import slogging.{LoggerConfig, SLF4JLoggerFactory}
 import tools._
 
-import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
-import korolev.state.javaSerialization._
+import scala.concurrent.{Await, Future}
 
 object GuineaPigRunner extends App {
 
@@ -60,8 +59,6 @@ object GuineaPigRunner extends App {
       "autoAcceptAlerts" -> "true"
     )
   )
-
-  LoggerConfig.factory = SLF4JLoggerFactory()
 
   val servers = List(
     (scenario: () => Boolean) => {

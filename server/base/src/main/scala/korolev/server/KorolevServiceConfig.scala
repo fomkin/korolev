@@ -16,6 +16,7 @@
 
 package korolev.server
 
+import korolev.Reporter
 import korolev.state.{DeviceId, EnvConfigurator, IdGenerator, SessionId}
 import korolev.{Async, Context, Router}
 import levsha.Document
@@ -34,7 +35,8 @@ case class KorolevServiceConfig[F[_]: Async, S, M](
   maxFormDataEntrySize: Int = 1024 * 1024 * 8,
   envConfigurator: EnvConfigurator[F, S, M] = EnvConfigurator.default[F, S, M],
   idGenerator: IdGenerator[F] = IdGenerator.default[F](),
-  heartbeatInterval: FiniteDuration = 5.seconds
+  heartbeatInterval: FiniteDuration = 5.seconds,
+  reporter: Reporter = Reporter.PrintReporter
 )
 
 object KorolevServiceConfig {

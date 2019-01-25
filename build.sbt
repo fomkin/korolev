@@ -55,10 +55,7 @@ lazy val server = (project in file("server") / "base").
   enablePlugins(GitVersioning).
   settings(crossVersionSettings).
   settings(commonSettings: _*).
-  settings(
-    normalizedName := "korolev-server",
-    libraryDependencies += "biz.enef" %% "slogging-slf4j" % "0.6.0"
-  ).
+  settings(normalizedName := "korolev-server").
   dependsOn(korolev)
 
 lazy val `server-blaze` = (project in file("server") / "blaze").
@@ -98,7 +95,6 @@ lazy val korolev = project.
   settings(
     normalizedName := "korolev",
     libraryDependencies ++= Seq(
-      "biz.enef" %% "slogging" % "0.6.0",
       "com.github.fomkin" %% "levsha-core" % levshaVersion,
       "com.github.fomkin" %% "levsha-events" % levshaVersion
     ),
@@ -125,6 +121,17 @@ lazy val `jcache-support` = project.
     libraryDependencies += "javax.cache" % "cache-api" % "1.0.0"
   ).
   dependsOn(server)
+
+lazy val `slf4j-support` = project.
+  enablePlugins(GitVersioning).
+  in(file("contrib/slf4j")).
+  settings(crossVersionSettings).
+  settings(commonSettings: _*).
+  settings(
+    normalizedName := "korolev-slf4j-support",
+    libraryDependencies += "org.slf4j" % "slf4j-api" % "1.7.25"
+  ).
+  dependsOn(async)
 
 lazy val `monix-support` = project.
   enablePlugins(GitVersioning).
@@ -240,6 +247,7 @@ lazy val `integration-tests` = project.
       "com.github.fomkin" %% "pushka-json" % "0.8.0"
     )
   ).
+  dependsOn(`slf4j-support`).
   dependsOn(`server-blaze`).
   dependsOn(`server-akkahttp`)
 
@@ -268,7 +276,7 @@ lazy val root = project.in(file(".")).
   aggregate(
     korolev, async,
     server, `server-blaze`, `server-akkahttp`,
-    `jcache-support`, `monix-support`,
+    `jcache-support`, `monix-support`, `slf4j-support`,
     simpleExample, routingExample, gameOfLifeExample,
     jcacheExample, formDataExample, delayExample, focusExample,
     webComponentExample, componentExample, akkaHttpExample,

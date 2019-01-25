@@ -26,7 +26,6 @@ import korolev.state.{StateDeserializer, StateManager, StateSerializer}
 import levsha.events.calculateEventPropagation
 import levsha.impl.DiffRenderContext
 import levsha.{Document, Id, XmlNs}
-import slogging.LazyLogging
 
 final class ApplicationInstance
   [
@@ -40,14 +39,16 @@ final class ApplicationInstance
     initialState: S,
     render: PartialFunction[S, Document.Node[Effect[F, S, M]]],
     router: Router[F, S, Option[S]],
-    fromScratch: Boolean
-  )
-  extends LazyLogging {
+    fromScratch: Boolean,
+    reporter: Reporter
+  ) {
+
+  import reporter.Implicit
 
   private val devMode = new DevMode.ForRenderContext(sessionId.toString, fromScratch)
   private val currentRenderNum = new AtomicInteger(0)
   private val renderContext = DiffRenderContext[Effect[F, S, M]](savedBuffer = devMode.loadRenderContext())
-  private val frontend = new ClientSideApi[F](connection)
+  private val frontend = new ClientSideApi[F](connection, reporter)
 
   val topLevelComponentInstance: ComponentInstance[F, S, M, S, Any, M] = {
     val renderer = render.lift
@@ -55,7 +56,7 @@ final class ApplicationInstance
     val component = new Component[F, S, Any, M](initialState, Component.TopLevelComponentId) {
       def render(parameters: Any, state: S): Document.Node[Effect[F, S, M]] = {
         renderer(state).getOrElse {
-          logger.error(s"Render is not defined for $state")
+          reporter.error(s"Render is not defined for $state")
           Document.Node[Effect[F, S, M]] { rc =>
             rc.openNode(XmlNs.html, "body")
             rc.addTextNode("Render is not defined for the state")
@@ -66,7 +67,7 @@ final class ApplicationInstance
     }
     new ComponentInstance[F, S, M, S, Any, M](
       Id.TopLevel, sessionId, frontend, eventRegistry,
-      stateManager, () => currentRenderNum.get(), component
+      stateManager, () => currentRenderNum.get(), component, reporter
     )
   }
 

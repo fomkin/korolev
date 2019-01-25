@@ -540,6 +540,15 @@ Korolev is not some sort of CDN node. Avoid serving lots of large files using th
 
 == Integrations
 
+=== Slf4j
+
+By default Korolev log all messages to standard output. You can redirect logs to SLF4J backend.
+
+[source,scala]
+------------------------------
+libraryDependencies += "com.github.fomkin" %% "korolev-slf4j-support" % "0.10.0"
+------------------------------
+
 === JCache
 
 For large applications, when one node can't serve all clients, you need a way to scale application to multiple nodes. Although Korolev usually use persistent connections, a case when a client connects to a wrong node is possible. First, it may happen after reconnect. Secondly, it may happen when the client downgrades his connection from WebSocket to long polling for some reason. It means that every node in a cluster should have access to all user states (sessions).
@@ -548,7 +557,7 @@ To fix this, you can apply any in-memory storage compatible with https://github.
 
 [source,scala]
 ------------------------------
-libraryDependencies += "com.github.fomkin" %% "korolev-jcache-support" % "0.6.1"
+libraryDependencies += "com.github.fomkin" %% "korolev-jcache-support" % "0.10.0"
 ------------------------------
 
 https://github.com/fomkin/korolev/blob/v0.8.0/examples/jcache/src/main/scala/JCacheExample.scala[See full example]
@@ -559,7 +568,15 @@ Korolev provides smooth Akka HTTP integration out of the box. To use it, add a d
 
 [source,scala]
 ------------------------------
-libraryDependencies += "com.github.fomkin" %% "korolev-server-akkahttp" % "0.6.1"
+libraryDependencies += "com.github.fomkin" %% "korolev-server-akkahttp" % "0.10.0"
+------------------------------
+
+[source,scala]
+------------------------------
+val service = KorolevServiceConfig[...](
+  reporter = korolev.slf4j.Slf4jReporter,
+  ...
+))
 ------------------------------
 
 And create Korolev route:
@@ -579,13 +596,15 @@ Then embed the route into your Akka HTTP routes structure.
 
 https://github.com/fomkin/korolev/blob/v0.8.0/examples/akka-http/src/main/scala/AkkaHttpExample.scala[See full example]
 
+This integration overrides default logging behavior to `akka.event.Logging`.
+
 === Monix
 
 Monix integration module provides `Async` implementation using `monix.eval.Task`. To use it, add a dependency:
 
 [source,scala]
 ------------------------------
-libraryDependencies += "com.github.fomkin" %% "korolev-monix-support" % "0.6.1"
+libraryDependencies += "com.github.fomkin" %% "korolev-monix-support" % "0.10.0"
 ------------------------------
 
 [source,scala]

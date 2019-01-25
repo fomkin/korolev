@@ -68,6 +68,7 @@ object GuineaPigService {
 
   val service = KorolevServiceConfig[Future, State, Any](
     stateStorage = storage,
+    reporter = korolev.slf4j.Slf4jReporter,
     head = {
       Seq(
         'title("The Test App"),
