@@ -1,12 +1,12 @@
 import korolev._
 import korolev.server._
-import korolev.blazeServer._
+import korolev.akkahttp._
 import korolev.execution._
 import korolev.state.javaSerialization._
 
 import scala.concurrent.Future
 
-object GameOfLife extends KorolevBlazeServer {
+object GameOfLife extends SimpleAkkaHttpKorolevApp {
 
   import Universe.globalContext._
   import Universe.globalContext.symbolDsl._
@@ -20,27 +20,28 @@ object GameOfLife extends KorolevBlazeServer {
   val viewSideS = viewSide.toString
   val cellRadiusS = cellRadius.toString
 
-  val service = blazeService[Future, Universe, Any] from KorolevServiceConfig(
-    stateStorage = StateStorage.default(Universe(universeSize)),
-    router = emptyRouter,
-    render = {
-      case universe =>
-        'body(
-          'div(
-            'button(
-              event('click) { access =>
-                access.transition { case state =>
-                  state.next
-                }
-              },
-              "Step"
-            )
-          ),
-          ns.svg('svg)('width /= viewSideS, 'height /= viewSideS,
-            for {
-              x <- 0 until universe.size
-              y <- 0 until universe.size
-            } yield {
+  val service = akkaHttpService {
+    KorolevServiceConfig[Future, Universe, Any](
+      stateStorage = StateStorage.default(Universe(universeSize)),
+      router = emptyRouter,
+      render = {
+        case universe =>
+          'body(
+            'div(
+              'button(
+                event('click) { access =>
+                  access.transition { case state =>
+                    state.next
+                  }
+                },
+                "Step"
+              )
+            ),
+            ns.svg('svg)('width /= viewSideS, 'height /= viewSideS,
+              for {
+                x <- 0 until universe.size
+                y <- 0 until universe.size
+              } yield {
                 def pos(n: Int) = {
                   val p = cellRadius + n * (cellWidth + cellGap)
                   p.toString
@@ -60,11 +61,12 @@ object GameOfLife extends KorolevBlazeServer {
                     }
                   }
                 )
-            }
+              }
+            )
           )
-        )
-    }
-  )
+      }
+    )
+  }
 }
 
 case class Universe(cells: Vector[Universe.Cell], size: Int) {

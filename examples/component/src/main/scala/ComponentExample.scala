@@ -1,13 +1,13 @@
 import korolev._
-import korolev.server._
-import korolev.blazeServer._
+import korolev.akkahttp._
 import korolev.execution._
+import korolev.server._
 import korolev.state.javaSerialization._
 
 import scala.concurrent.Future
 import scala.util.Random
 
-object ComponentExample extends KorolevBlazeServer {
+object ComponentExample extends SimpleAkkaHttpKorolevApp {
 
   import State.globalContext._
   import symbolDsl._
@@ -63,28 +63,30 @@ object ComponentExample extends KorolevBlazeServer {
     }
   }
 
-  val service = blazeService[Future, String, Any] from KorolevServiceConfig[Future, String, Any] (
-    router = emptyRouter,
-    stateStorage = StateStorage.default("a"),
-    render = {
-      case state =>
-        'body(
-          s"State is $state",
-          ComponentAsObject("Click me, i'm function") { (access, _) =>
-            access.transition(_ + Random.nextPrintableChar())
-          },
-          ComponentAsFunction("Click me, i'm object") { (access, _) =>
-            access.transition(_ + Random.nextPrintableChar())
-          },
-          'button(
-            "Click me too",
-            event('click) { access =>
+  val service: AkkaHttpService = akkaHttpService {
+    KorolevServiceConfig[Future, String, Any] (
+      router = emptyRouter,
+      stateStorage = StateStorage.default("a"),
+      render = {
+        case state =>
+          'body(
+            s"State is $state",
+            ComponentAsObject("Click me, i'm function") { (access, _) =>
               access.transition(_ + Random.nextPrintableChar())
-            }
+            },
+            ComponentAsFunction("Click me, i'm object") { (access, _) =>
+              access.transition(_ + Random.nextPrintableChar())
+            },
+            'button(
+              "Click me too",
+              event('click) { access =>
+                access.transition(_ + Random.nextPrintableChar())
+              }
+            )
           )
-        )
-    }
-  )
+      }
+    )
+  }
 }
 
 object State {

@@ -3,11 +3,12 @@ package tools
 import java.net.URL
 import java.util.concurrent.Executors
 
+import akka.actor.ActorSystem
 import org.openqa.selenium.remote.RemoteWebDriver
 
 import scala.concurrent.{ExecutionContext, Future}
 
-case class Scenario(name: String, steps: Seq[Step]) {
+case class Scenario(name: String, steps: Seq[Step])(implicit actorSystem: ActorSystem) {
 
   def run(cases: Caps*): Future[Boolean] = {
     // Sauce labs give us 5 parallel sessions

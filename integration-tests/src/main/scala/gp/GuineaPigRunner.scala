@@ -1,10 +1,7 @@
 package gp
 
-import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import akka.stream.ActorMaterializer
 import korolev.akkahttp._
-import korolev.blazeServer._
 import korolev.execution._
 import korolev.state.javaSerialization._
 import org.openqa.selenium.remote.DesiredCapabilities
@@ -61,22 +58,20 @@ object GuineaPigRunner extends App {
   )
 
   val servers = List(
-    (scenario: () => Boolean) => {
-      println("Starting Blaze server")
-      val service = blazeService[Future, GuineaPigService.State, Any].from(GuineaPigService.service)
-      val config = BlazeServerConfig(port = 8000, doNotBlockCurrentThread = true)
-      val server = korolev.blazeServer.runServer(service, config)
-      Future {
-        val result = scenario()
-        server.close()
-        println("Blaze server shutting down")
-        result
-      }
-    },
+//    (scenario: () => Boolean) => {
+//      println("Starting Blaze server")
+//      val service = blazeService[Future, GuineaPigService.State, Any].from(GuineaPigService.service)
+//      val config = BlazeServerConfig(port = 8000, doNotBlockCurrentThread = true)
+//      val server = korolev.blazeServer.runServer(service, config)
+//      Future {
+//        val result = scenario()
+//        server.close()
+//        println("Blaze server shutting down")
+//        result
+//      }
+//    },
     (scenario: () => Boolean) => {
       println("Starting Akka-http server")
-      implicit val actorSystem = ActorSystem()
-      implicit val materializer = ActorMaterializer()
       val route = akkaHttpService(GuineaPigService.service).apply(AkkaHttpServerConfig())
       Http().bindAndHandle(route, "localhost", 8000).map { server =>
         val result = scenario()
