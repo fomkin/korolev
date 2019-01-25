@@ -23,6 +23,7 @@ From server to the client
 9. Keep-alive message from server (noop)
 10. EvalJs(descriptor, code)
 11. ExtractEventData(descriptor, renderNum)
+11. UploadFile(descriptor, renderNum)
 
 ### Modify dom commands
 

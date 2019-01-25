@@ -22,7 +22,7 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 
 import korolev.Async._
-import korolev.internal.{ApplicationInstance, Connection}
+import korolev.internal.{ApplicationInstance, Connection, LazyBytes}
 import korolev.state._
 import levsha.Id
 
@@ -210,6 +210,9 @@ package object server {
             korolev.topLevelComponentInstance.resolveFormData(descriptor, formData)
           }
 
+          def resolveFile(descriptor: String, bytes: LazyBytes[F]): Unit =
+            korolev.topLevelComponentInstance.resolveFile(descriptor, bytes)
+
           def destroy(): F[Unit] = {
             if (aliveRef.getAndSet(false))
               env.onDestroy()
@@ -262,7 +265,7 @@ package object server {
                 val res = Response.Http(Response.Status.BadRequest, error)
                 Async[F].pure(res)
               case Some(boundary) =>
-                r.strictBody().map { body =>
+                r.body.toStrict.map { body =>
                   val formData = Try(formDataCodec.decode(ByteBuffer.wrap(body), boundary))
                   session.resolveFormData(descriptor, formData)
                   Response.Http(Response.Status.Ok, None)
@@ -271,12 +274,20 @@ package object server {
           case None =>
             Async[F].pure(Response.Http(Response.Status.BadRequest, "Session doesn't exist"))
         }
-      case r @ Request(Root / "bridge" / "long-polling" / deviceId / sessionId / "publish", _, _, _, _) =>
+      case Request(Root / "bridge" / deviceId / sessionId / "file" / descriptor, _, _, _, body) =>
+        sessions.get(makeSessionKey(deviceId, sessionId)) match {
+          case Some(session) =>
+            session.resolveFile(descriptor, body)
+            body.finished.map(_ => Response.Http(Response.Status.Ok, None))
+          case None =>
+            Async[F].pure(Response.Http(Response.Status.BadRequest, "Session doesn't exist"))
+        }
+      case Request(Root / "bridge" / "long-polling" / deviceId / sessionId / "publish", _, _, _, body) =>
         sessions.get(makeSessionKey(deviceId, sessionId)) match {
           case Some(session) =>
             for {
-              body <- r.strictBody()
-              message = new String(body, StandardCharsets.UTF_8)
+              bytes <- body.toStrict
+              message = new String(bytes, StandardCharsets.UTF_8)
               _ <- session.publish(message)
             } yield {
               Response.Http(Response.Status.Ok)

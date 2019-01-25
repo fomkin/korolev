@@ -16,39 +16,13 @@
 
 package korolev.server
 
-import java.nio.ByteBuffer
-
+import korolev.internal.LazyBytes
 import korolev.{Async, Router}
 
-/**
-  * @param body Deliver bytes of request body. empty array means EOF
-  */
-final case class Request[F[_]](
+final case class Request[F[_]: Async](
   path: Router.Path,
   params: Map[String, String],
   cookie: String => Option[String],
   headers: Seq[(String, String)],
-  body: () => F[Option[Array[Byte]]]
-)(implicit async: Async[F]) {
-
-  def strictBody(): F[Array[Byte]] = {
-    def aux(acc: List[Array[Byte]], b: F[Option[Array[Byte]]]): F[List[Array[Byte]]] = {
-      async.flatMap(b) {
-        case Some(bytes) => aux(bytes :: acc, body())
-        case None => async.pure(acc)
-      }
-    }
-    async.map(aux(Nil, body())) { xs =>
-      val length = xs.foldLeft(0)(_ + _.length)
-      xs.foldRight(ByteBuffer.allocate(length))((a, b) => b.put(a)).array()
-    }
-  }
-}
-
-object Request {
-  def emptyBody[F[_]](implicit async: Async[F]): () => F[Option[Array[Byte]]] = {
-    val it = async.pure(Option.empty[Array[Byte]])
-    () => it
-  }
-
-}
+  body: LazyBytes[F]
+)

@@ -332,6 +332,25 @@ export class Korolev {
     request.send(formData);
   }
 
+   /**
+    * @param {string} id
+    * @param {string} descriptor
+    */
+  uploadFile(id, descriptor) {
+    let self = this;
+    let input = self.els[id];
+    let request = new XMLHttpRequest();
+    let deviceId = getDeviceId();
+    let uri = self.config['r'] +
+      'bridge' +
+      '/' + deviceId +
+      '/' + self.config['sid'] +
+      '/file' +
+      '/' + descriptor;
+    request.open("POST", uri, true);
+    request.send(input.files[0]);
+  }
+
   reloadCss() {
     var links = document.getElementsByTagName("link");
     for (var i = 0; i < links.length; i++) {

@@ -175,6 +175,13 @@ lazy val formDataExample = (project in examples / "form-data").
   settings(mainClass := Some("FormDataExample")).
   dependsOn(`server-akkahttp`)
 
+lazy val `file-streaming-example` = (project in examples / "file-streaming-example").
+  disablePlugins(HeaderPlugin).
+  settings(crossVersionSettings).
+  settings(exampleSettings: _*).
+  settings(mainClass := Some("FileStreamingExample")).
+  dependsOn(`server-akkahttp`)
+
 lazy val delayExample = (project in examples / "delay").
   disablePlugins(HeaderPlugin).
   settings(crossVersionSettings).
@@ -267,7 +274,7 @@ lazy val root = project.in(file(".")).
     server, `server-akkahttp`,
     `jcache-support`, `monix-support`, `slf4j-support`,
     simpleExample, routingExample, gameOfLifeExample,
-    jcacheExample, formDataExample, delayExample, focusExample,
+    jcacheExample, formDataExample, `file-streaming-example`, delayExample, focusExample,
     webComponentExample, componentExample, akkaHttpExample,
     eventDataExample, `integration-tests`
   )

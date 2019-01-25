@@ -63,7 +63,7 @@ final class ComponentInstance
   private val async = Async[F]
   private val miscLock = new Object()
   private val subscriptionsLock = new Object()
-  private val lastFromId = new AtomicInteger(0)
+  private val lastPostDescriptor = new AtomicInteger(0)
 
   private val markedDelays = mutable.Set.empty[Id] // Set of the delays which are should survive
   private val markedComponentInstances = mutable.Set.empty[Id]
@@ -72,6 +72,7 @@ final class ComponentInstance
   private val events = mutable.Map.empty[EventId, Event[F, CS, E]]
   private val nestedComponents = mutable.Map.empty[Id, ComponentInstance[F, CS, E, _, _, _]]
   private val formDataPromises = mutable.Map.empty[String, Promise[F, FormData]]
+  private val downloadFilePromises = mutable.Map.empty[String, Promise[F, LazyBytes[F]]]
   private val formDataProgressTransitions = mutable.Map.empty[String, (Int, Int) => Transition[CS]]
 
   private val stateChangeSubscribers = mutable.ArrayBuffer.empty[(Id, Any) => Unit]
@@ -130,7 +131,7 @@ final class ComponentInstance
 
     def downloadFormData(element: ElementId[F, CS, E]): FormDataDownloader[F, CS] = new FormDataDownloader[F, CS] {
 
-      private val descriptor = nodeId.mkString + lastFromId.getAndIncrement()
+      private val descriptor = nodeId.mkString + lastPostDescriptor.getAndIncrement()
 
       def start(): F[FormData] = getId(element) flatMap { id =>
         val promise = async.promise[FormData]
@@ -143,6 +144,18 @@ final class ComponentInstance
         formDataProgressTransitions.put(descriptor, f)
         this
       }
+    }
+
+    def downloadFile(id: ElementId[F, CS, E]): F[Array[Byte]] = {
+      downloadFileAsStream(id).flatMap(_.toStrict)
+    }
+
+    def downloadFileAsStream(elementId: ElementId[F, CS, E]): F[LazyBytes[F]] = {
+      val promise = async.promise[LazyBytes[F]]
+      val descriptor = nodeId.mkString + lastPostDescriptor.getAndIncrement()
+      frontend.uploadFile(elements(elementId), descriptor)
+      downloadFilePromises.put(descriptor, promise)
+      promise.future
     }
 
     def evalJs(code: String): F[String] = frontend.evalJs(code)
@@ -358,6 +371,18 @@ final class ComponentInstance
       case None =>
         nestedComponents.values.foreach { nested =>
           nested.resolveFormData(descriptor, formData)
+        }
+    }
+  }
+
+  def resolveFile(descriptor: String, bytes: LazyBytes[F]): Unit = miscLock.synchronized {
+    downloadFilePromises.get(descriptor) match {
+      case Some(promise) =>
+        downloadFilePromises.remove(descriptor)
+        promise.complete(Success(bytes))
+      case None =>
+        nestedComponents.values.foreach { nested =>
+          nested.resolveFile(descriptor, bytes)
         }
     }
   }

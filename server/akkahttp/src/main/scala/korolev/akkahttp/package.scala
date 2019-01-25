@@ -27,10 +27,12 @@ import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import akka.stream.{Materializer, OverflowStrategy}
 import korolev.akkahttp.util.{IncomingMessageHandler, LoggingReporter}
 import korolev.execution.defaultExecutor
+import korolev.internal.LazyBytes
 import korolev.server.{KorolevService, KorolevServiceConfig, MimeTypes, Request => KorolevRequest, Response => KorolevResponse}
 import korolev.state.{StateDeserializer, StateSerializer}
 
 import scala.concurrent.{Future, Promise}
+import scala.util.Success
 
 package object akkahttp {
 
@@ -61,7 +63,7 @@ package object akkahttp {
     extractRequest { request =>
       extractUnmatchedPath { path =>
         extractUpgradeToWebSocket { upgrade =>
-          val korolevRequest = mkKorolevRequest(request, path.toString, Map.empty, KorolevRequest.emptyBody)
+          val korolevRequest = mkKorolevRequest(request, path.toString, Map.empty, LazyBytes.empty)
 
           onSuccess(asyncToFuture(korolevServer(korolevRequest))) {
             case KorolevResponse.WebSocket(publish, subscribe, destroy) =>
@@ -106,7 +108,7 @@ package object akkahttp {
       extractRequest { request =>
         extractUnmatchedPath { path =>
           parameterMap { params =>
-            val korolevRequest = mkKorolevRequest(request, path.toString, params, KorolevRequest.emptyBody)
+            val korolevRequest = mkKorolevRequest(request, path.toString, params, LazyBytes.empty)
             val responseF = handleHttpResponse(korolevServer, korolevRequest)
             complete(responseF)
           }
@@ -126,12 +128,18 @@ package object akkahttp {
                 .map(_.toArray)
                 .toMat(Sink.queue[Array[Byte]])(Keep.right)
                 .run()
-              val body = { () =>
+              val finished = async.promise[Unit]
+              val pull = { () =>
                 val future = queue.pull()
                 val promise = async.promise[Option[Array[Byte]]]
-                future.onComplete(promise.complete)
+                future.onComplete { `try` =>
+                  if (`try`.isSuccess && `try`.get.isEmpty)
+                    finished.complete(Success(()))
+                  promise.complete(`try`)
+                }
                 promise.future
               }
+              val body = LazyBytes(pull, finished.future, request.entity.contentLengthOption)
               val korolevRequest = mkKorolevRequest(request, path.toString, params, body)
               val responseF = handleHttpResponse(korolevServer, korolevRequest)
               complete(responseF)
@@ -144,7 +152,7 @@ package object akkahttp {
   private def mkKorolevRequest[F[_]](request: HttpRequest,
                                             path: String,
                                             params: Map[String, String],
-                                            body: () => F[Option[Array[Byte]]])
+                                            body: LazyBytes[F])
                                     (implicit async: Async[F]): KorolevRequest[F] =
     KorolevRequest(
       path = Router.Path.fromString(path),

@@ -73,6 +73,9 @@ final class ClientSideApi[F[_]: Async](connection: Connection[F], reporter: Repo
   def uploadForm(id: Id, descriptor: String): Unit =
     connection.send(Procedure.UploadForm.code, id.mkString, descriptor)
 
+  def uploadFile(id: Id, descriptor: String): Unit =
+    connection.send(Procedure.UploadFile.code, id.mkString, descriptor)
+
   def focus(id: Id): Unit =
     connection.send(Procedure.Focus.code, id.mkString)
 
@@ -244,6 +247,7 @@ object ClientSideApi {
     case object KeepAlive extends Procedure(9) // ()
     case object EvalJs extends Procedure(10) // (code)
     case object ExtractEventData extends Procedure(11) // (descriptor, renderNum)
+    case object UploadFile extends Procedure(12) // (id, descriptor)
 
     val All = Set(
       SetRenderNum, CleanRoot, ListenEvent, ExtractProperty,

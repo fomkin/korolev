@@ -16,7 +16,7 @@
 
 package korolev
 
-import korolev.internal.{ClientSideApi, ComponentInstance, EventRegistry}
+import korolev.internal.{ClientSideApi, ComponentInstance, EventRegistry, LazyBytes}
 import korolev.state.{StateDeserializer, StateManager, StateSerializer}
 import levsha._
 import levsha.events.EventPhase
@@ -148,6 +148,18 @@ object Context {
       * @return
       */
     def downloadFormData(id: ElementId[F, S, M]): FormDataDownloader[F, S]
+
+    /**
+      * Download selected file from input correspondent to given element id.
+      */
+    def downloadFile(id: ElementId[F, S, M]): F[Array[Byte]]
+
+    /**
+      * Same as [[downloadFile]] but for stream mode. The method is useful
+      * when user want to upload very large file which is problematic to keep
+      * in memory (especially when count of users is more than one).
+      */
+    def downloadFileAsStream(id: ElementId[F, S, M]): F[LazyBytes[F]]
 
     /**
       * Gives current state.
