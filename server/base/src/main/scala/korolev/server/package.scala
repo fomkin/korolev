@@ -17,6 +17,7 @@
 package korolev
 
 import java.io.{ByteArrayOutputStream, InputStream}
+import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 
@@ -35,7 +36,7 @@ package object server {
   val StateStorage = korolev.state.StateStorage
 
   type MimeTypes = String => Option[String]
-  type KorolevService[F[_]] = PartialFunction[Request, F[Response]]
+  type KorolevService[F[_]] = PartialFunction[Request[F], F[Response]]
 
   def korolevService
       [
@@ -59,7 +60,7 @@ package object server {
         stateManager <- maybeStateManager.fold(config.stateStorage.create(deviceId, sessionId))(Async[F].pure(_))
       } yield (stateManager, maybeStateManager.isEmpty)
 
-    def renderStatic(request: Request): F[Response] =
+    def renderStatic(request: Request[F]): F[Response] =
       for {
         deviceId <- deviceFromRequest(request)
         sessionId <- config.idGenerator.generateSessionId()
@@ -121,7 +122,7 @@ package object server {
       /**
         * @return (resource bytes, ContentType)
         */
-      def unapply(req: Request): Option[(Array[Byte], String)] =
+      def unapply(req: Request[F]): Option[(Array[Byte], String)] =
         req.path match {
           case Root => None
           case path @ _ / fileName =>
@@ -153,7 +154,7 @@ package object server {
       }
     }
 
-    def deviceFromRequest(request: Request): F[DeviceId] =
+    def deviceFromRequest(request: Request[F]): F[DeviceId] =
       request.cookie(Cookies.DeviceId) match {
         case None => config.idGenerator.generateDeviceId()
         case Some(deviceId) => Async[F].pure(deviceId)
@@ -235,7 +236,7 @@ package object server {
 
     val formDataCodec = new FormDataCodec(config.maxFormDataEntrySize)
 
-    val service: PartialFunction[Request, F[Response]] = {
+    val service: PartialFunction[Request[F], F[Response]] = {
       case matchStatic(stream, fileExtensionOpt) =>
         val headers = mimeTypes(fileExtensionOpt).fold(Seq.empty[(String, String)]) {
           fileExtension =>
@@ -243,7 +244,7 @@ package object server {
         }
         val response = Response.Http(Response.Status.Ok, Some(stream), headers)
         Async[F].pure(response)
-      case Request(Root / "bridge" / deviceId / sessionId / "form-data" / descriptor, _, _, headers, body) =>
+      case r @ Request(Root / "bridge" / deviceId / sessionId / "form-data" / descriptor, _, _, headers, _) =>
         sessions.get(makeSessionKey(deviceId, sessionId)) match {
           case Some(session) =>
             val boundaryOpt = headers collectFirst {
@@ -261,20 +262,25 @@ package object server {
                 val res = Response.Http(Response.Status.BadRequest, error)
                 Async[F].pure(res)
               case Some(boundary) =>
-                val formData = Try(formDataCodec.decode(body, boundary))
-                session.resolveFormData(descriptor, formData)
-                Async[F].pure(Response.Http(Response.Status.Ok, None))
+                r.strictBody().map { body =>
+                  val formData = Try(formDataCodec.decode(ByteBuffer.wrap(body), boundary))
+                  session.resolveFormData(descriptor, formData)
+                  Response.Http(Response.Status.Ok, None)
+                }
             }
           case None =>
             Async[F].pure(Response.Http(Response.Status.BadRequest, "Session doesn't exist"))
         }
-      case Request(Root / "bridge" / "long-polling" / deviceId / sessionId / "publish", _, _, _, body) =>
+      case r @ Request(Root / "bridge" / "long-polling" / deviceId / sessionId / "publish", _, _, _, _) =>
         sessions.get(makeSessionKey(deviceId, sessionId)) match {
           case Some(session) =>
-            val message = new String(body.array(), StandardCharsets.UTF_8)
-            session
-              .publish(message)
-              .map(_ => Response.Http(Response.Status.Ok))
+            for {
+              body <- r.strictBody()
+              message = new String(body, StandardCharsets.UTF_8)
+              _ <- session.publish(message)
+            } yield {
+              Response.Http(Response.Status.Ok)
+            }
           case None =>
             Async[F].pure(Response.Http(Response.Status.BadRequest, "Session doesn't exist"))
         }

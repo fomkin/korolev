@@ -16,8 +16,6 @@
 
 package korolev
 
-import java.nio.ByteBuffer
-
 import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model._
@@ -131,10 +129,11 @@ package object akkahttp {
       }
     }
 
-  private def mkKorolevRequest(request: HttpRequest,
-                               path: String,
-                               params: Map[String, String] = Map.empty,
-                               body: Option[Array[Byte]] = None): KorolevRequest =
+  private def mkKorolevRequest[F[_]](request: HttpRequest,
+                                            path: String,
+                                            params: Map[String, String] = Map.empty,
+                                            body: Option[Array[Byte]] = None)
+                                    (implicit async: Async[F]): KorolevRequest[F] =
     KorolevRequest(
       path = Router.Path.fromString(path),
       params,
@@ -146,11 +145,14 @@ package object akkahttp {
 
         request.headers.map(h => (h.name(), h.value())) ++ contentTypeHeaders
       },
-      body = body.fold(ByteBuffer.allocate(0))(ByteBuffer.wrap)
+      body = body match {
+        case Some(bytes) => () => async.pure(bytes)
+        case None => () => async.pure(Array.empty[Byte])
+      }
     )
 
   private def handleHttpResponse[F[_]: Async](korolevServer: KorolevService[F],
-                                               korolevRequest: KorolevRequest): Future[HttpResponse] =
+                                               korolevRequest: KorolevRequest[F]): Future[HttpResponse] =
     asyncToFuture(korolevServer(korolevRequest)).map {
       case KorolevResponse.Http(status, streamOpt, responseHeaders) =>
         val (contentTypeOpt, otherHeaders) = getContentTypeAndResponseHeaders(responseHeaders)

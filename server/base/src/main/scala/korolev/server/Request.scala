@@ -18,12 +18,29 @@ package korolev.server
 
 import java.nio.ByteBuffer
 
-import korolev.Router
+import korolev.{Async, Router}
 
-case class Request(
+/**
+  * @param body Deliver bytes of request body. empty array means EOF
+  */
+final case class Request[F[_]](
   path: Router.Path,
   params: Map[String, String],
   cookie: String => Option[String],
   headers: Seq[(String, String)],
-  body: ByteBuffer
-)
+  body: () => F[Array[Byte]]
+)(implicit async: Async[F]) {
+
+  def strictBody(): F[Array[Byte]] = {
+    def aux(acc: List[Array[Byte]], b: F[Array[Byte]]): F[List[Array[Byte]]] = {
+      async.flatMap(b) { bytes =>
+        if (bytes.isEmpty) async.pure(acc)
+        else aux(bytes :: acc, body())
+      }
+    }
+    async.map(aux(Nil, body())) { xs =>
+      val length = xs.foldLeft(0)(_ + _.length)
+      xs.foldRight(ByteBuffer.allocate(length))((a, b) => b.put(a)).array()
+    }
+  }
+}
