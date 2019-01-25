@@ -58,16 +58,6 @@ lazy val server = (project in file("server") / "base").
   settings(normalizedName := "korolev-server").
   dependsOn(korolev)
 
-lazy val `server-blaze` = (project in file("server") / "blaze").
-  enablePlugins(GitVersioning).
-  settings(commonSettings: _*).
-  settings(crossVersionSettings).
-  settings(
-    normalizedName := "korolev-server-blaze",
-    libraryDependencies ++= Seq("org.http4s" %% "blaze-http" % "0.12.11")
-  ).
-  dependsOn(server)
-
 lazy val `server-akkahttp` = (project in file("server") / "akkahttp").
   enablePlugins(GitVersioning).
   settings(crossVersionSettings).
@@ -152,21 +142,21 @@ lazy val simpleExample = (project in examples / "simple").
   settings(crossVersionSettings).
   settings(exampleSettings: _*).
   settings(mainClass := Some("SimpleExample")).
-  dependsOn(`server-blaze`)
+  dependsOn(`server-akkahttp`)
 
 lazy val routingExample = (project in examples / "routing").
   disablePlugins(HeaderPlugin).
   settings(crossVersionSettings).
   settings(exampleSettings: _*).
   settings(mainClass := Some("RoutingExample")).
-  dependsOn(`server-blaze`)
+  dependsOn(`server-akkahttp`)
 
 lazy val gameOfLifeExample = (project in examples / "game-of-life").
   disablePlugins(HeaderPlugin).
   settings(crossVersionSettings).
   settings(exampleSettings: _*).
   settings(mainClass := Some("GameOfLife")).
-  dependsOn(`server-blaze`)
+  dependsOn(`server-akkahttp`)
 
 lazy val jcacheExample = (project in examples / "jcache").
   disablePlugins(HeaderPlugin).
@@ -176,42 +166,42 @@ lazy val jcacheExample = (project in examples / "jcache").
     mainClass := Some("JCacheExample"),
     libraryDependencies += "com.hazelcast" % "hazelcast" % "3.8"
   ).
-  dependsOn(`server-blaze`, `jcache-support`)
+  dependsOn(`server-akkahttp`, `jcache-support`)
 
 lazy val formDataExample = (project in examples / "form-data").
   disablePlugins(HeaderPlugin).
   settings(crossVersionSettings).
   settings(exampleSettings: _*).
   settings(mainClass := Some("FormDataExample")).
-  dependsOn(`server-blaze`)
+  dependsOn(`server-akkahttp`)
 
 lazy val delayExample = (project in examples / "delay").
   disablePlugins(HeaderPlugin).
   settings(crossVersionSettings).
   settings(exampleSettings: _*).
   settings(mainClass := Some("DelayExample")).
-  dependsOn(`server-blaze`)
+  dependsOn(`server-akkahttp`)
 
 lazy val focusExample = (project in examples / "focus").
   disablePlugins(HeaderPlugin).
   settings(crossVersionSettings).
   settings(exampleSettings: _*).
   settings(mainClass := Some("FocusExample")).
-  dependsOn(`server-blaze`)
+  dependsOn(`server-akkahttp`)
 
 lazy val webComponentExample = (project in examples / "web-component").
   disablePlugins(HeaderPlugin).
   settings(crossVersionSettings).
   settings(exampleSettings: _*).
   settings(mainClass := Some("WebComponentExample")).
-  dependsOn(`server-blaze`)
+  dependsOn(`server-akkahttp`)
 
 lazy val componentExample = (project in examples / "component").
   disablePlugins(HeaderPlugin).
   settings(crossVersionSettings).
   settings(exampleSettings: _*).
   settings(mainClass := Some("ComponentExample")).
-  dependsOn(`server-blaze`)
+  dependsOn(`server-akkahttp`)
 
 lazy val akkaHttpExample = (project in examples / "akka-http").
   disablePlugins(HeaderPlugin).
@@ -232,7 +222,7 @@ lazy val eventDataExample = (project in examples / "event-data").
   settings(crossVersionSettings).
   settings(exampleSettings: _*).
   settings(mainClass := Some("EventDataExample")).
-  dependsOn(`server-blaze`)
+  dependsOn(`server-akkahttp`)
 
 lazy val `integration-tests` = project.
   disablePlugins(HeaderPlugin).
@@ -248,7 +238,6 @@ lazy val `integration-tests` = project.
     )
   ).
   dependsOn(`slf4j-support`).
-  dependsOn(`server-blaze`).
   dependsOn(`server-akkahttp`)
 
 lazy val `performance-benchmark` = project.
@@ -275,7 +264,7 @@ lazy val root = project.in(file(".")).
   settings(dontPublishSettings:_*).
   aggregate(
     korolev, async,
-    server, `server-blaze`, `server-akkahttp`,
+    server, `server-akkahttp`,
     `jcache-support`, `monix-support`, `slf4j-support`,
     simpleExample, routingExample, gameOfLifeExample,
     jcacheExample, formDataExample, delayExample, focusExample,

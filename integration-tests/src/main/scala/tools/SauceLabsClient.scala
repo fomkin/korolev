@@ -1,22 +1,16 @@
 package tools
 
-import java.nio.ByteBuffer
 import java.util.Base64
-import javax.net.ssl.SSLContext
 
-import org.http4s.blaze.channel.nio2.ClientChannelFactory
-import org.http4s.blaze.http.{HttpClient, HttpResponse}
-import org.http4s.blaze.util.{Execution, GenericSSLContext}
+import akka.actor.ActorSystem
+import akka.http.scaladsl.Http
+import akka.http.scaladsl.model._
+import akka.http.scaladsl.model.headers._
 
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Await
 import scala.concurrent.duration._
 
-class SauceLabsClient(userName: String, accessKey: String, jobId: String) extends HttpClient {
-
-  import scala.concurrent.ExecutionContext.Implicits.global
-
-  override lazy val connectionManager = new ClientChannelFactory()
-  override protected val sslContext: SSLContext = GenericSSLContext.clientSSLContext()
+class SauceLabsClient(userName: String, accessKey: String, jobId: String)(implicit actorSystem: ActorSystem) {
 
   def setName(name: String): Unit = {
     putToJob(s"""{"name": "$name"}""")
@@ -31,25 +25,18 @@ class SauceLabsClient(userName: String, accessKey: String, jobId: String) extend
       val s = s"$userName:$accessKey"
       Base64.getEncoder.encodeToString(s.getBytes)
     }
-    val headers = Seq(
-      "content-type" -> "application/json",
-      "authorization" -> s"Basic $authorization"
+
+    val request = HttpRequest(
+      uri = s"https://saucelabs.com/rest/v1/$userName/jobs/$jobId",
+      method = HttpMethods.PUT,
+      headers = List(Authorization(BasicHttpCredentials(authorization))),
+      entity = HttpEntity(ContentTypes.`application/json`, data.getBytes)
     )
-    val response = PUT(
-      url = s"https://saucelabs.com/rest/v1/$userName/jobs/$jobId", headers,
-      body = ByteBuffer.wrap(data.getBytes),
-      5 seconds
-    )
+
+    val response = Http()
+      .singleRequest(request)
+
     Await.result(response, 10 seconds)
     ()
-  }
-
-  // Cause blaze client doesn't support anything else GET!
-  def PUT(url: String, headers: Seq[(String, String)], body: ByteBuffer,timeout: Duration): Future[HttpResponse] = {
-    val r = runReq("PUT", url, headers, body, timeout)
-    r.flatMap {
-      case r: HttpResponse => Future.successful(r)
-      case _ => Future.failed(new Exception(s"Received invalid response type: ${r.getClass}"))
-    }(Execution.directec)
   }
 }

@@ -1,4 +1,5 @@
 
+import akka.actor.ActorSystem
 import org.openqa.selenium.{JavascriptExecutor, WebDriver, WebElement}
 import org.slf4j.LoggerFactory
 
@@ -11,7 +12,7 @@ package object tools {
   def step(caption: String)(lambda: WebDriver => StepResult) =
     Step(caption, lambda)
 
-  def scenario(name: String)(steps: Step*): Scenario =
+  def scenario(name: String)(steps: Step*)(implicit as: ActorSystem): Scenario =
     Scenario(name, steps)
 
   def assert(message: String, f: => Boolean) = {
