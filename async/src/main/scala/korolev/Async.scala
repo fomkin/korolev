@@ -82,12 +82,12 @@ object Async {
     def runOrReport[U](f: A => U)(implicit er: Reporter): Unit =
       Async[F].run(async) {
         case Success(x) => f(x)
-        case Failure(e) => er.error(e)
+        case Failure(e) => er.error("Unhandled error", e)
       }
     def runIgnoreResult(implicit er: Reporter): Unit =
       Async[F].run(async) {
         case Success(_) => // do nothing
-        case Failure(e) => er.error(e)
+        case Failure(e) => er.error("Unhandled error", e)
       }
   }
 }

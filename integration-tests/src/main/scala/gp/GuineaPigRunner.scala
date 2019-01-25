@@ -60,9 +60,6 @@ object GuineaPigRunner extends App {
     )
   )
 
-  // TODO configure slf4j
-  //LoggerConfig.factory = SLF4JLoggerFactory()
-
   val servers = List(
     (scenario: () => Boolean) => {
       println("Starting Blaze server")
