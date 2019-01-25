@@ -27,7 +27,6 @@ import korolev.state.{StateDeserializer, StateManager, StateSerializer}
 import levsha.Document.Node
 import levsha.{Id, StatefulRenderContext, XmlNs}
 import levsha.events.EventId
-import slogging.LazyLogging
 
 import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
@@ -54,11 +53,12 @@ final class ComponentInstance
     eventRegistry: EventRegistry[F],
     stateManager: StateManager[F],
     getRenderNum: () => Int,
-    val component: Component[F, CS, P, E]
-  )
-  extends LazyLogging { self =>
+    val component: Component[F, CS, P, E],
+    reporter: Reporter
+  ) { self =>
 
   import ComponentInstance._
+  import reporter.Implicit
 
   private val async = Async[F]
   private val miscLock = new Object()
@@ -155,7 +155,7 @@ final class ComponentInstance
   private def applyEventResult(effect: F[Unit]): Unit = {
     // Run effect
     effect.run {
-      case Failure(e) => logger.error("Exception during applying transition", e)
+      case Failure(e) => reporter.error("Exception during applying transition", e)
       case Success(_) => ()
     }
   }
@@ -196,7 +196,7 @@ final class ComponentInstance
       } catch {
         case e: MatchError =>
           Node[Effect[F, CS, E]] { rc =>
-            logger.error(s"Render is not defined for $state", e)
+            reporter.error(s"Render is not defined for $state", e)
             rc.openNode(XmlNs.html, "span")
             rc.addTextNode("Render is not defined for the state")
             rc.closeNode("span")
@@ -224,7 +224,7 @@ final class ComponentInstance
             val id = rc.currentContainerId
             markedDelays += id
             if (!delays.contains(id)) {
-              val delayInstance = new DelayInstance(delay)
+              val delayInstance = new DelayInstance(delay, reporter)
               delays.put(id, delayInstance)
               delayInstance.start(browserAccess)
             }
@@ -238,7 +238,8 @@ final class ComponentInstance
                 n.applyRenderContext(entry.parameters, proxy, snapshot)
               case _ =>
                 // Create new nested component instance
-                val n = entry.createInstance(id, sessionId, frontend, eventRegistry, stateManager, getRenderNum)
+                val n = entry.createInstance(
+                  id, sessionId, frontend, eventRegistry, stateManager, getRenderNum, reporter)
                 markedComponentInstances += id
                 nestedComponents.put(id, n)
                 n.subscribeStateChange { (id, state) =>
@@ -269,10 +270,10 @@ final class ComponentInstance
           }
         } catch {
           case e: MatchError =>
-            logger.warn("Transition doesn't fit the state", e)
+            reporter.warning("Transition doesn't fit the state", e)
             async.unit
           case e: Throwable =>
-            logger.error("Exception happened when applying transition", e)
+            reporter.error("Exception happened when applying transition", e)
             async.unit
         }
       } runOrReport { _ =>
@@ -379,7 +380,9 @@ private object ComponentInstance {
   import Context.Access
   import Context.Delay
 
-  final class DelayInstance[F[_]: Async: Scheduler, S, M](delay: Delay[F, S, M]) {
+  final class DelayInstance[F[_]: Async: Scheduler, S, M](delay: Delay[F, S, M], reporter: Reporter) {
+
+    import reporter.Implicit
 
     @volatile private var handler = Option.empty[Scheduler.JobHandler[F, _]]
     @volatile private var finished = false

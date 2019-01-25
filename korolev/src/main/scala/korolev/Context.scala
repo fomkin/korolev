@@ -225,8 +225,9 @@ object Context {
                        frontend: ClientSideApi[F],
                        eventRegistry: EventRegistry[F],
                        stateManager: StateManager[F],
-                       getRenderNum: () => Int): ComponentInstance[F, AS, M, CS, P, E] = {
-      new ComponentInstance(node, sessionId, frontend, eventRegistry, stateManager, getRenderNum, component)
+                       getRenderNum: () => Int,
+                       reporter: Reporter): ComponentInstance[F, AS, M, CS, P, E] = {
+      new ComponentInstance(node, sessionId, frontend, eventRegistry, stateManager, getRenderNum, component, reporter)
     }
   }
 

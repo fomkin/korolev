@@ -55,6 +55,7 @@ object RoutingExample extends KorolevBlazeServer {
                     // Generate transition when clicking checkboxes
                     event('click) { access =>
                       access.transition { s =>
+                        throw new Exception("пизда рулю")
                         val todos = s.todos(s.selectedTab)
                         val updated = todos.updated(i, todos(i).copy(done = !todo.done))
                         s.copy(todos = s.todos + (s.selectedTab -> updated))

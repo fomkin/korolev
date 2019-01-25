@@ -18,12 +18,11 @@ package korolev.internal
 
 import java.util.concurrent.atomic.AtomicInteger
 
-import korolev.{Async, Router}
+import korolev.{Async, Reporter, Router}
 import korolev.Async._
 import korolev.Router.Path
 import levsha.Id
 import levsha.impl.DiffRenderContext.ChangesPerformer
-import slogging.LazyLogging
 
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
@@ -32,8 +31,8 @@ import scala.util.{Failure, Success}
 /**
   * Typed interface to client side
   */
-final class ClientSideApi[F[_]: Async](connection: Connection[F])
-  extends ChangesPerformer with LazyLogging {
+final class ClientSideApi[F[_]: Async](connection: Connection[F], reporter: Reporter)
+  extends ChangesPerformer {
 
   import ClientSideApi._
 
@@ -218,7 +217,7 @@ final class ClientSideApi[F[_]: Async](connection: Connection[F])
       }
       onReceive()
     case Failure(e) =>
-      logger.error("Unable to receive message from client", e)
+      reporter.error("Unable to receive message from client", e)
   }
 
   onReceive()

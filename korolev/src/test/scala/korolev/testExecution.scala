@@ -16,7 +16,7 @@ object testExecution {
   implicit val defaultExecutor: ExecutionContext = new RunNowExecutionContext()
 
   implicit def defaultScheduler[F[_]: Async] = new Scheduler[F] {
-    def scheduleOnce[T](delay: FiniteDuration)(job: => T): JobHandler[F, T] = ???
-    def schedule[U](interval: FiniteDuration)(job: => U): Cancel = ???
+    def scheduleOnce[T](delay: FiniteDuration)(job: => T)(implicit r: Reporter): JobHandler[F, T] = ???
+    def schedule[U](interval: FiniteDuration)(job: => U)(implicit r: Reporter): Cancel = ???
   }
 }

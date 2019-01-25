@@ -45,6 +45,8 @@ package object blazeServer {
     mimeTypes: MimeTypes
   ): HttpService = {
 
+    import config.reporter.Implicit
+
     val korolevServer = korolev.server.korolevService(mimeTypes, config)
 
     (_, uri, headers, body) => {

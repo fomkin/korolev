@@ -24,13 +24,12 @@ import korolev.Async._
 import korolev.internal.{ApplicationInstance, Connection}
 import korolev.state._
 import levsha.Id
-import slogging.LazyLogging
 
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
 
-package object server extends LazyLogging {
+package object server {
 
   type StateStorage[F[_], S] = korolev.state.StateStorage[F, S]
   val StateStorage = korolev.state.StateStorage
@@ -48,6 +47,8 @@ package object server extends LazyLogging {
         config: KorolevServiceConfig[F, S, M]
       ): KorolevService[F] = {
 
+    import config.reporter
+    import reporter.Implicit
     import misc._
 
     val sessions = TrieMap.empty[String, KorolevSession[F]]
@@ -176,7 +177,8 @@ package object server extends LazyLogging {
         korolev = new ApplicationInstance(
           qualifiedSessionId, connection,
           stateManager, initialState,
-          config.render, router, fromScratch = isNew
+          config.render, router, fromScratch = isNew,
+          reporter
         )
         env <- config.envConfigurator.configure(korolev.topLevelComponentInstance.browserAccess)
       } yield {
@@ -192,7 +194,7 @@ package object server extends LazyLogging {
           val currentPromise = new AtomicReference(Option.empty[Async.Promise[F, String]])
 
           // Put the session to registry
-          val sessionKey = makeSessionKey(deviceId, sessionId)
+          val sessionKey: String = makeSessionKey(deviceId, sessionId)
           sessions.put(sessionKey, this)
 
           def publish(message: String): F[Unit] = {
@@ -212,7 +214,7 @@ package object server extends LazyLogging {
               env.onDestroy()
                 .recover {
                   case ex: Throwable =>
-                    logger.error("Error destroying environment", ex)
+                    reporter.error("Error destroying environment", ex)
                     ()
                 }
                 .map { _ =>
@@ -301,11 +303,11 @@ package object server extends LazyLogging {
           Response.WebSocket(
             destroyHandler = () => session.destroy() run {
               case Success(_) => // do nothing
-              case Failure(e) => logger.error("An error occurred during destroying the session", e)
+              case Failure(e) => reporter.error("An error occurred during destroying the session", e)
             },
             publish = message => session.publish(message) run {
               case Success(_) => // do nothing
-              case Failure(e) => logger.error("An error occurred during publishing message to session", e)
+              case Failure(e) => reporter.error("An error occurred during publishing message to session", e)
             },
             subscribe = { newSubscriber =>
               def aux(): Unit = session.nextMessage run {
@@ -314,7 +316,7 @@ package object server extends LazyLogging {
                   aux()
                 case Failure(_: SessionDestroyedException) => // Do nothing
                 case Failure(e) =>
-                  logger.error("An error occurred during polling message from session", e)
+                  reporter.error("An error occurred during polling message from session", e)
               }
               aux()
             }

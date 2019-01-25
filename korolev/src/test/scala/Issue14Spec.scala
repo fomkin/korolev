@@ -39,7 +39,8 @@ class Issue14Spec extends FlatSpec with Matchers {
         )
       },
       stateManager = StateStorage.default("firstState").create("", "").value.get.get,
-      initialState = "firstState"
+      initialState = "firstState",
+      reporter = Reporter.PrintReporter
     )
 
     def fireEvent(data: String) =

@@ -55,10 +55,7 @@ lazy val server = (project in file("server") / "base").
   enablePlugins(GitVersioning).
   settings(crossVersionSettings).
   settings(commonSettings: _*).
-  settings(
-    normalizedName := "korolev-server",
-    libraryDependencies += "biz.enef" %% "slogging-slf4j" % "0.6.0"
-  ).
+  settings(normalizedName := "korolev-server").
   dependsOn(korolev)
 
 lazy val `server-blaze` = (project in file("server") / "blaze").
@@ -98,7 +95,6 @@ lazy val korolev = project.
   settings(
     normalizedName := "korolev",
     libraryDependencies ++= Seq(
-      "biz.enef" %% "slogging" % "0.6.0",
       "com.github.fomkin" %% "levsha-core" % levshaVersion,
       "com.github.fomkin" %% "levsha-events" % levshaVersion
     ),
