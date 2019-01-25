@@ -27,7 +27,7 @@ import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.stream.{Materializer, OverflowStrategy}
-import korolev.akkahttp.util.IncomingMessageHandler
+import korolev.akkahttp.util.{IncomingMessageHandler, LoggingReporter}
 import korolev.execution.defaultExecutor
 import korolev.server.{KorolevService, KorolevServiceConfig, MimeTypes, Request => KorolevRequest, Response => KorolevResponse}
 import korolev.state.{StateDeserializer, StateSerializer}
@@ -41,9 +41,14 @@ package object akkahttp {
   def akkaHttpService[F[_]: Async, S: StateSerializer: StateDeserializer, M]
       (config: KorolevServiceConfig[F, S, M], mimeTypes: MimeTypes = server.mimeTypes)
       (implicit actorSystem: ActorSystem, materializer: Materializer): AkkaHttpService = { akkaHttpConfig =>
-    val korolevServer = korolev.server.korolevService(mimeTypes, config)
+    // If reporter wasn't overridden, use akka-logging reporter.
+    val actualConfig =
+      if (config.reporter != Reporter.PrintReporter) config
+      else config.copy(reporter = new LoggingReporter(actorSystem))
 
-    webSocketRoute(korolevServer, akkaHttpConfig, config) ~
+    val korolevServer = korolev.server.korolevService(mimeTypes, actualConfig)
+
+    webSocketRoute(korolevServer, akkaHttpConfig, actualConfig) ~
       httpGetRoute(korolevServer) ~
       httpPostRoute(korolevServer)
   }

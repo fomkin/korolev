@@ -596,6 +596,8 @@ Then embed the route into your Akka HTTP routes structure.
 
 https://github.com/fomkin/korolev/blob/v0.8.0/examples/akka-http/src/main/scala/AkkaHttpExample.scala[See full example]
 
+This integration overrides default logging behavior to `akka.event.Logging`.
+
 === Monix
 
 Monix integration module provides `Async` implementation using `monix.eval.Task`. To use it, add a dependency:
