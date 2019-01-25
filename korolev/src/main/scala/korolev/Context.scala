@@ -27,7 +27,7 @@ import scala.concurrent.duration.FiniteDuration
   * Provides DSLs and effects for application or component
   * @since 0.6.0
   */
-final class Context[F[+_]: Async, S: StateSerializer: StateDeserializer, M] {
+final class Context[F[_]: Async, S: StateSerializer: StateDeserializer, M] {
 
   import Context._
   import EventPhase._
@@ -79,9 +79,9 @@ object Context {
     * @tparam S Type of application state
     * @tparam M Type of events
     */
-  def apply[F[+_]: Async, S: StateSerializer: StateDeserializer, M] = new Context[F, S, M]()
+  def apply[F[_]: Async, S: StateSerializer: StateDeserializer, M] = new Context[F, S, M]()
 
-  trait BaseAccess[F[+_], S, M] {
+  trait BaseAccess[F[_], S, M] {
 
     /**
       * Extracts property of element from client-side DOM.
@@ -179,7 +179,7 @@ object Context {
 
   }
 
-  trait EventAccess[F[+_], S, M] {
+  trait EventAccess[F[_], S, M] {
 
     /**
       * Gives json with string, number and boolean fields of
@@ -194,23 +194,23 @@ object Context {
   /**
     * Provides access to make side effects
     */
-  abstract class Access[F[+_]: Async, S, M] extends BaseAccess[F, S, M] with EventAccess[F, S, M]
+  abstract class Access[F[_]: Async, S, M] extends BaseAccess[F, S, M] with EventAccess[F, S, M]
 
-  sealed abstract class Effect[F[+_]: Async, S, M]
+  sealed abstract class Effect[F[_]: Async, S, M]
 
-  abstract class PropertyHandler[F[+_]: Async] {
+  abstract class PropertyHandler[F[_]: Async] {
     def get(propName: Symbol): F[String]
     def set(propName: Symbol, value: Any): F[Unit]
   }
 
-  abstract class FormDataDownloader[F[+_]: Async, S] {
+  abstract class FormDataDownloader[F[_]: Async, S] {
     def onProgress(f: (Int, Int) => Transition[S]): this.type
     def start(): F[FormData]
   }
 
   final case class ComponentEntry
     [
-      F[+_]: Async,
+      F[_]: Async,
       AS: StateSerializer: StateDeserializer, M,
       CS: StateSerializer: StateDeserializer, P, E
     ](
@@ -230,16 +230,16 @@ object Context {
     }
   }
 
-  final case class Event[F[+_]: Async, S, M](
+  final case class Event[F[_]: Async, S, M](
       `type`: Symbol,
       phase: EventPhase,
       effect: Access[F, S, M] => F[Unit]) extends Effect[F, S, M]
 
-  final case class Delay[F[+_]: Async, S, M](
+  final case class Delay[F[_]: Async, S, M](
       duration: FiniteDuration,
       effect: Access[F, S, M] => F[Unit]) extends Effect[F, S, M]
 
-  final class ElementId[F[+_]: Async, S, M](val name: Option[String]) extends Effect[F, S, M] {
+  final class ElementId[F[_]: Async, S, M](val name: Option[String]) extends Effect[F, S, M] {
     override def equals(obj: Any): Boolean = obj match {
       case other: ElementId[F, S, M] => if (name.isDefined) name == other.name else super.equals(other)
       case _ => false

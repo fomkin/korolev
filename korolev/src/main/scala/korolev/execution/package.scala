@@ -28,7 +28,7 @@ package object execution {
   implicit val defaultExecutor: ExecutionContextExecutorService =
     ExecutionContext.fromExecutorService(Executors.newWorkStealingPool())
 
-  implicit def defaultScheduler[F[+_]: Async]: Scheduler[F] = {
+  implicit def defaultScheduler[F[_]: Async]: Scheduler[F] = {
     val async = Async[F]
     val scheduler = schedulerCache.getOrElseUpdate(async, new JavaTimerScheduler[F])
     scheduler.asInstanceOf[Scheduler[F]]

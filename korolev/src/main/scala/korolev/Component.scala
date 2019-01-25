@@ -36,7 +36,7 @@ import scala.util.Random
   */
 abstract class Component
   [
-    F[+ _]: Async: Scheduler,
+    F[_]: Async: Scheduler,
     S: StateSerializer: StateDeserializer, P, E
   ](
     val initialState: S,
@@ -62,14 +62,14 @@ abstract class Component
 object Component {
 
   /** (context, state) => document */
-  type Render[F[+ _], S, P, E] = (Context[F, S, E], P, S) => Node[Effect[F, S, E]]
+  type Render[F[_], S, P, E] = (Context[F, S, E], P, S) => Node[Effect[F, S, E]]
 
   /**
     * Create component in functional style
     * @param f Component renderer
     * @see [[Component]]
     */
-  def apply[F[+ _]: Async: Scheduler, S: StateSerializer: StateDeserializer, P, E]
+  def apply[F[_]: Async: Scheduler, S: StateSerializer: StateDeserializer, P, E]
            (initialState: S, id: String = Component.randomId())
            (f: Render[F, S, P, E]): Component[F, S, P, E] = {
     new Component[F, S, P, E](initialState, id) {

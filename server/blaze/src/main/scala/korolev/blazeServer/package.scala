@@ -34,13 +34,13 @@ import scala.concurrent.Promise
 
 package object blazeServer {
 
-  def blazeService[F[+_]: Async, S: StateSerializer: StateDeserializer, M]: BlazeServiceBuilder[F, S, M] =
+  def blazeService[F[_]: Async, S: StateSerializer: StateDeserializer, M]: BlazeServiceBuilder[F, S, M] =
     new BlazeServiceBuilder(server.mimeTypes)
 
-  def blazeService[F[+_]: Async, S: StateSerializer: StateDeserializer, M](mimeTypes: MimeTypes): BlazeServiceBuilder[F, S, M] =
+  def blazeService[F[_]: Async, S: StateSerializer: StateDeserializer, M](mimeTypes: MimeTypes): BlazeServiceBuilder[F, S, M] =
     new BlazeServiceBuilder(mimeTypes)
 
-  def blazeService[F[+_]: Async: Scheduler, S: StateSerializer: StateDeserializer, M](
+  def blazeService[F[_]: Async: Scheduler, S: StateSerializer: StateDeserializer, M](
     config: KorolevServiceConfig[F, S, M],
     mimeTypes: MimeTypes
   ): HttpService = {

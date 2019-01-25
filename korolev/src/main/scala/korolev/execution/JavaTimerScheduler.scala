@@ -24,7 +24,7 @@ import korolev.Async.AsyncOps
 import scala.concurrent.duration.FiniteDuration
 import scala.util.Success
 
-final class JavaTimerScheduler[F[+_]: Async] extends Scheduler[F] {
+final class JavaTimerScheduler[F[_]: Async] extends Scheduler[F] {
 
   import Scheduler._
 

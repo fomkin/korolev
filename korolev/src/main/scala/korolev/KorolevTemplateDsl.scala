@@ -25,7 +25,7 @@ import levsha.dsl.SymbolDsl
 /**
   * Levsha DSL with enrichments.
   */
-final class KorolevTemplateDsl[F[+_]: Async, S, M] extends SymbolDsl[Effect[F, S, M]] {
+final class KorolevTemplateDsl[F[_]: Async, S, M] extends SymbolDsl[Effect[F, S, M]] {
 
   type Document = levsha.Document[Effect[F, S, M]]
   type Node     = levsha.Document.Node[Effect[F, S, M]]

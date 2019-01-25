@@ -24,7 +24,7 @@ import levsha.Id
 
 import scala.collection.concurrent.TrieMap
 
-abstract class StateStorage[F[+_]: Async, S] {
+abstract class StateStorage[F[_]: Async, S] {
 
   def createTopLevelState: DeviceId => F[S]
 
@@ -54,7 +54,7 @@ object StateStorage {
     * @tparam S Type of state
     * @return The state storage
     */
-  def default[F[+_]: Async, S: StateSerializer](initialState: => S): StateStorage[F, S] = {
+  def default[F[_]: Async, S: StateSerializer](initialState: => S): StateStorage[F, S] = {
     new DefaultStateStorage(_ => Async[F].pure(initialState))
   }
 
@@ -77,11 +77,11 @@ object StateStorage {
     * @tparam S Type of state
     * @return The state storage
     */
-  def forDeviceId[F[+_]: Async, S: StateSerializer](initialState: String => F[S]): StateStorage[F, S] = {
+  def forDeviceId[F[_]: Async, S: StateSerializer](initialState: String => F[S]): StateStorage[F, S] = {
     new DefaultStateStorage(initialState)
   }
 
-  private class DefaultStateStorage[F[+_]: Async, S: StateSerializer]
+  private class DefaultStateStorage[F[_]: Async, S: StateSerializer]
       (val createTopLevelState: String => F[S]) extends StateStorage[F, S] {
 
     private val cache = TrieMap.empty[String, StateManager[F]]
@@ -113,7 +113,7 @@ object StateStorage {
     }
   }
 
-  private final class DevModeStateManager[F[+_]: Async](directory: File) extends StateManager[F] {
+  private final class DevModeStateManager[F[_]: Async](directory: File) extends StateManager[F] {
 
     def getStateFile(node: Id): File =
       new File(directory, node.mkString)
@@ -173,7 +173,7 @@ object StateStorage {
     }
   }
 
-  private final class SimpleInMemoryStateManager[F[+_]: Async] extends StateManager[F] {
+  private final class SimpleInMemoryStateManager[F[_]: Async] extends StateManager[F] {
 
     val cache = TrieMap.empty[Id, Any]
 

@@ -21,7 +21,7 @@ import monix.eval.Task
 import monix.execution.Scheduler
 
 import scala.collection.generic.CanBuildFrom
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 private[monixSupport] final class TaskAsync(implicit scheduler: Scheduler) extends Async[Task] {
   override val unit: Task[Unit] = Task.unit
@@ -39,5 +39,8 @@ private[monixSupport] final class TaskAsync(implicit scheduler: Scheduler) exten
   override def sequence[A, M[X] <: TraversableOnce[X]](in: M[Task[A]])
                                                       (implicit cbf: CanBuildFrom[M[Task[A]], A, M[A]]): Task[M[A]] =
     Task.sequence(in)
-  override def run[A, U](m: Task[A])(f: Try[A] => U): Unit = { m.runOnComplete(r => { f(r); () }); () }
+  override def run[A, U](m: Task[A])(f: Try[A] => U): Unit = {
+    m.runAsync { r => { f(r.fold(Failure(_), Success(_))); () } }
+    ()
+  }
 }
