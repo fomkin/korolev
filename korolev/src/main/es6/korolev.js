@@ -336,25 +336,33 @@ export class Korolev {
     * @param {string} id
     * @param {string} descriptor
     */
-  uploadFile(id, descriptor) {
+  uploadFiles(id, descriptor) {
     let self = this;
     let input = self.els[id];
     let deviceId = getDeviceId();
+    let files = [];
     let uri = self.config['r'] +
       'bridge' +
       '/' + deviceId +
       '/' + self.config['sid'] +
       '/file' +
       '/' + descriptor;
-    console.log(uri)
     for (var i = 0; i < input.files.length; i++) {
-      let file = input.files[i];
-      let request = new XMLHttpRequest();
-      request.open('POST', uri, true);
-      request.setRequestHeader('x-name', file.name)
-      request.setRequestHeader('x-total', input.files.length.toString())
-      request.send(file);
+      files.push(input.files[i]);
     }
+    // Send first request with information about files
+    let request = new XMLHttpRequest();
+    request.open('POST', uri + "/info", true);
+    request.send(files.map((f) => `${f.name}/${f.size}`).join('\n'));
+    request.addEventListener('load', () => {
+      // If info was sent, then send files
+      files.forEach((file) => {
+        let request = new XMLHttpRequest();
+        request.open('POST', uri, true);
+        request.setRequestHeader('x-name', file.name)
+        request.send(file);
+      });
+    })
   }
 
   reloadCss() {

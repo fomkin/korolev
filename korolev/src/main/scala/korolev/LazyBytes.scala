@@ -1,6 +1,7 @@
 package korolev
 
 import java.nio.ByteBuffer
+import java.nio.charset.StandardCharsets
 
 /**
   * @param pull Function which should be invoked recursively until it return None.
@@ -26,6 +27,13 @@ final case class LazyBytes[F[_]](
       val length = xs.foldLeft(0)(_ + _.length)
       xs.foldRight(ByteBuffer.allocate(length))((a, b) => b.put(a)).array()
     }
+  }
+
+  /**
+    * Same as [[toStrict]] but interprets bytes as UTF8 string.
+    */
+  def toStrictUtf8: F[String] = {
+    async.map(toStrict)(bs => new String(bs, StandardCharsets.UTF_8))
   }
 
   /**

@@ -50,8 +50,8 @@ package object server {
       ): KorolevService[F] = {
 
     import config.reporter
-    import reporter.Implicit
     import misc._
+    import reporter.Implicit
 
     val sessions = TrieMap.empty[String, KorolevSession[F]]
 
@@ -194,8 +194,8 @@ package object server {
 
           val aliveRef = new AtomicBoolean(true)
           val currentPromise = new AtomicReference(Option.empty[Async.Promise[F, String]])
-          val downloadFileList: mutable.Map[String, List[File[LazyBytes[F]]]] =
-            mutable.Map.empty[String, List[File[LazyBytes[F]]]] // descriptor -> file
+          val fileDownloadInfoMap: mutable.Map[String, Promise[F, LazyBytes[F]]] =
+            mutable.Map.empty // `descriptor/file-name` -> promise(bytes_proxy)
 
           // Put the session to registry
           val sessionKey: String = makeSessionKey(deviceId, sessionId)
@@ -213,19 +213,30 @@ package object server {
             korolev.topLevelComponentInstance.resolveFormData(descriptor, formData)
           }
 
-          def resolveFile(descriptor: String,
-                          file: File[LazyBytes[F]],
-                          total: Int): Unit = downloadFileList.synchronized {
-            val files = downloadFileList.getOrElse(descriptor, Nil)
-            val updated = file :: files
-            if (updated.length == total) {
-              downloadFileList.remove(descriptor)
-              korolev.topLevelComponentInstance.resolveFile(descriptor, updated)
+          def fileDownloadInfoKey(descriptor: String, name: String) =
+            s"$descriptor/$name"
+
+          def resolveFile(descriptor: String, name: String, bytes: Try[LazyBytes[F]]): Unit = {
+            val key = fileDownloadInfoKey(descriptor, name)
+            fileDownloadInfoMap.remove(key).foreach { promise =>
+              promise.complete(bytes)
             }
-            else {
-              downloadFileList.put(descriptor, file :: files)
+          }
+
+          def fileDownloadInfo(descriptor: String, filesInfo: Map[String, Long]): Unit = fileDownloadInfoMap.synchronized {
+            val files = filesInfo map {
+              case (name, size) =>
+                val promise = Async[F].promise[LazyBytes[F]]
+                val proxy = LazyBytes(
+                  pull = () => Async[F].flatMap(promise.async)(_.pull()),
+                  finished = Async[F].flatMap(promise.async)(_.finished),
+                  size = Some(size)
+                )
+                val key = fileDownloadInfoKey(descriptor, name)
+                fileDownloadInfoMap.put(key, promise)
+                File(name, proxy)
             }
-            ()
+            korolev.topLevelComponentInstance.resolveFile(descriptor, files.toList)
           }
 
           def destroy(): F[Unit] = {
@@ -289,6 +300,23 @@ package object server {
           case None =>
             Async[F].pure(Response.Http(Response.Status.BadRequest, "Session doesn't exist"))
         }
+      case Request(Root / "bridge" / deviceId / sessionId / "file" / descriptor / "info", _, _, _, body) =>
+        sessions.get(makeSessionKey(deviceId, sessionId)) match {
+          case Some(session) =>
+            Async[F].map(body.toStrictUtf8) { info =>
+              val files = info
+                .split("\n")
+                .map { entry =>
+                  val slash = entry.lastIndexOf('/')
+                  (entry.substring(0, slash), entry.substring(slash + 1).toLong)
+                }
+                .toMap
+              session.fileDownloadInfo(descriptor, files)
+              Response.Http(Response.Status.Ok, None)
+            }
+          case None =>
+            Async[F].pure(Response.Http(Response.Status.BadRequest, "Session doesn't exist"))
+        }
       case Request(Root / "bridge" / deviceId / sessionId / "file" / descriptor, _, _, headers, body) =>
         val result =
           for {
@@ -296,10 +324,8 @@ package object server {
               .toRight("Session doesn't exist")
             name <- headers.collectFirst { case ("x-name", v) => v }
               .toRight("`x-name` header should be defined")
-            total <- headers.collectFirst { case ("x-total", v) => v.toInt }
-              .toRight("`x-total` header should be defined")
           } yield {
-            session.resolveFile(descriptor, File(name, body), total)
+            session.resolveFile(descriptor, name, Success(body))
           }
         result match {
           case Right(_) => body.finished.map(_ => Response.Http(Response.Status.Ok, None))
