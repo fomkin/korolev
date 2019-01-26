@@ -27,7 +27,6 @@ import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import akka.stream.{Materializer, OverflowStrategy}
 import korolev.akkahttp.util.{IncomingMessageHandler, LoggingReporter}
 import korolev.execution.defaultExecutor
-import korolev.internal.LazyBytes
 import korolev.server.{KorolevService, KorolevServiceConfig, MimeTypes, Request => KorolevRequest, Response => KorolevResponse}
 import korolev.state.{StateDeserializer, StateSerializer}
 
@@ -137,9 +136,9 @@ package object akkahttp {
                     finished.complete(Success(()))
                   promise.complete(`try`)
                 }
-                promise.future
+                promise.async
               }
-              val body = LazyBytes(pull, finished.future, request.entity.contentLengthOption)
+              val body = LazyBytes(pull, finished.async, request.entity.contentLengthOption)
               val korolevRequest = mkKorolevRequest(request, path.toString, params, body)
               val responseF = handleHttpResponse(korolevServer, korolevRequest)
               complete(responseF)

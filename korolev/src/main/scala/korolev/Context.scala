@@ -16,7 +16,7 @@
 
 package korolev
 
-import korolev.internal.{ClientSideApi, ComponentInstance, EventRegistry, LazyBytes}
+import korolev.internal.{ClientSideApi, ComponentInstance, EventRegistry}
 import korolev.state.{StateDeserializer, StateManager, StateSerializer}
 import levsha._
 import levsha.events.EventPhase
@@ -150,16 +150,16 @@ object Context {
     def downloadFormData(id: ElementId[F, S, M]): FormDataDownloader[F, S]
 
     /**
-      * Download selected file from input correspondent to given element id.
+      * Download selected file list from input correspondent to given element id.
       */
-    def downloadFile(id: ElementId[F, S, M]): F[Array[Byte]]
+    def downloadFiles(id: ElementId[F, S, M]): F[List[File[Array[Byte]]]]
 
     /**
-      * Same as [[downloadFile]] but for stream mode. The method is useful
-      * when user want to upload very large file which is problematic to keep
-      * in memory (especially when count of users is more than one).
+      * Same as [[downloadFiles]] but for stream mode. The method is useful
+      * when user want to upload very large files list which is problematic
+      * to keep in memory (especially when count of users is more than one).
       */
-    def downloadFileAsStream(id: ElementId[F, S, M]): F[LazyBytes[F]]
+    def downloadFilesAsStream(id: ElementId[F, S, M]): F[List[File[LazyBytes[F]]]]
 
     /**
       * Gives current state.
@@ -214,6 +214,8 @@ object Context {
     def get(propName: Symbol): F[String]
     def set(propName: Symbol, value: Any): F[Unit]
   }
+
+  final case class File[A](name: String, data: A)
 
   abstract class FormDataDownloader[F[_]: Async, S] {
     def onProgress(f: (Int, Int) => Transition[S]): this.type

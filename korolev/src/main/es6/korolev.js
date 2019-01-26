@@ -339,7 +339,6 @@ export class Korolev {
   uploadFile(id, descriptor) {
     let self = this;
     let input = self.els[id];
-    let request = new XMLHttpRequest();
     let deviceId = getDeviceId();
     let uri = self.config['r'] +
       'bridge' +
@@ -347,8 +346,15 @@ export class Korolev {
       '/' + self.config['sid'] +
       '/file' +
       '/' + descriptor;
-    request.open("POST", uri, true);
-    request.send(input.files[0]);
+    console.log(uri)
+    for (var i = 0; i < input.files.length; i++) {
+      let file = input.files[i];
+      let request = new XMLHttpRequest();
+      request.open('POST', uri, true);
+      request.setRequestHeader('x-name', file.name)
+      request.setRequestHeader('x-total', input.files.length.toString())
+      request.send(file);
+    }
   }
 
   reloadCss() {

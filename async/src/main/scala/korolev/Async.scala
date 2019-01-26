@@ -42,7 +42,11 @@ object Async {
   private val futureInstanceCache =
     mutable.Map.empty[ExecutionContext, Async[Future]]
 
-  case class Promise[F[_], A](future: F[A], complete: Try[A] => Unit)
+  trait Promise[F[_], A] {
+    def async: F[A]
+    def complete(`try`: Try[A]): Unit
+    def completeAsync(async: F[A]): Unit
+  }
 
   def apply[F[_]: Async]: Async[F] = implicitly[Async[F]]
 
@@ -60,7 +64,11 @@ object Async {
       Future.sequence(in)
     def promise[A]: Promise[Future, A] = {
       val promise = scala.concurrent.Promise[A]()
-      Promise(promise.future, a => { promise.complete(a); () })
+      new Promise[Future, A] {
+        val async: Future[A] = promise.future
+        def complete(`try`: Try[A]): Unit = promise.complete(`try`)
+        def completeAsync(async: Future[A]): Unit = promise.completeWith(async)
+      }
     }
   }
 

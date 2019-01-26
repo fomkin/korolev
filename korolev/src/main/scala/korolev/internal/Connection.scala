@@ -102,11 +102,11 @@ object Connection {
       if (queue.isEmpty) {
         promise match {
           case Some(p) =>
-            p.future
+            p.async
           case None =>
             val p = Async[F].promise[T]
             promise = Some(p)
-            p.future
+            p.async
         }
       }
       else {

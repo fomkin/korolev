@@ -17,10 +17,12 @@
 package korolev.monixSupport
 
 import korolev.Async
+import korolev.Async.Promise
 import monix.eval.Task
-import monix.execution.Scheduler
+import monix.execution.{Callback, Scheduler}
 
 import scala.collection.generic.CanBuildFrom
+import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
 
 private[monixSupport] final class TaskAsync(implicit scheduler: Scheduler) extends Async[Task] {
@@ -31,7 +33,11 @@ private[monixSupport] final class TaskAsync(implicit scheduler: Scheduler) exten
   override def fromTry[A](value: => Try[A]): Task[A] = Task.fromTry(value)
   override def promise[A]: korolev.Async.Promise[Task, A] = {
     val promise = scala.concurrent.Promise[A]()
-    korolev.Async.Promise(Task.fromFuture(promise.future), a => { promise.complete(a); () })
+    new Promise[Task, A] {
+      val async: Task[A] = Task.fromFuture(promise.future)
+      def complete(`try`: Try[A]): Unit = promise.complete(`try`)
+      def completeAsync(async: Task[A]): Unit = promise.completeWith(async.runToFuture)
+    }
   }
   override def flatMap[A, B](m: Task[A])(f: A => Task[B]): Task[B] = m.flatMap(f)
   override def map[A, B](m: Task[A])(f: A => B): Task[B] = m.map(f)

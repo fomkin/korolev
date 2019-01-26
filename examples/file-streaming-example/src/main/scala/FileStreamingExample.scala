@@ -10,7 +10,7 @@ import scala.concurrent.Future
 
 object FileStreamingExample extends SimpleAkkaHttpKorolevApp {
 
-  case class State(loaded: Int, total: Long, inProgress: Boolean)
+  case class State(progress: Map[String, (Long, Long)], inProgress: Boolean)
 
   val globalContext = Context[Future, State, Any]
 
@@ -19,33 +19,50 @@ object FileStreamingExample extends SimpleAkkaHttpKorolevApp {
 
   val fileInput = elementId()
 
-  val file = new File("file-streaming-example.dump")
-
   val service = akkaHttpService {
     KorolevServiceConfig[Future, State, Any] (
       router = emptyRouter,
-      stateStorage = StateStorage.default(State(0, 0, inProgress = false)),
+      stateStorage = StateStorage.default(State(Map.empty, inProgress = false)),
       render = {
-        case State(loaded, total, inProgress) =>
+        case State(progress, inProgress) =>
           'body(
-            'input('type /= "file", fileInput),
+            'input('type /= "file", 'multiple /= "multiple", fileInput),
+            'ul(
+              progress.map {
+                case (name, (loaded, total)) =>
+                  'li(s"$name: $loaded / $total")
+              }
+            ),
             'button(
-              if (inProgress) s"$loaded/$total"
-              else "Upload",
+              "Upload",
+              if (inProgress) 'disabled /= "" else void,
               event('click) { access =>
-                access.downloadFileAsStream(fileInput).flatMap { lazyBytes =>
-                  access.transition(_.copy(total = lazyBytes.size.getOrElse(0L), inProgress = true)).flatMap { _ =>
-                    def loop(): Future[Unit] = lazyBytes.pull() flatMap {
-                      case Some(bytes) =>
-                        val w = new FileOutputStream(file, true)
-                        w.write(bytes)
-                        w.flush()
-                        w.close()
-                        access.transition(x => x.copy(loaded = x.loaded + bytes.length)).flatMap(_ => loop())
-                      case None =>
-                        Future.unit
+                access.downloadFilesAsStream(fileInput).flatMap { files =>
+                  access.transition(_.copy(files.map(x => (x.name, (0L, x.data.size.getOrElse(0L)))).toMap, inProgress = true)).flatMap { _ =>
+                    Future.sequence {
+                      files.map { file =>
+                        val size = file.data.size.getOrElse(0L)
+                        def loop(acc: Long): Future[Unit] = file.data.pull() flatMap {
+                          case Some(bytes) =>
+                            val loaded = acc + bytes.length
+                            val w = new FileOutputStream(new File(file.name), true)
+                            w.write(bytes)
+                            w.flush()
+                            w.close()
+                            access
+                              .transition { state =>
+                                val updated = state.progress + ((file.name, (loaded, size)))
+                                state.copy(progress = updated)
+                              }
+                              .flatMap(_ => loop(loaded))
+                          case None =>
+                            Future.unit
+                        }
+                        loop(0L)
+                      }
+                    }.flatMap { _ =>
+                      access.transition(_.copy(inProgress = false))
                     }
-                    loop()
                   }
                 }
               }

@@ -22,7 +22,8 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 
 import korolev.Async._
-import korolev.internal.{ApplicationInstance, Connection, LazyBytes}
+import korolev.Context.File
+import korolev.internal.{ApplicationInstance, Connection}
 import korolev.state._
 import levsha.Id
 
@@ -193,6 +194,8 @@ package object server {
 
           val aliveRef = new AtomicBoolean(true)
           val currentPromise = new AtomicReference(Option.empty[Async.Promise[F, String]])
+          val downloadFileList: mutable.Map[String, List[File[LazyBytes[F]]]] =
+            mutable.Map.empty[String, List[File[LazyBytes[F]]]] // descriptor -> file
 
           // Put the session to registry
           val sessionKey: String = makeSessionKey(deviceId, sessionId)
@@ -210,8 +213,20 @@ package object server {
             korolev.topLevelComponentInstance.resolveFormData(descriptor, formData)
           }
 
-          def resolveFile(descriptor: String, bytes: LazyBytes[F]): Unit =
-            korolev.topLevelComponentInstance.resolveFile(descriptor, bytes)
+          def resolveFile(descriptor: String,
+                          file: File[LazyBytes[F]],
+                          total: Int): Unit = downloadFileList.synchronized {
+            val files = downloadFileList.getOrElse(descriptor, Nil)
+            val updated = file :: files
+            if (updated.length == total) {
+              downloadFileList.remove(descriptor)
+              korolev.topLevelComponentInstance.resolveFile(descriptor, updated)
+            }
+            else {
+              downloadFileList.put(descriptor, file :: files)
+            }
+            ()
+          }
 
           def destroy(): F[Unit] = {
             if (aliveRef.getAndSet(false))
@@ -274,13 +289,21 @@ package object server {
           case None =>
             Async[F].pure(Response.Http(Response.Status.BadRequest, "Session doesn't exist"))
         }
-      case Request(Root / "bridge" / deviceId / sessionId / "file" / descriptor, _, _, _, body) =>
-        sessions.get(makeSessionKey(deviceId, sessionId)) match {
-          case Some(session) =>
-            session.resolveFile(descriptor, body)
-            body.finished.map(_ => Response.Http(Response.Status.Ok, None))
-          case None =>
-            Async[F].pure(Response.Http(Response.Status.BadRequest, "Session doesn't exist"))
+      case Request(Root / "bridge" / deviceId / sessionId / "file" / descriptor, _, _, headers, body) =>
+        val result =
+          for {
+            session <- sessions.get(makeSessionKey(deviceId, sessionId))
+              .toRight("Session doesn't exist")
+            name <- headers.collectFirst { case ("x-name", v) => v }
+              .toRight("`x-name` header should be defined")
+            total <- headers.collectFirst { case ("x-total", v) => v.toInt }
+              .toRight("`x-total` header should be defined")
+          } yield {
+            session.resolveFile(descriptor, File(name, body), total)
+          }
+        result match {
+          case Right(_) => body.finished.map(_ => Response.Http(Response.Status.Ok, None))
+          case Left(error) => Async[F].pure(Response.Http(Response.Status.BadRequest, error))
         }
       case Request(Root / "bridge" / "long-polling" / deviceId / sessionId / "publish", _, _, _, body) =>
         sessions.get(makeSessionKey(deviceId, sessionId)) match {

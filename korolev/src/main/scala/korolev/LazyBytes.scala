@@ -1,7 +1,6 @@
-package korolev.internal
-import java.nio.ByteBuffer
+package korolev
 
-import korolev.Async
+import java.nio.ByteBuffer
 
 /**
   * @param pull Function which should be invoked recursively until it return None.

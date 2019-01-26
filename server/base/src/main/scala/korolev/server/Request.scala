@@ -15,9 +15,7 @@
  */
 
 package korolev.server
-
-import korolev.internal.LazyBytes
-import korolev.{Async, Router}
+import korolev.{Async, LazyBytes, Router}
 
 final case class Request[F[_]: Async](
   path: Router.Path,

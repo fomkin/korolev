@@ -45,7 +45,7 @@ final class JavaTimerScheduler[F[_]: Async] extends Scheduler[F] {
     timer.schedule(task, delay.toMillis)
     JobHandler(
       cancel = () => { task.cancel(); () },
-      result = promise.future
+      result = promise.async
     )
   }
 
