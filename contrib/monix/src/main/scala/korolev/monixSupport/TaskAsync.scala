@@ -19,24 +19,29 @@ package korolev.monixSupport
 import korolev.Async
 import korolev.Async.Promise
 import monix.eval.Task
-import monix.execution.{Callback, Scheduler}
+import monix.execution.Scheduler
 
 import scala.collection.generic.CanBuildFrom
-import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
 
 private[monixSupport] final class TaskAsync(implicit scheduler: Scheduler) extends Async[Task] {
-  override val unit: Task[Unit] = Task.unit
-  override def pureStrict[A](value: A): Task[A] = Task.now(value)
-  override def pure[A](value: => A): Task[A] = Task.now(value)
-  override def fork[A](value: => A): Task[A] = Task(value)
-  override def fromTry[A](value: => Try[A]): Task[A] = Task.fromTry(value)
-  override def promise[A]: korolev.Async.Promise[Task, A] = {
+  val unit: Task[Unit] = Task.unit
+  def pureStrict[A](value: A): Task[A] = Task.now(value)
+  def pure[A](value: => A): Task[A] = Task.eval(value)
+  def fork[A](value: => A): Task[A] = Task(value)
+  def fromTry[A](value: => Try[A]): Task[A] = Task.fromTry(value)
+  def promise[A]: korolev.Async.Promise[Task, A] = {
     val promise = scala.concurrent.Promise[A]()
     new Promise[Task, A] {
       val async: Task[A] = Task.fromFuture(promise.future)
-      def complete(`try`: Try[A]): Unit = promise.complete(`try`)
-      def completeAsync(async: Task[A]): Unit = promise.completeWith(async.runToFuture)
+      def complete(`try`: Try[A]): Unit = {
+        promise.complete(`try`)
+        ()
+      }
+      def completeAsync(async: Task[A]): Unit = {
+        promise.completeWith(async.runToFuture)
+        ()
+      }
     }
   }
   override def flatMap[A, B](m: Task[A])(f: A => Task[B]): Task[B] = m.flatMap(f)

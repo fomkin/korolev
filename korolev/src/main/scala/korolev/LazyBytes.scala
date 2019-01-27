@@ -6,11 +6,13 @@ import java.nio.charset.StandardCharsets
 /**
   * @param pull Function which should be invoked recursively until it return None.
   * @param finished Completes when all bytes was pulled
+  * @param cancel Cancels pulling. After that pull can return None or Exception depends on implementation.
   * @param size known (or not) size
   */
 final case class LazyBytes[F[_]](
     pull: () => F[Option[Array[Byte]]],
     finished: F[Unit],
+    cancel: () => F[Unit],
     size: Option[Long])(implicit async: Async[F]) {
 
   /**
@@ -51,6 +53,6 @@ final case class LazyBytes[F[_]](
 object LazyBytes {
   def empty[F[_]](implicit async: Async[F]): LazyBytes[F] = {
     val it = async.pure(Option.empty[Array[Byte]])
-    LazyBytes(() => it, async.unit, Some(0L))
+    LazyBytes(() => it, async.unit, () => async.unit, Some(0L))
   }
 }

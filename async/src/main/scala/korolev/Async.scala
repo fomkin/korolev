@@ -66,8 +66,15 @@ object Async {
       val promise = scala.concurrent.Promise[A]()
       new Promise[Future, A] {
         val async: Future[A] = promise.future
-        def complete(`try`: Try[A]): Unit = promise.complete(`try`)
-        def completeAsync(async: Future[A]): Unit = promise.completeWith(async)
+        def complete(`try`: Try[A]): Unit = {
+          promise.complete(`try`)
+          ()
+        }
+
+        def completeAsync(async: Future[A]): Unit = {
+          promise.completeWith(async)
+          ()
+        }
       }
     }
   }

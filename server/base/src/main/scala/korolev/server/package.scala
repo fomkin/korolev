@@ -229,6 +229,7 @@ package object server {
                 val promise = Async[F].promise[LazyBytes[F]]
                 val proxy = LazyBytes(
                   pull = () => Async[F].flatMap(promise.async)(_.pull()),
+                  cancel = () => Async[F].flatMap(promise.async)(_.cancel()),
                   finished = Async[F].flatMap(promise.async)(_.finished),
                   size = Some(size)
                 )
@@ -321,15 +322,13 @@ package object server {
         val result =
           for {
             session <- sessions.get(makeSessionKey(deviceId, sessionId))
-              .toRight("Session doesn't exist")
             name <- headers.collectFirst { case ("x-name", v) => v }
-              .toRight("`x-name` header should be defined")
           } yield {
             session.resolveFile(descriptor, name, Success(body))
           }
         result match {
-          case Right(_) => body.finished.map(_ => Response.Http(Response.Status.Ok, None))
-          case Left(error) => Async[F].pure(Response.Http(Response.Status.BadRequest, error))
+          case Some(_) => body.finished.map(_ => Response.Http(Response.Status.Ok, None))
+          case None => Async[F].pure(Response.Http(Response.Status.BadRequest))
         }
       case Request(Root / "bridge" / "long-polling" / deviceId / sessionId / "publish", _, _, _, body) =>
         sessions.get(makeSessionKey(deviceId, sessionId)) match {

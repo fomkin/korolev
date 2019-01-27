@@ -138,7 +138,12 @@ package object akkahttp {
                 }
                 promise.async
               }
-              val body = LazyBytes(pull, finished.async, request.entity.contentLengthOption)
+              val body = LazyBytes(
+                pull = pull,
+                cancel = () => async.pure(queue.cancel()),
+                finished = finished.async,
+                size = request.entity.contentLengthOption
+              )
               val korolevRequest = mkKorolevRequest(request, path.toString, params, body)
               val responseF = handleHttpResponse(korolevServer, korolevRequest)
               complete(responseF)

@@ -56,7 +56,7 @@ object FileStreamingExample extends SimpleAkkaHttpKorolevApp {
                               }
                               .flatMap(_ => loop(loaded))
                           case None =>
-                            Future.unit
+                            Future.successful(())
                         }
                         loop(0L)
                       }
