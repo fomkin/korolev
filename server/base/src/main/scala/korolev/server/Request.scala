@@ -15,15 +15,12 @@
  */
 
 package korolev.server
+import korolev.{Async, LazyBytes, Router}
 
-import java.nio.ByteBuffer
-
-import korolev.Router
-
-case class Request(
+final case class Request[F[_]: Async](
   path: Router.Path,
   params: Map[String, String],
   cookie: String => Option[String],
   headers: Seq[(String, String)],
-  body: ByteBuffer
+  body: LazyBytes[F]
 )

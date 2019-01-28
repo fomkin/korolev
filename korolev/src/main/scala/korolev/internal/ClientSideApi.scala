@@ -73,6 +73,9 @@ final class ClientSideApi[F[_]: Async](connection: Connection[F], reporter: Repo
   def uploadForm(id: Id, descriptor: String): Unit =
     connection.send(Procedure.UploadForm.code, id.mkString, descriptor)
 
+  def uploadFiles(id: Id, descriptor: String): Unit =
+    connection.send(Procedure.UploadFiles.code, id.mkString, descriptor)
+
   def focus(id: Id): Unit =
     connection.send(Procedure.Focus.code, id.mkString)
 
@@ -81,7 +84,7 @@ final class ClientSideApi[F[_]: Async](connection: Connection[F], reporter: Repo
     val promise = async.promise[String]
     promises.put(descriptor, promise)
     connection.send(Procedure.ExtractProperty.code, descriptor, id.mkString, name)
-    promise.future
+    promise.async
   }
 
   def setProperty(id: Id, name: Symbol, value: Any): Unit = {
@@ -94,7 +97,7 @@ final class ClientSideApi[F[_]: Async](connection: Connection[F], reporter: Repo
     val promise = async.promise[String]
     promises.put(descriptor, promise)
     connection.send(Procedure.EvalJs.code, descriptor, code)
-    promise.future
+    promise.async
   }
 
   def changePageUrl(path: Path): Unit =
@@ -114,7 +117,7 @@ final class ClientSideApi[F[_]: Async](connection: Connection[F], reporter: Repo
     val promise = async.promise[String]
     promises.put(descriptor, promise)
     connection.send(Procedure.ExtractEventData.code, descriptor, renderNum)
-    promise.future
+    promise.async
   }
 
   def startDomChanges(): Unit = {
@@ -244,6 +247,7 @@ object ClientSideApi {
     case object KeepAlive extends Procedure(9) // ()
     case object EvalJs extends Procedure(10) // (code)
     case object ExtractEventData extends Procedure(11) // (descriptor, renderNum)
+    case object UploadFiles extends Procedure(12) // (id, descriptor)
 
     val All = Set(
       SetRenderNum, CleanRoot, ListenEvent, ExtractProperty,

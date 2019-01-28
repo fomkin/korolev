@@ -63,7 +63,7 @@ final class ComponentInstance
   private val async = Async[F]
   private val miscLock = new Object()
   private val subscriptionsLock = new Object()
-  private val lastFromId = new AtomicInteger(0)
+  private val lastPostDescriptor = new AtomicInteger(0)
 
   private val markedDelays = mutable.Set.empty[Id] // Set of the delays which are should survive
   private val markedComponentInstances = mutable.Set.empty[Id]
@@ -72,6 +72,7 @@ final class ComponentInstance
   private val events = mutable.Map.empty[EventId, Event[F, CS, E]]
   private val nestedComponents = mutable.Map.empty[Id, ComponentInstance[F, CS, E, _, _, _]]
   private val formDataPromises = mutable.Map.empty[String, Promise[F, FormData]]
+  private val downloadFilePromises = mutable.Map.empty[String, Promise[F, List[File[LazyBytes[F]]]]]
   private val formDataProgressTransitions = mutable.Map.empty[String, (Int, Int) => Transition[CS]]
 
   private val stateChangeSubscribers = mutable.ArrayBuffer.empty[(Id, Any) => Unit]
@@ -130,19 +131,37 @@ final class ComponentInstance
 
     def downloadFormData(element: ElementId[F, CS, E]): FormDataDownloader[F, CS] = new FormDataDownloader[F, CS] {
 
-      private val descriptor = nodeId.mkString + lastFromId.getAndIncrement()
+      private val descriptor = nodeId.mkString + lastPostDescriptor.getAndIncrement()
 
       def start(): F[FormData] = getId(element) flatMap { id =>
         val promise = async.promise[FormData]
         frontend.uploadForm(id, descriptor)
         formDataPromises.put(descriptor, promise)
-        promise.future
+        promise.async
       }
 
       def onProgress(f: (Int, Int) => Transition[CS]): this.type = {
         formDataProgressTransitions.put(descriptor, f)
         this
       }
+    }
+
+    def downloadFiles(id: ElementId[F, CS, E]): F[List[File[Array[Byte]]]] = {
+      downloadFilesAsStream(id).flatMap { lazyFileList =>
+        async.sequence {
+          lazyFileList.map { lazyFile =>
+            lazyFile.data.toStrict.map(x => File(lazyFile.name, x))
+          }
+        }
+      }
+    }
+
+    def downloadFilesAsStream(elementId: ElementId[F, CS, E]): F[List[File[LazyBytes[F]]]] = {
+      val promise = async.promise[List[File[LazyBytes[F]]]]
+      val descriptor = nodeId.mkString + lastPostDescriptor.getAndIncrement()
+      frontend.uploadFiles(elements(elementId), descriptor)
+      downloadFilePromises.put(descriptor, promise)
+      promise.async
     }
 
     def evalJs(code: String): F[String] = frontend.evalJs(code)
@@ -288,7 +307,7 @@ final class ComponentInstance
     val promise = async.promise[Unit]
     if (transitionInProgress) pendingTransitions.offer((transition, promise))
     else runTransition(transition, promise)
-    promise.future
+    promise.async
   }
 
   def applyEvent(eventId: EventId): Boolean = {
@@ -358,6 +377,18 @@ final class ComponentInstance
       case None =>
         nestedComponents.values.foreach { nested =>
           nested.resolveFormData(descriptor, formData)
+        }
+    }
+  }
+
+  def resolveFile(descriptor: String, files: List[File[LazyBytes[F]]]): Unit = miscLock.synchronized {
+    downloadFilePromises.get(descriptor) match {
+      case Some(promise) =>
+        downloadFilePromises.remove(descriptor)
+        promise.complete(Success(files))
+      case None =>
+        nestedComponents.values.foreach { nested =>
+          nested.resolveFile(descriptor, files)
         }
     }
   }

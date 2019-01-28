@@ -150,6 +150,18 @@ object Context {
     def downloadFormData(id: ElementId[F, S, M]): FormDataDownloader[F, S]
 
     /**
+      * Download selected file list from input correspondent to given element id.
+      */
+    def downloadFiles(id: ElementId[F, S, M]): F[List[File[Array[Byte]]]]
+
+    /**
+      * Same as [[downloadFiles]] but for stream mode. The method is useful
+      * when user want to upload very large files list which is problematic
+      * to keep in memory (especially when count of users is more than one).
+      */
+    def downloadFilesAsStream(id: ElementId[F, S, M]): F[List[File[LazyBytes[F]]]]
+
+    /**
       * Gives current state.
       */
     def state: F[S]
@@ -202,6 +214,8 @@ object Context {
     def get(propName: Symbol): F[String]
     def set(propName: Symbol, value: Any): F[Unit]
   }
+
+  final case class File[A](name: String, data: A)
 
   abstract class FormDataDownloader[F[_]: Async, S] {
     def onProgress(f: (Int, Int) => Transition[S]): this.type
