@@ -104,7 +104,7 @@ package object server {
           status = Response.Status.Ok,
           headers = Seq(
             "content-type" -> htmlContentType,
-            "set-cookie" -> s"${Cookies.DeviceId}=$deviceId"
+            "set-cookie" -> s"${Cookies.DeviceId}=$deviceId; Path=${config.rootPath}"
           ),
           body = Some {
             val sb = mutable.StringBuilder.newBuilder
