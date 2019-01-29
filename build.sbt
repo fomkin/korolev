@@ -134,6 +134,17 @@ lazy val `monix-support` = project.
   ).
   dependsOn(async)
 
+lazy val `cats-effect-support` = project.
+  enablePlugins(GitVersioning).
+  in(file("contrib/cats-effect")).
+  settings(crossVersionSettings).
+  settings(commonSettings: _*).
+  settings(
+    normalizedName := "korolev-cats-effect-support",
+    libraryDependencies += "org.typelevel" %% "cats-effect" % "1.2.0"
+  ).
+  dependsOn(async)
+
 // Examples
 val examples = file("examples")
 
@@ -272,7 +283,7 @@ lazy val root = project.in(file(".")).
   aggregate(
     korolev, async,
     server, `server-akkahttp`,
-    `jcache-support`, `monix-support`, `slf4j-support`,
+    `jcache-support`, `monix-support`, `cats-effect-support`, `slf4j-support`,
     simpleExample, routingExample, gameOfLifeExample,
     jcacheExample, formDataExample, `file-streaming-example`, delayExample, focusExample,
     webComponentExample, componentExample, akkaHttpExample,
