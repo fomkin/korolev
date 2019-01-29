@@ -123,17 +123,6 @@ lazy val `slf4j-support` = project.
   ).
   dependsOn(async)
 
-lazy val `monix-support` = project.
-  enablePlugins(GitVersioning).
-  in(file("contrib/monix")).
-  settings(crossVersionSettings).
-  settings(commonSettings: _*).
-  settings(
-    normalizedName := "korolev-monix-support",
-    libraryDependencies += "io.monix" %% "monix-eval" % "3.0.0-RC2"
-  ).
-  dependsOn(async)
-
 lazy val `cats-effect-support` = project.
   enablePlugins(GitVersioning).
   in(file("contrib/cats-effect")).
@@ -233,7 +222,10 @@ lazy val monixExample = (project in examples / "monix").
   settings(crossVersionSettings).
   settings(exampleSettings: _*).
   settings(mainClass := Some("MonixExample")).
-  dependsOn(`monix-support`, `server-akkahttp`)
+  settings(
+    libraryDependencies += "io.monix" %% "monix-eval" % "3.0.0-RC2"
+  ).
+  dependsOn(`cats-effect-support`, `server-akkahttp`)
 
 lazy val eventDataExample = (project in examples / "event-data").
   disablePlugins(HeaderPlugin).
@@ -283,7 +275,7 @@ lazy val root = project.in(file(".")).
   aggregate(
     korolev, async,
     server, `server-akkahttp`,
-    `jcache-support`, `monix-support`, `cats-effect-support`, `slf4j-support`,
+    `jcache-support`, `cats-effect-support`, `slf4j-support`,
     simpleExample, routingExample, gameOfLifeExample,
     jcacheExample, formDataExample, `file-streaming-example`, delayExample, focusExample,
     webComponentExample, componentExample, akkaHttpExample,

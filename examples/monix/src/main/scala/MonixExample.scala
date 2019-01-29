@@ -1,20 +1,36 @@
+import java.util.concurrent.Executors
+
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.stream.{ActorMaterializer, Materializer}
+import cats.Monad
 import korolev._
 import korolev.akkahttp.{AkkaHttpServerConfig, akkaHttpService}
-import korolev.execution._
-import korolev.monixSupport._
+import korolev.catsEffectSupport.implicits._
+import cats.syntax.flatMap._
 import korolev.server._
 import korolev.state.javaSerialization._
 import monix.eval.Task
+import monix.execution.ExecutionModel.AlwaysAsyncExecution
+import monix.execution.Scheduler
 
 object MonixExample extends App {
-
   private implicit val actorSystem: ActorSystem = ActorSystem()
   private implicit val materializer: Materializer = ActorMaterializer()
 
-  val applicationContext: Context[Task, State, Any] = Context[Task, State, Any]
+  implicit val taskScheduler: Scheduler = Scheduler(
+    Executors.newScheduledThreadPool(10),
+    AlwaysAsyncExecution
+  )
+
+  private val route = akkaHttpService(new ToDoList[Task]().config).apply(AkkaHttpServerConfig())
+  Http().bindAndHandle(route, "0.0.0.0", 8080)
+}
+
+class ToDoList[F[_]: Async: Monad] {
+  val applicationContext: Context[F, State, Any] = {
+    Context[F, State, Any]
+  }
 
   import applicationContext._
   import symbolDsl._
@@ -23,7 +39,7 @@ object MonixExample extends App {
   private val inputId = elementId()
   private val editInputId = elementId()
 
-  private val config = KorolevServiceConfig[Task, State, Any](
+  val config = KorolevServiceConfig[F, State, Any](
     stateStorage = StateStorage.default(State()),
     router = emptyRouter,
     render = { case state =>
@@ -103,11 +119,6 @@ object MonixExample extends App {
       )
     }
   )
-
-  private val route = akkaHttpService(config).apply(AkkaHttpServerConfig())
-
-  Http().bindAndHandle(route, "0.0.0.0", 8080)
-
 }
 
 case class State(
@@ -118,4 +129,3 @@ case class State(
 object State {
   case class Todo(text: String, done: Boolean)
 }
-
