@@ -20,7 +20,7 @@ import cats.effect.IO
 import korolev.Async
 
 import scala.collection.generic.CanBuildFrom
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 import cats.syntax.applicative._
 import cats.syntax.functor._
 import cats.syntax.flatMap._
@@ -86,7 +86,7 @@ object implicits {
     override def run[A, U](m: F[A])(f: Try[A] => U): Unit =
       m.runAsync { r =>
         IO {
-          f(r.toTry)
+          f(r.fold(Failure(_), Success(_))) // for scala 2.11
           ()
         }
       }.unsafeRunSync()
