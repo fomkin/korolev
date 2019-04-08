@@ -21,7 +21,7 @@ export class Bridge {
     let interval = parseInt(config['heartbeatInterval'], 10);
 
     if (interval > 0) {
-      setInterval(() => this._onCallback(CallbackType.HEARTBEAT), interval);
+      this._intervalId = setInterval(() => this._onCallback(CallbackType.HEARTBEAT), interval);
     }
   }
 
@@ -61,6 +61,7 @@ export class Bridge {
   }
 
   destroy() {
+    clearInterval(this._intervalId);
     this._connection.dispatcher.removeEventListener("message", this._messageHandler);
     this._korolev.destroy();
   }
