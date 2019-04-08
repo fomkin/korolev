@@ -39,8 +39,6 @@ export class Korolev {
     this.rootListeners = [];
     /** @type {?function(Event)} */
     this.historyHandler = null;
-    /** @type {string} */
-    this.initialPath = window.location.pathname;
     /** @type {function(CallbackType, string)} */
     this.callback = callback;
     /** @type {Array} */
@@ -63,7 +61,7 @@ export class Korolev {
     this.listenRoot('submit', true);
 
     this.historyHandler = (/** @type {Event} */ event) => {
-      if (event.state === null) callback(CallbackType.HISTORY, this.initialPath);
+      if (event.state === null) callback(CallbackType.HISTORY, window.location.pathname);
       else callback(CallbackType.HISTORY, event.state);
     };
 
