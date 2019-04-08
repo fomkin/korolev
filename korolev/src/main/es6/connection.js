@@ -112,6 +112,7 @@ export class Connection {
             if (firstTime)
               this._onOpen();
             this._onMessage(request.responseText);
+          case 503:
             // Poll again
             subscribe(false);
             break;
