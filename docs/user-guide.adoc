@@ -598,26 +598,27 @@ https://github.com/fomkin/korolev/blob/v0.8.0/examples/akka-http/src/main/scala/
 
 This integration overrides default logging behavior to `akka.event.Logging`.
 
-=== Monix
+=== Cats-effect
 
-Monix integration module provides `Async` implementation using `monix.eval.Task`. To use it, add a dependency:
-
-[source,scala]
-------------------------------
-libraryDependencies += "com.github.fomkin" %% "korolev-monix-support" % "0.10.0"
-------------------------------
+Cats-effect integration module provides `Async` instance from `cats.effect.Effect` instance. To use it, add a dependency:
 
 [source,scala]
 ------------------------------
-import korolev.execution._
-import korolev.monixSupport._
-import monix.eval.Task
+libraryDependencies += "com.github.fomkin" %% "korolev-cats-effect-support" % "0.10.0"
+------------------------------
 
-val config = KorolevServiceConfig[Task, Boolean, Any](
-  stateStorage = StateStorage.default(false),
-  router = Router.empty[Task, Boolean],
-  render = { case _ => 'body('div("Hello Monix Task")) }
-)
+[source,scala]
+------------------------------
+import korolev.catsEffectSupport.implicits._
+
+class Config[F[_]: Effect] {
+  ...
+  val config = KorolevServiceConfig[F, Boolean, Any](
+    stateStorage = StateStorage.default(false),
+    router = emptyRouter,
+    render = { case _ => 'body('div("Hello Cats Effect")) }
+  )
+}
 ------------------------------
 
 https://github.com/fomkin/korolev/blob/v0.8.0/examples/monix/src/main/scala/MonixExample.scala[See full example]
