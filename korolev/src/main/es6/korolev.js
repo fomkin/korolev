@@ -250,6 +250,15 @@ export class Korolev {
     */
   setAttr(id, xmlNs, name, value, isProperty) {
     var element = this.els[id];
+
+     // Do not update the value of a focused text input as the user may be typing a value into it at this moment
+     var isFocused = (document.activeElement === element);
+     if (isFocused) {
+       var isInputText = element instanceof HTMLInputElement && element.type == 'text';
+       if (isInputText)
+         return;
+     }
+
     if (isProperty) element[name] = value;
     else if (xmlNs === 0) {
       element.setAttribute(name, value);
