@@ -622,3 +622,28 @@ class Config[F[_]: Effect] {
 ------------------------------
 
 https://github.com/fomkin/korolev/blob/v0.8.0/examples/monix/src/main/scala/MonixExample.scala[See full example]
+
+== Troubleshooting
+
+=== Debug mode
+
+You view Korolev's client-server exchange. Enter in developer console of your browser and execute this.
+
+[source,javascript]
+------------------------------
+Korolev.setProtocolDebugEnabled(true)
+------------------------------
+
+Now you can see something like this.
+
+------------------------------
+-> [0,0 ]
+-> [2,"click",false ]
+<- [0,"0:1_3_1_1:click"]
+-> [6,"/tab2" ]
+-> [4,3,"1_3_1_1",0,"class","checkbox checkbox__checked",false,0,"1_3_1","1_3_1_2",0,"strike",1,"1_3_1_2","1_3_1_2_1","This is TODO #0" ]
+-> [0,1 ]
+------------------------------
+
+Message starting with `->` is commands from server. Message started with `<-` is callback and client side events.
+First number is always an procedure or callback code. You can protocol description https://github.com/fomkin/korolev/blob/v0.10.0/korolev/src/main/protocol.md[here].

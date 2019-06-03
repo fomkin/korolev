@@ -11,7 +11,7 @@ branches:
     - /.*-fixes/
 scala:
   - 2.11.12
-  - 2.12.4
+  - 2.12.8
 cache:
   directories:
     - $HOME/.sbt

@@ -28,6 +28,7 @@ export class Connection {
     this._useSSL = location.protocol === "https:";
 
     this._reconnectTimeout = MIN_RECONNECT_TIMEOUT;
+    this._webSocket = null;
     this._webSocketsSupported = window.WebSocket !== undefined;
     this._connectionType = ConnectionType.LONG_POLLING;
     this._wasConnected = false;
@@ -80,15 +81,15 @@ export class Connection {
     let url = (this._useSSL ? "wss://" : "ws://") + this._hostPort;
     let path = this._serverRootPath + `bridge/web-socket/${this._deviceId}/${this._sessionId}`;
     let uri = url + path;
-    let webSocket = new WebSocket(uri);
 
-    this._send = (data) => webSocket.send(data);
+    this._webSocket = new WebSocket(uri);
+    this._send = (data) => this._webSocket.send(data);
     this._connectionType = ConnectionType.WEB_SOCKET;
 
-    webSocket.addEventListener('open', (event) => this._onOpen());
-    webSocket.addEventListener('close', (event) => this._onClose());
-    webSocket.addEventListener('error', (event) => this._onError());
-    webSocket.addEventListener('message', (event) => this._onMessage(event.data));
+    this._webSocket.addEventListener('open', (event) => this._onOpen());
+    this._webSocket.addEventListener('close', (event) => this._onClose());
+    this._webSocket.addEventListener('error', (event) => this._onError());
+    this._webSocket.addEventListener('message', (event) => this._onMessage(event.data));
     
     console.log(`Trying to open connection to ${uri} using WebSocket`);
   }
@@ -199,6 +200,15 @@ export class Connection {
    */
   send(data) {
     this._send(data);
+  }
+
+  disconnect() {
+    if (this._webSocket != null) {
+        this._webSocket.close();
+        this._onClose();
+    } else {
+        console.log("Disconnect allowed only for WebSocket connections")
+    }
   }
 
   connect() {

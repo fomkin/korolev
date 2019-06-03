@@ -17,6 +17,7 @@
 package korolev.state
 
 import java.io.{File, FileInputStream, FileOutputStream}
+import java.util
 
 import korolev.Async
 import korolev.internal.DevMode
@@ -41,6 +42,9 @@ abstract class StateStorage[F[_]: Async, S] {
     */
   def get(deviceId: DeviceId, sessionId: SessionId): F[Option[StateManager[F]]]
 
+  /**
+    * Marks session to remove
+    */
   def remove(deviceId: DeviceId, sessionId: SessionId): Unit
 }
 
@@ -85,13 +89,24 @@ object StateStorage {
       (val createTopLevelState: String => F[S]) extends StateStorage[F, S] {
 
     private val cache = TrieMap.empty[String, StateManager[F]]
+    private val forDeletionCacheCapacity = 5000 // TODO export to config
+    private val mutex = new Object()
+    private val forDeletionCache = {
+      new util.LinkedHashMap[String, StateManager[F]](forDeletionCacheCapacity, 0.7F, true) {
+        override def removeEldestEntry(entry: java.util.Map.Entry[String, StateManager[F]]): Boolean = {
+          this.size() > forDeletionCacheCapacity
+        }
+      }
+    }
 
     def mkKey(deviceId: DeviceId, sessionId: SessionId): String = {
       s"$deviceId-$sessionId"
     }
 
     def get(deviceId: DeviceId, sessionId: SessionId): F[Option[StateManager[F]]] = {
-      Async[F].pure(cache.get(mkKey(deviceId, sessionId)))
+      val key = mkKey(deviceId, sessionId)
+      lazy val alternative = Option(mutex.synchronized(forDeletionCache.get(key)))
+      Async[F].pure(cache.get(key).orElse(alternative))
     }
 
     def create(deviceId: DeviceId, sessionId: SessionId): F[StateManager[F]] = {
@@ -108,8 +123,12 @@ object StateStorage {
     }
 
     override def remove(deviceId: DeviceId, sessionId: SessionId): Unit = {
-      cache.remove(mkKey(deviceId, sessionId))
-      ()
+      val key = mkKey(deviceId, sessionId)
+      cache.remove(key) foreach { sm =>
+        mutex.synchronized {
+          forDeletionCache.put(key, sm)
+        }
+      }
     }
   }
 
@@ -146,7 +165,6 @@ object StateStorage {
       }
     }
 
-
     def delete(nodeId: Id): F[Unit] = Async[F].fork {
       val file = getStateFile(nodeId)
       file.delete()
@@ -175,7 +193,7 @@ object StateStorage {
 
   private final class SimpleInMemoryStateManager[F[_]: Async] extends StateManager[F] {
 
-    val cache = TrieMap.empty[Id, Any]
+    val cache: TrieMap[Id, Any] = TrieMap.empty[Id, Any]
 
     val snapshot: F[StateManager.Snapshot] = Async[F].pureStrict {
       new StateManager.Snapshot {
