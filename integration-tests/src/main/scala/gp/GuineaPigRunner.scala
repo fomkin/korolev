@@ -17,44 +17,44 @@ object GuineaPigRunner extends App {
       "platform" -> "Windows 7",
       "version" -> "55.0",
       "chromedriverVersion" -> "2.27"
-    ),
-    Caps(() => DesiredCapabilities.edge)(
-      "platform" -> "Windows 10",
-      "version" -> "14.14393"
-    ),
-    Caps(() => DesiredCapabilities.internetExplorer)(
-      "platform" -> "Windows 7",
-      "version" -> "10.0"
-    ),
-    Caps(() => DesiredCapabilities.internetExplorer)(
-      "platform" -> "Windows 7",
-      "version" -> "11"
-    ),
-    Caps(() => DesiredCapabilities.firefox)(
-      "platform" -> "Linux",
-      "version" -> "45.0",
-      "seleniumVersion" -> "2.53.0"
-    ),
-    Caps(() => DesiredCapabilities.android)(
-      "deviceName" ->  "Android Emulator" ,
-      "deviceOrientation" ->   "portrait" ,
-      "browserName" ->   "Browser" ,
-      "platformVersion" -> "5.1" ,
-      "platformName" ->  "Android"
-    ),
-    Caps(() => DesiredCapabilities.safari)(
-      "platform" -> "OS X 10.11",
-      "version" -> "10.0"
-    ),
-    Caps(() => DesiredCapabilities.iphone)(
-      "appiumVersion" -> "1.5.3",
-      "deviceName" -> "iPhone 6 Simulator",
-      "deviceOrientation" -> "portrait",
-      "platformVersion" -> "9.3",
-      "platformName" -> "iOS",
-      "browserName" -> "Safari",
-      "autoAcceptAlerts" -> "true"
-    )
+    )//,
+//    Caps(() => DesiredCapabilities.edge)(
+//      "platform" -> "Windows 10",
+//      "version" -> "14.14393"
+//    ),
+//    Caps(() => DesiredCapabilities.internetExplorer)(
+//      "platform" -> "Windows 7",
+//      "version" -> "10.0"
+//    ),
+//    Caps(() => DesiredCapabilities.internetExplorer)(
+//      "platform" -> "Windows 7",
+//      "version" -> "11"
+//    ),
+//    Caps(() => DesiredCapabilities.firefox)(
+//      "platform" -> "Linux",
+//      "version" -> "45.0",
+//      "seleniumVersion" -> "2.53.0"
+//    ),
+//    Caps(() => DesiredCapabilities.android)(
+//      "deviceName" ->  "Android Emulator" ,
+//      "deviceOrientation" ->   "portrait" ,
+//      "browserName" ->   "Browser" ,
+//      "platformVersion" -> "5.1" ,
+//      "platformName" ->  "Android"
+//    ),
+//    Caps(() => DesiredCapabilities.safari)(
+//      "platform" -> "OS X 10.11",
+//      "version" -> "10.0"
+//    ),
+//    Caps(() => DesiredCapabilities.iphone)(
+//      "appiumVersion" -> "1.5.3",
+//      "deviceName" -> "iPhone 6 Simulator",
+//      "deviceOrientation" -> "portrait",
+//      "platformVersion" -> "9.3",
+//      "platformName" -> "iOS",
+//      "browserName" -> "Safari",
+//      "autoAcceptAlerts" -> "true"
+//    )
   )
 
   val servers = List(

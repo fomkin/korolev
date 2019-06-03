@@ -1,5 +1,5 @@
 window.document.addEventListener("DOMContentLoaded", function() {
-  Bridge.setProtocolDebugEnabled(true);
+  Korolev.setProtocolDebugEnabled(true);
   var display = document.createElement("pre");
   display.setAttribute('style', 'height: 300px; overflow-y: scroll')
   display.innerHTML = '<div><strong id="debug-log-label">Client log</strong></div>';
