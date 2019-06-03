@@ -4,8 +4,9 @@ import { ConnectionLostWidget, getDeviceId } from './utils.js';
 
 // Export `setProtocolDebugEnabled` function
 // to global scope
-window['Bridge'] = {
-  'setProtocolDebugEnabled': setProtocolDebugEnabled
+window['Korolev'] = {
+  'setProtocolDebugEnabled': setProtocolDebugEnabled,
+  'reconnect': () => console.log("Connection is not ready")
 };
 
 window.document.addEventListener("DOMContentLoaded", () => {
@@ -18,6 +19,9 @@ window.document.addEventListener("DOMContentLoaded", () => {
     config['r'],
     window.location
   );
+
+  // Set reconnect handler
+  window['Korolev']['reconnect'] = () => connection.disconnect();
 
   connection.dispatcher.addEventListener('open', () => {
     clw.hide();
