@@ -88,10 +88,16 @@ final class ComponentInstance
       async.fromTry(Failure(exception))
     }
 
-    private def getId(elementId: ElementId[F, CS, E]): F[Id] =
-      elements
-        .get(elementId)
-        .fold(noElementException[Id])(id => async.pure(id))
+    private def getId(elementId: ElementId[F, CS, E]): F[Id] = {
+      // miscLock synchronization required
+      // because prop handler methods can be
+      // invoked during render.
+      miscLock.synchronized {
+        elements
+          .get(elementId)
+          .fold(noElementException[Id])(id => async.pure(id))
+      }
+    }
 
     def property(elementId: ElementId[F, CS, E]): PropertyHandler[F] = {
       val idF = getId(elementId)
@@ -208,6 +214,8 @@ final class ComponentInstance
   def applyRenderContext(parameters: P,
                          rc: StatefulRenderContext[Effect[F, AS, M]],
                          snapshot: StateManager.Snapshot): Unit = miscLock.synchronized {
+    // Reset all event handlers delays and elements
+    prepare()
     val state = snapshot[CS](nodeId).getOrElse(component.initialState)
     val node =
       try {
@@ -349,7 +357,7 @@ final class ComponentInstance
     * Removes all temporary and obsolete misc.
     * All nested components also will be prepared.
     */
-  def prepare(): Unit = miscLock.synchronized {
+  private def prepare(): Unit = {
     markedComponentInstances.clear()
     markedDelays.clear()
     elements.clear()
@@ -359,9 +367,6 @@ final class ComponentInstance
       case (id, delay) =>
         if (delay.isFinished)
           delays.remove(id)
-    }
-    nestedComponents.values.foreach { nested =>
-      nested.prepare()
     }
   }
 

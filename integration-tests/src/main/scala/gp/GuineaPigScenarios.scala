@@ -50,12 +50,14 @@ object GuineaPigScenarios {
       ))
     },
     step("Todo should be added after 'Add todo' click") { implicit wd =>
-      // Add new todo
+      // Add new row
       val newTodoText = "Hello world"
       val input = wd.findElement(By.id("todo-input"))
       input.scrollTo()
       input.sendKeys(newTodoText)
+      sleep(5000.millis)
       wd.findElement(By.id("todo-submit-button")).click()
+      sleep(1.second)
       // Check new dod
       assert(s"Last todo text should contain $newTodoText", wait(wd).until(
         ExpectedConditions.textToBe(
@@ -69,13 +71,25 @@ object GuineaPigScenarios {
       assert("Field should be empty", value == "property value")
     },
     step("keydown event should be handled") { implicit wd =>
-      val input = wd.findElement(By.id("todo-input"))
-      input.scrollTo()
-      input.sendKeys("k")
-      sleep(1000.millis)
-      assert(s"theKey should contain 'd'", wait(wd).until(
-        ExpectedConditions.textToBe(By.id("theKey"), "k")
-      ))
+      val shouldRun = wd match {
+        case r: RemoteWebDriver =>
+          if (r.getCapabilities.getPlatform == Platform.MAC) false
+          else if (r.getCapabilities.getBrowserName == "firefox") false
+          else true
+        case _ => true
+      }
+      if (shouldRun) {
+        val input = wd.findElement(By.id("todo-input"))
+        input.scrollTo()
+        input.sendKeys("k")
+        sleep(5000.millis)
+        assert(s"theKey should contain 'd'",
+           wait(wd).until(
+             ExpectedConditions.textToBe(By.id("theKey"), "k")
+           ))
+      } else {
+        StepResult.CowardlySkipped("Not supported")
+      }
     },
     step("Uploaded text file should be displayed") { wd =>
       val shouldRun = wd match {
@@ -101,7 +115,7 @@ object GuineaPigScenarios {
           close()
         }
         wd.findElement(By.name("upload-input")).sendKeys(file.getAbsolutePath)
-        sleep(500.millis)
+        sleep(3.second)
         wd.findElement(By.id("upload-button")).click()
         assert(s"upload-text.textContent should be $text", wait(wd).until(
           ExpectedConditions.textToBe(
@@ -117,12 +131,12 @@ object GuineaPigScenarios {
     step("Delay should be performed") { wd =>
       val el = wd.findElement(By.id("delay-text"))
       el.click()
-      sleep(1000.millis)
+      sleep(100.millis)
       assert(
         "delay-text should be 'Wait a second'",
         el.getText == "Wait a second"
       )
-      sleep(2000.millis)
+      sleep(3000.millis)
       assert(
         "delay-text should be 'Click me'",
         el.getText == "Click me"
@@ -132,7 +146,7 @@ object GuineaPigScenarios {
       val el = wd.findElement(By.id("the-component"))
       val checks = for (i <- 1 to 5) yield {
         el.click()
-        sleep(1.second)
+        sleep(3.second)
         val text = el.getText
         if (text == "label " + i) 1 else 0
       }
@@ -141,6 +155,7 @@ object GuineaPigScenarios {
     step("Component should produce event") { wd =>
       val el = wd.findElement(By.id("the-component"))
       el.click()
+      sleep(3.second)
       assert(s"upload-text.textContent should be 'Cat'", wait(wd).until(
         ExpectedConditions.textToBe(
           By.id("from-component"),

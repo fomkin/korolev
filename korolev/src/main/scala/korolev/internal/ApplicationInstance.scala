@@ -81,9 +81,6 @@ final class ApplicationInstance
       // Prepare render context
       renderContext.swap()
 
-      // Reset all event handlers delays and elements
-      topLevelComponentInstance.prepare()
-
       // Perform rendering
       topLevelComponentInstance.applyRenderContext(
         parameters = (), // Boxed unit as parameter. Top level component doesn't need parameters
