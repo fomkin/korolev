@@ -105,8 +105,19 @@ object StateStorage {
 
     def get(deviceId: DeviceId, sessionId: SessionId): F[Option[StateManager[F]]] = {
       val key = mkKey(deviceId, sessionId)
-      lazy val alternative = Option(mutex.synchronized(forDeletionCache.get(key)))
-      Async[F].pure(cache.get(key).orElse(alternative))
+      val result = cache.get(key) match {
+        case None =>
+          mutex.synchronized {
+            Option(forDeletionCache.remove(key)) match {
+              case optionResult @ Some(sm) =>
+                cache.put(key, sm)
+                optionResult
+              case None => None
+            }
+          }
+        case optionResult => optionResult
+      }
+      Async[F].pure(result)
     }
 
     def create(deviceId: DeviceId, sessionId: SessionId): F[StateManager[F]] = {

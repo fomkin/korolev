@@ -63,6 +63,7 @@ final class CachedStateStorage[F[_]: Async, S]
   private class CachedStateManager(deviceId: DeviceId, sessionId: SessionId) extends StateManager[F] {
 
     def delete(nodeId: Id): F[Unit] = {
+      // FIXME https://github.com/fomkin/korolev/issues/256
       Async[F].run(Async[F].fork(cache.remove(mkKey(nodeId))))(_ => ())
       Async[F].unit
     }
