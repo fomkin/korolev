@@ -88,10 +88,16 @@ final class ComponentInstance
       async.fromTry(Failure(exception))
     }
 
-    private def getId(elementId: ElementId[F, CS, E]): F[Id] =
-      elements
-        .get(elementId)
-        .fold(noElementException[Id])(id => async.pure(id))
+    private def getId(elementId: ElementId[F, CS, E]): F[Id] = {
+      // miscLock synchronization required
+      // because prop handler methods can be
+      // invoked during render.
+      miscLock.synchronized {
+        elements
+          .get(elementId)
+          .fold(noElementException[Id])(id => async.pure(id))
+      }
+    }
 
     def property(elementId: ElementId[F, CS, E]): PropertyHandler[F] = {
       val idF = getId(elementId)

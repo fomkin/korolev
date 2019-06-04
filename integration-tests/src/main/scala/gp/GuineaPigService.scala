@@ -199,7 +199,7 @@ object GuineaPigService {
               }
             }
           ),
-          'span('id /= "theKey", state.key.fold("<no key>")(identity)),
+          'span('id /= "theKey", state.key.fold("[no key]")(identity)),
           'div(
             TheComponent("label") { (access, _) =>
               access.transition(_.copy(eventFromComponentReceived = true))
