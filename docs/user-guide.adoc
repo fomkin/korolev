@@ -647,3 +647,14 @@ Now you can see something like this.
 
 Message starting with `->` is commands from server. Message started with `<-` is callback and client side events.
 First number is always an procedure or callback code. You can protocol description https://github.com/fomkin/korolev/blob/v0.10.0/korolev/src/main/protocol.md[here].
+
+=== Periodical reconnections under Ingress
+
+When using Korolev under Ingress you may face a problem with frequent recconections of websocket channel between browser and server. 
+
+For Google Cloud hosting you can try the following:
+
+1. There is https://cloud.google.com/kubernetes-engine/docs/concepts/ingress#support_for_websocket[section] in the Ingress documentaion concerning websockets. It suggests to create a https://cloud.google.com/kubernetes-engine/docs/how-to/configure-backend-service[`BackendConfig`].
+2. You should set https://cloud.google.com/kubernetes-engine/docs/how-to/configure-backend-service#creating_a_backendconfig[`connectionDraining.drainingTimeoutSec`] to sufficiently large value (e.g. `"3600"`), `timeoutSec` doesn't solve the problem.
+
+This solution was tested only for Google Cloud, but it might work for other systems. Don't hesitate to open a PR and describe if this instruction works for other cases. 
