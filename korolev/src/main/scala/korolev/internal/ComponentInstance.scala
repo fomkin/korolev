@@ -40,6 +40,9 @@ import scala.util.{Failure, Success, Try}
   * 2. Optionally setState()
   * 3. applyRenderContext()
   * 4. dropObsoleteMisc()
+  *
+  * @tparam AS Type of top level state (application state)
+  * @tparam CS Type of component state
   */
 final class ComponentInstance
   [
@@ -51,7 +54,7 @@ final class ComponentInstance
     sessionId: QualifiedSessionId,
     frontend: ClientSideApi[F],
     eventRegistry: EventRegistry[F],
-    stateManager: StateManager[F],
+    stateManager: StateManager[F, CS],
     getRenderNum: () => Int,
     val component: Component[F, CS, P, E],
     reporter: Reporter
@@ -265,8 +268,8 @@ final class ComponentInstance
                 n.applyRenderContext(entry.parameters, proxy, snapshot)
               case _ =>
                 // Create new nested component instance
-                val n = entry.createInstance(
-                  id, sessionId, frontend, eventRegistry, stateManager, getRenderNum, reporter)
+                val sm = stateManager.withDefault(entry.component.initialState)
+                val n = entry.createInstance(id, sessionId, frontend, eventRegistry, sm, getRenderNum, reporter)
                 markedComponentInstances += id
                 nestedComponents.put(id, n)
                 n.subscribeStateChange { (id, state) =>

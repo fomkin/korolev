@@ -35,10 +35,10 @@ final class ApplicationInstance
   ](
     sessionId: QualifiedSessionId,
     connection: Connection[F],
-    stateManager: StateManager[F],
+    stateManager: StateManager[F, S],
     initialState: S,
     render: PartialFunction[S, Document.Node[Effect[F, S, M]]],
-    router: Router[F, S, Option[S]],
+    router: Router[F, S],
     fromScratch: Boolean,
     reporter: Reporter
   ) {
@@ -109,7 +109,7 @@ final class ApplicationInstance
         .flatMap { maybeTopLevelState =>
           router
             .toState
-            .lift(Some(maybeTopLevelState.getOrElse(initialState)) -> path)
+            .lift((maybeTopLevelState.getOrElse(initialState), path))
             .fold(Async[F].pure(Option.empty[S]))(_.map(Some(_)))
         }
         .flatMap {

@@ -19,7 +19,7 @@ object FocusExample extends SimpleAkkaHttpKorolevApp {
   val service: AkkaHttpService = akkaHttpService {
     KorolevServiceConfig[Future, Boolean, Any](
       stateStorage = StateStorage.default(false),
-      router = emptyRouter,
+      router = Router.empty,
       render = {
         case _ =>
           'body(

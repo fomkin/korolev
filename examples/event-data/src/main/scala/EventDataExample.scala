@@ -15,7 +15,7 @@ object EventDataExample extends SimpleAkkaHttpKorolevApp {
 
   val service = akkaHttpService {
     KorolevServiceConfig [Future, String, Any] (
-      router = emptyRouter,
+      router = Router.empty,
       stateStorage = StateStorage.default("nothing"),
       render = {
         case json =>

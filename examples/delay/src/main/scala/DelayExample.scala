@@ -17,7 +17,7 @@ object DelayExample extends SimpleAkkaHttpKorolevApp {
   val service = akkaHttpService {
     KorolevServiceConfig[Future, Option[Int], Any](
       stateStorage = StateStorage.default(Option.empty[Int]),
-      router = emptyRouter,
+      router = Router.empty,
       render = {
         case Some(n) => 'body(
           delay(3.seconds) { access =>

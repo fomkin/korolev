@@ -23,7 +23,7 @@ object GameOfLife extends SimpleAkkaHttpKorolevApp {
   val service = akkaHttpService {
     KorolevServiceConfig[Future, Universe, Any](
       stateStorage = StateStorage.default(Universe(universeSize)),
-      router = emptyRouter,
+      router = Router.empty,
       render = {
         case universe =>
           'body(

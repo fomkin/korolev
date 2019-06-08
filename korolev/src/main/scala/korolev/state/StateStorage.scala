@@ -27,20 +27,18 @@ import scala.collection.concurrent.TrieMap
 
 abstract class StateStorage[F[_]: Async, S] {
 
+  @deprecated("Use get(device, session).default", "0.12.0")
   def createTopLevelState: DeviceId => F[S]
 
   /**
-    * Initialize a new state for a new session under the device
-    * @param deviceId Identifier of device
-    * @return Future with new state
+    * Check if state manager for the session is exist
     */
-  def create(deviceId: DeviceId, sessionId: SessionId): F[StateManager[F]]
+  def exists(deviceId: DeviceId, sessionId: SessionId): F[Boolean]
 
   /**
-    * Restore session from storage
-    * @return Future with result if session already exists
+    * Restore session manager from storage or create new one
     */
-  def get(deviceId: DeviceId, sessionId: SessionId): F[Option[StateManager[F]]]
+  def get(deviceId: DeviceId, sessionId: SessionId): F[StateManager[F, S]]
 
   /**
     * Marks session to remove
@@ -88,12 +86,12 @@ object StateStorage {
   private class DefaultStateStorage[F[_]: Async, S: StateSerializer]
       (val createTopLevelState: String => F[S]) extends StateStorage[F, S] {
 
-    private val cache = TrieMap.empty[String, StateManager[F]]
+    private val cache = TrieMap.empty[String, StateManager[F, S]]
     private val forDeletionCacheCapacity = 5000 // TODO export to config
     private val mutex = new Object()
     private val forDeletionCache = {
-      new util.LinkedHashMap[String, StateManager[F]](forDeletionCacheCapacity, 0.7F, true) {
-        override def removeEldestEntry(entry: java.util.Map.Entry[String, StateManager[F]]): Boolean = {
+      new util.LinkedHashMap[String, StateManager[F, S]](forDeletionCacheCapacity, 0.7F, true) {
+        override def removeEldestEntry(entry: java.util.Map.Entry[String, StateManager[F, S]]): Boolean = {
           this.size() > forDeletionCacheCapacity
         }
       }
@@ -103,34 +101,41 @@ object StateStorage {
       s"$deviceId-$sessionId"
     }
 
-    def get(deviceId: DeviceId, sessionId: SessionId): F[Option[StateManager[F]]] = {
+    def exists(deviceId: DeviceId, sessionId: SessionId): F[Boolean] = {
       val key = mkKey(deviceId, sessionId)
-      val result = cache.get(key) match {
-        case None =>
-          mutex.synchronized {
-            Option(forDeletionCache.remove(key)) match {
-              case optionResult @ Some(sm) =>
-                cache.put(key, sm)
-                optionResult
-              case None => None
-            }
-          }
-        case optionResult => optionResult
-      }
+      val result = cache.contains(key) || forDeletionCache.containsKey(key)
       Async[F].pure(result)
     }
 
-    def create(deviceId: DeviceId, sessionId: SessionId): F[StateManager[F]] = {
+    def get(deviceId: DeviceId, sessionId: SessionId): F[StateManager[F, S]] = {
       val key = mkKey(deviceId, sessionId)
-      val sm = if (DevMode.isActive) {
-        val directory = new File(DevMode.sessionsDirectory, key)
-        new DevModeStateManager[F](directory)
+      cache.get(key) match {
+        case None =>
+          Option(mutex.synchronized(forDeletionCache.remove(key))) match {
+            case Some(sm) =>
+              cache.put(key, sm)
+              Async[F].pure(sm)
+            case None =>
+              create(deviceId, sessionId)
+          }
+        case Some(sm) => Async[F].pure(sm)
       }
-      else {
-        new SimpleInMemoryStateManager[F]()
+    }
+
+    private def create(deviceId: DeviceId, sessionId: SessionId): F[StateManager[F, S]] = {
+      val key = mkKey(deviceId, sessionId)
+      Async[F].flatMap(createTopLevelState(deviceId)) { default =>
+        val sm = if (DevMode.isActive) {
+          val directory = new File(DevMode.sessionsDirectory, key)
+          new DevModeStateManager[F, S](directory, default)
+        }
+        else {
+          new SimpleInMemoryStateManager[F, S](default)
+        }
+        cache.put(key, sm)
+        // TODO maybe it should be moved to StateManager
+        Async[F].map(sm.write(Id.TopLevel, sm.default))(_ => sm)
       }
-      cache.put(key, sm)
-      Async[F].pure(sm)
     }
 
     override def remove(deviceId: DeviceId, sessionId: SessionId): Unit = {
@@ -143,7 +148,7 @@ object StateStorage {
     }
   }
 
-  private final class DevModeStateManager[F[_]: Async](directory: File) extends StateManager[F] {
+  private final class DevModeStateManager[F[_]: Async, S](directory: File, val default: S) extends StateManager[F, S] {
 
     def getStateFile(node: Id): File =
       new File(directory, node.mkString)
@@ -156,7 +161,7 @@ object StateStorage {
     def snapshot: F[StateManager.Snapshot] = Async[F].pure {
       new StateManager.Snapshot {
 
-        val cache = directory
+        val cache: Map[Id, Array[Byte]] = directory
           .listFiles()
           .map { file => Id(file.getName) -> readFile(file) }
           .toMap
@@ -202,7 +207,7 @@ object StateStorage {
     }
   }
 
-  private final class SimpleInMemoryStateManager[F[_]: Async] extends StateManager[F] {
+  private final class SimpleInMemoryStateManager[F[_]: Async, S](val default: S) extends StateManager[F, S] {
 
     val cache: TrieMap[Id, Any] = TrieMap.empty[Id, Any]
 

@@ -1,9 +1,9 @@
 = Korolev: Single Page Applications Framework
-
-Aleksey Fomkin <aleksey.fomkin@gmail.com>
 :source-highlighter: pygments
 :numbered:
 :toc:
+
+Aleksey Fomkin <aleksey.fomkin@gmail.com>
 
 == Introduction
 
@@ -444,9 +444,6 @@ Let's pretends that your application is a blogging platform.
 -------------------------------------------------------------------------------
 case class MyState(author: String, title: String, text: String)
 
-// Converts "The Cow: Saga" to "the-cow-saga"
-def captionToUrl(s: String) = ???
-
 KorolevServiceConfig(
   ...
   // Render the article
@@ -457,28 +454,16 @@ KorolevServiceConfig(
     )
   },
   router = Router(
-    // Static router works when user enters
-    // with any url but "/".
-    static = (deviceId) => Router(
-      toState = {
-        case (_, Root / author / article) => articleService.load(author, article)
-        case _ => articleService.defaultArticle
-      }
-    ),
-    dynamic = (device, session) => Router(
-      fromState = {
-        case MyState(tab, _) =>
-          Root / tab.toLowerCase
-      },
-      toState = {
-        case (s, Root) =>
-          val u = s.copy(selectedTab = s.todos.keys.head)
-          Future.successful(u)
-        case (s, Root / name) =>
-          val key = s.todos.keys.find(_.toLowerCase == name)
-          Future.successful(key.fold(s)(k => s.copy(selectedTab = k)))
-      }
-    )
+    fromState = {
+      case MyState(author, article, _) =>
+        Root / author / article
+    },
+    toState = {
+      case (s, Root / author / article) =>
+        articleService.load(author, article).map { text =>
+          MyState(author, article, text)
+        }
+    }
   )
 )
 -------------------------------------------------------------------------------
@@ -546,21 +531,8 @@ By default Korolev log all messages to standard output. You can redirect logs to
 
 [source,scala]
 ------------------------------
-libraryDependencies += "com.github.fomkin" %% "korolev-slf4j-support" % "0.10.0"
+libraryDependencies += "com.github.fomkin" %% "korolev-slf4j-support" % "0.11.1"
 ------------------------------
-
-=== JCache
-
-For large applications, when one node can't serve all clients, you need a way to scale application to multiple nodes. Although Korolev usually use persistent connections, a case when a client connects to a wrong node is possible. First, it may happen after reconnect. Secondly, it may happen when the client downgrades his connection from WebSocket to long polling for some reason. It means that every node in a cluster should have access to all user states (sessions).
-
-To fix this, you can apply any in-memory storage compatible with https://github.com/jsr107/jsr107spec[JCache]. Just add a dependency to your SBT configuration.
-
-[source,scala]
-------------------------------
-libraryDependencies += "com.github.fomkin" %% "korolev-jcache-support" % "0.10.0"
-------------------------------
-
-https://github.com/fomkin/korolev/blob/v0.8.0/examples/jcache/src/main/scala/JCacheExample.scala[See full example]
 
 === Akka HTTP
 
@@ -568,7 +540,7 @@ Korolev provides smooth Akka HTTP integration out of the box. To use it, add a d
 
 [source,scala]
 ------------------------------
-libraryDependencies += "com.github.fomkin" %% "korolev-server-akkahttp" % "0.10.0"
+libraryDependencies += "com.github.fomkin" %% "korolev-server-akkahttp" % "0.11.1"
 ------------------------------
 
 [source,scala]
@@ -604,7 +576,7 @@ Cats-effect integration module provides `Async` instance from `cats.effect.Effec
 
 [source,scala]
 ------------------------------
-libraryDependencies += "com.github.fomkin" %% "korolev-cats-effect-support" % "0.10.0"
+libraryDependencies += "com.github.fomkin" %% "korolev-cats-effect-support" % "0.11.1"
 ------------------------------
 
 [source,scala]
@@ -615,7 +587,7 @@ class Config[F[_]: Effect] {
   ...
   val config = KorolevServiceConfig[F, Boolean, Any](
     stateStorage = StateStorage.default(false),
-    router = emptyRouter,
+    router = Router.empty,
     render = { case _ => 'body('div("Hello Cats Effect")) }
   )
 }
@@ -646,9 +618,9 @@ Now you can see something like this.
 ------------------------------
 
 Message starting with `->` is commands from server. Message started with `<-` is callback and client side events.
-First number is always an procedure or callback code. You can protocol description https://github.com/fomkin/korolev/blob/v0.10.0/korolev/src/main/protocol.md[here].
+First number is always an procedure or callback code. You can protocol description https://github.com/fomkin/korolev/blob/v0.11.1/korolev/src/main/protocol.md[here].
 
-=== Periodical reconnections under Ingress
+=== Reconnections under Kubernetes Ingress
 
 When using Korolev under Ingress you may face a problem with frequent recconections of websocket channel between browser and server. 
 
