@@ -238,7 +238,7 @@ object Context {
                        sessionId: QualifiedSessionId,
                        frontend: ClientSideApi[F],
                        eventRegistry: EventRegistry[F],
-                       stateManager: StateManager[F],
+                       stateManager: StateManager[F, CS],
                        getRenderNum: () => Int,
                        reporter: Reporter): ComponentInstance[F, AS, M, CS, P, E] = {
       new ComponentInstance(node, sessionId, frontend, eventRegistry, stateManager, getRenderNum, component, reporter)

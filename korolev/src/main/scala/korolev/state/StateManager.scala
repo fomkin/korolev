@@ -19,11 +19,19 @@ package korolev.state
 import korolev.Async
 import levsha.Id
 
-abstract class StateManager[F[_]: Async] {
+abstract class StateManager[F[_]: Async, S] { self =>
+  def default: S
   def snapshot: F[StateManager.Snapshot]
   def read[T: StateDeserializer](nodeId: Id): F[Option[T]]
   def delete(nodeId: Id): F[Unit]
   def write[T: StateSerializer](nodeId: Id, value: T): F[Unit]
+  def withDefault[B](newDefault: B): StateManager[F, B] = new StateManager[F, B] {
+    val default: B = newDefault
+    def snapshot: F[StateManager.Snapshot] = self.snapshot
+    def read[T: StateDeserializer](nodeId: Id): F[Option[T]] = self.read(nodeId)
+    def delete(nodeId: Id): F[Unit] = self.delete(nodeId)
+    def write[T: StateSerializer](nodeId: Id, value: T): F[Unit] = self.write(nodeId, value)
+  }
 }
 
 object StateManager {

@@ -25,7 +25,6 @@ import korolev.Async._
 import korolev.Context.File
 import korolev.internal.{ApplicationInstance, Connection}
 import korolev.state._
-import levsha.Id
 
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
@@ -55,25 +54,14 @@ package object server {
 
     val sessions = TrieMap.empty[String, KorolevSession[F]]
 
-    def getOrCreateStateManager(deviceId: DeviceId, sessionId: SessionId): F[(StateManager[F], Boolean)] =
-      for {
-        maybeStateManager <- config.stateStorage.get(deviceId, sessionId)
-        stateManager <- maybeStateManager.fold(config.stateStorage.create(deviceId, sessionId))(Async[F].pure(_))
-      } yield (stateManager, maybeStateManager.isEmpty)
-
     def renderStatic(request: Request[F]): F[Response] =
       for {
         deviceId <- deviceFromRequest(request)
         sessionId <- config.idGenerator.generateSessionId()
-        state <- config.router(deviceId, None)
-          .toState
-          .lift((None, request.path))
-          .getOrElse(config.stateStorage.createTopLevelState(deviceId))
-          .flatMap { state =>
-            getOrCreateStateManager(deviceId, sessionId).map(_._1).flatMap { manager =>
-              manager.write(Id.TopLevel, state).map(_ => state)
-            }
-          }
+        manager <- config.stateStorage.get(deviceId, sessionId)
+        state <- config.router.toState
+          .lift((manager.default, request.path))
+          .getOrElse(Async[F].pure(manager.default))
       } yield {
         val dsl = new levsha.dsl.SymbolDsl[Context.Effect[F, S, M]]()
         val textRenderContext = new HtmlRenderContext[F, S, M]()
@@ -131,7 +119,7 @@ package object server {
             val stream = getClass.getResourceAsStream(fsPath)
             Option(stream) map { stream =>
               val fileExtension = fileName.lastIndexOf('.') match {
-                case -1 => binaryContentType
+                case -1 => "bin"
                 case index => fileName.substring(index + 1)
               }
               (inputStreamToBytes(stream), fileExtension)
@@ -169,17 +157,13 @@ package object server {
       val connection = new Connection[F]()
 
       for {
-        stateManagerIsNew <- getOrCreateStateManager(deviceId, sessionId)
-        (stateManager, isNew) = stateManagerIsNew
-        initialState <- config.stateStorage.createTopLevelState(deviceId)
-
-        // Create Korolev with dynamic router
-        router = config.router(deviceId, Some(sessionId))
+        isOld <- config.stateStorage.exists(deviceId, sessionId)
+        stateManager <- config.stateStorage.get(deviceId, sessionId)
         qualifiedSessionId = QualifiedSessionId(deviceId, sessionId)
         korolev = new ApplicationInstance(
           qualifiedSessionId, connection,
-          stateManager, initialState,
-          config.render, router, fromScratch = isNew,
+          stateManager, stateManager.default,
+          config.render, config.router, fromScratch = !isOld,
           reporter
         )
         env <- config.envConfigurator.configure(korolev.topLevelComponentInstance.browserAccess)
@@ -393,8 +377,8 @@ package object server {
     service
   }
 
-  def emptyRouter[F[_]: Async, S]: (DeviceId, Option[SessionId]) => Router[F, S, Option[S]] =
-    (_, _) => Router.empty[F, S, Option[S]]
+  @deprecated("Use Router.empty instead", "0.12.0")
+  def emptyRouter[F[_]: Async, S]: Router[F, S] = Router.empty[F, S]
 
   private[server] object misc {
     val htmlContentType = "text/html; charset=utf-8"

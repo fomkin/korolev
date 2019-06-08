@@ -16,9 +16,8 @@
 
 package korolev.server
 
-import korolev.Reporter
-import korolev.state.{DeviceId, EnvConfigurator, IdGenerator, SessionId}
-import korolev.{Async, Context, Router}
+import korolev.state.{EnvConfigurator, IdGenerator}
+import korolev.{Async, Context, Reporter, Router}
 import levsha.Document
 import levsha.dsl.SymbolDsl
 
@@ -26,7 +25,7 @@ import scala.concurrent.duration._
 
 case class KorolevServiceConfig[F[_]: Async, S, M](
   stateStorage: korolev.state.StateStorage[F, S],
-  router: (DeviceId, Option[SessionId]) => Router[F, S, Option[S]],
+  router: Router[F, S],
   rootPath: String = "/",
   render: PartialFunction[S, Document.Node[Context.Effect[F, S, M]]],
   head: Seq[Document.Node[Context.Effect[F, S, M]]] = Seq.empty,

@@ -1,9 +1,9 @@
 = Korolev: Single Page Applications Framework
-
-Aleksey Fomkin <aleksey.fomkin@gmail.com>
 :source-highlighter: pygments
 :numbered:
 :toc:
+
+Aleksey Fomkin <aleksey.fomkin@gmail.com>
 
 == Introduction
 
@@ -546,7 +546,7 @@ By default Korolev log all messages to standard output. You can redirect logs to
 
 [source,scala]
 ------------------------------
-libraryDependencies += "com.github.fomkin" %% "korolev-slf4j-support" % "0.10.0"
+libraryDependencies += "com.github.fomkin" %% "korolev-slf4j-support" % "0.11.1"
 ------------------------------
 
 === JCache
@@ -557,7 +557,7 @@ To fix this, you can apply any in-memory storage compatible with https://github.
 
 [source,scala]
 ------------------------------
-libraryDependencies += "com.github.fomkin" %% "korolev-jcache-support" % "0.10.0"
+libraryDependencies += "com.github.fomkin" %% "korolev-jcache-support" % "0.11.1"
 ------------------------------
 
 https://github.com/fomkin/korolev/blob/v0.8.0/examples/jcache/src/main/scala/JCacheExample.scala[See full example]
@@ -568,7 +568,7 @@ Korolev provides smooth Akka HTTP integration out of the box. To use it, add a d
 
 [source,scala]
 ------------------------------
-libraryDependencies += "com.github.fomkin" %% "korolev-server-akkahttp" % "0.10.0"
+libraryDependencies += "com.github.fomkin" %% "korolev-server-akkahttp" % "0.11.1"
 ------------------------------
 
 [source,scala]
@@ -604,7 +604,7 @@ Cats-effect integration module provides `Async` instance from `cats.effect.Effec
 
 [source,scala]
 ------------------------------
-libraryDependencies += "com.github.fomkin" %% "korolev-cats-effect-support" % "0.10.0"
+libraryDependencies += "com.github.fomkin" %% "korolev-cats-effect-support" % "0.11.1"
 ------------------------------
 
 [source,scala]
@@ -646,9 +646,9 @@ Now you can see something like this.
 ------------------------------
 
 Message starting with `->` is commands from server. Message started with `<-` is callback and client side events.
-First number is always an procedure or callback code. You can protocol description https://github.com/fomkin/korolev/blob/v0.10.0/korolev/src/main/protocol.md[here].
+First number is always an procedure or callback code. You can protocol description https://github.com/fomkin/korolev/blob/v0.11.1/korolev/src/main/protocol.md[here].
 
-=== Periodical reconnections under Ingress
+=== Reconnections under Kubernetes Ingress
 
 When using Korolev under Ingress you may face a problem with frequent recconections of websocket channel between browser and server. 
 
