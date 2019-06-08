@@ -21,7 +21,7 @@ object AkkaHttpExample extends App {
 
   private val config = KorolevServiceConfig[Future, Boolean, Any](
     stateStorage = StateStorage.default(false),
-    router = emptyRouter,
+    router = Router.empty,
     render = { case s =>
       'body(
         s"Hello akka-http: $s",

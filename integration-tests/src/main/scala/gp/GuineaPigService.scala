@@ -211,26 +211,19 @@ object GuineaPigService {
           )
         )
     },
-    router = { (deviceId, _) =>
+    router = {
       Router(
         fromState = {
           case State(tab, _, _, _, _, _) =>
             Root / tab.toLowerCase
         },
         toState = {
-          case (Some(s), Root) =>
+          case (s, Root) =>
             val u = s.copy(selectedTab = s.todos.keys.head)
             Future.successful(u)
-          case (Some(s), Root / name) =>
+          case (s, Root / name) =>
             val key = s.todos.keys.find(_.toLowerCase == name)
             Future.successful(key.fold(s)(k => s.copy(selectedTab = k)))
-          case (None, Root) =>
-            storage.createTopLevelState(deviceId)
-          case (None, Root / name) =>
-            storage.createTopLevelState(deviceId) map { s =>
-              val key = s.todos.keys.find(_.toLowerCase == name)
-              key.fold(s)(k => s.copy(selectedTab = k))
-            }
         }
       )
     }

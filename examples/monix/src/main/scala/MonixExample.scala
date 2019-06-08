@@ -41,7 +41,7 @@ class ToDoList[F[_]: Async: Monad] {
 
   val config = KorolevServiceConfig[F, State, Any](
     stateStorage = StateStorage.default(State()),
-    router = emptyRouter,
+    router = Router.empty,
     render = { case state =>
       'body(
         'div("Super TODO tracker"),

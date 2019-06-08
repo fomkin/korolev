@@ -101,17 +101,6 @@ lazy val korolev = project.
 
 // Contribs
 
-lazy val `jcache-support` = project.
-  enablePlugins(GitVersioning).
-  in(file("contrib/jcache")).
-  settings(crossVersionSettings).
-  settings(commonSettings: _*).
-  settings(
-    normalizedName := "korolev-jcache-support",
-    libraryDependencies += "javax.cache" % "cache-api" % "1.0.0"
-  ).
-  dependsOn(server)
-
 lazy val `slf4j-support` = project.
   enablePlugins(GitVersioning).
   in(file("contrib/slf4j")).
@@ -157,16 +146,6 @@ lazy val gameOfLifeExample = (project in examples / "game-of-life").
   settings(exampleSettings: _*).
   settings(mainClass := Some("GameOfLife")).
   dependsOn(`server-akkahttp`)
-
-lazy val jcacheExample = (project in examples / "jcache").
-  disablePlugins(HeaderPlugin).
-  settings(crossVersionSettings).
-  settings(exampleSettings: _*).
-  settings(
-    mainClass := Some("JCacheExample"),
-    libraryDependencies += "com.hazelcast" % "hazelcast" % "3.8"
-  ).
-  dependsOn(`server-akkahttp`, `jcache-support`)
 
 lazy val formDataExample = (project in examples / "form-data").
   disablePlugins(HeaderPlugin).
@@ -275,9 +254,9 @@ lazy val root = project.in(file(".")).
   aggregate(
     korolev, async,
     server, `server-akkahttp`,
-    `jcache-support`, `cats-effect-support`, `slf4j-support`,
+    `cats-effect-support`, `slf4j-support`,
     simpleExample, routingExample, gameOfLifeExample,
-    jcacheExample, formDataExample, `file-streaming-example`, delayExample, focusExample,
+    formDataExample, `file-streaming-example`, delayExample, focusExample,
     webComponentExample, componentExample, akkaHttpExample,
     eventDataExample, `integration-tests`
   )

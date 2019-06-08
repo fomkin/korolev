@@ -21,7 +21,7 @@ object WebComponentExample extends SimpleAkkaHttpKorolevApp {
 
   val service = akkaHttpService{
     KorolevServiceConfig [Future, State, Any] (
-      router = emptyRouter,
+      router = Router.empty,
       stateStorage = StateStorage.default(State()),
       head = {
         Seq(
