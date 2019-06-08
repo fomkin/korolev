@@ -29,7 +29,7 @@ import scala.annotation.tailrec
   */
 final case class Router[F[_]: Async, S](
     fromState: PartialFunction[S, Router.Path] = PartialFunction.empty,
-    toState: PartialFunction[(S, Router.Path), F[S]] = PartialFunction.empty
+    toState: PartialFunction[Router.Path, S => F[S]] = PartialFunction.empty
 )
 
 object Router {
@@ -41,6 +41,13 @@ object Router {
         case prev / s => aux(s :: acc, prev)
       }
       "/" + aux(Nil, this).mkString("/")
+    }
+    def startsWith(s: String): Boolean = {
+      @tailrec def aux(last: String, path: Path): Boolean = path match {
+        case Root => last == s
+        case prev / x => aux(x, prev)
+      }
+      aux("", this)
     }
     def /(s: String): Path = Router./(this, s)
   }

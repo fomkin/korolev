@@ -218,10 +218,10 @@ object GuineaPigService {
             Root / tab.toLowerCase
         },
         toState = {
-          case (s, Root) =>
+          case Root => s =>
             val u = s.copy(selectedTab = s.todos.keys.head)
             Future.successful(u)
-          case (s, Root / name) =>
+          case Root / name => s =>
             val key = s.todos.keys.find(_.toLowerCase == name)
             Future.successful(key.fold(s)(k => s.copy(selectedTab = k)))
         }

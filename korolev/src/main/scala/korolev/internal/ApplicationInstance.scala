@@ -109,8 +109,8 @@ final class ApplicationInstance
         .flatMap { maybeTopLevelState =>
           router
             .toState
-            .lift((maybeTopLevelState.getOrElse(initialState), path))
-            .fold(Async[F].pure(Option.empty[S]))(_.map(Some(_)))
+            .lift(path)
+            .fold(Async[F].pure(Option.empty[S]))(_(maybeTopLevelState.getOrElse(initialState)).map(Some(_)))
         }
         .flatMap {
           case Some(newState) =>

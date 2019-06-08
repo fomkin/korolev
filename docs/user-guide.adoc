@@ -459,7 +459,7 @@ KorolevServiceConfig(
         Root / author / article
     },
     toState = {
-      case (s, Root / author / article) =>
+      case Root / author / article => defaultState =>
         articleService.load(author, article).map { text =>
           MyState(author, article, text)
         }

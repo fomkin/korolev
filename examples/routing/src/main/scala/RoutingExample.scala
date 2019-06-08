@@ -1,10 +1,11 @@
 import korolev._
-import korolev.server._
 import korolev.akkahttp._
 import korolev.execution._
+import korolev.server._
 import korolev.state.javaSerialization._
 
 import scala.concurrent.Future
+import scala.util.Random
 
 object RoutingExample extends SimpleAkkaHttpKorolevApp {
 
@@ -21,7 +22,7 @@ object RoutingExample extends SimpleAkkaHttpKorolevApp {
         Seq(
           'title("Main Routing Page"),
           'link(
-            'href /= "/main.css",
+            'href /= "/static/main.css",
             'rel /= "stylesheet",
             'type /= "text/css"
           )
@@ -92,12 +93,11 @@ object RoutingExample extends SimpleAkkaHttpKorolevApp {
             Root / tab.toLowerCase
         },
         toState = {
-          case (s, Root) =>
-            val u = s.copy(selectedTab = s.todos.keys.head)
-            Future.successful(u)
-          case (s, Root / name) =>
-            val key = s.todos.keys.find(_.toLowerCase == name)
-            Future.successful(key.fold(s)(k => s.copy(selectedTab = k)))
+          case Root => initialState =>
+            Future.successful(initialState)
+          case Root / name if State.Tabs.exists(_.toLowerCase == name.toLowerCase) => initialState =>
+            val key = initialState.todos.keys.find(_.toLowerCase == name)
+            Future.successful(key.fold(initialState)(k => initialState.copy(selectedTab = k)))
         }
       )
     )
@@ -106,14 +106,15 @@ object RoutingExample extends SimpleAkkaHttpKorolevApp {
 
 case class State(
   selectedTab: String = "Tab1",
-  todos: Map[String, Vector[State.Todo]] = Map(
-    "Tab1" -> State.Todo(5),
-    "Tab2" -> State.Todo(7),
-    "Tab3" -> State.Todo(2)
-  )
+  todos: Map[String, Vector[State.Todo]] = State.Tabs
+    .map(tab => tab -> State.Todo(Random.nextInt(7)))
+    .toMap
 )
 
 object State {
+
+  final val Tabs = Seq("Tab1", "Tab2", "Tab3")
+
   val globalContext = Context[Future, State, Any]
   case class Todo(text: String, done: Boolean)
   object Todo {

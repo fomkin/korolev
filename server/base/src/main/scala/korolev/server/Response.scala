@@ -45,6 +45,10 @@ object Response {
   }
 
   object Status {
+    case object NotFound extends Status {
+      val code = 404
+      val phrase = "Not Found"
+    }
     case object Ok extends Status {
       val code = 200
       val phrase = "OK"
