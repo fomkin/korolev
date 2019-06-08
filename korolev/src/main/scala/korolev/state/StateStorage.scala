@@ -103,8 +103,14 @@ object StateStorage {
 
     def exists(deviceId: DeviceId, sessionId: SessionId): F[Boolean] = {
       val key = mkKey(deviceId, sessionId)
-      val result = cache.contains(key) || forDeletionCache.containsKey(key)
-      Async[F].pure(result)
+      if (DevMode.isActive) {
+        val file = new File(DevMode.sessionsDirectory, key)
+        val result = cache.contains(key) || forDeletionCache.containsKey(key) || file.exists()
+        Async[F].pure(result)
+      } else {
+        val result = cache.contains(key) || forDeletionCache.containsKey(key)
+        Async[F].pure(result)
+      }
     }
 
     def get(deviceId: DeviceId, sessionId: SessionId): F[StateManager[F, S]] = {
@@ -125,16 +131,18 @@ object StateStorage {
     private def create(deviceId: DeviceId, sessionId: SessionId): F[StateManager[F, S]] = {
       val key = mkKey(deviceId, sessionId)
       Async[F].flatMap(createTopLevelState(deviceId)) { default =>
-        val sm = if (DevMode.isActive) {
+        if (DevMode.isActive) {
           val directory = new File(DevMode.sessionsDirectory, key)
-          new DevModeStateManager[F, S](directory, default)
+          val sm = new DevModeStateManager[F, S](directory, default)
+          cache.put(key, sm)
+          if (directory.exists()) Async[F].pure(sm) // Do not rewrite state manager cache
+          else Async[F].map(sm.write(Id.TopLevel, default))(_ => sm)
         }
         else {
-          new SimpleInMemoryStateManager[F, S](default)
+          val sm = new SimpleInMemoryStateManager[F, S](default)
+          cache.put(key, sm)
+          Async[F].map(sm.write(Id.TopLevel, default))(_ => sm)
         }
-        cache.put(key, sm)
-        // TODO maybe it should be moved to StateManager
-        Async[F].map(sm.write(Id.TopLevel, sm.default))(_ => sm)
       }
     }
 
@@ -160,6 +168,9 @@ object StateStorage {
 
     def snapshot: F[StateManager.Snapshot] = Async[F].pure {
       new StateManager.Snapshot {
+
+        if (!directory.exists())
+          directory.mkdirs()
 
         val cache: Map[Id, Array[Byte]] = directory
           .listFiles()
