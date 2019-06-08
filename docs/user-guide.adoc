@@ -444,9 +444,6 @@ Let's pretends that your application is a blogging platform.
 -------------------------------------------------------------------------------
 case class MyState(author: String, title: String, text: String)
 
-// Converts "The Cow: Saga" to "the-cow-saga"
-def captionToUrl(s: String) = ???
-
 KorolevServiceConfig(
   ...
   // Render the article
@@ -457,28 +454,16 @@ KorolevServiceConfig(
     )
   },
   router = Router(
-    // Static router works when user enters
-    // with any url but "/".
-    static = (deviceId) => Router(
-      toState = {
-        case (_, Root / author / article) => articleService.load(author, article)
-        case _ => articleService.defaultArticle
-      }
-    ),
-    dynamic = (device, session) => Router(
-      fromState = {
-        case MyState(tab, _) =>
-          Root / tab.toLowerCase
-      },
-      toState = {
-        case (s, Root) =>
-          val u = s.copy(selectedTab = s.todos.keys.head)
-          Future.successful(u)
-        case (s, Root / name) =>
-          val key = s.todos.keys.find(_.toLowerCase == name)
-          Future.successful(key.fold(s)(k => s.copy(selectedTab = k)))
-      }
-    )
+    fromState = {
+      case MyState(author, article, _) =>
+        Root / author / article
+    },
+    toState = {
+      case (s, Root / author / article) =>
+        articleService.load(author, article).map { text =>
+          MyState(author, article, text)
+        }
+    }
   )
 )
 -------------------------------------------------------------------------------
