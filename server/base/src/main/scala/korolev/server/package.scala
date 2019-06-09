@@ -60,8 +60,8 @@ package object server {
         sessionId <- config.idGenerator.generateSessionId()
         manager <- config.stateStorage.get(deviceId, sessionId)
         state <- config.router.toState
-          .lift((manager.default, request.path))
-          .getOrElse(Async[F].pure(manager.default))
+          .lift(request.path)
+          .fold(Async[F].pure(manager.default))(f => f(manager.default))
       } yield {
         val dsl = new levsha.dsl.SymbolDsl[Context.Effect[F, S, M]]()
         val textRenderContext = new HtmlRenderContext[F, S, M]()
@@ -79,7 +79,7 @@ package object server {
         val document = 'html(
           'head(
             'script('language /= "javascript", kfg),
-            'script('src /= config.rootPath + "korolev-client.min.js"),
+            'script('src /= config.rootPath + "static/korolev-client.min.js"),
             config.head
           ),
           config.render(state)
@@ -106,41 +106,20 @@ package object server {
         )
       }
 
-    object matchStatic {
+    def inputStreamToBytes(stream: InputStream): Array[Byte] = {
+      val bufferSize = 32
+      val baos = new ByteArrayOutputStream(Math.max(bufferSize, stream.available()))
+      val buffer = new Array[Byte](bufferSize)
 
-      /**
-        * @return (resource bytes, ContentType)
-        */
-      def unapply(req: Request[F]): Option[(Array[Byte], String)] =
-        req.path match {
-          case Root => None
-          case path @ _ / fileName =>
-            val fsPath = s"/static${path.toString}"
-            val stream = getClass.getResourceAsStream(fsPath)
-            Option(stream) map { stream =>
-              val fileExtension = fileName.lastIndexOf('.') match {
-                case -1 => "bin"
-                case index => fileName.substring(index + 1)
-              }
-              (inputStreamToBytes(stream), fileExtension)
-            }
-        }
-
-      private def inputStreamToBytes(stream: InputStream): Array[Byte] = {
-        val bufferSize = 32
-        val baos = new ByteArrayOutputStream(Math.max(bufferSize, stream.available()))
-        val buffer = new Array[Byte](bufferSize)
-
-        var lastBytesRead = 0
-        while ({
-          lastBytesRead = stream.read(buffer)
-          lastBytesRead != -1
-        }) {
-          baos.write(buffer, 0, lastBytesRead)
-        }
-
-        baos.toByteArray
+      var lastBytesRead = 0
+      while ({
+        lastBytesRead = stream.read(buffer)
+        lastBytesRead != -1
+      }) {
+        baos.write(buffer, 0, lastBytesRead)
       }
+
+      baos.toByteArray
     }
 
     def deviceFromRequest(request: Request[F]): F[DeviceId] =
@@ -250,14 +229,28 @@ package object server {
 
     val formDataCodec = new FormDataCodec(config.maxFormDataEntrySize)
 
+    val response404 = Async[F].pure[Response](Response.Http(Response.Status.NotFound, None, Seq.empty))
+
     val service: PartialFunction[Request[F], F[Response]] = {
-      case matchStatic(stream, fileExtensionOpt) =>
-        val headers = mimeTypes(fileExtensionOpt).fold(Seq.empty[(String, String)]) {
-          fileExtension =>
-            Seq("content-type" -> fileExtension)
+      case request if request.path == Root || config.router.toState.isDefinedAt(request.path) =>
+        renderStatic(request)
+      case Request(Root / "static", _, _, _, _) => response404
+      case Request(path, _, _, _, _) if path.startsWith("static") =>
+        val fsPath = path.toString
+        Option(this.getClass.getResourceAsStream(fsPath)) match {
+          case None => response404
+          case Some(stream) =>
+            val _ / fileName = path
+            val fileExtension = fileName.lastIndexOf('.') match {
+              case -1 => "bin"
+              case index => fileName.substring(index + 1)
+            }
+            val bytes = inputStreamToBytes(stream)
+            val headers = mimeTypes(fileExtension).fold(Seq.empty[(String, String)]) { fe =>
+              Seq("content-type" -> fe)
+            }
+            Async[F].pure(Response.Http(Response.Status.Ok, Some(bytes), headers))
         }
-        val response = Response.Http(Response.Status.Ok, Some(stream), headers)
-        Async[F].pure(response)
       case r @ Request(Root / "bridge" / deviceId / sessionId / "form-data" / descriptor, _, _, headers, _) =>
         sessions.get(makeSessionKey(deviceId, sessionId)) match {
           case Some(session) =>
@@ -371,7 +364,7 @@ package object server {
             }
           )
         }
-      case request => renderStatic(request)
+      case _ => response404
     }
 
     service
