@@ -21,7 +21,7 @@ val publishSettings = Seq(
   pomIncludeRepository := { _ => false },
   publishTo := sonatypePublishTo.value,
   sonatypeProjectHosting := Some(GitHubHosting("fomkin", "korolev", "Aleksey Fomkin", "aleksey.fomkin@gmail.com")),
-  headerLicense := Some(HeaderLicense.ALv2("2017-2018", "Aleksey Fomkin")),
+  headerLicense := Some(HeaderLicense.ALv2("2017-2019", "Aleksey Fomkin")),
   licenses := Seq("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.txt")),
 )
 
@@ -65,9 +65,9 @@ lazy val `server-akkahttp` = (project in file("server") / "akkahttp").
   settings(
     normalizedName := "korolev-server-akkahttp",
     libraryDependencies ++= Seq(
-      "com.typesafe.akka" %% "akka-actor" % "2.5.19",
-      "com.typesafe.akka" %% "akka-stream" % "2.5.19",
-      "com.typesafe.akka" %% "akka-http" % "10.1.6"
+      "com.typesafe.akka" %% "akka-actor" % "2.5.23",
+      "com.typesafe.akka" %% "akka-stream" % "2.5.23",
+      "com.typesafe.akka" %% "akka-http" % "10.1.8"
     )
   ).
   dependsOn(server)
@@ -119,7 +119,7 @@ lazy val `cats-effect-support` = project.
   settings(commonSettings: _*).
   settings(
     normalizedName := "korolev-cats-effect-support",
-    libraryDependencies += "org.typelevel" %% "cats-effect" % "1.2.0"
+    libraryDependencies += "org.typelevel" %% "cats-effect" % "1.3.1"
   ).
   dependsOn(async)
 
@@ -238,9 +238,9 @@ lazy val `performance-benchmark` = project.
     scalaVersion := "2.12.8",
     fork in run := true,
     libraryDependencies ++= Seq(
-      "com.typesafe.akka" %% "akka-http" % "10.1.6",
-      "com.typesafe.akka" %% "akka-stream" % "2.5.19",
-      "com.typesafe.akka" %% "akka-actor"  % "2.5.19",
+      "com.typesafe.akka" %% "akka-http" % "10.1.8",
+      "com.typesafe.akka" %% "akka-stream" % "2.5.23",
+      "com.typesafe.akka" %% "akka-actor"  % "2.5.23",
       "com.typesafe.akka" %% "akka-typed" % "2.5.8",
       "com.github.fomkin" %% "pushka-json" % "0.8.0"
     )
