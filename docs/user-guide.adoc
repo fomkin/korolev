@@ -525,7 +525,7 @@ By default Korolev log all messages to standard output. You can redirect logs to
 
 [source,scala]
 ------------------------------
-libraryDependencies += "com.github.fomkin" %% "korolev-slf4j-support" % "0.11.1"
+libraryDependencies += "com.github.fomkin" %% "korolev-slf4j-support" % "0.12.0"
 ------------------------------
 
 === Akka HTTP
@@ -534,7 +534,7 @@ Korolev provides smooth Akka HTTP integration out of the box. To use it, add a d
 
 [source,scala]
 ------------------------------
-libraryDependencies += "com.github.fomkin" %% "korolev-server-akkahttp" % "0.11.1"
+libraryDependencies += "com.github.fomkin" %% "korolev-server-akkahttp" % "0.12.0"
 ------------------------------
 
 [source,scala]
@@ -570,7 +570,7 @@ Cats-effect integration module provides `Async` instance from `cats.effect.Effec
 
 [source,scala]
 ------------------------------
-libraryDependencies += "com.github.fomkin" %% "korolev-cats-effect-support" % "0.11.1"
+libraryDependencies += "com.github.fomkin" %% "korolev-cats-effect-support" % "0.12.0"
 ------------------------------
 
 [source,scala]
@@ -612,7 +612,7 @@ Now you can see something like this.
 ------------------------------
 
 Message starting with `->` is commands from server. Message started with `<-` is callback and client side events.
-First number is always an procedure or callback code. You can protocol description https://github.com/fomkin/korolev/blob/v0.11.1/korolev/src/main/protocol.md[here].
+First number is always an procedure or callback code. You can protocol description https://github.com/fomkin/korolev/blob/v0.12.0/korolev/src/main/protocol.md[here].
 
 === Reconnections under Kubernetes Ingress
 
