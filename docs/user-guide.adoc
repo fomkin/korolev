@@ -516,7 +516,7 @@ Ensure that everything is stateless except Korolev part of the application. For 
 
 === Serve files from resource directory
 
-Everything placed in directory named `static` (in the classpath of the application) will be served from the root of the application endpoint. It may be useful when you want to distribute some small images or CSS with the app.
+Everything placed in directory named `static` (in the classpath of the application) will be served from the `/static/`. It may be useful when you want to distribute some small images or CSS with the app.
 
 [WARNING]
 ============
