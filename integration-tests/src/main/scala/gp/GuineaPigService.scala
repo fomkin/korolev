@@ -72,9 +72,9 @@ object GuineaPigService {
     head = {
       Seq(
         'title("The Test App"),
-        'link('href /= "/main.css", 'rel /= "stylesheet", 'type /= "text/css"),
+        'link('href /= "/static/main.css", 'rel /= "stylesheet", 'type /= "text/css"),
         'meta('content/="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0", 'name /= "viewport"),
-        'script('src /= "/debug-console.js")
+        'script('src /= "/static/debug-console.js")
       )
     },
     render = {

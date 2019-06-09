@@ -413,26 +413,20 @@ Also, we have a message queue which has a topic with notifications for current u
 
 [source,scala]
 -------------------------------------------------------------------------------
+val notificationQueue = ...
+
 KorolevServiceConfig(
   ...
-  envConfigurator = EnvConfigurator { (deviceId, sessionId, applyTransition) =>
-    messageQueue.subscribe(deviceId, sessionId).map { subscription =>
-      applyTransition {
-        case state: MyState =>
-          state.copy(notifications = notification :: state.notifications)
-      }
-
-      KorolevServiceConfig.Env(
-        onDestroy = () => subscription.unsubscribe(),
-        onMessage = {
-          case message => subscription.send(message)
-        }
-      )
+  envConfigurator = EnvConfigurator { access =>
+    val subscription = notificationQueue subscribe { notification =>
+      access.transition(s => s.copy(notifications = notification :: s.notifications))
     }
+    EnvConfigurator.Env(onDestroy = subscription.stop())
+  }
 )
 -------------------------------------------------------------------------------
 
-Now you can use `Access.publish(message)` to send messages to the queue and every invocation of lambda which was passed to `messageQueue.subscribe` will run the transition which will prepend notifications to the state. Render will be invoked automatically and user will get his page updated.
+Now every invocation of lambda which was passed to `notificationQueue.subscribe` will run the transition which will prepend notifications to the state. Render will be invoked automatically and user will get his page updated.
 
 === Routing
 
@@ -502,7 +496,7 @@ Developer mode provides "hot reload" experience. Run your application with `koro
 
 [source,bash]
 -------------------------------------------------------------------------------
-re-start --- -Dkorolev.dev=true
+reStart --- -Dkorolev.dev=true
 -------------------------------------------------------------------------------
 
 Make a change to your app source code and save the file. Switch to the browser and wait for changes to deliver.
