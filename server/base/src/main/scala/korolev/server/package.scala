@@ -232,8 +232,6 @@ package object server {
     val response404 = Async[F].pure[Response](Response.Http(Response.Status.NotFound, None, Seq.empty))
 
     val service: PartialFunction[Request[F], F[Response]] = {
-      case request if request.path == Root || config.router.toState.isDefinedAt(request.path) =>
-        renderStatic(request)
       case Request(Root / "static", _, _, _, _) => response404
       case Request(path, _, _, _, _) if path.startsWith("static") =>
         val fsPath = path.toString
@@ -364,6 +362,8 @@ package object server {
             }
           )
         }
+      case request if request.path == Root || config.router.toState.isDefinedAt(request.path) =>
+        renderStatic(request)
       case _ => response404
     }
 
