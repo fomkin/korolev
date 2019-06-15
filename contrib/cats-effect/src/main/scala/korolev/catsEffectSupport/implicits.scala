@@ -31,10 +31,10 @@ import scala.collection.{TraversableOnce, mutable}
 
 object implicits {
   implicit def korolevAsyncFromEffect[F[_]](implicit F: cats.effect.Effect[F]): Async[F] = new Async[F] {
-    override def pureStrict[A](value: A): F[A] =
+    override def pure[A](value: A): F[A] =
       value.pure
 
-    override def pure[A](value: => A): F[A] =
+    override def delay[A](value: => A): F[A] =
       F.delay(value)
 
     override def fork[A](value: => A): F[A] =

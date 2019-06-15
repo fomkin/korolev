@@ -44,7 +44,7 @@ object EnvConfigurator {
   private class DefaultEnvConfigurator[F[_], S, M] extends EnvConfigurator[F, S, M] {
     override def configure(access: Context.BaseAccess[F, S, M])
                           (implicit F: Async[F]): F[Env[F, M]] =
-      Async[F].pure(Env(onDestroy = () => Async[F].unit, PartialFunction.empty))
+      Async[F].delay(Env(onDestroy = () => Async[F].unit, PartialFunction.empty))
   }
 
 }

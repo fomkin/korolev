@@ -98,35 +98,31 @@ final class ComponentInstance
       miscLock.synchronized {
         elements
           .get(elementId)
-          .fold(noElementException[Id])(id => async.pure(id))
+          .fold(noElementException[Id])(id => async.delay(id))
       }
     }
 
     def property(elementId: ElementId[F, CS, E]): PropertyHandler[F] = {
       val idF = getId(elementId)
       new PropertyHandler[F] {
-        def get(propName: Symbol): F[String] = idF flatMap { id =>
+        def get(propName: Symbol): F[String] = idF.flatMap { id =>
           frontend.extractProperty(id, propName.name)
         }
 
-        def set(propName: Symbol, value: Any): F[Unit] = idF flatMap { id =>
+        def set(propName: Symbol, value: Any): F[Unit] = idF.flatMap { id =>
           // XmlNs argument is empty cause it will be ignored
-          frontend.setProperty(id, propName, value)
-          async.unit
+          async.delay(frontend.setProperty(id, propName, value))
         }
       }
     }
 
     def focus(element: ElementId[F, CS, E]): F[Unit] =
       getId(element).flatMap { id =>
-        frontend.focus(id)
-        async.unit
+        async.delay(frontend.focus(id))
       }
 
-    def publish(message: E): F[Unit] = {
-      eventSubscription.foreach(f => f(message))
-      async.unit
-    }
+    def publish(message: E): F[Unit] =
+      async.delay(eventSubscription.foreach(f => f(message)))
 
     def state: F[CS] = {
       val state = stateManager.read[CS](nodeId)
@@ -134,7 +130,7 @@ final class ComponentInstance
       state.map(_.getOrElse(throw new RuntimeException("State is empty")))
     }
 
-    def sessionId: F[QualifiedSessionId] = async.pure(self.sessionId)
+    def sessionId: F[QualifiedSessionId] = async.delay(self.sessionId)
 
     def transition(f: Transition[CS]): F[Unit] = applyTransition(f)
 
@@ -174,7 +170,7 @@ final class ComponentInstance
     }
 
     def evalJs(code: String): F[String] = frontend.evalJs(code)
-    
+
     def eventData: F[String] = {
       frontend.extractEventData(getRenderNum())
     }
@@ -300,11 +296,13 @@ final class ComponentInstance
           }
         } catch {
           case e: MatchError =>
-            reporter.warning("Transition doesn't fit the state", e)
-            async.unit
+            async.delay {
+              reporter.warning("Transition doesn't fit the state", e)
+            }
           case e: Throwable =>
-            reporter.error("Exception happened when applying transition", e)
-            async.unit
+            async.delay {
+              reporter.error("Exception happened when applying transition", e)
+            }
         }
       } runOrReport { _ =>
         promise.complete(Success(()))

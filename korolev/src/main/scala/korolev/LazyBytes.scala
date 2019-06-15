@@ -38,7 +38,7 @@ final case class LazyBytes[F[_]](
     def aux(acc: List[Array[Byte]]): F[List[Array[Byte]]] = {
       async.flatMap(pull()) {
         case Some(bytes) => aux(bytes :: acc)
-        case None => async.pure(acc)
+        case None => async.delay(acc)
       }
     }
     async.map(aux(Nil)) { xs =>
@@ -68,7 +68,7 @@ final case class LazyBytes[F[_]](
 
 object LazyBytes {
   def empty[F[_]](implicit async: Async[F]): LazyBytes[F] = {
-    val it = async.pure(Option.empty[Array[Byte]])
+    val it = async.delay(Option.empty[Array[Byte]])
     LazyBytes(() => it, async.unit, () => async.unit, Some(0L))
   }
 }

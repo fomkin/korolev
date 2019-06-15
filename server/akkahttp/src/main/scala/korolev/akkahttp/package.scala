@@ -140,7 +140,7 @@ package object akkahttp {
               }
               val body = LazyBytes(
                 pull = pull,
-                cancel = () => async.pure(queue.cancel()),
+                cancel = () => async.delay(queue.cancel()),
                 finished = finished.async,
                 size = request.entity.contentLengthOption
               )
