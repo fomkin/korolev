@@ -117,7 +117,7 @@ package object akkahttp {
 
   private def httpPostRoute[F[_]](korolevServer: KorolevService[F])(implicit mat: Materializer, async: Async[F]): Route =
     post {
-      extractRequest { request =>
+      extractRequest { _ =>
         extractUnmatchedPath { path =>
           parameterMap { params =>
             extractRequest { request =>
@@ -154,9 +154,9 @@ package object akkahttp {
     }
 
   private def mkKorolevRequest[F[_]](request: HttpRequest,
-                                            path: String,
-                                            params: Map[String, String],
-                                            body: LazyBytes[F])
+                                     path: String,
+                                     params: Map[String, String],
+                                     body: LazyBytes[F])
                                     (implicit async: Async[F]): KorolevRequest[F] =
     KorolevRequest(
       path = Router.Path.fromString(path),
@@ -173,7 +173,7 @@ package object akkahttp {
     )
 
   private def handleHttpResponse[F[_]: Async](korolevServer: KorolevService[F],
-                                               korolevRequest: KorolevRequest[F]): Future[HttpResponse] =
+                                              korolevRequest: KorolevRequest[F]): Future[HttpResponse] =
     asyncToFuture(korolevServer(korolevRequest)).map {
       case KorolevResponse.Http(status, streamOpt, responseHeaders) =>
         val (contentTypeOpt, otherHeaders) = getContentTypeAndResponseHeaders(responseHeaders)
