@@ -37,12 +37,12 @@ object IdGenerator {
   private class DefaultIdGenerator[F[_]](deviceIdLength: Int,
                                           sessionIdLength: Int) extends IdGenerator[F] {
     def generateDeviceId()(implicit F: Async[F]): F[DeviceId] =
-      Async[F].pure {
+      Async[F].delay {
         secureRandomString(deviceIdLength)
       }
 
     def generateSessionId()(implicit F: Async[F]): F[SessionId] =
-      Async[F].pure {
+      Async[F].delay {
         secureRandomString(sessionIdLength)
       }
 

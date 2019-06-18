@@ -57,7 +57,7 @@ object StateStorage {
     * @return The state storage
     */
   def default[F[_]: Async, S: StateSerializer](initialState: => S): StateStorage[F, S] = {
-    new DefaultStateStorage(_ => Async[F].pure(initialState))
+    new DefaultStateStorage(_ => Async[F].delay(initialState))
   }
 
   /**
@@ -106,10 +106,10 @@ object StateStorage {
       if (DevMode.isActive) {
         val file = new File(DevMode.sessionsDirectory, key)
         val result = cache.contains(key) || forDeletionCache.containsKey(key) || file.exists()
-        Async[F].pure(result)
+        Async[F].delay(result)
       } else {
         val result = cache.contains(key) || forDeletionCache.containsKey(key)
-        Async[F].pure(result)
+        Async[F].delay(result)
       }
     }
 
@@ -119,12 +119,14 @@ object StateStorage {
         case None =>
           Option(mutex.synchronized(forDeletionCache.remove(key))) match {
             case Some(sm) =>
-              cache.put(key, sm)
-              Async[F].pure(sm)
+              Async[F].delay {
+                cache.put(key, sm)
+                sm
+              }
             case None =>
               create(deviceId, sessionId)
           }
-        case Some(sm) => Async[F].pure(sm)
+        case Some(sm) => Async[F].delay(sm)
       }
     }
 
@@ -135,7 +137,7 @@ object StateStorage {
           val directory = new File(DevMode.sessionsDirectory, key)
           val sm = new DevModeStateManager[F, S](directory, default)
           cache.put(key, sm)
-          if (directory.exists()) Async[F].pure(sm) // Do not rewrite state manager cache
+          if (directory.exists()) Async[F].delay(sm) // Do not rewrite state manager cache
           else Async[F].map(sm.write(Id.TopLevel, default))(_ => sm)
         }
         else {
@@ -166,7 +168,7 @@ object StateStorage {
       if (file.exists()) Some(file) else None
     }
 
-    def snapshot: F[StateManager.Snapshot] = Async[F].pure {
+    def snapshot: F[StateManager.Snapshot] = Async[F].delay {
       new StateManager.Snapshot {
 
         if (!directory.exists())
@@ -185,20 +187,20 @@ object StateStorage {
       }
     }
 
-    def read[T: StateDeserializer](nodeId: Id): F[Option[T]] = Async[F].fork {
+    def read[T: StateDeserializer](nodeId: Id): F[Option[T]] = Async[F].delay {
       getStateFileOpt(nodeId).flatMap { file =>
         val data = readFile(file)
         implicitly[StateDeserializer[T]].deserialize(data)
       }
     }
 
-    def delete(nodeId: Id): F[Unit] = Async[F].fork {
+    def delete(nodeId: Id): F[Unit] = Async[F].delay {
       val file = getStateFile(nodeId)
       file.delete()
       ()
     }
 
-    def write[T: StateSerializer](nodeId: Id, value: T): F[Unit] = Async[F].fork {
+    def write[T: StateSerializer](nodeId: Id, value: T): F[Unit] = Async[F].delay {
       val file = getStateFile(nodeId)
       if (!file.exists()) {
         file.getParentFile.mkdirs()
@@ -222,7 +224,7 @@ object StateStorage {
 
     val cache: TrieMap[Id, Any] = TrieMap.empty[Id, Any]
 
-    val snapshot: F[StateManager.Snapshot] = Async[F].pureStrict {
+    val snapshot: F[StateManager.Snapshot] = Async[F].pure {
       new StateManager.Snapshot {
         def apply[T: StateDeserializer](nodeId: Id): Option[T] = try {
           cache
@@ -238,14 +240,16 @@ object StateStorage {
     def read[T: StateDeserializer](nodeId: Id): F[Option[T]] =
       Async[F].map(snapshot)(_.apply(nodeId))
 
-    def delete(nodeId: Id): F[Unit] = {
-      cache.remove(nodeId)
-      Async[F].unit
-    }
+    def delete(nodeId: Id): F[Unit] =
+      Async[F].delay {
+        cache.remove(nodeId)
+        ()
+      }
 
-    def write[T: StateSerializer](nodeId: Id, value: T): F[Unit] = {
-      cache.put(nodeId, value)
-      Async[F].unit
-    }
+    def write[T: StateSerializer](nodeId: Id, value: T): F[Unit] =
+      Async[F].delay {
+        cache.put(nodeId, value)
+        ()
+      }
   }
 }

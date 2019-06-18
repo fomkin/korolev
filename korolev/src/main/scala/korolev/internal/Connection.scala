@@ -111,7 +111,7 @@ object Connection {
       }
       else {
         val message = queue.poll()
-        Async[F].pure(message)
+        Async[F].delay(message)
       }
     }
   }
