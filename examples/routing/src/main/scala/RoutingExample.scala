@@ -5,7 +5,6 @@ import korolev.server._
 import korolev.state.javaSerialization._
 
 import scala.concurrent.Future
-import scala.util.Random
 
 object RoutingExample extends SimpleAkkaHttpKorolevApp {
 
@@ -107,7 +106,8 @@ object RoutingExample extends SimpleAkkaHttpKorolevApp {
 case class State(
   selectedTab: String = "Tab1",
   todos: Map[String, Vector[State.Todo]] = State.Tabs
-    .map(tab => tab -> State.Todo(Random.nextInt(7)))
+    .zipWithIndex
+    .map { case (tab, i) => tab -> State.Todo(i) }
     .toMap
 )
 
