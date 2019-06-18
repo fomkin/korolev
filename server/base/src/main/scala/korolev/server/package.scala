@@ -25,6 +25,7 @@ import korolev.Async._
 import korolev.Context.File
 import korolev.internal.{ApplicationInstance, Connection}
 import korolev.state._
+import levsha.Id
 
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
@@ -61,7 +62,8 @@ package object server {
         manager <- config.stateStorage.get(deviceId, sessionId)
         state <- config.router.toState
           .lift(request.path)
-          .fold(Async[F].delay(manager.default))(f => f(manager.default))
+          .fold(Async[F].pure(manager.default))(f => f(manager.default))
+        _ <- if (state != manager.default) manager.write(Id.TopLevel, state) else Async[F].unit
       } yield {
         val dsl = new levsha.dsl.SymbolDsl[Context.Effect[F, S, M]]()
         val textRenderContext = new HtmlRenderContext[F, S, M]()
