@@ -27,7 +27,7 @@ import scala.collection.concurrent.TrieMap
 
 abstract class StateStorage[F[_]: Async, S] {
 
-  @deprecated("Use get(device, session).default", "0.12.0")
+  @deprecated("Use get(device, session).map(_.default)", "0.12.0")
   def createTopLevelState: DeviceId => F[S]
 
   /**
