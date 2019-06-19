@@ -27,7 +27,12 @@ import scala.concurrent.duration.FiniteDuration
   * Provides DSLs and effects for application or component
   * @since 0.6.0
   */
-final class Context[F[_]: Async, S: StateSerializer: StateDeserializer, M] {
+final class Context[F[_]: Async, S: StateSerializer: StateDeserializer, M] extends ContextLens[F, S, S, M] {
+  type AccessType = S
+  protected val accessLens = identity
+}
+
+sealed abstract class ContextLens[F[_]: Async, S: StateSerializer: StateDeserializer, AccessType, M] {
 
   import Context._
   import EventPhase._
@@ -38,7 +43,7 @@ final class Context[F[_]: Async, S: StateSerializer: StateDeserializer, M] {
   type Transition = korolev.Transition[S]
   type Render = PartialFunction[S, Document.Node[Effect]]
   type ElementId = Context.ElementId[F, S, M]
-  type Access = Context.Access[F, S, M]
+  type Access = Context.Access[F, AccessType, M]
   type EventResult = F[Unit]
 
   val symbolDsl = new KorolevTemplateDsl[F, S, M]()
@@ -46,24 +51,55 @@ final class Context[F[_]: Async, S: StateSerializer: StateDeserializer, M] {
   @deprecated("This is compatibility layer for old fashioned API. Use Context instead.", "0.6.0")
   lazy val legacy = new ApplicationContext[F, S, M]
 
+  protected val accessLens: Context.Access[F, S, M] => Access
+
+  def lens[S2](read: S => S2)(write: (S, S2) => S) = new ContextLens[F, S, S2, M] {
+    protected val accessLens: Context.Access[F, S, M] => Access = access => new Context.Access[F, S2, M] {
+
+      def eventData: F[String] = access.eventData
+
+      def property(id: Context.ElementId[F, S2, M]): PropertyHandler[F] = ???
+
+      def focus(id: Context.ElementId[F, S2, M]): F[Unit] = ???
+  
+      def publish(message: M): F[Unit] = access.publish(message)
+  
+      def downloadFormData(id: Context.ElementId[F, S2, M]): FormDataDownloader[F, S2] = ???
+  
+      def downloadFiles(id: Context.ElementId[F, S2, M]): F[List[File[Array[Byte]]]] = ???
+  
+      def downloadFilesAsStream(id: Context.ElementId[F, S2, M]): F[List[File[LazyBytes[F]]]] = ???
+  
+      def state: F[S2] = Async[F].map(access.state)(read)
+  
+      def transition(f: korolev.Transition[S2]): F[Unit] =
+        access.transition(s => write(s, f(read(s))))
+  
+      def sessionId: F[QualifiedSessionId] = access.sessionId
+  
+      def evalJs(code: String): F[String] = access.evalJs(code)
+    }
+  }
+
   def elementId(name: Option[String] = None): ElementId = new Context.ElementId[F, S, M](name)
 
   /**
     * Schedules the transition with delay. For example it can be useful
     * when you want to hide something after timeout.
     */
-  def delay(duration: FiniteDuration)(effect: Access => F[Unit]): Delay[F, S, M] =
-    Delay(duration, effect)
+  def delay(duration: FiniteDuration)(effect: Access => F[Unit]): Delay[F, S, M] = {
+    Delay(duration, accessLens.andThen(effect))
+  }
 
   def event(name: Symbol, phase: EventPhase = Bubbling)(
       effect: Access => F[Unit]): Event =
-    Event(name, phase, effect)
+    Event(name, phase, accessLens.andThen(effect))
 
   val emptyTransition: PartialFunction[S, S] = { case x => x }
 
   implicit final class ComponentDsl[CS: StateSerializer: StateDeserializer, P, E](component: Component[F, CS, P, E]) {
     def apply(parameters: P)(f: (Access, E) => F[Unit]): ComponentEntry[F, S, M, CS, P, E] =
-      ComponentEntry(component, parameters, f)
+      ComponentEntry(component, parameters, (a: Context.Access[F, S, M], e: E) => f(accessLens(a), e))
 
     def silent(parameters: P): ComponentEntry[F, S, M, CS, P, E] =
       ComponentEntry(component, parameters, (_, _) => Async[F].unit)
@@ -79,7 +115,8 @@ object Context {
     * @tparam S Type of application state
     * @tparam M Type of events
     */
-  def apply[F[_]: Async, S: StateSerializer: StateDeserializer, M] = new Context[F, S, M]()
+  def apply[F[_]: Async, S: StateSerializer: StateDeserializer, M] =
+    new Context[F, S, M]()
 
   trait BaseAccess[F[_], S, M] {
 
