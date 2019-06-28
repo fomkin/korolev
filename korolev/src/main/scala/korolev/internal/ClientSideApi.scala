@@ -24,6 +24,7 @@ import korolev.Router.Path
 import levsha.Id
 import levsha.impl.DiffRenderContext.ChangesPerformer
 
+import scala.annotation.switch
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
 import scala.util.{Failure, Success}
@@ -171,6 +172,37 @@ final class ClientSideApi[F[_]: Async](connection: Connection[F], reporter: Repo
     }
   }
 
+  private def unescapeJsonString(s: String): String = {
+    val sb = StringBuilder.newBuilder
+    var i = 1
+    val len = s.length - 1
+    while (i < len) {
+      val c = s.charAt(i)
+      var charsConsumed = 0
+      if (c != '\\') {
+        charsConsumed = 1
+        sb.append(c)
+      } else {
+        charsConsumed = 2
+        (s.charAt(i + 1): @switch) match {
+          case '\\' => sb.append('\\')
+          case '"' => sb.append('"')
+          case 'b' => sb.append('\b')
+          case 'f' => sb.append('\f')
+          case 'n' => sb.append('\n')
+          case 'r' => sb.append('\r')
+          case 't' => sb.append('\t')
+          case 'u' =>
+            val code = s.substring(i + 2, i + 6)
+            charsConsumed = 6
+            sb.append(Integer.parseInt(code, 16).toChar)
+        }
+      }
+      i += charsConsumed
+    }
+    sb.result()
+  }
+
   private def onReceive(): Unit = connection.received.run {
     case Success(json) =>
       val tokens = json
@@ -178,7 +210,7 @@ final class ClientSideApi[F[_]: Async](connection: Connection[F], reporter: Repo
         .split(",", 2) // split to tokens
       val callbackType = tokens(0)
       val args =
-        if (tokens.length > 1) tokens(1).substring(1, tokens(1).length - 1) // remove ""
+        if (tokens.length > 1) unescapeJsonString(tokens(1))
         else ""
 
       callbackType.toInt match {
@@ -199,8 +231,7 @@ final class ClientSideApi[F[_]: Async](connection: Connection[F], reporter: Repo
             .foreach(_.complete(result))
         case CallbackType.ExtractEventDataResponse.code =>
           val Array(descriptor, value) = args.split(":", 2)
-          val unescapedValue = value.replaceAll("""\\"""", """"""")
-          promises.remove(descriptor).foreach(_.complete(Success(unescapedValue)))
+          promises.remove(descriptor).foreach(_.complete(Success(value)))
         case CallbackType.History.code =>
           onHistory(Router.Path.fromString(args))
         case CallbackType.EvalJsResponse.code =>
