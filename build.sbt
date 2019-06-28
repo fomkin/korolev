@@ -214,6 +214,13 @@ lazy val eventDataExample = (project in examples / "event-data").
   settings(mainClass := Some("EventDataExample")).
   dependsOn(`server-akkahttp`)
 
+lazy val contextScopeExample = (project in examples / "context-scope").
+  disablePlugins(HeaderPlugin).
+  settings(crossVersionSettings).
+  settings(exampleSettings: _*).
+  settings(mainClass := Some("ContextScopeExample")).
+  dependsOn(`server-akkahttp`)
+
 lazy val `integration-tests` = project.
   disablePlugins(HeaderPlugin).
   settings(crossVersionSettings).
@@ -258,7 +265,7 @@ lazy val root = project.in(file(".")).
     `cats-effect-support`, `slf4j-support`,
     simpleExample, routingExample, gameOfLifeExample,
     formDataExample, `file-streaming-example`, delayExample, focusExample,
-    webComponentExample, componentExample, akkaHttpExample,
+    webComponentExample, componentExample, akkaHttpExample, contextScopeExample,
     eventDataExample, `integration-tests`
   )
 
