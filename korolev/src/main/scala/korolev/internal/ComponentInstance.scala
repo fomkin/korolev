@@ -71,7 +71,7 @@ final class ComponentInstance
   private val markedDelays = mutable.Set.empty[Id] // Set of the delays which are should survive
   private val markedComponentInstances = mutable.Set.empty[Id]
   private val delays = mutable.Map.empty[Id, DelayInstance[F, CS, E]]
-  private val elements = mutable.Map.empty[ElementId[F, CS, E], Id]
+  private val elements = mutable.Map.empty[ElementId[F], Id]
   private val events = mutable.Map.empty[EventId, Event[F, CS, E]]
   private val nestedComponents = mutable.Map.empty[Id, ComponentInstance[F, CS, E, _, _, _]]
   private val formDataPromises = mutable.Map.empty[String, Promise[F, FormData]]
@@ -91,7 +91,7 @@ final class ComponentInstance
       async.fromTry(Failure(exception))
     }
 
-    private def getId(elementId: ElementId[F, CS, E]): F[Id] = {
+    private def getId(elementId: ElementId[F]): F[Id] = {
       // miscLock synchronization required
       // because prop handler methods can be
       // invoked during render.
@@ -102,7 +102,7 @@ final class ComponentInstance
       }
     }
 
-    def property(elementId: ElementId[F, CS, E]): PropertyHandler[F] = {
+    def property(elementId: ElementId[F]): PropertyHandler[F] = {
       val idF = getId(elementId)
       new PropertyHandler[F] {
         def get(propName: Symbol): F[String] = idF.flatMap { id =>
@@ -116,7 +116,7 @@ final class ComponentInstance
       }
     }
 
-    def focus(element: ElementId[F, CS, E]): F[Unit] =
+    def focus(element: ElementId[F]): F[Unit] =
       getId(element).flatMap { id =>
         async.delay(frontend.focus(id))
       }
@@ -134,7 +134,7 @@ final class ComponentInstance
 
     def transition(f: Transition[CS]): F[Unit] = applyTransition(f)
 
-    def downloadFormData(element: ElementId[F, CS, E]): FormDataDownloader[F, CS] = new FormDataDownloader[F, CS] {
+    def downloadFormData(element: ElementId[F]): FormDataDownloader[F, CS] = new FormDataDownloader[F, CS] {
 
       private val descriptor = nodeId.mkString + lastPostDescriptor.getAndIncrement()
 
@@ -151,7 +151,7 @@ final class ComponentInstance
       }
     }
 
-    def downloadFiles(id: ElementId[F, CS, E]): F[List[File[Array[Byte]]]] = {
+    def downloadFiles(id: ElementId[F]): F[List[File[Array[Byte]]]] = {
       downloadFilesAsStream(id).flatMap { lazyFileList =>
         async.sequence {
           lazyFileList.map { lazyFile =>
@@ -161,7 +161,7 @@ final class ComponentInstance
       }
     }
 
-    def downloadFilesAsStream(elementId: ElementId[F, CS, E]): F[List[File[LazyBytes[F]]]] = {
+    def downloadFilesAsStream(elementId: ElementId[F]): F[List[File[LazyBytes[F]]]] = {
       val promise = async.promise[List[File[LazyBytes[F]]]]
       val descriptor = nodeId.mkString + lastPostDescriptor.getAndIncrement()
       frontend.uploadFiles(elements(elementId), descriptor)
@@ -242,7 +242,7 @@ final class ComponentInstance
             val id = rc.currentContainerId
             events.put(EventId(id, eventType.name, phase), event)
             eventRegistry.registerEventType(event.`type`)
-          case element: ElementId[F, CS, E] =>
+          case element: ElementId[F] =>
             val id = rc.currentContainerId
             elements.put(element, id)
             ()

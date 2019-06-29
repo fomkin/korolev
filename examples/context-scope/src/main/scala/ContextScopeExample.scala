@@ -31,13 +31,23 @@ object ContextScopeExample extends SimpleAkkaHttpKorolevApp {
             'h1(state.blogName),
             'div(
               'div(
-                if (state.tab.isInstanceOf[Blog]) 'fontWeight @= "bold" else void,
+                if (state.tab.isInstanceOf[Blog]) Seq(
+                  'fontWeight @= "bold",
+                  'borderBottom @= "1px solid black",
+                ) else void,
                 event('click)(access => access.transition(_.copy(tab = Blog.default))),
+                'padding @= 5,
+                'display @= "inline-block",
                 "Blog"
                ),
               'div(
-                if (state.tab.isInstanceOf[About]) 'fontWeight @= "bold" else void,
+                if (state.tab.isInstanceOf[About]) Seq(
+                  'fontWeight @= "bold",
+                  'borderBottom @= "1px solid black",
+                ) else void,
                 event('click)(access => access.transition(_.copy(tab = About.default))),
+                'padding @= 5,
+                'display @= "inline-block",
                 "About"
               )
             ),

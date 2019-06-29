@@ -14,10 +14,11 @@ final class BlogView(ctx: Context.Scope[Future, ViewState, ViewState.Tab.Blog, A
   private val commentInput: ctx.ElementId = elementId()
 
   def apply(state: ViewState.Tab.Blog) = 'div(
+    'width @= "500px",
     state.articles map { article =>
       'div(
         'p(article.text),
-        'div('marginTop @= 20,
+        'div('marginTop @= 20, 'marginLeft @= 20,
           article.comments map { comment =>
             'div(
               'div('fontWeight @= "bold", s"${comment.author}:"),
