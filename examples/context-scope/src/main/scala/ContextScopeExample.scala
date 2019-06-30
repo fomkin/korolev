@@ -24,27 +24,25 @@ object ContextScopeExample extends SimpleAkkaHttpKorolevApp {
   val service: AkkaHttpService = akkaHttpService {
     KorolevServiceConfig[Future, ViewState, Any] (
       router = Router.empty,
-      stateStorage = StateStorage.default(ViewState("My blog", Blog.default)), // TODO
+      stateStorage = StateStorage.default(ViewState("My blog", Blog.default)),
       render = {
         case state =>
+          val isBlog = state.tab.isInstanceOf[Blog]
+          val isAbout = state.tab.isInstanceOf[About]
           'body(
             'h1(state.blogName),
             'div(
               'div(
-                if (state.tab.isInstanceOf[Blog]) Seq(
-                  'fontWeight @= "bold",
-                  'borderBottom @= "1px solid black",
-                ) else void,
+                if (isBlog) 'fontWeight @= "bold" else void,
+                if (isBlog) 'borderBottom @= "1px solid black" else void,
                 event('click)(access => access.transition(_.copy(tab = Blog.default))),
                 'padding @= 5,
                 'display @= "inline-block",
                 "Blog"
                ),
               'div(
-                if (state.tab.isInstanceOf[About]) Seq(
-                  'fontWeight @= "bold",
-                  'borderBottom @= "1px solid black",
-                ) else void,
+                if (isAbout) 'fontWeight @= "bold" else void,
+                if (isAbout) 'borderBottom @= "1px solid black" else void,
                 event('click)(access => access.transition(_.copy(tab = About.default))),
                 'padding @= 5,
                 'display @= "inline-block",

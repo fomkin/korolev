@@ -294,7 +294,7 @@ Let's use our component in the application.
 )
 -----------------------------------
 
-https://github.com/fomkin/korolev/blob/v0.8.0/examples/component/src/main/scala/ComponentExample.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.13.0/examples/component/src/main/scala/ComponentExample.scala[See full example]
 
 === Access element properties
 
@@ -361,7 +361,7 @@ val pictureFieldName = "picture"
 
 Use `onProgress` callback to handle progress of the form downloading. Function `start` return a `FormData`. Look API documentation for more details.
 
-https://github.com/fomkin/korolev/blob/v0.8.0/examples/form-data/src/main/scala/FormDataExample.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.13.0/examples/form-data/src/main/scala/FormDataExample.scala[See full example]
 
 === Delays
 
@@ -389,7 +389,7 @@ val render: Render = {
 }
 -----------------------------------
 
-https://github.com/fomkin/korolev/blob/v0.8.0/examples/delay/src/main/scala/DelayExample.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.13.0/examples/delay/src/main/scala/DelayExample.scala[See full example]
 
 === Environment configurator
 
@@ -462,7 +462,7 @@ KorolevServiceConfig(
 )
 -------------------------------------------------------------------------------
 
-https://github.com/fomkin/korolev/blob/v0.8.0/examples/routing/src/main/scala/RoutingExample.scala#L93[See full example]
+https://github.com/fomkin/korolev/blob/v0.13.0/examples/routing/src/main/scala/RoutingExample.scala#L93[See full example]
 
 ==== Running at a nested path
 
@@ -477,6 +477,48 @@ router = Router(
 )
 -------------------------------------------------------------------------------
 
+=== Context scope
+
+Large applications have large states with deep hierarchy. For example,
+when you are making the transition to modify the field of case class which inherits sealed trait, and you know that in this case, you will always have
+this case class, it can make you fill pain.
+
+[source,scala]
+-------------------------------------------------------------------------------
+case class ViewState(tab: Tab)
+sealed trait Tab
+case class Tab1(...) extends Tab
+case class Tab2(...) extends Tab
+
+def renderTab2(tab2: Tab2) = 'div(
+  ...,
+  'button(
+    "Push me",
+    event('click) { access =>
+      access.maybeTransition {
+        // Imagine that you have deeper hierarchy. Pain
+        case s @ ViewState(s2: Tab2) =>
+          s.copy(tab = s2.copy(...))
+      }
+    }
+  )
+)
+-------------------------------------------------------------------------------
+
+Korolev provides two solutions to solve this problem. First one is Components (noticed above). The second solution is context scoping.
+
+[source,scala]
+-------------------------------------------------------------------------------
+val scopedContext = context.scope(
+  read = { case ViewState(tab: Tab2) => tab }, // extract sub state
+  write = { case (orig, s) => orig.copy(tab = s) } // modify original state
+)
+-------------------------------------------------------------------------------
+
+Now you have context scoped to Tab2. If this context is imported, you will have isolated access to `Tab2`.
+
+https://github.com/fomkin/korolev/blob/v0.13.0/examples/context-scope/src/main/scala/ContextScopeExample.scala[See full example]
+
 == Productivity
 
 === Web Components
@@ -488,7 +530,7 @@ Usually when we say "components" we mean a UI element with its own state. Korole
 Korolev doesn't have any specific code to support WebComponents. WebComponent (Custom Elements + Shadow DOM) by design should behave as regular HTML tags. There is no difference between, for example, input or textarea, and any custom element.
 ============
 
-https://github.com/fomkin/korolev/blob/v0.8.0/examples/web-component/src/main/scala/WebComponentExample.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.13.0/examples/web-component/src/main/scala/WebComponentExample.scala[See full example]
 
 === Developer mode and "hot reload"
 
@@ -560,7 +602,7 @@ val korolevRoute = akkaHttpService(config).apply(AkkaHttpServerConfig())
 
 Then embed the route into your Akka HTTP routes structure.
 
-https://github.com/fomkin/korolev/blob/v0.8.0/examples/akka-http/src/main/scala/AkkaHttpExample.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.13.0/examples/akka-http/src/main/scala/AkkaHttpExample.scala[See full example]
 
 This integration overrides default logging behavior to `akka.event.Logging`.
 
@@ -587,7 +629,7 @@ class Config[F[_]: Effect] {
 }
 ------------------------------
 
-https://github.com/fomkin/korolev/blob/v0.8.0/examples/monix/src/main/scala/MonixExample.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.13.0/examples/monix/src/main/scala/MonixExample.scala[See full example]
 
 == Troubleshooting
 
@@ -612,7 +654,7 @@ Now you can see something like this.
 ------------------------------
 
 Message starting with `->` is commands from server. Message started with `<-` is callback and client side events.
-First number is always an procedure or callback code. You can protocol description https://github.com/fomkin/korolev/blob/v0.12.0/korolev/src/main/protocol.md[here].
+First number is always an procedure or callback code. You can protocol description https://github.com/fomkin/korolev/blob/v0.13.0/korolev/src/main/protocol.md[here].
 
 === Reconnections under Kubernetes Ingress
 

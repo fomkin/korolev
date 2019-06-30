@@ -4,7 +4,7 @@ import korolev.Context
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 
-final class BlogView(ctx: Context.Scope[Future, ViewState, ViewState.Tab.Blog, Any]) {
+final class BlogView(val ctx: Context.Scope[Future, ViewState, ViewState.Tab.Blog, Any]) {
 
   import ctx._
   import symbolDsl._
@@ -13,7 +13,7 @@ final class BlogView(ctx: Context.Scope[Future, ViewState, ViewState.Tab.Blog, A
 
   private val commentInput: ctx.ElementId = elementId()
 
-  def apply(state: ViewState.Tab.Blog) = 'div(
+  def apply(state: ViewState.Tab.Blog): Node = 'div(
     'width @= "500px",
     state.articles map { article =>
       'div(
@@ -41,7 +41,7 @@ final class BlogView(ctx: Context.Scope[Future, ViewState, ViewState.Tab.Blog, A
                         val xs = state.articles
                         val i = xs.indexWhere(_.id == article.id)
                         val x = xs(i)
-                        val upd = xs.updated(i, x.copy(comments = comment :: x.comments))
+                        val upd = xs.updated(i, x.copy(comments = x.comments :+ comment))
                         state.copy(articles = upd)
                       }
                     } yield ()
