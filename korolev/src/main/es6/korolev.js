@@ -382,16 +382,23 @@ export class Korolev {
     var result;
     var status = 0;
     try {
-      result = JSON.stringify(eval(code));
+      result = eval(code);
     } catch (e) {
       console.error(`Error evaluating code ${code}`, e);
       status = 1;
     }
 
-    this.callback(
-      CallbackType.EVALJS_RESPONSE,
-      `${descriptor}:${status}:${result}`
-    );	    
+    if (result instanceof Promise) {
+      result.then(
+        (res) => this.callback(CallbackType.EVALJS_RESPONSE,`${descriptor}:0:${JSON.stringify(res)}`),
+        (err) => this.callback(CallbackType.EVALJS_RESPONSE,`${descriptor}:1:${JSON.stringify(err)}`)
+      );
+    } else {
+      this.callback(
+        CallbackType.EVALJS_RESPONSE,
+        `${descriptor}:${status}:${JSON.stringify(result)}`
+      );
+    }
   }
 
   extractEventData(descriptor, renderNum) {
