@@ -23,7 +23,7 @@ Our project supports static page rendering so that search engines could index pa
 
 === Quick start
 
-You need SBT 0.13.15 and JDK 8+ installed. Once installed, run g8 template.
+You need SBT and JDK 8+ installed. Once installed, run g8 template.
 
 [source,bash]
 -----------------------------------
@@ -519,11 +519,11 @@ Now you have context scoped to Tab2. If this context is imported, you will have 
 
 https://github.com/fomkin/korolev/blob/v0.13.0/examples/context-scope/src/main/scala/ContextScopeExample.scala[See full example]
 
-== Productivity
+== JavaScript interoperability
 
-=== Web Components
+=== WebComponents
 
-Usually when we say "components" we mean a UI element with its own state. Korolev doesn't support components by design, cause it leads to multiple states and breaks the simplicity which we want to reach. However you still can use https://www.w3.org/standards/techs/components[WebComponents].
+If you need to extend your application with something that you can't implement with Korolev, you may use https://github.com/w3c/webcomponents[Web Components]. In simple terms, it is a standard technology that allows you to create custom HTML tags.
 
 [NOTE]
 ============
@@ -531,6 +531,44 @@ Korolev doesn't have any specific code to support WebComponents. WebComponent (C
 ============
 
 https://github.com/fomkin/korolev/blob/v0.13.0/examples/web-component/src/main/scala/WebComponentExample.scala[See full example]
+
+=== Call JavaScript from server
+
+Korolev allows executing arbitrary JavaScript code on the client. Use `access.evalJs` to run JavaScript's `eval` method on the client and retrieve the result. The result is a JSON string, so you possibly need to add your favorite https://duckduckgo.com/?q=scala+json+libraries&t=hp&ia=web[JSON library] to project dependencies.
+
+[source,scala]
+-------------------------------------------------------------------------------
+'button(
+  "Push me",
+  event('click)(_.evalJs("1 + 1").map(println)) // 2
+)
+-------------------------------------------------------------------------------
+
+Also it works for `Promise`.
+
+[source,scala]
+-------------------------------------------------------------------------------
+'button(
+  "Push me",
+  event('click) { access =>
+    access
+      .evalJs(
+        """crypto
+          |  .subtle
+          |  .digest('sha-256', Uint8Array.from([1, 2, 3]))
+          |  .then((res) => {
+          |    return Array.from(new Uint8Array(res))
+          |      .map(x => x.toString(16).padStart(2, '0'))
+          |      .join('')
+          |  })
+        """.stripMargin
+      )
+      .map(println) // "039058c6f2c0cb492c533b0a4d14ef77cc0f78abccced5287d84a1a2011cfb81"
+  }
+)
+-------------------------------------------------------------------------------
+
+== Productivity
 
 === Developer mode and "hot reload"
 
