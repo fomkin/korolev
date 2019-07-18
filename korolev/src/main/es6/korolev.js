@@ -391,7 +391,10 @@ export class Korolev {
     if (result instanceof Promise) {
       result.then(
         (res) => this.callback(CallbackType.EVALJS_RESPONSE,`${descriptor}:0:${JSON.stringify(res)}`),
-        (err) => this.callback(CallbackType.EVALJS_RESPONSE,`${descriptor}:1:${JSON.stringify(err)}`)
+        (err) => {
+          console.error(`Error evaluating code ${code}`, err);
+          this.callback(CallbackType.EVALJS_RESPONSE,`${descriptor}:1:${JSON.stringify(err)}`)
+        }
       );
     } else {
       this.callback(
