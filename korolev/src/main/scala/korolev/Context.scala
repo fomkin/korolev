@@ -55,6 +55,7 @@ object Context {
     type Render = PartialFunction[S, Document.Node[Effect]]
     type ElementId = Context.ElementId[F]
     type Access = Context.Access[F, AccessType, M]
+    type UnscopedAccess = Context.Access[F, S, M]
     type EventResult = F[Unit]
 
     val symbolDsl = new KorolevTemplateDsl[F, S, M]()
@@ -105,6 +106,10 @@ object Context {
     def delay(duration: FiniteDuration)(effect: Access => F[Unit]): Delay[F, S, M] = {
       Delay(duration, accessScope.andThen(effect))
     }
+
+    def eventUnscoped(name: Symbol, phase: EventPhase = Bubbling)(
+      effect: UnscopedAccess => F[Unit]): Event =
+      Event(name, phase, effect)
 
     def event(name: Symbol, phase: EventPhase = Bubbling)(
       effect: Access => F[Unit]): Event =

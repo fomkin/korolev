@@ -517,6 +517,8 @@ val scopedContext = context.scope(
 
 Now you have context scoped to Tab2. If this context is imported, you will have isolated access to `Tab2`.
 
+Sometimes, being in context scope, you need to apply a transition to all state. In this case, you can handle an event using `eventUnscoped` method of the context. You will get `UnscopedAccess` which ignores current context scope.
+
 https://github.com/fomkin/korolev/blob/v0.13.0/examples/context-scope/src/main/scala/ContextScopeExample.scala[See full example]
 
 == JavaScript interoperability
