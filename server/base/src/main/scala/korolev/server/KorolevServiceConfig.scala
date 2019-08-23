@@ -28,7 +28,7 @@ case class KorolevServiceConfig[F[_]: Async, S, M](
   router: Router[F, S],
   rootPath: String = "/",
   render: PartialFunction[S, Document.Node[Context.Effect[F, S, M]]],
-  head: Seq[Document.Node[Context.Effect[F, S, M]]] = Seq.empty,
+  head: S => Seq[Document.Node[Context.Effect[F, S, M]]] = (_: S) => Seq.empty,
   connectionLostWidget: Document.Node[Context.Effect[F, S, M]] =
     KorolevServiceConfig.defaultConnectionLostWidget[Context.Effect[F, S, M]],
   maxFormDataEntrySize: Int = 1024 * 1024 * 8,

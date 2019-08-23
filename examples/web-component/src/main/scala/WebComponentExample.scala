@@ -23,7 +23,7 @@ object WebComponentExample extends SimpleAkkaHttpKorolevApp {
     KorolevServiceConfig [Future, State, Any] (
       router = Router.empty,
       stateStorage = StateStorage.default(State()),
-      head = {
+      head = _ => {
         Seq(
           'script('src /= "https://cdnjs.cloudflare.com/ajax/libs/webcomponentsjs/0.7.24/webcomponents-lite.min.js"),
           'link('rel /= "import", 'href /= "https://leaflet-extras.github.io/leaflet-map/bower_components/leaflet-map/leaflet-map.html")

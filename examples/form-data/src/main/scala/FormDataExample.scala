@@ -23,7 +23,7 @@ object FormDataExample extends SimpleAkkaHttpKorolevApp(AkkaHttpServerConfig(max
     KorolevServiceConfig[Future, State, Any](
       stateStorage = StateStorage.default(State.empty),
       router = Router.empty,
-      head = {
+      head = _ => {
         Seq(
           'link(
             'rel /="stylesheet",
