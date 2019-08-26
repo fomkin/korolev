@@ -62,7 +62,7 @@ package object server {
         manager <- config.stateStorage.get(deviceId, sessionId)
         state <- config.router.toState
           .lift(request.path)
-          .fold(Async[F].pure(manager.default))(f => f(manager.default))
+          .fold(Async[F].pure(manager.default))(_(manager.default))
         _ <- if (state != manager.default) manager.write(Id.TopLevel, state) else Async[F].unit
       } yield {
         val dsl = new levsha.dsl.SymbolDsl[Context.Effect[F, S, M]]()
@@ -133,7 +133,7 @@ package object server {
     def makeSessionKey(deviceId: DeviceId, sessionId: SessionId): String =
       s"$deviceId-$sessionId"
 
-    def createSession(deviceId: DeviceId, sessionId: SessionId): F[KorolevSession[F]] = {
+    def createSession(deviceId: DeviceId, sessionId: SessionId, initialPath: String): F[KorolevSession[F]] = {
 
       val connection = new Connection[F]()
 
@@ -143,7 +143,7 @@ package object server {
         qualifiedSessionId = QualifiedSessionId(deviceId, sessionId)
         korolev = new ApplicationInstance(
           qualifiedSessionId, connection,
-          stateManager, stateManager.default,
+          stateManager, stateManager.default, initialPath,
           config.render, config.router, fromScratch = !isOld,
           reporter
         )
@@ -233,8 +233,8 @@ package object server {
     val response404 = Async[F].delay[Response](Response.Http(Response.Status.NotFound, None, Seq.empty))
 
     val service: PartialFunction[Request[F], F[Response]] = {
-      case Request(Root / "static", _, _, _, _) => response404
-      case Request(path, _, _, _, _) if path.startsWith("static") =>
+      case Request(Root / "static", _, _, _, _, _) => response404
+      case Request(path, _, _, _, _, _) if path.startsWith("static") =>
         val fsPath = path.toString
         Option(this.getClass.getResourceAsStream(fsPath)) match {
           case None => response404
@@ -250,7 +250,7 @@ package object server {
             }
             Async[F].delay(Response.Http(Response.Status.Ok, Some(bytes), headers))
         }
-      case r @ Request(Root / "bridge" / deviceId / sessionId / "form-data" / descriptor, _, _, headers, _) =>
+      case r @ Request(Root / "bridge" / deviceId / sessionId / "form-data" / descriptor, _, _, headers, _, _) =>
         sessions.get(makeSessionKey(deviceId, sessionId)) match {
           case Some(session) =>
             val boundaryOpt = headers collectFirst {
@@ -277,7 +277,7 @@ package object server {
           case None =>
             Async[F].delay(Response.Http(Response.Status.BadRequest, "Session doesn't exist"))
         }
-      case Request(Root / "bridge" / deviceId / sessionId / "file" / descriptor / "info", _, _, _, body) =>
+      case Request(Root / "bridge" / deviceId / sessionId / "file" / descriptor / "info", _, _, _, body, _) =>
         sessions.get(makeSessionKey(deviceId, sessionId)) match {
           case Some(session) =>
             Async[F].map(body.toStrictUtf8) { info =>
@@ -294,7 +294,7 @@ package object server {
           case None =>
             Async[F].delay(Response.Http(Response.Status.BadRequest, "Session doesn't exist"))
         }
-      case Request(Root / "bridge" / deviceId / sessionId / "file" / descriptor, _, _, headers, body) =>
+      case Request(Root / "bridge" / deviceId / sessionId / "file" / descriptor, _, _, headers, body, _) =>
         val result =
           for {
             session <- sessions.get(makeSessionKey(deviceId, sessionId))
@@ -306,7 +306,7 @@ package object server {
           case Some(_) => body.finished.map(_ => Response.Http(Response.Status.Ok, None))
           case None => Async[F].delay(Response.Http(Response.Status.BadRequest))
         }
-      case Request(Root / "bridge" / "long-polling" / deviceId / sessionId / "publish", _, _, _, body) =>
+      case Request(Root / "bridge" / "long-polling" / deviceId / sessionId / "publish", _, _, _, body, _) =>
         sessions.get(makeSessionKey(deviceId, sessionId)) match {
           case Some(session) =>
             for {
@@ -319,10 +319,10 @@ package object server {
           case None =>
             Async[F].delay(Response.Http(Response.Status.BadRequest, "Session doesn't exist"))
         }
-      case Request(Root / "bridge" / "long-polling" / deviceId / sessionId / "subscribe", _, _, _, _) =>
+      case Request(Root / "bridge" / "long-polling" / deviceId / sessionId / "subscribe", _, _, _, _, initialPath) =>
         val sessionAsync = sessions.get(makeSessionKey(deviceId, sessionId)) match {
           case Some(x) => Async[F].delay(x)
-          case None => createSession(deviceId, sessionId)
+          case None => createSession(deviceId, sessionId, initialPath)
         }
         sessionAsync.flatMap { session =>
           session.nextMessage.map { message =>
@@ -335,12 +335,12 @@ package object server {
           case _: SessionDestroyedException =>
             Response.Http(Response.Status.Gone, "Session has been destroyed")
         }
-      case Request(Root / "bridge" / "web-socket" / deviceId / sessionId, _, _, _, _) =>
+      case Request(Root / "bridge" / "web-socket" / deviceId / sessionId, _, _, _, _, initialPath) =>
         val sessionAsync = sessions.get(makeSessionKey(deviceId, sessionId)) match {
           case Some(x) => Async[F].delay(x)
-          case None => createSession(deviceId, sessionId)
+          case None => createSession(deviceId, sessionId, initialPath)
         }
-        sessionAsync map { session =>
+        sessionAsync.map { session =>
           Response.WebSocket(
             destroyHandler = () => session.destroy() run {
               case Success(_) => // do nothing

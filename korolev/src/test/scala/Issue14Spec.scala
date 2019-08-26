@@ -40,10 +40,11 @@ class Issue14Spec extends FlatSpec with Matchers {
       },
       stateManager = StateStorage.default("firstState").get("", "").value.get.get,
       initialState = "firstState",
+      initialPath = "/",
       reporter = Reporter.PrintReporter
     )
 
-    def fireEvent(data: String) =
+    def fireEvent(data: String): Unit =
       connection.receive(s"""[0,"$data"]""")
 
     fireEvent("1:1_2_1:mousedown")

@@ -37,6 +37,7 @@ final class ApplicationInstance
     connection: Connection[F],
     stateManager: StateManager[F, S],
     initialState: S,
+    initialPath: String,
     render: PartialFunction[S, Document.Node[Effect[F, S, M]]],
     router: Router[F, S],
     fromScratch: Boolean,
@@ -71,36 +72,56 @@ final class ApplicationInstance
     )
   }
 
-  private def onState(): F[Unit] = stateManager.snapshot.map { snapshot =>
-    renderContext.synchronized {
-      // Set page url if router exists
-      router.fromState
-        .lift(snapshot(Id.TopLevel).getOrElse(initialState))
-        .foreach(path => frontend.changePageUrl(path))
+  private def onState(initialPath: String, fromScratch: Boolean = false): F[Unit] =
+    for {
+      changePageUrl <-
+        if (fromScratch)
+          router.toState
+            .lift(Router.Path.fromString(initialPath))
+            .fold(Async[F].pure(true)) { f =>
+              stateManager.read(Id.TopLevel).flatMap {
+                _.fold(Async[F].pure(true)) { state =>
+                  f(state).flatMap(stateManager.write(Id.TopLevel, _)).map(_ => false)
+                }
+              }
+            }
+        else
+          Async[F].pure(true)
+      _ <- stateManager.snapshot.map { snapshot =>
+        renderContext.synchronized {
 
-      // Prepare render context
-      renderContext.swap()
+          if (changePageUrl) {
+            // Set page url if router exists
 
-      // Perform rendering
-      topLevelComponentInstance.applyRenderContext(
-        parameters = (), // Boxed unit as parameter. Top level component doesn't need parameters
-        snapshot = snapshot,
-        rc = renderContext
-      )
+            router.fromState
+              .lift(snapshot(Id.TopLevel).getOrElse(initialState))
+              .foreach(frontend.changePageUrl)
+          }
 
-      // Infer changes
-      frontend.startDomChanges()
-      renderContext.diff(frontend)
-      frontend.flushDomChanges()
+          // Prepare render context
+          renderContext.swap()
 
-      if (devMode.isActive)
-        devMode.saveRenderContext(renderContext)
+          // Perform rendering
+          topLevelComponentInstance.applyRenderContext(
+            parameters = (), // Boxed unit as parameter. Top level component doesn't need parameters
+            snapshot = snapshot,
+            rc = renderContext
+          )
 
-      // Make korolev ready to next render
-      topLevelComponentInstance.dropObsoleteMisc()
-      frontend.setRenderNum(currentRenderNum.incrementAndGet())
-    }
-  }
+          // Infer changes
+          frontend.startDomChanges()
+          renderContext.diff(frontend)
+          frontend.flushDomChanges()
+
+          if (devMode.isActive)
+            devMode.saveRenderContext(renderContext)
+
+          // Make korolev ready to next render
+          topLevelComponentInstance.dropObsoleteMisc()
+          frontend.setRenderNum(currentRenderNum.incrementAndGet())
+        }
+      }
+    } yield ()
 
   frontend.setHandlers(
     onHistory = { path =>
@@ -115,7 +136,7 @@ final class ApplicationInstance
         .flatMap {
           case Some(newState) =>
             stateManager.write(Id.TopLevel, newState)
-              .flatMap(_ => onState())
+              .flatMap(_ => onState(initialPath))
           case None =>
             Async[F].unit
         }
@@ -170,10 +191,11 @@ final class ApplicationInstance
     }
 
     topLevelComponentInstance.subscribeStateChange { (_, _) =>
-      onState().runIgnoreResult
+      onState(initialPath).runIgnoreResult
     }
 
-    if (fromScratch)
-      onState().runIgnoreResult
+    if (fromScratch) {
+      onState(initialPath, fromScratch = true).runIgnoreResult
+    }
   }
 }

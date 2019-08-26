@@ -80,9 +80,9 @@ export class Connection {
 
     let url = (this._useSSL ? "wss://" : "ws://") + this._hostPort;
     let path = this._serverRootPath + `bridge/web-socket/${this._deviceId}/${this._sessionId}`;
-    let uri = url + path;
+    let connectionUrl = `${url}${path}?initialPath=${window.location.pathname}`;
 
-    this._webSocket = new WebSocket(uri);
+    this._webSocket = new WebSocket(connectionUrl);
     this._send = (data) => this._webSocket.send(data);
     this._connectionType = ConnectionType.WEB_SOCKET;
 
@@ -90,8 +90,8 @@ export class Connection {
     this._webSocket.addEventListener('close', (event) => this._onClose());
     this._webSocket.addEventListener('error', (event) => this._onError());
     this._webSocket.addEventListener('message', (event) => this._onMessage(event.data));
-    
-    console.log(`Trying to open connection to ${uri} using WebSocket`);
+
+    console.log(`Trying to open connection to ${connectionUrl} using WebSocket`);
   }
 
   /** @private */
@@ -99,7 +99,7 @@ export class Connection {
 
     let url = (this._useSSL ? "https://" : "http://") + this._hostPort;
     let path = this._serverRootPath + `bridge/long-polling/${this._deviceId}/${this._sessionId}/`;
-    let uriPrefix = url + path;
+    let connectionUrl = `${url}${path}?initialPath=${window.location.pathname}`;
 
     /** @type {function(boolean)} */
     let subscribe = (firstTime) => {
@@ -126,7 +126,7 @@ export class Connection {
 
       let request = new XMLHttpRequest();
       request.addEventListener('readystatechange', onReadyStateChange);
-      request.open('GET', uriPrefix + 'subscribe', true);
+      request.open('GET', connectionUrl + 'subscribe', true);
       request.send('');
     };
 
@@ -147,17 +147,17 @@ export class Connection {
 
       let request = new XMLHttpRequest();
 
-      request.open('POST', uriPrefix + 'publish', true);
+      request.open('POST', connectionUrl + 'publish', true);
       request.setRequestHeader("Content-Type", "application/json");
       request.addEventListener('readystatechange', onReadyStateChange);
       request.send(data);
-    }
+    };
 
     this._connectionType = ConnectionType.LONG_POLLING;
     this._send = publish;
 
     subscribe(true);
-    console.log(`Trying to open connection to ${uriPrefix} using long polling`);
+    console.log(`Trying to open connection to ${connectionUrl} using long polling`);
   }
 
   /** @private */

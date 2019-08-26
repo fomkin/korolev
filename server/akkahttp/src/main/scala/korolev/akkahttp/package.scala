@@ -62,7 +62,7 @@ package object akkahttp {
     extractRequest { request =>
       extractUnmatchedPath { path =>
         extractUpgradeToWebSocket { upgrade =>
-          val korolevRequest = mkKorolevRequest(request, path.toString, Map.empty, LazyBytes.empty)
+          val korolevRequest = mkKorolevRequest(request, path.toString, Map.empty, LazyBytes.empty, request.uri.query().getOrElse("initialPath", "/"))
 
           onSuccess(asyncToFuture(korolevServer(korolevRequest))) {
             case KorolevResponse.WebSocket(publish, subscribe, destroy) =>
@@ -107,7 +107,7 @@ package object akkahttp {
       extractRequest { request =>
         extractUnmatchedPath { path =>
           parameterMap { params =>
-            val korolevRequest = mkKorolevRequest(request, path.toString, params, LazyBytes.empty)
+            val korolevRequest = mkKorolevRequest(request, path.toString, params, LazyBytes.empty, "/")
             val responseF = handleHttpResponse(korolevServer, korolevRequest)
             complete(responseF)
           }
@@ -144,7 +144,7 @@ package object akkahttp {
                 finished = finished.async,
                 size = request.entity.contentLengthOption
               )
-              val korolevRequest = mkKorolevRequest(request, path.toString, params, body)
+              val korolevRequest = mkKorolevRequest(request, path.toString, params, body, "/")
               val responseF = handleHttpResponse(korolevServer, korolevRequest)
               complete(responseF)
             }
@@ -156,20 +156,22 @@ package object akkahttp {
   private def mkKorolevRequest[F[_]](request: HttpRequest,
                                      path: String,
                                      params: Map[String, String],
-                                     body: LazyBytes[F])
+                                     body: LazyBytes[F],
+                                     initialPath: String)
                                     (implicit async: Async[F]): KorolevRequest[F] =
     KorolevRequest(
-      path = Router.Path.fromString(path),
+      Router.Path.fromString(path),
       params,
-      cookie = key => request.cookies.find(_.name == key).map(_.value),
-      headers = {
+      key => request.cookies.find(_.name == key).map(_.value),
+      {
         val contentType = request.entity.contentType
         val contentTypeHeaders =
           if (contentType.mediaType.isMultipart) Seq("content-type" -> contentType.toString) else Seq.empty
 
         request.headers.map(h => (h.name(), h.value())) ++ contentTypeHeaders
       },
-      body = body
+      body,
+      initialPath
     )
 
   private def handleHttpResponse[F[_]: Async](korolevServer: KorolevService[F],

@@ -15,6 +15,7 @@
  */
 
 package korolev.server
+
 import korolev.{Async, LazyBytes, Router}
 
 final case class Request[F[_]: Async](
@@ -22,5 +23,6 @@ final case class Request[F[_]: Async](
   params: Map[String, String],
   cookie: String => Option[String],
   headers: Seq[(String, String)],
-  body: LazyBytes[F]
+  body: LazyBytes[F],
+  initialPath: String
 )
