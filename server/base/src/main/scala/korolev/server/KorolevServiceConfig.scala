@@ -42,8 +42,8 @@ object KorolevServiceConfig {
   def defaultConnectionLostWidget[MiscType]: Document.Node[MiscType] = {
     val dsl = new SymbolDsl[MiscType]()
     import dsl._
-    'div('style /= "position: absolute; top: 0; left: 0; right: 0;" +
-                   "background-color: yellow; border-bottom: 1px solid black; padding: 10px;",
+    'div('style /= "position: fixed; top: 0; left: 0; right: 0;" +
+                   "background-color: lightyellow; border-bottom: 1px solid black; padding: 10px;",
       "Connection lost. Waiting to resume."
     )
   }
