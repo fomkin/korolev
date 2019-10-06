@@ -33,7 +33,7 @@ object FocusExample extends SimpleAkkaHttpKorolevApp {
             ),
             'div(
               'button(
-                event('click) { access =>
+                event("click") { access =>
                   access.focus(inputId)
                 },
                 "Click to focus"

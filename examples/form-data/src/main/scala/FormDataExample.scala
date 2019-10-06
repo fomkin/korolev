@@ -67,7 +67,7 @@ object FormDataExample extends SimpleAkkaHttpKorolevApp(AkkaHttpServerConfig(max
                   'button ("Submit")
                 )
               ),
-              event('submit) { access =>
+              event("submit") { access =>
                 for {
                   formData <- access
                     .downloadFormData(myForm)

@@ -67,7 +67,7 @@ object FileStreamingExample extends SimpleAkkaHttpKorolevApp {
             'button(
               "Upload",
               if (inProgress) 'disabled /= "" else void,
-              event('click)(onUploadClick)
+              event("click")(onUploadClick)
             )
           )
       }

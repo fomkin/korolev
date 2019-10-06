@@ -34,7 +34,7 @@ object RoutingExample extends SimpleAkkaHttpKorolevApp {
             'div (
               state.todos.keys map { name =>
                 'a(
-                  event('click) { access =>
+                  event("click") { access =>
                     access.transition(_.copy(selectedTab = name))
                   },
                   'href /= "/" + name.toLowerCase, disableHref,
@@ -54,7 +54,7 @@ object RoutingExample extends SimpleAkkaHttpKorolevApp {
                         else "checkbox checkbox__checked"
                       },
                       // Generate transition when clicking checkboxes
-                      event('click) { access =>
+                      event("click") { access =>
                         access.transition { s =>
                           val todos = s.todos(s.selectedTab)
                           val updated = todos.updated(i, todos(i).copy(done = !todo.done))
@@ -69,7 +69,7 @@ object RoutingExample extends SimpleAkkaHttpKorolevApp {
             ),
             'form (
               // Generate AddTodo action when 'Add' button clicked
-              event('submit) { access =>
+              event("submit") { access =>
                 access.property(inputId, 'value) flatMap { value =>
                   val todo = State.Todo(value, done = false)
                   access.transition { s =>

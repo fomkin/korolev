@@ -32,7 +32,7 @@ object SimpleExample extends SimpleAkkaHttpKorolevApp {
                       if (state.edit.nonEmpty) 'disabled /= "" else void,
                       if (todo.done) 'checked /= "" else void,
                       // Generate transition when clicking checkboxes
-                      event('click) { access =>
+                      event("click") { access =>
                         access.transition { s =>
                           val updated = s.todos.updated(i, s.todos(i).copy(done = !todo.done))
                           s.copy(todos = updated)
@@ -50,7 +50,7 @@ object SimpleExample extends SimpleAkkaHttpKorolevApp {
                           'value := todo.text
                         ),
                         'button('display @= "inline-block", "Save"),
-                        event('submit) { access =>
+                        event("submit") { access =>
                           access.property(editInputId, 'value) flatMap { value =>
                             access.transition { s =>
                               val updatedTodo = s.todos(i).copy(text = value)
@@ -64,7 +64,7 @@ object SimpleExample extends SimpleAkkaHttpKorolevApp {
                       'span(
                         if (todo.done) 'textDecoration @= "line-through" else void,
                         todo.text,
-                        event('dblclick) { access =>
+                        event("dblclick") { access =>
                           access.transition(_.copy(edit = Some(i)))
                         }
                       )
@@ -74,7 +74,7 @@ object SimpleExample extends SimpleAkkaHttpKorolevApp {
             ),
             'form(
               // Generate AddTodo action when 'Add' button clicked
-              event('submit) { access =>
+              event("submit") { access =>
                 val prop = access.property(inputId)
                 prop.get('value) flatMap { value =>
                   prop.set('value, "") flatMap { _ =>

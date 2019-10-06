@@ -35,7 +35,7 @@ object ContextScopeExample extends SimpleAkkaHttpKorolevApp {
               'div(
                 if (isBlog) 'fontWeight @= "bold" else void,
                 if (isBlog) 'borderBottom @= "1px solid black" else void,
-                event('click)(access => access.transition(_.copy(tab = Blog.default))),
+                event("click")(access => access.transition(_.copy(tab = Blog.default))),
                 'padding @= 5,
                 'display @= "inline-block",
                 "Blog"
@@ -43,7 +43,7 @@ object ContextScopeExample extends SimpleAkkaHttpKorolevApp {
               'div(
                 if (isAbout) 'fontWeight @= "bold" else void,
                 if (isAbout) 'borderBottom @= "1px solid black" else void,
-                event('click)(access => access.transition(_.copy(tab = About.default))),
+                event("click")(access => access.transition(_.copy(tab = About.default))),
                 'padding @= 5,
                 'display @= "inline-block",
                 "About"

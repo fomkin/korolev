@@ -29,7 +29,7 @@ object GameOfLife extends SimpleAkkaHttpKorolevApp {
           'body(
             'div(
               'button(
-                event('click) { access =>
+                event("click") { access =>
                   access.transition { case state =>
                     state.next
                   }
@@ -55,7 +55,7 @@ object GameOfLife extends SimpleAkkaHttpKorolevApp {
                     else "#EEEEEE"
                   },
                   // Generate actions when clicking checkboxes
-                  event('click) { access =>
+                  event("click") { access =>
                     access.transition { case state =>
                       state.check(x, y)
                     }

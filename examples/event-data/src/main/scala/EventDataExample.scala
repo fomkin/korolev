@@ -22,7 +22,7 @@ object EventDataExample extends SimpleAkkaHttpKorolevApp {
           'body(
             'input(
               'type /= "text",
-              event('keydown) { access =>
+              event("keydown") { access =>
                 access.eventData.flatMap { eventData =>
                   access.transition(_ => eventData)
                 }

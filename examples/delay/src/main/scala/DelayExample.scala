@@ -27,7 +27,7 @@ object DelayExample extends SimpleAkkaHttpKorolevApp {
           },
           'button(
             "Push the button " + n,
-            event('click) { access =>
+            event("click") { access =>
               access.transition {
                 case s => s.map(_ + 1)
               }
@@ -37,7 +37,7 @@ object DelayExample extends SimpleAkkaHttpKorolevApp {
         )
         case None => 'body(
           'button(
-            event('click) { access =>
+            event("click") { access =>
               access.transition {
                 case _ => Some(1)
               }

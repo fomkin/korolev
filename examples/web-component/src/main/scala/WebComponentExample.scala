@@ -33,11 +33,11 @@ object WebComponentExample extends SimpleAkkaHttpKorolevApp {
         case state =>
           'body (
             'div (
-              'button ("San Francisco", event('click)(setLatLon(37.7576793, -122.5076402))),
-              'button ("London", event('click)(setLatLon(51.528308, -0.3817983))),
-              'button ("New York", event('click)(setLatLon(40.705311, -74.2581908))),
-              'button ("Moscow", event('click)(setLatLon(55.748517, 37.0720941))),
-              'button ("Korolev", event('click)(setLatLon(55.9226846, 37.7961706)))
+              'button ("San Francisco", event("click")(setLatLon(37.7576793, -122.5076402))),
+              'button ("London", event("click")(setLatLon(51.528308, -0.3817983))),
+              'button ("New York", event("click")(setLatLon(40.705311, -74.2581908))),
+              'button ("Moscow", event("click")(setLatLon(55.748517, 37.0720941))),
+              'button ("Korolev", event("click")(setLatLon(55.9226846, 37.7961706)))
             ),
             'leafletMap (
               'width @= 500, 'height @= 300,

@@ -26,7 +26,7 @@ object AkkaHttpExample extends App {
       'body(
         s"Hello akka-http: $s",
         'button("Click me!",
-          event('click)(_.transition(!_))
+          event("click")(_.transition(!_))
         )
       )
     }

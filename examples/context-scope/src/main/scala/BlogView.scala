@@ -32,7 +32,7 @@ final class BlogView(val ctx: Context.Scope[Future, ViewState, ViewState.Tab.Blo
                 'input(commentInput, 'type /= "text", 'placeholder /= "Comment"),
                 'button(
                   "Send comment",
-                  event('click) { access =>
+                  event("click") { access =>
                     for {
                       name <- access.valueOf(nameInput)
                       text <- access.valueOf(commentInput)
@@ -51,7 +51,7 @@ final class BlogView(val ctx: Context.Scope[Future, ViewState, ViewState.Tab.Blo
             case _ =>
               'button(
                 "Add comment",
-                event('click) { access =>
+                event("click") { access =>
                   access.transition(_.copy(addCommentFor = Some(article.id)))
                 }
               )

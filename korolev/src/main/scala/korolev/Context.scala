@@ -107,13 +107,41 @@ object Context {
       Delay(duration, accessScope.andThen(effect))
     }
 
-    def eventUnscoped(name: Symbol, phase: EventPhase = Bubbling)(
+    @deprecated("""Use "eventName" instead of 'eventName""", "0.13.0")
+    def eventUnscoped(name: Symbol)(
       effect: UnscopedAccess => F[Unit]): Event =
-      Event(name, phase, effect)
+      Event(name.name, Bubbling, effect)
 
-    def event(name: Symbol, phase: EventPhase = Bubbling)(
+    @deprecated("""Use "eventName" instead of 'eventName""", "0.13.0")
+    def event(name: Symbol)(
+      effect: Access => F[Unit]): Event =
+      Event(name.name, Bubbling, accessScope.andThen(effect))
+
+    @deprecated("""Use "eventName" instead of 'eventName""", "0.13.0")
+    def eventUnscoped(name: Symbol, phase: EventPhase)(
+      effect: UnscopedAccess => F[Unit]): Event =
+      Event(name.name, phase, effect)
+
+    @deprecated("""Use "eventName" instead of 'eventName""", "0.13.0")
+    def event(name: Symbol, phase: EventPhase)(
+      effect: Access => F[Unit]): Event =
+      Event(name.name, phase, accessScope.andThen(effect))
+
+    def event(name: String)(
+      effect: Access => F[Unit]): Event =
+      Event(name, Bubbling, accessScope.andThen(effect))
+
+    def eventUnscoped(name: String)(
+      effect: UnscopedAccess => F[Unit]): Event =
+      Event(name, Bubbling, effect)
+
+    def event(name: String, phase: EventPhase)(
       effect: Access => F[Unit]): Event =
       Event(name, phase, accessScope.andThen(effect))
+
+    def eventUnscoped(name: String, phase: EventPhase)(
+      effect: UnscopedAccess => F[Unit]): Event =
+      Event(name, phase, effect)
 
     val emptyTransition: PartialFunction[S, S] = { case x => x }
 
@@ -301,7 +329,7 @@ object Context {
   }
 
   final case class Event[F[_]: Async, S, M](
-      `type`: Symbol,
+      `type`: String,
       phase: EventPhase,
       effect: Access[F, S, M] => F[Unit]) extends Effect[F, S, M]
 

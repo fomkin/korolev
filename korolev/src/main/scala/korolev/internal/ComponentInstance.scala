@@ -240,7 +240,7 @@ final class ComponentInstance
         misc match {
           case event @ Event(eventType, phase, _) =>
             val id = rc.currentContainerId
-            events.put(EventId(id, eventType.name, phase), event)
+            events.put(EventId(id, eventType, phase), event)
             eventRegistry.registerEventType(event.`type`)
           case element: ElementId[F] =>
             val id = rc.currentContainerId

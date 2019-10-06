@@ -31,7 +31,7 @@ object ComponentExample extends SimpleAkkaHttpKorolevApp {
       'borderStyle @= "solid",
       'borderColor @= s"rgb($r, $g, $b)",
       label,
-      event('click) { access =>
+      event("click") { access =>
         access.transition(_ => randomRgb()) flatMap { _ =>
           access.publish(())
         }
@@ -52,7 +52,7 @@ object ComponentExample extends SimpleAkkaHttpKorolevApp {
         'borderStyle @= "solid",
         'borderColor @= s"rgb($r, $g, $b)",
         label,
-        event('click) { access =>
+        event("click") { access =>
           access.publish(()).flatMap { _ =>
             access.transition {
               case _ => randomRgb()
@@ -79,7 +79,7 @@ object ComponentExample extends SimpleAkkaHttpKorolevApp {
             },
             'button(
               "Click me too",
-              event('click) { access =>
+              event("click") { access =>
                 access.transition(_ + Random.nextPrintableChar())
               }
             )
