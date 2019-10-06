@@ -70,7 +70,7 @@ object RoutingExample extends SimpleAkkaHttpKorolevApp {
             'form (
               // Generate AddTodo action when 'Add' button clicked
               event("submit") { access =>
-                access.property(inputId, 'value) flatMap { value =>
+                access.property(inputId, "value") flatMap { value =>
                   val todo = State.Todo(value, done = false)
                   access.transition { s =>
                     s.copy(todos = s.todos + (s.selectedTab -> (s.todos(s.selectedTab) :+ todo)))

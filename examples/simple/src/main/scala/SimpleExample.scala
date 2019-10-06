@@ -76,8 +76,8 @@ object SimpleExample extends SimpleAkkaHttpKorolevApp {
               // Generate AddTodo action when 'Add' button clicked
               event("submit") { access =>
                 val prop = access.property(inputId)
-                prop.get('value) flatMap { value =>
-                  prop.set('value, "") flatMap { _ =>
+                prop.get("value") flatMap { value =>
+                  prop.set("value", "") flatMap { _ =>
                     val todo = State.Todo(value, done = false)
                     access.transition(s => s.copy(todos = s.todos :+ todo))
                   }

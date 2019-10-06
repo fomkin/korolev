@@ -105,11 +105,17 @@ final class ComponentInstance
     def property(elementId: ElementId[F]): PropertyHandler[F] = {
       val idF = getId(elementId)
       new PropertyHandler[F] {
-        def get(propName: Symbol): F[String] = idF.flatMap { id =>
-          frontend.extractProperty(id, propName.name)
+        def get(propName: Symbol): F[String] =
+          get(propName.name)
+
+        def set(propName: Symbol, value: Any): F[Unit] =
+          set(propName.name, value)
+
+        def get(propName: String): F[String] = idF.flatMap { id =>
+          frontend.extractProperty(id, propName)
         }
 
-        def set(propName: Symbol, value: Any): F[Unit] = idF.flatMap { id =>
+        def set(propName: String, value: Any): F[Unit] = idF.flatMap { id =>
           // XmlNs argument is empty cause it will be ignored
           async.delay(frontend.setProperty(id, propName, value))
         }

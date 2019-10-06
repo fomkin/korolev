@@ -178,16 +178,23 @@ object Context {
     def property(id: ElementId[F]): PropertyHandler[F]
 
     /**
-      * Shortcut for `property(id).get(proName)`.
+      * Shortcut for `property(id).get(propName)`.
       * @since 0.6.0
       */
+    @deprecated("""Use "propertyName" instead of 'propertyName""", "0.13.0")
     final def property(id: ElementId[F], propName: Symbol): F[String] = property(id).get(propName)
+
+    /**
+      * Shortcut for `property(id).get(propName)`.
+      * @since 0.13.0
+      */
+    final def property(id: ElementId[F], propName: String): F[String] = property(id).get(propName)
 
     /**
       * Shortcut for `property(id).get('value)`.
       * @since 0.6.0
       */
-    final def valueOf(id: ElementId[F]): F[String] = property(id, 'value)
+    final def valueOf(id: ElementId[F]): F[String] = property(id, "value")
 
     /**
       * Makes focus on the element
@@ -284,8 +291,12 @@ object Context {
   sealed abstract class Effect[F[_]: Async, +S, +M]
 
   abstract class PropertyHandler[F[_]: Async] {
+    @deprecated("""Use "propertyName" instead of 'propertyName""", "0.13.0")
     def get(propName: Symbol): F[String]
+    @deprecated("""Use "propertyName" instead of 'propertyName""", "0.13.0")
     def set(propName: Symbol, value: Any): F[Unit]
+    def get(propName: String): F[String]
+    def set(propName: String, value: Any): F[Unit]
   }
 
   final case class File[A](name: String, data: A)

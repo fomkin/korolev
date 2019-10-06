@@ -39,7 +39,7 @@ final class KorolevTemplateDsl[F[_]: Async, S, M] extends SymbolDsl[Effect[F, S,
 
     /** define style attribute */
     def @=(value: String): Document.Attr[Effect[F, S, M]] = Document.Attr { rc =>
-      rc.setAttr(levsha.XmlNs.html, '*' + s.name, value)
+      rc.setAttr(levsha.XmlNs.html, s"*${s.name}", value)
     }
 
     /** define property */

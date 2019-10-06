@@ -88,9 +88,9 @@ final class ClientSideApi[F[_]: Async](connection: Connection[F], reporter: Repo
     promise.async
   }
 
-  def setProperty(id: Id, name: Symbol, value: Any): Unit = {
+  def setProperty(id: Id, name: String, value: Any): Unit = {
     // TODO setProperty should be dedicated
-    connection.send(Procedure.ModifyDom.code, ModifyDomProcedure.SetAttr.code, id.mkString, 0, name.name, value, true)
+    connection.send(Procedure.ModifyDom.code, ModifyDomProcedure.SetAttr.code, id.mkString, 0, name, value, true)
   }
 
   def evalJs(code: String): F[String] = {
