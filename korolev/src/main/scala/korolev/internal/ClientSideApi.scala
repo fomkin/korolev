@@ -126,7 +126,7 @@ final class ClientSideApi[F[_]: Async](connection: Connection[F], reporter: Repo
   }
 
   def flushDomChanges(): Unit = {
-    connection.send(domChangesBuffer: _*)
+    connection.send(domChangesBuffer.toSeq: _*)
     domChangesBuffer.clear()
   }
 

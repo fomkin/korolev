@@ -46,17 +46,25 @@ object implicits {
     override def fromTry[A](value: => Try[A]): F[A] =
       F.fromTry(value)
 
-    override def promise[A]: Async.Promise[F, A] = {
-      val promise = scala.concurrent.Promise[A]()
+    def promise[A]: Async.Promise[F, A] = {
       new korolev.Async.Promise[F, A] {
-        val async: F[A] = F.liftIO(IO.fromFuture(IO.pure(promise.future)))
-        override def complete(`try`: Try[A]): Unit = {
-          promise.complete(`try`)
-          ()
+
+        private var callback: Either[Throwable, A] => Unit = _
+
+        val async: F[A] = F.async { cb =>
+          callback = cb
+          this.notify()
         }
-        override def completeAsync(async: F[A]): Unit = {
-          promise.completeWith(async.toIO.unsafeToFuture())
-          ()
+
+        def complete(`try`: Try[A]): Unit = this.synchronized {
+          if (callback == null)
+            this.wait()
+          callback(`try`.toEither)
+        }
+
+        def completeAsync(async: F[A]): Unit = {
+          F.runAsync(async)(result => IO.pure(callback(result)))
+            .unsafeRunSync()
         }
       }
     }
