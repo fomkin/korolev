@@ -52,8 +52,10 @@ object implicits {
         private var callback: Either[Throwable, A] => Unit = _
 
         val async: F[A] = F.async { cb =>
-          callback = cb
-          this.notify()
+          this.synchronized {
+            callback = cb
+            this.notify()
+          }
         }
 
         def complete(`try`: Try[A]): Unit = this.synchronized {

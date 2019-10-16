@@ -56,7 +56,7 @@ abstract class Component
   /**
     * Component render
     */
-  def render(parameters: P, state: S): context.symbolDsl.Node
+  def render(parameters: P, state: S): context.Node
 }
 
 object Component {

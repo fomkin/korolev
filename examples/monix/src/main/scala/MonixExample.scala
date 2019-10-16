@@ -33,7 +33,9 @@ class ToDoList[F[_]: Async: Monad] {
   }
 
   import applicationContext._
-  import symbolDsl._
+
+  import levsha.dsl._
+  import html._
 
   // Handler to input
   private val inputId = elementId()
@@ -43,16 +45,16 @@ class ToDoList[F[_]: Async: Monad] {
     stateStorage = StateStorage.default(State()),
     router = Router.empty,
     render = { case state =>
-      'body(
-        'div("Super TODO tracker"),
-        'div('height @= 250, 'overflowY @= "scroll",
+      body(
+        div("Super TODO tracker"),
+        div(height @= "250px", overflow @= "scroll",
           (state.todos zipWithIndex) map {
             case (todo, i) =>
-              'div(
-                'input(
-                  'type /= "checkbox",
-                  if (state.edit.nonEmpty) 'disabled /= "" else void,
-                  if (todo.done) 'checked /= "" else void,
+              div(
+                input(
+                  `type` := "checkbox",
+                  if (state.edit.nonEmpty) disabled else void,
+                  if (todo.done) checked else void,
                   // Generate transition when clicking checkboxes
                   event("click") { access =>
                     access.transition { s =>
@@ -62,18 +64,18 @@ class ToDoList[F[_]: Async: Monad] {
                   }
                 ),
                 if (state.edit.contains(i)) {
-                  'form(
-                    'marginBottom @= -10,
-                    'display @= "inline-block",
-                    'input(
+                  form(
+                    marginBottom @= "-10px",
+                    display @= "inline-block",
+                    input(
                       editInputId,
-                      'display @= "inline-block",
-                      'type /= "text",
-                      'value := todo.text
+                      display @= "inline-block",
+                      `type` := "text",
+                      value := todo.text
                     ),
-                    'button('display @= "inline-block", "Save"),
+                    button(display @= "inline-block", "Save"),
                     event("submit") { access =>
-                      access.property(editInputId, 'value) flatMap { value =>
+                      access.valueOf(editInputId) flatMap { value =>
                         access.transition { s =>
                           val updatedTodo = s.todos(i).copy(text = value)
                           val updatedTodos = s.todos.updated(i, updatedTodo)
@@ -83,8 +85,8 @@ class ToDoList[F[_]: Async: Monad] {
                     }
                   )
                 } else {
-                  'span(
-                    if (todo.done) 'textDecoration @= "line-through" else void,
+                  span(
+                    if (todo.done) textDecoration @= "line-through" else void,
                     todo.text,
                     event("dblclick") { access =>
                       access.transition(_.copy(edit = Some(i)))
@@ -94,25 +96,25 @@ class ToDoList[F[_]: Async: Monad] {
               )
           }
         ),
-        'form(
-          // Generate AddTodo action when 'Add' button clicked
+        form(
+          // Generate AddTodo action when Add' button clicked
           event("submit") { access =>
             val prop = access.property(inputId)
-            prop.get('value) flatMap { value =>
-              prop.set('value, "") flatMap { _ =>
+            prop.get("value") flatMap { value =>
+              prop.set("value", "") flatMap { _ =>
                 val todo = State.Todo(value, done = false)
                 access.transition(s => s.copy(todos = s.todos :+ todo))
               }
             }
           },
-          'input(
-            if (state.edit.nonEmpty) 'disabled /= "" else void,
+          input(
+            if (state.edit.nonEmpty) disabled else void,
             inputId,
-            'type /= "text",
-            'placeholder /= "What should be done?"
+            `type` := "text",
+            placeholder := "What should be done?"
           ),
-          'button(
-            if (state.edit.nonEmpty) 'disabled /= "" else void,
+          button(
+            if (state.edit.nonEmpty) disabled else void,
             "Add todo"
           )
         )

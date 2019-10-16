@@ -15,7 +15,8 @@ object FileStreamingExample extends SimpleAkkaHttpKorolevApp {
   val globalContext = Context[Future, State, Any]
 
   import globalContext._
-  import symbolDsl._
+  import levsha.dsl._
+  import html._
 
   val fileInput = elementId()
 
@@ -55,21 +56,22 @@ object FileStreamingExample extends SimpleAkkaHttpKorolevApp {
       router = Router.empty,
       stateStorage = StateStorage.default(State(Map.empty, inProgress = false)),
       render = {
-        case State(progress, inProgress) =>
-          'body(
-            'input('type /= "file", 'multiple /= "multiple", fileInput),
-            'ul(
+        case State(progress, inProgress) => optimize {
+          body(
+            input(`type` := "file", multiple, fileInput),
+            ul(
               progress.map {
                 case (name, (loaded, total)) =>
-                  'li(s"$name: $loaded / $total")
+                  li(s"$name: $loaded / $total")
               }
             ),
-            'button(
+            button(
               "Upload",
-              if (inProgress) 'disabled /= "" else void,
+              when(inProgress)(disabled),
               event("click")(onUploadClick)
             )
           )
+        }
       }
     )
   }

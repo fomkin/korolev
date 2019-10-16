@@ -9,7 +9,7 @@ import scala.concurrent.Future
 object GameOfLife extends SimpleAkkaHttpKorolevApp {
 
   import Universe.globalContext._
-  import Universe.globalContext.symbolDsl._
+  import levsha.dsl._
 
   val universeSize = 20
   val cellRadius = 10
@@ -20,15 +20,52 @@ object GameOfLife extends SimpleAkkaHttpKorolevApp {
   val viewSideS = viewSide.toString
   val cellRadiusS = cellRadius.toString
 
+  def renderUniverse(universe: Universe): Node = {
+    import svg._
+
+    def pos(n: Int) = {
+      val p = cellRadius + n * (cellWidth + cellGap)
+      p.toString
+    }
+
+    def onClick(x: Int, y: Int)(access: Access) = {
+      access.transition(_.check(x, y))
+    }
+
+    def choseColor(x: Int, y: Int) = {
+      if (universe(x, y).alive) "#000000"
+      else "#EEEEEE"
+    }
+
+    optimize {
+      Svg(width := viewSideS, height := viewSideS,
+        for {
+          x <- 0 until universe.size
+          y <- 0 until universe.size
+        } yield {
+          circle(
+            cx   := pos(x),
+            cy   := pos(y),
+            r    := cellRadiusS,
+            fill := choseColor(x, y),
+            // Generate actions when clicking checkboxes
+            event("click")(onClick(x, y))
+          )
+        }
+      )
+    }
+  }
+
   val service = akkaHttpService {
     KorolevServiceConfig[Future, Universe, Any](
       stateStorage = StateStorage.default(Universe(universeSize)),
       router = Router.empty,
-      render = {
-        case universe =>
-          'body(
-            'div(
-              'button(
+      render = { case universe =>
+        import html._
+        optimize {
+          body(
+            div(
+              button(
                 event("click") { access =>
                   access.transition { case state =>
                     state.next
@@ -37,33 +74,9 @@ object GameOfLife extends SimpleAkkaHttpKorolevApp {
                 "Step"
               )
             ),
-            ns.svg('svg)('width /= viewSideS, 'height /= viewSideS,
-              for {
-                x <- 0 until universe.size
-                y <- 0 until universe.size
-              } yield {
-                def pos(n: Int) = {
-                  val p = cellRadius + n * (cellWidth + cellGap)
-                  p.toString
-                }
-                ns.svg('circle)(
-                  'cx   /= pos(x),
-                  'cy   /= pos(y),
-                  'r    /= cellRadiusS,
-                  'fill @= {
-                    if (universe(x, y).alive) "#000000"
-                    else "#EEEEEE"
-                  },
-                  // Generate actions when clicking checkboxes
-                  event("click") { access =>
-                    access.transition { case state =>
-                      state.check(x, y)
-                    }
-                  }
-                )
-              }
-            )
+            renderUniverse(universe)
           )
+        }
       }
     )
   }

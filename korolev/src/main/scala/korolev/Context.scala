@@ -57,6 +57,9 @@ object Context {
     type Access = Context.Access[F, AccessType, M]
     type UnscopedAccess = Context.Access[F, S, M]
     type EventResult = F[Unit]
+    type Document = levsha.Document[Effect]
+    type Node = levsha.Document.Node[Effect]
+    type Attr = levsha.Document.Attr[Effect]
 
     val symbolDsl = new KorolevTemplateDsl[F, S, M]()
 

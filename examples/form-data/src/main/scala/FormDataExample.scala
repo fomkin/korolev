@@ -8,13 +8,17 @@ import korolev.akkahttp._
 import korolev.server._
 import korolev.execution._
 import korolev.state.javaSerialization._
+import levsha.XmlNs
 
 import scala.concurrent.Future
 
 object FormDataExample extends SimpleAkkaHttpKorolevApp(AkkaHttpServerConfig(maxRequestBodySize = 20 * 1024 * 1024)) {
 
   import State.globalContext._
-  import State.globalContext.symbolDsl._
+  import levsha.dsl._
+  import html._
+
+  val role = AttrDef(XmlNs.html, "role")
 
   val myForm = elementId()
   val pictureFieldName = "picture"
@@ -25,46 +29,44 @@ object FormDataExample extends SimpleAkkaHttpKorolevApp(AkkaHttpServerConfig(max
       router = Router.empty,
       head = {
         Seq(
-          'link(
-            'rel /="stylesheet",
-            'href /="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-alpha.6/css/bootstrap.min.css",
-            'integrity /= "sha384-rwoIResjU2yc3z8GV/NPeZWAv56rSmLldC3R/AZzGRnGxQQKnKkoFVhFQhNUwEyJ",
-            'crossorigin /= "anonymous"
+          link(
+            rel :="stylesheet",
+            href :="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-alpha.6/css/bootstrap.min.css",
+            integrity := "sha384-rwoIResjU2yc3z8GV/NPeZWAv56rSmLldC3R/AZzGRnGxQQKnKkoFVhFQhNUwEyJ",
+            crossorigin := "anonymous"
           ),
-          'style("""
-          body { margin: 2em }
-         """),
-          'script(
-            'src /= "https://code.jquery.com/jquery-3.1.1.slim.min.js",
-            'integrity /= "sha384-A7FZj7v+d/sdmMqp/nOQwliLvUsJfDHW+k9Omg/a/EheAdgtzNs3hpfag6Ed950n",
-            'crossorigin /= "anonymous"
+          style("body { margin: 2em }"),
+          script(
+            src := "https://code.jquery.com/jquery-3.1.1.slim.min.js",
+            integrity := "sha384-A7FZj7v+d/sdmMqp/nOQwliLvUsJfDHW+k9Omg/a/EheAdgtzNs3hpfag6Ed950n",
+            crossorigin := "anonymous"
           ),
-          'script(
-            'src /= "https://cdnjs.cloudflare.com/ajax/libs/tether/1.4.0/js/tether.min.js",
-            'integrity /= "sha384-DztdAPBWPRXSA/3eYEEUWrWCy7G5KFbe8fFjk5JAIxUYHKkDx6Qin1DkWx51bBrb",
-            'crossorigin /= "anonymous"
+          script(
+            src := "https://cdnjs.cloudflare.com/ajax/libs/tether/1.4.0/js/tether.min.js",
+            integrity := "sha384-DztdAPBWPRXSA/3eYEEUWrWCy7G5KFbe8fFjk5JAIxUYHKkDx6Qin1DkWx51bBrb",
+            crossorigin := "anonymous"
           ),
-          'script(
-            'src /= "https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-alpha.6/js/bootstrap.min.js",
-            'integrity /= "sha384-vBWWzlZJ8ea9aCX4pEW3rVHjgjt7zpkNpZk+02D9phzyeVkE+jo0ieGizqPLForn",
-            'crossorigin /= "anonymous"
+          script(
+            src := "https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-alpha.6/js/bootstrap.min.js",
+            integrity := "sha384-vBWWzlZJ8ea9aCX4pEW3rVHjgjt7zpkNpZk+02D9phzyeVkE+jo0ieGizqPLForn",
+            crossorigin := "anonymous"
           )
         )
       },
       render = {
         case Initial =>
-          'body (
-            'form ('class /= "card",
+          body (
+            form (`class` := "card",
               myForm,
-              'div (
-                'class /= "card-block",
-                'legend ("FormData Example"),
-                'p (
-                  'label ("Picture"),
-                  'input ('type /= "file", 'name /= pictureFieldName)
+              div (
+                `class` := "card-block",
+                legend ("FormData Example"),
+                p (
+                  label ("Picture"),
+                  input (`type` := "file", name := pictureFieldName)
                 ),
-                'p (
-                  'button ("Submit")
+                p (
+                  button ("Submit")
                 )
               ),
               event("submit") { access =>
@@ -98,25 +100,25 @@ object FormDataExample extends SimpleAkkaHttpKorolevApp(AkkaHttpServerConfig(max
             )
           )
         case InProgress(loaded, total) =>
-          'body (
-            'div ('class /= "card",
-              'div ('class /= "card-block",
-                'div ('class /= "progress",
-                  'div (
-                    'class /= "progress-bar progress-bar-striped progress-bar-animated",
-                    'role /= "progress-bar",
-                    'width @= s"${(loaded.toDouble / total) * 100}%"
+          body (
+            div (`class` := "card",
+              div (`class` := "card-block",
+                div (`class` := "progress",
+                  div (
+                    `class` := "progress-bar progress-bar-striped progress-bar-animated",
+                    role := "progress-bar",
+                    width @= s"${(loaded.toDouble / total) * 100}%"
                   )
                 )
               )
             )
           )
-        case Complete(picture, mimeType, width, height) =>
-          'body (
-            'div (
-              'backgroundImage @= s"url('data:$mimeType;base64,$picture')",
-              'width @= width,
-              'height @= height
+        case Complete(picture, mimeType, w, h) =>
+          body (
+            div (
+              backgroundImage @= s"url(data:$mimeType;base64,$picture')",
+              width @= s"${w}px",
+              height @= s"${h}px"
             )
           )
       },

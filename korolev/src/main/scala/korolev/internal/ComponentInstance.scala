@@ -241,6 +241,7 @@ final class ComponentInstance
       def openNode(xmlNs: XmlNs, name: String): Unit = rc.openNode(xmlNs, name)
       def closeNode(name: String): Unit = rc.closeNode(name)
       def setAttr(xmlNs: XmlNs, name: String, value: String): Unit = rc.setAttr(xmlNs, name, value)
+      def setStyle(name: String, value: String): Unit = rc.setStyle(name, value)
       def addTextNode(text: String): Unit = rc.addTextNode(text)
       def addMisc(misc: Effect[F, CS, E]): Unit = {
         misc match {
