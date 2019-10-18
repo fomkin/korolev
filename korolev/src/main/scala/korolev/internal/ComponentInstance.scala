@@ -105,11 +105,17 @@ final class ComponentInstance
     def property(elementId: ElementId[F]): PropertyHandler[F] = {
       val idF = getId(elementId)
       new PropertyHandler[F] {
-        def get(propName: Symbol): F[String] = idF.flatMap { id =>
-          frontend.extractProperty(id, propName.name)
+        def get(propName: Symbol): F[String] =
+          get(propName.name)
+
+        def set(propName: Symbol, value: Any): F[Unit] =
+          set(propName.name, value)
+
+        def get(propName: String): F[String] = idF.flatMap { id =>
+          frontend.extractProperty(id, propName)
         }
 
-        def set(propName: Symbol, value: Any): F[Unit] = idF.flatMap { id =>
+        def set(propName: String, value: Any): F[Unit] = idF.flatMap { id =>
           // XmlNs argument is empty cause it will be ignored
           async.delay(frontend.setProperty(id, propName, value))
         }
@@ -235,12 +241,13 @@ final class ComponentInstance
       def openNode(xmlNs: XmlNs, name: String): Unit = rc.openNode(xmlNs, name)
       def closeNode(name: String): Unit = rc.closeNode(name)
       def setAttr(xmlNs: XmlNs, name: String, value: String): Unit = rc.setAttr(xmlNs, name, value)
+      def setStyle(name: String, value: String): Unit = rc.setStyle(name, value)
       def addTextNode(text: String): Unit = rc.addTextNode(text)
       def addMisc(misc: Effect[F, CS, E]): Unit = {
         misc match {
           case event @ Event(eventType, phase, _) =>
             val id = rc.currentContainerId
-            events.put(EventId(id, eventType.name, phase), event)
+            events.put(EventId(id, eventType, phase), event)
             eventRegistry.registerEventType(event.`type`)
           case element: ElementId[F] =>
             val id = rc.currentContainerId

@@ -11,7 +11,8 @@ object FocusExample extends SimpleAkkaHttpKorolevApp {
   val globalContext = Context[Future, Boolean, Any]
 
   import globalContext._
-  import symbolDsl._
+  import levsha.dsl._
+  import html._
 
   // Handler to input
   val inputId = elementId()
@@ -21,25 +22,26 @@ object FocusExample extends SimpleAkkaHttpKorolevApp {
       stateStorage = StateStorage.default(false),
       router = Router.empty,
       render = {
-        case _ =>
-          'body(
-            'div("Focus example"),
-            'div(
-              'input(
+        case _ => optimize {
+          body(
+            div("Focus example"),
+            div(
+              input(
                 inputId,
-                'type /= "text",
-                'placeholder /= "Wanna get some focus?"
+                `type` := "text",
+                placeholder := "Wanna get some focus?"
               )
             ),
-            'div(
-              'button(
-                event('click) { access =>
+            div(
+              button(
+                event("click") { access =>
                   access.focus(inputId)
                 },
                 "Click to focus"
               )
             )
           )
+        }
       }
     )
   }

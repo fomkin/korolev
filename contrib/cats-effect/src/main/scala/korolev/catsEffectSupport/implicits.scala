@@ -16,79 +16,74 @@
 
 package korolev.catsEffectSupport
 
-import cats.effect.IO
+import cats.Traverse
 import korolev.Async
+import cats.effect._
+import cats.instances.list._
 
-import scala.collection.generic.CanBuildFrom
-import scala.util.{Failure, Success, Try}
-import cats.syntax.applicative._
-import cats.syntax.functor._
-import cats.syntax.flatMap._
-import cats.syntax.applicativeError._
-import cats.effect.syntax.effect._
-
-import scala.collection.{TraversableOnce, mutable}
+import scala.util.Try
 
 object implicits {
-  implicit def korolevAsyncFromEffect[F[_]](implicit F: cats.effect.Effect[F]): Async[F] = new Async[F] {
-    override def pure[A](value: A): F[A] =
-      value.pure
 
-    override def delay[A](value: => A): F[A] =
-      F.delay(value)
+  implicit def korolevAsyncFromEffect[F[_]: Effect]: Async[F] = new Async[F] {
 
-    override def fork[A](value: => A): F[A] =
-      F.delay(value)
+    def pure[A](value: A): F[A] =
+      Effect[F].pure(value)
 
-    override def unit: F[Unit] =
-      F.unit
+    def delay[A](value: => A): F[A] =
+      Effect[F].delay(value)
 
-    override def fromTry[A](value: => Try[A]): F[A] =
-      F.fromTry(value)
+    def fork[A](value: => A): F[A] =
+      Effect[F].delay(value)
 
-    override def promise[A]: Async.Promise[F, A] = {
-      val promise = scala.concurrent.Promise[A]()
+    def unit: F[Unit] =
+      Effect[F].unit
+
+    def fromTry[A](value: => Try[A]): F[A] =
+      Effect[F].fromTry(value)
+
+    def promise[A]: Async.Promise[F, A] = {
       new korolev.Async.Promise[F, A] {
-        val async: F[A] = F.liftIO(IO.fromFuture(IO.pure(promise.future)))
-        override def complete(`try`: Try[A]): Unit = {
-          promise.complete(`try`)
-          ()
+
+        private var callback: Either[Throwable, A] => Unit = _
+
+        val async: F[A] = Effect[F].async { cb =>
+          this.synchronized {
+            callback = cb
+            this.notify()
+          }
         }
-        override def completeAsync(async: F[A]): Unit = {
-          promise.completeWith(async.toIO.unsafeToFuture())
-          ()
+
+        def complete(`try`: Try[A]): Unit = this.synchronized {
+          if (callback == null)
+            this.wait()
+          callback(`try`.toEither)
+        }
+
+        def completeAsync(async: F[A]): Unit = {
+          Effect[F].runAsync(async)(result => IO.pure(callback(result)))
+            .unsafeRunSync()
         }
       }
     }
 
-    override def flatMap[A, B](m: F[A])(f: A => F[B]): F[B] =
-      m.flatMap(f)
+    def flatMap[A, B](m: F[A])(f: A => F[B]): F[B] =
+      Effect[F].flatMap(m)(f)
 
-    override def map[A, B](m: F[A])(f: A => B): F[B] = m.map(f)
+    def map[A, B](m: F[A])(f: A => B): F[B] =
+      Effect[F].map(m)(f)
 
-    override def recover[A, U >: A](m: F[A])(f: PartialFunction[Throwable, U]): F[U] =
-      m.map[U](identity).recover(f)
+    def recover[A](m: F[A])(f: PartialFunction[Throwable, A]): F[A] =
+      Effect[F].recover(m)(f)
 
-    override def sequence[A, M[X] <: TraversableOnce[X]](in: M[F[A]])
-                                                        (implicit cbf: CanBuildFrom[M[F[A]], A, M[A]]): F[M[A]] = {
-      def loop(cursor: Iterator[F[A]], acc: mutable.Builder[A, M[A]]): F[M[A]] = {
-        if (cursor.hasNext) {
-          val next = cursor.next()
-          next.flatMap { a => loop(cursor, acc += a) }
-        } else acc.result().pure
-      }
-      F.defer {
-        val cursor: Iterator[F[A]] = in.toIterator
-        loop(cursor, cbf(in))
-      }
+    def sequence[A](in: List[F[A]]): F[List[A]] =
+      Traverse[List].sequence(in)
+
+    def run[A, U](m: F[A])(callback: Try[A] => U): Unit = {
+      // FIXME async is always sync, because no context shift by default
+      Effect[F]
+        .runAsync(m)(result => IO { callback(result.toTry); () })
+        .unsafeRunSync()
     }
-
-    override def run[A, U](m: F[A])(f: Try[A] => U): Unit =
-      m.runAsync { r =>
-        IO {
-          f(r.fold(Failure(_), Success(_))) // for scala 2.11
-          ()
-        }
-      }.unsafeRunSync()
   }
 }

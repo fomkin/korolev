@@ -57,6 +57,9 @@ object Context {
     type Access = Context.Access[F, AccessType, M]
     type UnscopedAccess = Context.Access[F, S, M]
     type EventResult = F[Unit]
+    type Document = levsha.Document[Effect]
+    type Node = levsha.Document.Node[Effect]
+    type Attr = levsha.Document.Attr[Effect]
 
     val symbolDsl = new KorolevTemplateDsl[F, S, M]()
 
@@ -107,13 +110,41 @@ object Context {
       Delay(duration, accessScope.andThen(effect))
     }
 
-    def eventUnscoped(name: Symbol, phase: EventPhase = Bubbling)(
+    @deprecated("""Use "eventName" instead of 'eventName""", "0.13.0")
+    def eventUnscoped(name: Symbol)(
       effect: UnscopedAccess => F[Unit]): Event =
-      Event(name, phase, effect)
+      Event(name.name, Bubbling, effect)
 
-    def event(name: Symbol, phase: EventPhase = Bubbling)(
+    @deprecated("""Use "eventName" instead of 'eventName""", "0.13.0")
+    def event(name: Symbol)(
+      effect: Access => F[Unit]): Event =
+      Event(name.name, Bubbling, accessScope.andThen(effect))
+
+    @deprecated("""Use "eventName" instead of 'eventName""", "0.13.0")
+    def eventUnscoped(name: Symbol, phase: EventPhase)(
+      effect: UnscopedAccess => F[Unit]): Event =
+      Event(name.name, phase, effect)
+
+    @deprecated("""Use "eventName" instead of 'eventName""", "0.13.0")
+    def event(name: Symbol, phase: EventPhase)(
+      effect: Access => F[Unit]): Event =
+      Event(name.name, phase, accessScope.andThen(effect))
+
+    def event(name: String)(
+      effect: Access => F[Unit]): Event =
+      Event(name, Bubbling, accessScope.andThen(effect))
+
+    def eventUnscoped(name: String)(
+      effect: UnscopedAccess => F[Unit]): Event =
+      Event(name, Bubbling, effect)
+
+    def event(name: String, phase: EventPhase)(
       effect: Access => F[Unit]): Event =
       Event(name, phase, accessScope.andThen(effect))
+
+    def eventUnscoped(name: String, phase: EventPhase)(
+      effect: UnscopedAccess => F[Unit]): Event =
+      Event(name, phase, effect)
 
     val emptyTransition: PartialFunction[S, S] = { case x => x }
 
@@ -150,16 +181,23 @@ object Context {
     def property(id: ElementId[F]): PropertyHandler[F]
 
     /**
-      * Shortcut for `property(id).get(proName)`.
+      * Shortcut for `property(id).get(propName)`.
       * @since 0.6.0
       */
+    @deprecated("""Use "propertyName" instead of 'propertyName""", "0.13.0")
     final def property(id: ElementId[F], propName: Symbol): F[String] = property(id).get(propName)
+
+    /**
+      * Shortcut for `property(id).get(propName)`.
+      * @since 0.13.0
+      */
+    final def property(id: ElementId[F], propName: String): F[String] = property(id).get(propName)
 
     /**
       * Shortcut for `property(id).get('value)`.
       * @since 0.6.0
       */
-    final def valueOf(id: ElementId[F]): F[String] = property(id, 'value)
+    final def valueOf(id: ElementId[F]): F[String] = property(id, "value")
 
     /**
       * Makes focus on the element
@@ -256,8 +294,12 @@ object Context {
   sealed abstract class Effect[F[_]: Async, +S, +M]
 
   abstract class PropertyHandler[F[_]: Async] {
+    @deprecated("""Use "propertyName" instead of 'propertyName""", "0.13.0")
     def get(propName: Symbol): F[String]
+    @deprecated("""Use "propertyName" instead of 'propertyName""", "0.13.0")
     def set(propName: Symbol, value: Any): F[Unit]
+    def get(propName: String): F[String]
+    def set(propName: String, value: Any): F[Unit]
   }
 
   final case class File[A](name: String, data: A)
@@ -301,7 +343,7 @@ object Context {
   }
 
   final case class Event[F[_]: Async, S, M](
-      `type`: Symbol,
+      `type`: String,
       phase: EventPhase,
       effect: Access[F, S, M] => F[Unit]) extends Effect[F, S, M]
 

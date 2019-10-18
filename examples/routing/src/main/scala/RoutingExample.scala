@@ -9,7 +9,9 @@ import scala.concurrent.Future
 object RoutingExample extends SimpleAkkaHttpKorolevApp {
 
   import State.globalContext._
-  import symbolDsl._
+
+  import levsha.dsl._
+  import html._
 
   val storage = StateStorage.default[Future, State](State())
   val inputId = elementId()
@@ -19,42 +21,43 @@ object RoutingExample extends SimpleAkkaHttpKorolevApp {
       stateStorage = storage,
       head = {
         Seq(
-          'title("Main Routing Page"),
-          'link(
-            'href /= "/static/main.css",
-            'rel /= "stylesheet",
-            'type /= "text/css"
+          title("Main Routing Page"),
+          link(
+            href := "/static/main.css",
+            rel := "stylesheet",
+            `type` := "text/css"
           )
         )
       },
       render = {
-        case state =>
-          'body (
-            'div ("Super TODO tracker"),
-            'div (
+        case state => optimize {
+          body(
+            div("Super TODO tracker"),
+            div(
               state.todos.keys map { name =>
-                'a(
-                  event('click) { access =>
+                a(
+                  event("click") { access =>
                     access.transition(_.copy(selectedTab = name))
                   },
-                  'href /= "/" + name.toLowerCase, disableHref,
-                  'marginLeft @= 10,
-                  if (name == state.selectedTab) 'strong (name)
+                  href := "/" + name.toLowerCase,
+                  preventDefaultClickBehavior,
+                  marginLeft @= "10px",
+                  if (name == state.selectedTab) strong(name)
                   else name
                 )
               }
             ),
-            'div ('class /= "todos",
+            div(clazz := "todos",
               (state.todos(state.selectedTab) zipWithIndex) map {
                 case (todo, i) =>
-                  'div(
-                    'div(
-                      'class /= {
+                  div(
+                    div(
+                      clazz := {
                         if (!todo.done) "checkbox"
                         else "checkbox checkbox__checked"
                       },
                       // Generate transition when clicking checkboxes
-                      event('click) { access =>
+                      event("click") { access =>
                         access.transition { s =>
                           val todos = s.todos(s.selectedTab)
                           val updated = todos.updated(i, todos(i).copy(done = !todo.done))
@@ -62,29 +65,30 @@ object RoutingExample extends SimpleAkkaHttpKorolevApp {
                         }
                       }
                     ),
-                    if (!todo.done) 'span(todo.text)
-                    else 'strike(todo.text)
+                    if (!todo.done) span(todo.text)
+                    else span(textDecoration @= "line-through", todo.text)
                   )
               }
             ),
-            'form (
+            form(
               // Generate AddTodo action when 'Add' button clicked
-              event('submit) { access =>
-                access.property(inputId, 'value) flatMap { value =>
+              event("submit") { access =>
+                access.valueOf(inputId) flatMap { value =>
                   val todo = State.Todo(value, done = false)
                   access.transition { s =>
                     s.copy(todos = s.todos + (s.selectedTab -> (s.todos(s.selectedTab) :+ todo)))
                   }
                 }
               },
-              'input (
+              input(
                 inputId,
-                'type /= "text",
-                'placeholder /= "What should be done?"
+                `type` := "text",
+                placeholder := "What should be done?"
               ),
-              'button ("Add todo")
+              button("Add todo")
             )
           )
+        }
       },
       router = Router(
         fromState = {

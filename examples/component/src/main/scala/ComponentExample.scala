@@ -10,7 +10,9 @@ import scala.util.Random
 object ComponentExample extends SimpleAkkaHttpKorolevApp {
 
   import State.globalContext._
-  import symbolDsl._
+
+  import levsha.dsl._
+  import html._
 
   type Rgb = (Int, Int, Int)
   val Black = (0, 0, 0)
@@ -22,21 +24,21 @@ object ComponentExample extends SimpleAkkaHttpKorolevApp {
   val ComponentAsFunction = Component[Future, Rgb, String, Unit](Black) { (context, label, state) =>
 
     import context._
-    import symbolDsl._
 
     val (r, g, b) = state
-
-    'div(
-      'borderWidth @= 2,
-      'borderStyle @= "solid",
-      'borderColor @= s"rgb($r, $g, $b)",
-      label,
-      event('click) { access =>
-        access.transition(_ => randomRgb()) flatMap { _ =>
-          access.publish(())
+    optimize {
+      div(
+        borderWidth @= "2px",
+        borderStyle @= "solid",
+        borderColor @= s"rgb($r, $g, $b)",
+        label,
+        event("click") { access =>
+          access.transition(_ => randomRgb()) flatMap { _ =>
+            access.publish(())
+          }
         }
-      }
-    )
+      )
+    }
   }
 
   // Declare component as an object syntax
@@ -47,12 +49,12 @@ object ComponentExample extends SimpleAkkaHttpKorolevApp {
 
     def render(label: String, state: (Int, Int, Int)): Node = {
       val (r, g, b) = state
-      'div(
-        'borderWidth @= 2,
-        'borderStyle @= "solid",
-        'borderColor @= s"rgb($r, $g, $b)",
+      div(
+        borderWidth @= "2px",
+        borderStyle @= "solid",
+        borderColor @= s"rgb($r, $g, $b)",
         label,
-        event('click) { access =>
+        event("click") { access =>
           access.publish(()).flatMap { _ =>
             access.transition {
               case _ => randomRgb()
@@ -69,7 +71,7 @@ object ComponentExample extends SimpleAkkaHttpKorolevApp {
       stateStorage = StateStorage.default("a"),
       render = {
         case state =>
-          'body(
+          body(
             s"State is $state",
             ComponentAsObject("Click me, i'm function") { (access, _) =>
               access.transition(_ + Random.nextPrintableChar())
@@ -77,9 +79,9 @@ object ComponentExample extends SimpleAkkaHttpKorolevApp {
             ComponentAsFunction("Click me, i'm object") { (access, _) =>
               access.transition(_ + Random.nextPrintableChar())
             },
-            'button(
+            button(
               "Click me too",
-              event('click) { access =>
+              event("click") { access =>
                 access.transition(_ + Random.nextPrintableChar())
               }
             )

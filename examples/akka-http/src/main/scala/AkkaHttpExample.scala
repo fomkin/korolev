@@ -17,18 +17,21 @@ object AkkaHttpExample extends App {
   val applicationContext = Context[Future, Boolean, Any]
 
   import applicationContext._
-  import symbolDsl._
+  import levsha.dsl._
+  import html.{body, button}
 
   private val config = KorolevServiceConfig[Future, Boolean, Any](
     stateStorage = StateStorage.default(false),
     router = Router.empty,
     render = { case s =>
-      'body(
-        s"Hello akka-http: $s",
-        'button("Click me!",
-          event('click)(_.transition(!_))
+      optimize {
+        body(
+          s"Hello akka-http: $s",
+          button("Click me!",
+            event("click")(_.transition(!_))
+          )
         )
-      )
+      }
     }
   )
 

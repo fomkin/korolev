@@ -10,8 +10,7 @@ import org.slf4j.LoggerFactory
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
-import pushka.json._
-import pushka.Ast
+import io.circe._, io.circe.generic.auto._, io.circe.parser._, io.circe.syntax._
 
 object GuineaPigService {
 
@@ -27,6 +26,8 @@ object GuineaPigService {
     eventFromComponentReceived: Boolean = false,
     key: Option[String] = None
   )
+
+  case class EventData(key: String)
 
   object State {
     val globalContext = Context[Future, State, Any]
@@ -53,7 +54,7 @@ object GuineaPigService {
     'span(
       'id /= "the-component",
       s"$label $state",
-      event('click) { access =>
+      event("click") { access =>
         val future =
           if (state == 5) access.publish(())
           else Future.successful(())
@@ -85,7 +86,7 @@ object GuineaPigService {
             state.todos.keys map { name =>
               'span(
                 'id /= name,
-                event('click) { access =>
+                event("click") { access =>
                   access.transition { case s =>
                     s.copy(selectedTab = name)
                   }
@@ -112,7 +113,7 @@ object GuineaPigService {
                       else "todo_checkbox todo_checkbox__checked"
                     },
                     // Generate transition when clicking checkboxes
-                    event('click) { access =>
+                    event("click") { access =>
                       access.transition { case s =>
                         val todos = s.todos(s.selectedTab)
                         val updated = todos.updated(i, todos(i).copy(done = !todo.done))
@@ -126,7 +127,7 @@ object GuineaPigService {
           ),
           'form(
             // Generate AddTodo action when 'Add' button clicked
-            event('submit) { access =>
+            event("submit") { access =>
               logger.info("Submit clicked")
               val property = access.property(inputId)
               property.get('value) flatMap { value =>
@@ -144,14 +145,15 @@ object GuineaPigService {
               'id /= "todo-input",
               'type /= "text",
               'placeholder /= "What should be done?",
-              event('keydown) { access =>
+              event("keydown") { access =>
                 access.eventData.flatMap { jsonString =>
-                  val data = read[Map[String, Ast]](jsonString)
-                  data.get("key")
-                    .collect { case Ast.Str(s) => s }
-                    .fold(Future.successful(())) { key =>
+                  decode[EventData](jsonString) match {
+                    case Right(EventData(key)) =>
                       access.transition(_.copy(key = Some(key)))
-                    }
+                    case Left(error) =>
+                      println(error)
+                      Future.unit
+                  }
                 }
               }
             ),
@@ -170,7 +172,7 @@ object GuineaPigService {
               'id /= "upload-form",
               'input('type /= "file", 'name /= "upload-input"),
               'button('id /= "upload-button", "Submit"),
-              event('submit) { access =>
+              event("submit") { access =>
                 access
                   .downloadFormData(uploadFormId)
                   .start()
@@ -192,7 +194,7 @@ object GuineaPigService {
                 }
               }
             } else {
-              event('click) { access =>
+              event("click") { access =>
                 access.transition {
                   case s => s.copy(delayOn = true)
                 }

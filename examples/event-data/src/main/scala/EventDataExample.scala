@@ -11,25 +11,27 @@ object EventDataExample extends SimpleAkkaHttpKorolevApp {
   val globalContext = Context[Future, String, Any]
 
   import globalContext._
-  import symbolDsl._
+  import levsha.dsl._
+  import html._
 
   val service = akkaHttpService {
     KorolevServiceConfig [Future, String, Any] (
       router = Router.empty,
       stateStorage = StateStorage.default("nothing"),
       render = {
-        case json =>
-          'body(
-            'input(
-              'type /= "text",
-              event('keydown) { access =>
+        case json => optimize {
+          body(
+            input(
+              `type` := "text",
+              event("keydown") { access =>
                 access.eventData.flatMap { eventData =>
                   access.transition(_ => eventData)
                 }
               }
             ),
-            'pre(json)
+            pre(json)
           )
+        }
       }
     )
   }

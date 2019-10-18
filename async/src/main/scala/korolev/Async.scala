@@ -17,7 +17,6 @@
 package korolev
 
 import scala.annotation.implicitNotFound
-import scala.collection.generic.CanBuildFrom
 import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
@@ -32,9 +31,9 @@ trait Async[F[_]] {
   def promise[A]: Async.Promise[F, A]
   def flatMap[A, B](m: F[A])(f: A => F[B]): F[B]
   def map[A, B](m: F[A])(f: A => B): F[B]
-  def recover[A, U >: A](m: F[A])(f: PartialFunction[Throwable, U]): F[U]
-  def sequence[A, M[X] <: TraversableOnce[X]](in: M[F[A]])(implicit cbf: CanBuildFrom[M[F[A]], A, M[A]]): F[M[A]]
-  def run[A, U](m: F[A])(f: Try[A] => U): Unit
+  def recover[A](m: F[A])(f: PartialFunction[Throwable, A]): F[A]
+  def sequence[A](in: List[F[A]]): F[List[A]]
+  def run[A, U](m: F[A])(callback: Try[A] => U): Unit
 }
 
 object Async {
@@ -59,8 +58,8 @@ object Async {
     def flatMap[A, B](m: Future[A])(f: A => Future[B]): Future[B] = m.flatMap(f)
     def map[A, B](m: Future[A])(f: A => B): Future[B] = m.map(f)
     def run[A, U](m: Future[A])(f: Try[A] => U): Unit = m.onComplete(f)
-    def recover[A, U >: A](m: Future[A])(f: PartialFunction[Throwable, U]): Future[U] = m.recover(f)
-    def sequence[A, M[X] <: TraversableOnce[X]](in: M[Future[A]])(implicit cbf: CanBuildFrom[M[Future[A]], A, M[A]]): Future[M[A]] =
+    def recover[A](m: Future[A])(f: PartialFunction[Throwable, A]): Future[A] = m.recover(f)
+    def sequence[A](in: List[Future[A]]): Future[List[A]] =
       Future.sequence(in)
     def promise[A]: Promise[Future, A] = {
       val promise = scala.concurrent.Promise[A]()
@@ -89,10 +88,10 @@ object Async {
     }
   }
 
-  implicit final class AsyncOps[F[_]: Async, +A](async: => F[A]) {
+  implicit final class AsyncOps[F[_]: Async, A](async: => F[A]) {
     def map[B](f: A => B): F[B] = Async[F].map(async)(f)
     def flatMap[B](f: A => F[B]): F[B] = Async[F].flatMap(async)(f)
-    def recover[U >: A](f: PartialFunction[Throwable, U]): F[U] = Async[F].recover[A, U](async)(f)
+    def recover(f: PartialFunction[Throwable, A]): F[A] = Async[F].recover[A](async)(f)
     def run[U](f: Try[A] => U): Unit = Async[F].run(async)(f)
     def runOrReport[U](f: A => U)(implicit er: Reporter): Unit =
       Async[F].run(async) {

@@ -49,9 +49,6 @@ final class ClientSideApi[F[_]: Async](connection: Connection[F], reporter: Repo
   private def isProperty(name: String) =
     name.charAt(0) == '^'
 
-  private def isStyle(name: String) =
-    name.charAt(0) == '*'
-
   private def escapeName(name: String, truncate: Boolean) =
     if (truncate) name.substring(1)
     else name
@@ -88,9 +85,9 @@ final class ClientSideApi[F[_]: Async](connection: Connection[F], reporter: Repo
     promise.async
   }
 
-  def setProperty(id: Id, name: Symbol, value: Any): Unit = {
+  def setProperty(id: Id, name: String, value: Any): Unit = {
     // TODO setProperty should be dedicated
-    connection.send(Procedure.ModifyDom.code, ModifyDomProcedure.SetAttr.code, id.mkString, 0, name.name, value, true)
+    connection.send(Procedure.ModifyDom.code, ModifyDomProcedure.SetAttr.code, id.mkString, 0, name, value, true)
   }
 
   def evalJs(code: String): F[String] = {
@@ -126,7 +123,7 @@ final class ClientSideApi[F[_]: Async](connection: Connection[F], reporter: Repo
   }
 
   def flushDomChanges(): Unit = {
-    connection.send(domChangesBuffer: _*)
+    connection.send(domChangesBuffer.toSeq: _*)
     domChangesBuffer.clear()
   }
 
@@ -144,32 +141,31 @@ final class ClientSideApi[F[_]: Async](connection: Connection[F], reporter: Repo
     domChangesBuffer.append(ModifyDomProcedure.Create.code, parent, id.mkString, pXmlns, tag)
   }
 
+
+  def removeStyle(id: Id, name: String): Unit = {
+    domChangesBuffer.append(ModifyDomProcedure.RemoveStyle.code, id.mkString, name)
+  }
+
+  def setStyle(id: Id, name: String, value: String): Unit = {
+    domChangesBuffer.append(ModifyDomProcedure.SetStyle.code, id.mkString, name, value)
+  }
+
   def setAttr(id: Id, xmlNs: String, name: String, value: String): Unit = {
-    if (isStyle(name)) {
-      val n = escapeName(name, truncate = true)
-      domChangesBuffer.append(ModifyDomProcedure.SetStyle.code, id.mkString, n, value)
-    } else {
-      val p = isProperty(name)
-      val n = escapeName(name, p)
-      val pXmlns =
-        if (xmlNs eq levsha.XmlNs.html.uri) 0
-        else xmlNs
-      domChangesBuffer.append(ModifyDomProcedure.SetAttr.code, id.mkString, pXmlns, n, value, p)
-    }
+    val p = isProperty(name)
+    val n = escapeName(name, p)
+    val pXmlns =
+      if (xmlNs eq levsha.XmlNs.html.uri) 0
+      else xmlNs
+    domChangesBuffer.append(ModifyDomProcedure.SetAttr.code, id.mkString, pXmlns, n, value, p)
   }
 
   def removeAttr(id: Id, xmlNs: String, name: String): Unit = {
-    if (isStyle(name)) {
-      val n = escapeName(name, truncate = true)
-      domChangesBuffer.append(ModifyDomProcedure.RemoveStyle.code, id.mkString, n)
-    } else {
-      val p = isProperty(name)
-      val n = escapeName(name, p)
-      val pXmlns =
-        if (xmlNs eq levsha.XmlNs.html.uri) 0
-        else xmlNs
-      domChangesBuffer.append(ModifyDomProcedure.RemoveAttr.code, id.mkString, pXmlns, n, p)
-    }
+    val p = isProperty(name)
+    val n = escapeName(name, p)
+    val pXmlns =
+      if (xmlNs eq levsha.XmlNs.html.uri) 0
+      else xmlNs
+    domChangesBuffer.append(ModifyDomProcedure.RemoveAttr.code, id.mkString, pXmlns, n, p)
   }
 
   private def unescapeJsonString(s: String): String = {

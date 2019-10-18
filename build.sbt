@@ -1,11 +1,11 @@
 import xerial.sbt.Sonatype._
 
-val levshaVersion = "0.7.2"
+val levshaVersion = "0.9.0"
 
 val unusedRepo = Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
 
 val crossVersionSettings = Seq(
-  crossScalaVersions := Seq("2.11.12", "2.12.8")
+  crossScalaVersions := Seq("2.12.10", "2.13.1")
 )
 
 val dontPublishSettings = Seq(
@@ -30,21 +30,17 @@ val commonSettings = publishSettings ++ Seq(
   git.useGitDescribe := true,
   organization := "com.github.fomkin",
   libraryDependencies ++= Seq(
-    "org.scalatest" %% "scalatest" % "3.0.5" % Test
+    "org.scalatest" %% "scalatest" % "3.0.8" % Test
   ),
   scalacOptions ++= Seq(
     "-deprecation",
     "-feature",
-    "-Xfatal-warnings",
     "-language:postfixOps",
     "-language:implicitConversions",
     "-language:higherKinds",
     "-Xlint",
-    "-Yno-adapted-args",
     "-Ywarn-numeric-widen",
-    "-Ywarn-value-discard",
-    "-Xfuture",
-    "-Ywarn-unused-import"
+    "-Ywarn-value-discard"
   )
 )
 
@@ -66,9 +62,9 @@ lazy val `server-akkahttp` = (project in file("server") / "akkahttp").
   settings(
     normalizedName := "korolev-server-akkahttp",
     libraryDependencies ++= Seq(
-      "com.typesafe.akka" %% "akka-actor" % "2.5.23",
-      "com.typesafe.akka" %% "akka-stream" % "2.5.23",
-      "com.typesafe.akka" %% "akka-http" % "10.1.8"
+      "com.typesafe.akka" %% "akka-actor" % "2.5.25",
+      "com.typesafe.akka" %% "akka-stream" % "2.5.25",
+      "com.typesafe.akka" %% "akka-http" % "10.1.10"
     )
   ).
   dependsOn(server)
@@ -120,7 +116,7 @@ lazy val `cats-effect-support` = project.
   settings(commonSettings: _*).
   settings(
     normalizedName := "korolev-cats-effect-support",
-    libraryDependencies += "org.typelevel" %% "cats-effect" % "1.3.1"
+    libraryDependencies += "org.typelevel" %% "cats-effect" % "2.0.0"
   ).
   dependsOn(async)
 
@@ -203,7 +199,7 @@ lazy val monixExample = (project in examples / "monix").
   settings(exampleSettings: _*).
   settings(mainClass := Some("MonixExample")).
   settings(
-    libraryDependencies += "io.monix" %% "monix-eval" % "3.0.0-RC2"
+    libraryDependencies += "io.monix" %% "monix-eval" % "3.0.0"
   ).
   dependsOn(`cats-effect-support`, `server-akkahttp`)
 
@@ -231,29 +227,31 @@ lazy val `integration-tests` = project.
     libraryDependencies ++= Seq(
       "org.slf4j" % "slf4j-simple" % "1.7.+",
       "org.seleniumhq.selenium" % "selenium-java" % "2.53.1",
-      "com.github.fomkin" %% "pushka-json" % "0.8.0"
+      "io.circe" %% "circe-core" % "0.12.2",
+      "io.circe" %% "circe-generic" % "0.12.2",
+      "io.circe" %% "circe-parser" % "0.12.2"
     )
   ).
   dependsOn(`slf4j-support`).
   dependsOn(`server-akkahttp`)
 
-lazy val `performance-benchmark` = project.
-  disablePlugins(HeaderPlugin).
-  settings(commonSettings).
-  settings(dontPublishSettings:_*).
-  settings(
-    addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full),
-    scalaVersion := "2.12.8",
-    fork in run := true,
-    libraryDependencies ++= Seq(
-      "com.typesafe.akka" %% "akka-http" % "10.1.8",
-      "com.typesafe.akka" %% "akka-stream" % "2.5.23",
-      "com.typesafe.akka" %% "akka-actor"  % "2.5.23",
-      "com.typesafe.akka" %% "akka-typed" % "2.5.8",
-      "com.github.fomkin" %% "pushka-json" % "0.8.0"
-    )
-  ).
-  dependsOn(korolev)
+//lazy val `performance-benchmark` = project.
+//  disablePlugins(HeaderPlugin).
+//  settings(commonSettings).
+//  settings(dontPublishSettings:_*).
+//  settings(
+//    addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full),
+//    scalaVersion := "2.12.8",
+//    fork in run := true,
+//    libraryDependencies ++= Seq(
+//      "com.typesafe.akka" %% "akka-http" % "10.1.8",
+//      "com.typesafe.akka" %% "akka-stream" % "2.5.23",
+//      "com.typesafe.akka" %% "akka-actor"  % "2.5.23",
+//      "com.typesafe.akka" %% "akka-typed" % "2.5.8",
+//      "com.github.fomkin" %% "pushka-json" % "0.8.0"
+//    )
+//  ).
+//  dependsOn(korolev)
 
 lazy val root = project.in(file(".")).
   settings(crossVersionSettings).

@@ -43,9 +43,12 @@ Korolev uses https://github.com/fomkin/levsha[Levsha] as DSL (domain specific la
 
 [source,scala]
 -----------------------------------
-'div(
-  'backgroundColor @= "yellow",
-  'input('type /= "text")
+import levsha.dsl._
+import html._
+
+div(
+  backgroundColor @= "yellow",
+  input(`type` := "text")
 )
 -----------------------------------
 
@@ -60,11 +63,10 @@ This code fragment corresponds to HTML below.
 
 As you can see there are three simple rules:
 
-1. `'tag()` declares tag
-2. `'attribute /= "value"` declares attribute
-3. `'backgroundColor @= "black"` declares style
-
-And one more special thing. Use `:=` when you want to set attribute as an element's property. It may be useful when some data can be passed through attribute. For example value of `'input`.
+1. `tag()` declares tag
+2. `attribute := "value"` declares attribute
+4. `disabled`, `selected` is attributes too
+5. `backgroundColor @= "black"` declares style
 
 [NOTE]
 ==========================
@@ -120,20 +122,20 @@ Render is a view of the state. Render is a function which takes state as an argu
 -----------------------------------
 val render: Render = {
   case Anonymous(_) =>
-    'body(
-      'form(
-        'input('placeholder /= "Login"),
-        'input('placeholder /= "Password"),
-        'button("Submit")
+    body(
+      form(
+        input(placeholder := "Login"),
+        input(placeholder := "Password"),
+        button("Submit")
       )
     )
   case Authorized(_, User(name, friends)) =>
-    'body(
-      'div(s"Your name is $name. Your friends:"),
-      'ul(
+    body(
+      div(s"Your name is $name. Your friends:"),
+      ul(
         // Look at that. You just map data to view
         friends map { friend =>
-          'li(friend)
+          li(friend)
         }
       )
     )
@@ -175,17 +177,19 @@ Every DOM event emitted which had been emitted by browser's `document` object, c
 --------------------------------------------------------------
 case class MyState(i: String)
 
+def onClick(access: Access) = {
+  access.transition {
+    case MyState(i) =>
+      state.copy(i = i + 1)
+  }
+}
+
 val renderAnonymous: Render = {
   case MyState(i) =>
-    'body(
+    body(
       i.toString,
-      'button("Increment",
-        event('click) { access =>
-          access.transition {
-            case MyState(i) =>
-              state.copy(i = i + 1)
-          }
-        }
+      button("Increment",
+        event("click")(onClick)
       )
     )
 }
@@ -198,24 +202,26 @@ When "Increment" button will be clicked, `i` will be incremented by 1. Let's con
 val loginField = elementId()
 val passwordField = elementId()
 
+def onSubmit(access: Access) = {
+  for {
+    login <- access.valueOf(loginField)
+    password <- access.valueOf(passwordField)
+    user <- authService.authorize(login, password)
+    _ <- access.transition {
+      case Anonymous(deviceId) =>
+        Authorized(deviceId, user)
+    }
+  } yield ()
+}
+
 val renderAnonymous: Render = {
   case Anonymous(_) =>
-    'body(
-      'form(
-        'input('placeholder /= "Login", loginField),
-        'input('placeholder /= "Password", passwordField),
-        'button("Submit"),
-        event('submit) { access =>
-          for {
-            login <- access.property(loginField, 'value)
-            password <- access.property(passwordField, 'value)
-            user <- authService.authorize(login, password)
-            _ <- access.transition {
-              case Anonymous(deviceId) =>
-                Authorized(deviceId, user)
-            }
-          } yield ()
-        }
+    body(
+      form(
+        input(placeholder := "Login", loginField),
+        input(placeholder := "Password", passwordField),
+        button("Submit"),
+        event("submit")(onSubmit)
       )
     )
 }
@@ -245,10 +251,10 @@ val MyComponent = Component[Future, ComponentState, ComponentParameters, EventTy
   import context._
   import symbolDsl._
 
-  'div(
+  div(
     parameters.toString,
     state.toString,
-    event('click) { access =>
+    event("click) { access =>
       // Change component state here
       // using transition as usual.
     }
@@ -266,10 +272,10 @@ object MyComponent extends Component[Future, ComponentState, ComponentParameters
   import symbolDsl._
 
   def render(parameters: ComponentParameters, state: ComponentState): Node = {
-    'div(
+    div(
       parameters.toString,
       state.toString,
-      event('click) {
+      event("click") {
         // Change component state here
       }
     )
@@ -281,7 +287,7 @@ Let's use our component in the application.
 
 [source,scala]
 -----------------------------------
-'body(
+body(
   "Hello world!",
   MyComponent(parameters) { (access, _) =>
     // make transition on component event
@@ -306,8 +312,8 @@ val loginField = elementId()
 
 ...
 
-event('submit) { access =>
-  access.property(loginField, 'value) flatMap {
+event("submit") { access =>
+  access.property(loginField, "value") flatMap {
     access.transition { ... }
   }
 }
@@ -317,7 +323,7 @@ Or you can set the value
 
 [source,scala]
 -----------------------------------
-access.property(loginField).set('value, "John Doe")
+access.property(loginField).set("value", "John Doe")
 -----------------------------------
 
 Also you can use shortcut `valueOf` for get values from elements.
@@ -333,19 +339,17 @@ In contrast to `property`, FormData works with form tag, not with input tag.
 val myForm = elementId()
 val pictureFieldName = "picture"
 
-'form(
+form(
   myForm,
-  'div(
-    'legend("FormData Example"),
-    'p(
-      'label("Picture"),
-      'input('type /= "file", 'name /= pictureFieldName)
+  div(
+    legend("FormData Example"),
+    p(
+      label("Picture"),
+      input(`type` := "file", name := pictureFieldName)
     ),
-    'p(
-      'button("Submit")
-    )
+    p(button("Submit"))
   ),
-  event('submit) { access =>
+  event("submit") { access =>
     access
       .downloadFormData(myForm)
       .onProgress { (loaded, total) => state =>
@@ -372,15 +376,15 @@ Sometimes you want to update a page after a timeout. For example it is useful wh
 type MyState = Boolean
 
 val render: Render = {
-  case true => 'body(
+  case true => body(
     delay(3.seconds) { access =>
       access.transition(_ => false)
     },
     "Wait 3 seconds!"
   )
-  case false => 'body(
-    'button(
-      event('click) { access =>
+  case false => body(
+    button(
+      event("click") { access =>
         access.transition(_ => true)
       },
       "Push the button"
@@ -401,9 +405,9 @@ case class MyState(notifications: List[String])
 
 var render: Render = {
   case MyState(notifications) =>
-    'ul(
+    ul(
       notifications.map(notification =>
-        'li(notification)
+        li(notification)
       )
     )
 }
@@ -442,9 +446,9 @@ KorolevServiceConfig(
   ...
   // Render the article
   render = {
-    case MyState(author, title, text) => 'body(
-      'div(s"$author: $title"),
-      'div(text)
+    case MyState(author, title, text) => body(
+      div(s"$author: $title"),
+      div(text)
     )
   },
   router = Router(
@@ -490,11 +494,11 @@ sealed trait Tab
 case class Tab1(...) extends Tab
 case class Tab2(...) extends Tab
 
-def renderTab2(tab2: Tab2) = 'div(
+def renderTab2(tab2: Tab2) = div(
   ...,
-  'button(
+  button(
     "Push me",
-    event('click) { access =>
+    event("click") { access =>
       access.maybeTransition {
         // Imagine that you have deeper hierarchy. Pain
         case s @ ViewState(s2: Tab2) =>
@@ -540,9 +544,9 @@ Korolev allows executing arbitrary JavaScript code on the client. Use `access.ev
 
 [source,scala]
 -------------------------------------------------------------------------------
-'button(
+button(
   "Push me",
-  event('click)(_.evalJs("1 + 1").map(println)) // 2
+  event("click")(_.evalJs("1 + 1").map(println)) // 2
 )
 -------------------------------------------------------------------------------
 
@@ -550,9 +554,9 @@ Also it works for `Promise`.
 
 [source,scala]
 -------------------------------------------------------------------------------
-'button(
+button(
   "Push me",
-  event('click) { access =>
+  event("click") { access =>
     access
       .evalJs(
         """crypto
@@ -607,7 +611,7 @@ By default Korolev log all messages to standard output. You can redirect logs to
 
 [source,scala]
 ------------------------------
-libraryDependencies += "com.github.fomkin" %% "korolev-slf4j-support" % "0.12.0"
+libraryDependencies += "com.github.fomkin" %% "korolev-slf4j-support" % "0.13.0"
 ------------------------------
 
 === Akka HTTP
@@ -616,7 +620,7 @@ Korolev provides smooth Akka HTTP integration out of the box. To use it, add a d
 
 [source,scala]
 ------------------------------
-libraryDependencies += "com.github.fomkin" %% "korolev-server-akkahttp" % "0.12.0"
+libraryDependencies += "com.github.fomkin" %% "korolev-server-akkahttp" % "0.13.0"
 ------------------------------
 
 [source,scala]
@@ -634,7 +638,7 @@ And create Korolev route:
 val config = KorolevServiceConfig[Future, Boolean, Any](
   stateStorage = StateStorage.default(false),
   router = Router.empty[Future, Boolean],
-  render = { case _ => 'body('div("Hello akka-http")) }
+  render = { case _ => body(div("Hello akka-http")) }
 )
 
 val korolevRoute = akkaHttpService(config).apply(AkkaHttpServerConfig())
@@ -652,7 +656,7 @@ Cats-effect integration module provides `Async` instance from `cats.effect.Effec
 
 [source,scala]
 ------------------------------
-libraryDependencies += "com.github.fomkin" %% "korolev-cats-effect-support" % "0.12.0"
+libraryDependencies += "com.github.fomkin" %% "korolev-cats-effect-support" % "0.13.0"
 ------------------------------
 
 [source,scala]
@@ -664,7 +668,7 @@ class Config[F[_]: Effect] {
   val config = KorolevServiceConfig[F, Boolean, Any](
     stateStorage = StateStorage.default(false),
     router = Router.empty,
-    render = { case _ => 'body('div("Hello Cats Effect")) }
+    render = { case _ => body(div("Hello Cats Effect")) }
   )
 }
 ------------------------------
