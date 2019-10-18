@@ -1,6 +1,6 @@
 import xerial.sbt.Sonatype._
 
-val levshaVersion = "0.8.0-9-g91f4d49-SNAPSHOT"
+val levshaVersion = "0.9.0"
 
 val unusedRepo = Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
 
@@ -227,9 +227,9 @@ lazy val `integration-tests` = project.
     libraryDependencies ++= Seq(
       "org.slf4j" % "slf4j-simple" % "1.7.+",
       "org.seleniumhq.selenium" % "selenium-java" % "2.53.1",
-      "io.circe" %% "circe-core" % "0.11.1",
-      "io.circe" %% "circe-generic" % "0.11.1",
-      "io.circe" %% "circe-parser" % "0.11.1"
+      "io.circe" %% "circe-core" % "0.12.2",
+      "io.circe" %% "circe-generic" % "0.12.2",
+      "io.circe" %% "circe-parser" % "0.12.2"
     )
   ).
   dependsOn(`slf4j-support`).

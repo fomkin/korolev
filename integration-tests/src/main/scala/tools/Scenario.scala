@@ -22,7 +22,7 @@ case class Scenario(name: String, steps: Seq[Step])(implicit actorSystem: ActorS
 
         val capsDc = caps.desiredCapabilities
         val scenarioName = s"'$name' for ${capsDc.getPlatform}/${capsDc.getBrowserName}/${capsDc.getVersion}"
-        val sb = StringBuilder.newBuilder
+        val sb = new StringBuilder()
 
         // Show message immediately
         println(s"! ${Console.BLUE}$scenarioName started.${Console.RESET}")
