@@ -324,7 +324,7 @@ package object server {
           case Some(x) => Async[F].delay(x)
           case None => createSession(deviceId, sessionId)
         }
-        sessionAsync.flatMap { session =>
+        (sessionAsync.flatMap { session =>
           session.nextMessage.map { message =>
             Response.Http(Response.Status.Ok,
               body = Some(message.getBytes(StandardCharsets.UTF_8)),
@@ -334,7 +334,7 @@ package object server {
         } recover {
           case _: SessionDestroyedException =>
             Response.Http(Response.Status.Gone, "Session has been destroyed")
-        }
+        }).asInstanceOf[F[Response]]
       case Request(Root / "bridge" / "web-socket" / deviceId / sessionId, _, _, _, _) =>
         val sessionAsync = sessions.get(makeSessionKey(deviceId, sessionId)) match {
           case Some(x) => Async[F].delay(x)

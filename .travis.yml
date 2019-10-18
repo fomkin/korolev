@@ -1,7 +1,10 @@
 sudo: false
 language: scala
 jdk:
-  - oraclejdk8
+  - openjdk13
+scala:
+  - 2.13.1
+  - 2.12.10
 env:
   - SAUCE_USERNAME=yelbota
 branches:
@@ -9,9 +12,6 @@ branches:
     - master
     - develop
     - /.*-fixes/
-scala:
-  - 2.11.12
-  - 2.12.8
 cache:
   directories:
     - $HOME/.sbt

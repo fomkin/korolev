@@ -217,22 +217,24 @@ lazy val contextScopeExample = (project in examples / "context-scope").
   settings(mainClass := Some("ContextScopeExample")).
   dependsOn(`server-akkahttp`)
 
-//lazy val `integration-tests` = project.
-//  disablePlugins(HeaderPlugin).
-//  settings(crossVersionSettings).
-//  settings(commonSettings).
-//  settings(dontPublishSettings:_*).
-//  settings(
-//    fork in run := true,
-//    libraryDependencies ++= Seq(
-//      "org.slf4j" % "slf4j-simple" % "1.7.+",
-//      "org.seleniumhq.selenium" % "selenium-java" % "2.53.1",
-//      "com.github.fomkin" %% "pushka-json" % "0.8.0"
-//    )
-//  ).
-//  dependsOn(`slf4j-support`).
-//  dependsOn(`server-akkahttp`)
-//
+lazy val `integration-tests` = project.
+  disablePlugins(HeaderPlugin).
+  settings(crossVersionSettings).
+  settings(commonSettings).
+  settings(dontPublishSettings:_*).
+  settings(
+    fork in run := true,
+    libraryDependencies ++= Seq(
+      "org.slf4j" % "slf4j-simple" % "1.7.+",
+      "org.seleniumhq.selenium" % "selenium-java" % "2.53.1",
+      "io.circe" %% "circe-core" % "0.11.1",
+      "io.circe" %% "circe-generic" % "0.11.1",
+      "io.circe" %% "circe-parser" % "0.11.1"
+    )
+  ).
+  dependsOn(`slf4j-support`).
+  dependsOn(`server-akkahttp`)
+
 //lazy val `performance-benchmark` = project.
 //  disablePlugins(HeaderPlugin).
 //  settings(commonSettings).
@@ -262,6 +264,6 @@ lazy val root = project.in(file(".")).
     simpleExample, routingExample, gameOfLifeExample,
     formDataExample, `file-streaming-example`, delayExample, focusExample,
     webComponentExample, componentExample, akkaHttpExample, contextScopeExample,
-    eventDataExample//, `integration-tests`
+    eventDataExample, `integration-tests`
   )
 

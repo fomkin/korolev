@@ -10,8 +10,7 @@ import org.slf4j.LoggerFactory
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
-import pushka.json._
-import pushka.Ast
+import io.circe._, io.circe.generic.auto._, io.circe.parser._, io.circe.syntax._
 
 object GuineaPigService {
 
@@ -27,6 +26,8 @@ object GuineaPigService {
     eventFromComponentReceived: Boolean = false,
     key: Option[String] = None
   )
+
+  case class EventData(key: String)
 
   object State {
     val globalContext = Context[Future, State, Any]
@@ -146,12 +147,13 @@ object GuineaPigService {
               'placeholder /= "What should be done?",
               event("keydown") { access =>
                 access.eventData.flatMap { jsonString =>
-                  val data = read[Map[String, Ast]](jsonString)
-                  data.get("key")
-                    .collect { case Ast.Str(s) => s }
-                    .fold(Future.successful(())) { key =>
+                  decode[EventData](jsonString) match {
+                    case Right(EventData(key)) =>
                       access.transition(_.copy(key = Some(key)))
-                    }
+                    case Left(error) =>
+                      println(error)
+                      Future.unit
+                  }
                 }
               }
             ),
