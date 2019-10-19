@@ -52,7 +52,7 @@ object JsUtils {
       stringBuilder.toString
     }
 
-    IO.write(sourceOutputFile, sourceOutput + "\n//# sourceMappingURL=korolev-client.min.js.map\n")
+    IO.write(sourceOutputFile, s"(function(){$sourceOutput}).call(this);\n//# sourceMappingURL=korolev-client.min.js.map\n")
     IO.write(sourceMapOutputFile, sourceMapOutput)
     Seq(sourceOutputFile, sourceMapOutputFile)
   }
