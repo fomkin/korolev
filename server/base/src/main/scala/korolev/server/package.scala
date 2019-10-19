@@ -82,7 +82,7 @@ package object server {
           'head(
             'script('language /= "javascript", kfg),
             'script('src /= config.rootPath + "static/korolev-client.min.js", 'defer /= ""),
-            config.head
+            config.head(state)
           ),
           config.render(state)
         )

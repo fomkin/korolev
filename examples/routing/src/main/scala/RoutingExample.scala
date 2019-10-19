@@ -19,7 +19,7 @@ object RoutingExample extends SimpleAkkaHttpKorolevApp {
   val service = akkaHttpService{
     KorolevServiceConfig [Future, State, Any] (
       stateStorage = storage,
-      head = {
+      head = _ => {
         Seq(
           title("Main Routing Page"),
           link(
