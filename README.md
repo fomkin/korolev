@@ -25,11 +25,11 @@ Korolev runs a single-page application on the server side, keeping in the browse
 ## Documentation
 
 * [User guide (open site)](https://fomkin.org/korolev/user-guide.html), [(download PDF)](https://fomkin.org/korolev/user-guide.pdf)
-* [API overview](https://www.javadoc.io/doc/com.github.fomkin/korolev_2.12/0.12.0) 
+* [API overview](https://www.javadoc.io/doc/com.github.fomkin/korolev_2.13/0.13.0) 
 
 ## Tools
 
-* [HTML to symbolDsl converter](https://fomkin.org/korolev/html-to-symbol-dsl)
+* [HTML to Levsha DSL converter](https://fomkin.org/korolev/html-to-levsha)
 
 [![Browser support results](https://fomkin.org/korolev/browser-support.svg)](https://saucelabs.com/u/yelbota)
 

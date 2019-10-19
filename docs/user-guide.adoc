@@ -65,8 +65,8 @@ As you can see there are three simple rules:
 
 1. `tag()` declares tag
 2. `attribute := "value"` declares attribute
-4. `disabled`, `selected` is attributes too
-5. `backgroundColor @= "black"` declares style
+3. `disabled`, `selected` is attributes too
+4. `backgroundColor @= "black"` declares style
 
 [NOTE]
 ==========================
