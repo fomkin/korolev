@@ -2,10 +2,9 @@ import { Connection } from './connection.js';
 import { Bridge, setProtocolDebugEnabled } from './bridge.js';
 import { ConnectionLostWidget, getDeviceId } from './utils.js';
 
-// Export `setProtocolDebugEnabled` function
-// to global scope
 window['Korolev'] = {
   'setProtocolDebugEnabled': setProtocolDebugEnabled,
+  'swapElementInRegistry': () => console.log("Korolev is not ready"),
   'reconnect': () => console.log("Connection is not ready")
 };
 
@@ -26,6 +25,7 @@ window.document.addEventListener("DOMContentLoaded", () => {
   connection.dispatcher.addEventListener('open', () => {
     clw.hide();
     let bridge = new Bridge(config, connection);
+    window['Korolev']['swapElementInRegistry'] = (a, b) => bridge._korolev.swapElementInRegistry(a, b);
     let closeHandler = (event) => {
       bridge.destroy();
       clw.show();
