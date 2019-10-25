@@ -1,6 +1,6 @@
 import xerial.sbt.Sonatype._
 
-val levshaVersion = "0.9.0"
+val levshaVersion = "0.9.1"
 
 val unusedRepo = Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
 
@@ -27,6 +27,7 @@ val publishSettings = Seq(
 )
 
 val commonSettings = publishSettings ++ Seq(
+  addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
   git.useGitDescribe := true,
   organization := "com.github.fomkin",
   libraryDependencies ++= Seq(

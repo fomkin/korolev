@@ -53,8 +53,7 @@ object FileStreamingExample extends SimpleAkkaHttpKorolevApp {
 
   val service = akkaHttpService {
     KorolevServiceConfig[Future, State, Any] (
-      router = Router.empty,
-      stateStorage = StateStorage.default(State(Map.empty, inProgress = false)),
+      stateLoader = StateLoader.default(State(Map.empty, inProgress = false)),
       render = {
         case State(progress, inProgress) => optimize {
           body(

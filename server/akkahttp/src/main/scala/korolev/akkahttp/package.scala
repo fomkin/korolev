@@ -156,8 +156,7 @@ package object akkahttp {
   private def mkKorolevRequest[F[_]](request: HttpRequest,
                                      path: String,
                                      params: Map[String, String],
-                                     body: LazyBytes[F])
-                                    (implicit async: Async[F]): KorolevRequest[F] =
+                                     body: LazyBytes[F]): KorolevRequest[F] =
     KorolevRequest(
       path = Router.Path.fromString(path),
       params,
@@ -166,7 +165,6 @@ package object akkahttp {
         val contentType = request.entity.contentType
         val contentTypeHeaders =
           if (contentType.mediaType.isMultipart) Seq("content-type" -> contentType.toString) else Seq.empty
-
         request.headers.map(h => (h.name(), h.value())) ++ contentTypeHeaders
       },
       body = body

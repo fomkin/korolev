@@ -24,11 +24,9 @@ import korolev.internal.DevMode
 import levsha.Id
 
 import scala.collection.concurrent.TrieMap
+import scala.util.Failure
 
 abstract class StateStorage[F[_]: Async, S] {
-
-  @deprecated("Use get(device, session).map(_.default)", "0.12.0")
-  def createTopLevelState: DeviceId => F[S]
 
   /**
     * Check if state manager for the session is exist
@@ -36,9 +34,14 @@ abstract class StateStorage[F[_]: Async, S] {
   def exists(deviceId: DeviceId, sessionId: SessionId): F[Boolean]
 
   /**
-    * Restore session manager from storage or create new one
+   * Create new state manager
+   */
+  def create(deviceId: DeviceId, sessionId: SessionId, topLevelState: S): F[StateManager[F]]
+
+  /**
+    * Restore session manager from storage
     */
-  def get(deviceId: DeviceId, sessionId: SessionId): F[StateManager[F, S]]
+  def get(deviceId: DeviceId, sessionId: SessionId): F[StateManager[F]]
 
   /**
     * Marks session to remove
@@ -48,50 +51,14 @@ abstract class StateStorage[F[_]: Async, S] {
 
 object StateStorage {
 
-  /**
-    * Initializes a simple in-memory storage (based on TrieMap)
-    * with equal initial state for all sessions.
-    *
-    * @param initialState State factory
-    * @tparam S Type of state
-    * @return The state storage
-    */
-  def default[F[_]: Async, S: StateSerializer](initialState: => S): StateStorage[F, S] = {
-    new DefaultStateStorage(_ => Async[F].delay(initialState))
-  }
+  final class DefaultStateStorage[F[_]: Async, S: StateSerializer] extends StateStorage[F, S] {
 
-  /**
-    * Initializes a simple in-memory storage (based on TrieMap)
-    * with initial state based on deviceId
-    *
-    * {{{
-    * case class MyState(deviceId: DeviceId, ...)
-    *
-    * StateStorage forDeviceId { deviceId =>
-    *   MyStorage.getStateByDeviceId(deviceId) map {
-    *     case Some(state) => state
-    *     case None => MyState(deviceId, ...)
-    *   }
-    * }
-    * }}}
-    *
-    * @param initialState State factory
-    * @tparam S Type of state
-    * @return The state storage
-    */
-  def forDeviceId[F[_]: Async, S: StateSerializer](initialState: String => F[S]): StateStorage[F, S] = {
-    new DefaultStateStorage(initialState)
-  }
-
-  private class DefaultStateStorage[F[_]: Async, S: StateSerializer]
-      (val createTopLevelState: String => F[S]) extends StateStorage[F, S] {
-
-    private val cache = TrieMap.empty[String, StateManager[F, S]]
+    private val cache = TrieMap.empty[String, StateManager[F]]
     private val forDeletionCacheCapacity = 5000 // TODO export to config
     private val mutex = new Object()
     private val forDeletionCache = {
-      new util.LinkedHashMap[String, StateManager[F, S]](forDeletionCacheCapacity, 0.7F, true) {
-        override def removeEldestEntry(entry: java.util.Map.Entry[String, StateManager[F, S]]): Boolean = {
+      new util.LinkedHashMap[String, StateManager[F]](forDeletionCacheCapacity, 0.7F, true) {
+        override def removeEldestEntry(entry: java.util.Map.Entry[String, StateManager[F]]): Boolean = {
           this.size() > forDeletionCacheCapacity
         }
       }
@@ -113,7 +80,7 @@ object StateStorage {
       }
     }
 
-    def get(deviceId: DeviceId, sessionId: SessionId): F[StateManager[F, S]] = {
+    def get(deviceId: DeviceId, sessionId: SessionId): F[StateManager[F]] = {
       val key = mkKey(deviceId, sessionId)
       cache.get(key) match {
         case None =>
@@ -124,27 +91,25 @@ object StateStorage {
                 sm
               }
             case None =>
-              create(deviceId, sessionId)
+              Async[F].fromTry(Failure(new NoSuchElementException(s"There is no state for $deviceId/$sessionId")))
           }
         case Some(sm) => Async[F].delay(sm)
       }
     }
 
-    private def create(deviceId: DeviceId, sessionId: SessionId): F[StateManager[F, S]] = {
+    def create(deviceId: DeviceId, sessionId: SessionId, state: S): F[StateManager[F]] = {
       val key = mkKey(deviceId, sessionId)
-      Async[F].flatMap(createTopLevelState(deviceId)) { default =>
-        if (DevMode.isActive) {
-          val directory = new File(DevMode.sessionsDirectory, key)
-          val sm = new DevModeStateManager[F, S](directory, default)
-          cache.put(key, sm)
-          if (directory.exists()) Async[F].delay(sm) // Do not rewrite state manager cache
-          else Async[F].map(sm.write(Id.TopLevel, default))(_ => sm)
-        }
-        else {
-          val sm = new SimpleInMemoryStateManager[F, S](default)
-          cache.put(key, sm)
-          Async[F].map(sm.write(Id.TopLevel, default))(_ => sm)
-        }
+      if (DevMode.isActive) {
+        val directory = new File(DevMode.sessionsDirectory, key)
+        val sm = new DevModeStateManager[F](directory)
+        cache.put(key, sm)
+        if (directory.exists()) Async[F].delay(sm) // Do not rewrite state manager cache
+        else Async[F].map(sm.write(Id.TopLevel, state))(_ => sm)
+      }
+      else {
+        val sm = new SimpleInMemoryStateManager[F]()
+        cache.put(key, sm)
+        Async[F].map(sm.write(Id.TopLevel, state))(_ => sm)
       }
     }
 
@@ -158,7 +123,7 @@ object StateStorage {
     }
   }
 
-  private final class DevModeStateManager[F[_]: Async, S](directory: File, val default: S) extends StateManager[F, S] {
+  private final class DevModeStateManager[F[_]: Async](directory: File) extends StateManager[F] {
 
     def getStateFile(node: Id): File =
       new File(directory, node.mkString)
@@ -220,7 +185,7 @@ object StateStorage {
     }
   }
 
-  private final class SimpleInMemoryStateManager[F[_]: Async, S](val default: S) extends StateManager[F, S] {
+  private[korolev] final class SimpleInMemoryStateManager[F[_]: Async] extends StateManager[F] {
 
     val cache: TrieMap[Id, Any] = TrieMap.empty[Id, Any]
 

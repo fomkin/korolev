@@ -35,13 +35,13 @@ final class ApplicationInstance
   ](
     sessionId: QualifiedSessionId,
     connection: Connection[F],
-    stateManager: StateManager[F, S],
+    stateManager: StateManager[F],
     initialState: S,
-    render: PartialFunction[S, Document.Node[Effect[F, S, M]]],
+    render: S => Document.Node[Effect[F, S, M]],
     router: Router[F, S],
     fromScratch: Boolean,
     reporter: Reporter
-  ) {
+  ) { application =>
 
   import reporter.Implicit
 
@@ -51,17 +51,20 @@ final class ApplicationInstance
   private val frontend = new ClientSideApi[F](connection, reporter)
 
   val topLevelComponentInstance: ComponentInstance[F, S, M, S, Any, M] = {
-    val renderer = render.lift
     val eventRegistry = new EventRegistry[F](frontend)
     val component = new Component[F, S, Any, M](initialState, Component.TopLevelComponentId) {
       def render(parameters: Any, state: S): Document.Node[Effect[F, S, M]] = {
-        renderer(state).getOrElse {
-          reporter.error(s"Render is not defined for $state")
-          Document.Node[Effect[F, S, M]] { rc =>
-            rc.openNode(XmlNs.html, "body")
-            rc.addTextNode("Render is not defined for the state")
-            rc.closeNode("body")
-          }
+        try {
+          application.render(state)
+        } catch {
+          case e: MatchError =>
+            Document.Node[Effect[F, S, M]] { rc =>
+              reporter.error(s"Render is not defined for $state")
+              rc.openNode(XmlNs.html, "body")
+              rc.addTextNode("Render is not defined for the state. ")
+              rc.addTextNode(e.getMessage())
+              rc.closeNode("body")
+            }
         }
       }
     }

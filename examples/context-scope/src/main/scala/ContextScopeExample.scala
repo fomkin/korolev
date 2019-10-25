@@ -1,5 +1,4 @@
 import ViewState.Tab.{About, Blog}
-
 import korolev._
 import korolev.akkahttp._
 import korolev.execution._
@@ -25,10 +24,9 @@ object ContextScopeExample extends SimpleAkkaHttpKorolevApp {
 
   val service: AkkaHttpService = akkaHttpService {
     KorolevServiceConfig[Future, ViewState, Any] (
-      router = Router.empty,
-      stateStorage = StateStorage.default(ViewState("My blog", Blog.default)),
+      stateLoader = StateLoader.default(ViewState("My blog", Blog.default)),
       render = {
-        case state =>
+        state =>
           val isBlog = state.tab.isInstanceOf[Blog]
           val isAbout = state.tab.isInstanceOf[About]
 

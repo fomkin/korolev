@@ -67,10 +67,9 @@ object ComponentExample extends SimpleAkkaHttpKorolevApp {
 
   val service: AkkaHttpService = akkaHttpService {
     KorolevServiceConfig[Future, String, Any] (
-      router = Router.empty,
-      stateStorage = StateStorage.default("a"),
+      stateLoader = StateLoader.default("a"),
       render = {
-        case state =>
+        state =>
           body(
             s"State is $state",
             ComponentAsObject("Click me, i'm function") { (access, _) =>

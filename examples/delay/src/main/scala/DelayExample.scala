@@ -17,8 +17,7 @@ object DelayExample extends SimpleAkkaHttpKorolevApp {
 
   val service = akkaHttpService {
     KorolevServiceConfig[Future, Option[Int], Any](
-      stateStorage = StateStorage.default(Option.empty[Int]),
-      router = Router.empty,
+      stateLoader = StateLoader.default(Option.empty[Int]),
       render = {
         case Some(n) =>
           optimize {
