@@ -33,9 +33,7 @@ import scala.util.{Failure, Success, Try}
 
 package object server {
 
-  type StateStorage[F[_], S] = korolev.state.StateStorage[F, S]
-  val StateStorage = korolev.state.StateStorage
-
+  type StateLoader[F[_], S] = (DeviceId, Option[Request[F]]) => F[S]
   type MimeTypes = String => Option[String]
   type KorolevService[F[_]] = PartialFunction[Request[F], F[Response]]
 
@@ -53,17 +51,20 @@ package object server {
     import misc._
     import reporter.Implicit
 
+    val stateStorage =
+      if (config.stateStorage == null) new StateStorage.DefaultStateStorage[F, S]()
+      else config.stateStorage
     val sessions = TrieMap.empty[String, KorolevSession[F]]
 
     def renderStatic(request: Request[F]): F[Response] =
       for {
         deviceId <- deviceFromRequest(request)
         sessionId <- config.idGenerator.generateSessionId()
-        manager <- config.stateStorage.get(deviceId, sessionId)
+        defaultState <- config.stateLoader(deviceId, Some(request))
         state <- config.router.toState
           .lift(request.path)
-          .fold(Async[F].pure(manager.default))(f => f(manager.default))
-        _ <- if (state != manager.default) manager.write(Id.TopLevel, state) else Async[F].unit
+          .fold(Async[F].pure(defaultState))(f => f(defaultState))
+        _ <- stateStorage.create(deviceId, sessionId, state)
       } yield {
         val dsl = new levsha.dsl.SymbolDsl[Context.Effect[F, S, M]]()
         val textRenderContext = new HtmlRenderContext[F, S, M]()
@@ -138,12 +139,17 @@ package object server {
       val connection = new Connection[F]()
 
       for {
-        isOld <- config.stateStorage.exists(deviceId, sessionId)
-        stateManager <- config.stateStorage.get(deviceId, sessionId)
+        isOld <- stateStorage.exists(deviceId, sessionId)
+        (state, stateManager) <- {
+          if (isOld) stateStorage.get(deviceId, sessionId)
+            .flatMap(sm => sm.read[S](Id.TopLevel).map(state => (state.get, sm)))
+          else config.stateLoader(deviceId, None)
+            .flatMap(state => stateStorage.create(deviceId, sessionId, state).map(sm => (state, sm)))
+        }
         qualifiedSessionId = QualifiedSessionId(deviceId, sessionId)
         korolev = new ApplicationInstance(
           qualifiedSessionId, connection,
-          stateManager, stateManager.default,
+          stateManager, state,
           config.render, config.router, fromScratch = !isOld,
           reporter
         )
@@ -216,7 +222,7 @@ package object server {
                     promise.complete(Failure(new SessionDestroyedException("Session has been closed")))
                   }
 
-                  config.stateStorage.remove(deviceId, sessionId)
+                  stateStorage.remove(deviceId, sessionId)
                   sessions.remove(sessionKey)
 
                   ()

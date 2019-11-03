@@ -88,7 +88,7 @@ object Async {
     }
   }
 
-  implicit final class AsyncOps[F[_]: Async, A](async: => F[A]) {
+  @inline implicit final class AsyncOps[F[_]: Async, A](async: => F[A]) {
     def map[B](f: A => B): F[B] = Async[F].map(async)(f)
     def flatMap[B](f: A => F[B]): F[B] = Async[F].flatMap(async)(f)
     def recover(f: PartialFunction[Throwable, A]): F[A] = Async[F].recover[A](async)(f)

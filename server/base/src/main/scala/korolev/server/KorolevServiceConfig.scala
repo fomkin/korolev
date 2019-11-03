@@ -19,15 +19,15 @@ package korolev.server
 import korolev.state.{EnvConfigurator, IdGenerator}
 import korolev.{Async, Context, Reporter, Router}
 import levsha.Document
-import levsha.dsl.SymbolDsl
 
 import scala.concurrent.duration._
 
 case class KorolevServiceConfig[F[_]: Async, S, M](
-  stateStorage: korolev.state.StateStorage[F, S],
-  router: Router[F, S],
+  stateLoader: StateLoader[F, S],
+  stateStorage: korolev.state.StateStorage[F, S] = null, // By default it StateStorage.DefaultStateStorage
+  router: Router[F, S] = Router.empty[F, S],
   rootPath: String = "/",
-  render: PartialFunction[S, Document.Node[Context.Effect[F, S, M]]],
+  render: S => Document.Node[Context.Effect[F, S, M]] = (_: S) => levsha.dsl.html.body(),
   head: S => Seq[Document.Node[Context.Effect[F, S, M]]] = (_: S) => Seq.empty,
   connectionLostWidget: Document.Node[Context.Effect[F, S, M]] =
     KorolevServiceConfig.defaultConnectionLostWidget[Context.Effect[F, S, M]],
@@ -39,12 +39,22 @@ case class KorolevServiceConfig[F[_]: Async, S, M](
 )
 
 object KorolevServiceConfig {
+
   def defaultConnectionLostWidget[MiscType]: Document.Node[MiscType] = {
-    val dsl = new SymbolDsl[MiscType]()
-    import dsl._
-    'div('style /= "position: fixed; top: 0; left: 0; right: 0;" +
-                   "background-color: lightyellow; border-bottom: 1px solid black; padding: 10px;",
-      "Connection lost. Waiting to resume."
-    )
+    import levsha.dsl._
+    import html._
+
+    optimize {
+      div(
+        position @= "fixed",
+        top @= "0",
+        left @= "0",
+        right @= "0",
+        backgroundColor @= "lightyellow",
+        borderBottom @= "1px solid black",
+        padding @= "10px",
+        "Connection lost. Waiting to resume."
+      )
+    }
   }
 }

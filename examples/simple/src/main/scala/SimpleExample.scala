@@ -18,8 +18,7 @@ object SimpleExample extends SimpleAkkaHttpKorolevApp {
 
   val service = akkaHttpService {
     KorolevServiceConfig [Future, State, Any] (
-      router = Router.empty,
-      stateStorage = StateStorage.default(State()),
+      stateLoader = StateLoader.default(State()),
       render = {
         case state => optimize {
           body(

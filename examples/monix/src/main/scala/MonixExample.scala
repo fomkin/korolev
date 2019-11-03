@@ -42,9 +42,8 @@ class ToDoList[F[_]: Async: Monad] {
   private val editInputId = elementId()
 
   val config = KorolevServiceConfig[F, State, Any](
-    stateStorage = StateStorage.default(State()),
-    router = Router.empty,
-    render = { case state =>
+    stateLoader = StateLoader.default(State()),
+    render = state => {
       body(
         div("Super TODO tracker"),
         div(height @= "250px", overflow @= "scroll",

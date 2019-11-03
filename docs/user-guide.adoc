@@ -116,11 +116,11 @@ The only way to modify the State is by applying a *transition* (see below).
 
 === Render
 
-Render is a view of the state. Render is a function which takes state as an argument and returns a DOM. Korolev has its own DSL to define templates using Scala code. Do not be afraid, you will quickly get used to it.
+Render is a map between state and view. In other words render is a function which takes state as an argument and returns a DOM. Korolev uses https://github.com/fomkin/levsha[Levsha DSL] to define templates using Scala code. Do not be afraid, you will quickly get used to it.
 
 [source,scala]
 -----------------------------------
-val render: Render = {
+val render: State => Node = {
   case Anonymous(_) =>
     body(
       form(
@@ -143,8 +143,6 @@ val render: Render = {
 -----------------------------------
 
 Render is called for each new state. It's important to understand that render produces a full DOM for every call. It does not mean that client receives a new page every time. Korolev makes a diff between current and latest DOM. Only changes between the two are sent to the client.
-
-`Render` is a type alias for `PartialFunction[S, Document.Node]` where `S` is a type of your state.
 
 [NOTE]
 ==========================
@@ -184,14 +182,13 @@ def onClick(access: Access) = {
   }
 }
 
-val renderAnonymous: Render = {
-  case MyState(i) =>
-    body(
-      i.toString,
-      button("Increment",
-        event("click")(onClick)
-      )
+def renderAnonymous(state: MyState) = optimize {
+  body(
+    state.i.toString,
+    button("Increment",
+      event("click")(onClick)
     )
+  )
 }
 --------------------------------------------------------------
 
@@ -214,20 +211,16 @@ def onSubmit(access: Access) = {
   } yield ()
 }
 
-val renderAnonymous: Render = {
-  case Anonymous(_) =>
-    body(
-      form(
-        input(placeholder := "Login", loginField),
-        input(placeholder := "Password", passwordField),
-        button("Submit"),
-        event("submit")(onSubmit)
-      )
+def renderAnonymous = optimize {
+  body(
+    form(
+      input(placeholder := "Login", loginField),
+      input(placeholder := "Password", passwordField),
+      button("Submit"),
+      event("submit")(onSubmit)
     )
+  )
 }
-
-val renderAuthorized: Render = ???
-val render = renderAnonymous orElse renderAuthorized
 -----------------------------------
 
 Event gives you an access to information from the client side. In this case, it it is values of the input fields. Also you can get data from event object using `access.eventData` function`.
@@ -375,21 +368,24 @@ Sometimes you want to update a page after a timeout. For example it is useful wh
 -----------------------------------
 type MyState = Boolean
 
-val render: Render = {
-  case true => body(
-    delay(3.seconds) { access =>
-      access.transition(_ => false)
-    },
-    "Wait 3 seconds!"
-  )
-  case false => body(
-    button(
-      event("click") { access =>
-        access.transition(_ => true)
+def render(state: Boolean) =
+  if (state) {
+    body(
+      delay(3.seconds) { access =>
+        access.transition(_ => false)
       },
-      "Push the button"
+      "Wait 3 seconds!"
     )
-  )
+  } else {
+    body(
+      button(
+        event("click") { access =>
+          access.transition(_ => true)
+        },
+        "Push the button"
+      )
+    )
+  }
 }
 -----------------------------------
 
@@ -403,13 +399,12 @@ Korolev is not just request-response, but also push. One of the big advantages o
 -----------------------------------
 case class MyState(notifications: List[String])
 
-var render: Render = {
-  case MyState(notifications) =>
-    ul(
-      notifications.map(notification =>
-        li(notification)
-      )
+def render(state: MyState) = optimize {
+  ul(
+    state.notifications.map(notification =>
+      li(notification)
     )
+  )
 }
 -----------------------------------
 
@@ -635,10 +630,9 @@ And create Korolev route:
 
 [source,scala]
 ------------------------------
-val config = KorolevServiceConfig[Future, Boolean, Any](
-  stateStorage = StateStorage.default(false),
-  router = Router.empty[Future, Boolean],
-  render = { case _ => body(div("Hello akka-http")) }
+val config = KorolevServiceConfig[Future, String, Any](
+  stateLoader = StateLoader.default("world"),
+  render = state => body(div(s"Hello $state"))
 )
 
 val korolevRoute = akkaHttpService(config).apply(AkkaHttpServerConfig())
@@ -665,10 +659,9 @@ import korolev.catsEffectSupport.implicits._
 
 class Config[F[_]: Effect] {
   ...
-  val config = KorolevServiceConfig[F, Boolean, Any](
-    stateStorage = StateStorage.default(false),
-    router = Router.empty,
-    render = { case _ => body(div("Hello Cats Effect")) }
+  val config = KorolevServiceConfig[F, String, Any](
+    stateLoader = StateLoader.default("Cats"),
+    render = state => body(div("Hello $state"))
   )
 }
 ------------------------------

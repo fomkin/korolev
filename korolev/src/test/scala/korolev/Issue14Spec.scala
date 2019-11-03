@@ -1,11 +1,12 @@
-import korolev._
-import org.scalatest.{FlatSpec, Matchers}
+package korolev
+
 import korolev.internal.{ApplicationInstance, Connection}
 import korolev.state.StateStorage
 import korolev.state.javaSerialization._
+import korolev.testExecution._
+import org.scalatest.{FlatSpec, Matchers}
 
 import scala.concurrent.Future
-import korolev.testExecution._
 
 class Issue14Spec extends FlatSpec with Matchers {
 
@@ -38,7 +39,7 @@ class Issue14Spec extends FlatSpec with Matchers {
           }
         )
       },
-      stateManager = StateStorage.default("firstState").get("", "").value.get.get,
+      stateManager = new StateStorage.SimpleInMemoryStateManager[Future](),
       initialState = "firstState",
       reporter = Reporter.PrintReporter
     )

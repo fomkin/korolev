@@ -25,8 +25,7 @@ object FormDataExample extends SimpleAkkaHttpKorolevApp(AkkaHttpServerConfig(max
 
   val service = akkaHttpService{
     KorolevServiceConfig[Future, State, Any](
-      stateStorage = StateStorage.default(State.empty),
-      router = Router.empty,
+      stateLoader = StateLoader.default(State.empty),
       head = _ => {
         Seq(
           link(

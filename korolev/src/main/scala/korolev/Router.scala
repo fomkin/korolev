@@ -27,7 +27,7 @@ import scala.annotation.tailrec
   * @tparam F A async control
   * @tparam S Type of State
   */
-final case class Router[F[_]: Async, S](
+final case class Router[F[_], S](
     fromState: PartialFunction[S, Router.Path] = PartialFunction.empty,
     toState: PartialFunction[Router.Path, S => F[S]] = PartialFunction.empty
 )
@@ -61,5 +61,5 @@ object Router {
       .foldLeft(Root: Path)((xs, x) => /(xs, x))
   }
 
-  def empty[F[_]: Async, S]: Router[F, S] = Router()
+  def empty[F[_], S]: Router[F, S] = Router()
 }

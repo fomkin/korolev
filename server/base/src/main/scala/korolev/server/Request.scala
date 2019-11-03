@@ -15,9 +15,9 @@
  */
 
 package korolev.server
-import korolev.{Async, LazyBytes, Router}
+import korolev.{LazyBytes, Router}
 
-final case class Request[F[_]: Async](
+final case class Request[F[_]](
   path: Router.Path,
   params: Map[String, String],
   cookie: String => Option[String],

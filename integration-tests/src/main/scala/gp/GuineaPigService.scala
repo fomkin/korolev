@@ -43,7 +43,6 @@ object GuineaPigService {
   import State.globalContext.symbolDsl._
 
   val logger = LoggerFactory.getLogger("GuineaPig")
-  val storage = StateStorage.default[Future, State](State())
 
   val uploadFormId = elementId()
   val inputId = elementId()
@@ -68,7 +67,7 @@ object GuineaPigService {
   }
 
   val service = KorolevServiceConfig[Future, State, Any](
-    stateStorage = storage,
+    stateLoader = StateLoader.default[Future, State](State()),
     reporter = korolev.slf4j.Slf4jReporter,
     head = _ => {
       Seq(

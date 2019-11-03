@@ -13,12 +13,11 @@ object RoutingExample extends SimpleAkkaHttpKorolevApp {
   import levsha.dsl._
   import html._
 
-  val storage = StateStorage.default[Future, State](State())
   val inputId = elementId()
 
   val service = akkaHttpService{
-    KorolevServiceConfig [Future, State, Any] (
-      stateStorage = storage,
+    KorolevServiceConfig [Future, State, Any](
+      stateLoader = StateLoader.default(State()),
       head = _ => {
         Seq(
           title("Main Routing Page"),
@@ -29,8 +28,8 @@ object RoutingExample extends SimpleAkkaHttpKorolevApp {
           )
         )
       },
-      render = {
-        case state => optimize {
+      render = state => {
+        optimize {
           body(
             div("Super TODO tracker"),
             div(

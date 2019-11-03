@@ -54,7 +54,7 @@ final class ComponentInstance
     sessionId: QualifiedSessionId,
     frontend: ClientSideApi[F],
     eventRegistry: EventRegistry[F],
-    stateManager: StateManager[F, CS],
+    stateManager: StateManager[F],
     getRenderNum: () => Int,
     val component: Component[F, CS, P, E],
     reporter: Reporter
@@ -270,9 +270,7 @@ final class ComponentInstance
                 n.setEventsSubscription((e: Any) => entry.eventHandler(browserAccess, e).runIgnoreResult)
                 n.applyRenderContext(entry.parameters, proxy, snapshot)
               case _ =>
-                // Create new nested component instance
-                val sm = stateManager.withDefault(entry.component.initialState)
-                val n = entry.createInstance(id, sessionId, frontend, eventRegistry, sm, getRenderNum, reporter)
+                val n = entry.createInstance(id, sessionId, frontend, eventRegistry, stateManager, getRenderNum, reporter)
                 markedComponentInstances += id
                 nestedComponents.put(id, n)
                 n.subscribeStateChange { (id, state) =>
