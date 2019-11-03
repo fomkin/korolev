@@ -24,7 +24,7 @@ import levsha.impl.{AbstractTextRenderContext, TextPrettyPrintingConfig}
 
 import scala.collection.mutable
 
-final class HtmlRenderContext[F[_]: Async, S, M] extends AbstractTextRenderContext[Effect[F, S, M]] {
+final class HtmlRenderContext[F[_]: Async, S, M] extends AbstractTextRenderContext[Binding[F, S, M]] {
 
   import HtmlRenderContext._
 
@@ -42,9 +42,9 @@ final class HtmlRenderContext[F[_]: Async, S, M] extends AbstractTextRenderConte
 
   val prettyPrinting = TextPrettyPrintingConfig.noPrettyPrinting
 
-  override def addMisc(misc: Effect[F, S, M]): Unit = misc match {
+  override def addMisc(misc: Binding[F, S, M]): Unit = misc match {
     case ComponentEntry(component, parameters, _) =>
-      val rc = this.asInstanceOf[RenderContext[Context.Effect[F, Any, Any]]]
+      val rc = this.asInstanceOf[RenderContext[Context.Binding[F, Any, Any]]]
       // Static pages always made from scratch
       component.render(parameters, component.initialState).apply(rc)
     case _ => ()

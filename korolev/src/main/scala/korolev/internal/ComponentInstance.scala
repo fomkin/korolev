@@ -217,7 +217,7 @@ final class ComponentInstance
   }
 
   def applyRenderContext(parameters: P,
-                         rc: StatefulRenderContext[Effect[F, AS, M]],
+                         rc: StatefulRenderContext[Binding[F, AS, M]],
                          snapshot: StateManager.Snapshot): Unit = miscLock.synchronized {
     // Reset all event handlers delays and elements
     prepare()
@@ -227,14 +227,14 @@ final class ComponentInstance
         component.render(parameters, state)
       } catch {
         case e: MatchError =>
-          Node[Effect[F, CS, E]] { rc =>
+          Node[Binding[F, CS, E]] { rc =>
             reporter.error(s"Render is not defined for $state", e)
             rc.openNode(XmlNs.html, "span")
             rc.addTextNode("Render is not defined for the state")
             rc.closeNode("span")
           }
       }
-    val proxy = new StatefulRenderContext[Effect[F, CS, E]] { proxy =>
+    val proxy = new StatefulRenderContext[Binding[F, CS, E]] { proxy =>
       def subsequentId: Id = rc.subsequentId
       def currentId: Id = rc.currentId
       def currentContainerId: Id = rc.currentContainerId
@@ -243,7 +243,7 @@ final class ComponentInstance
       def setAttr(xmlNs: XmlNs, name: String, value: String): Unit = rc.setAttr(xmlNs, name, value)
       def setStyle(name: String, value: String): Unit = rc.setStyle(name, value)
       def addTextNode(text: String): Unit = rc.addTextNode(text)
-      def addMisc(misc: Effect[F, CS, E]): Unit = {
+      def addMisc(misc: Binding[F, CS, E]): Unit = {
         misc match {
           case event @ Event(eventType, phase, _) =>
             val id = rc.currentContainerId
