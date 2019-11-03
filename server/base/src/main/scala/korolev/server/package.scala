@@ -66,7 +66,7 @@ package object server {
           .fold(Async[F].pure(defaultState))(f => f(defaultState))
         _ <- stateStorage.create(deviceId, sessionId, state)
       } yield {
-        val dsl = new levsha.dsl.SymbolDsl[Context.Effect[F, S, M]]()
+        val dsl = new levsha.dsl.SymbolDsl[Context.Binding[F, S, M]]()
         val textRenderContext = new HtmlRenderContext[F, S, M]()
         val rootPath = config.rootPath
         val clw = {

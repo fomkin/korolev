@@ -37,7 +37,7 @@ final class ApplicationInstance
     connection: Connection[F],
     stateManager: StateManager[F],
     initialState: S,
-    render: S => Document.Node[Effect[F, S, M]],
+    render: S => Document.Node[Binding[F, S, M]],
     router: Router[F, S],
     fromScratch: Boolean,
     reporter: Reporter
@@ -47,18 +47,18 @@ final class ApplicationInstance
 
   private val devMode = new DevMode.ForRenderContext(sessionId.toString, fromScratch)
   private val currentRenderNum = new AtomicInteger(0)
-  private val renderContext = DiffRenderContext[Effect[F, S, M]](savedBuffer = devMode.loadRenderContext())
+  private val renderContext = DiffRenderContext[Binding[F, S, M]](savedBuffer = devMode.loadRenderContext())
   private val frontend = new ClientSideApi[F](connection, reporter)
 
   val topLevelComponentInstance: ComponentInstance[F, S, M, S, Any, M] = {
     val eventRegistry = new EventRegistry[F](frontend)
     val component = new Component[F, S, Any, M](initialState, Component.TopLevelComponentId) {
-      def render(parameters: Any, state: S): Document.Node[Effect[F, S, M]] = {
+      def render(parameters: Any, state: S): Document.Node[Binding[F, S, M]] = {
         try {
           application.render(state)
         } catch {
           case e: MatchError =>
-            Document.Node[Effect[F, S, M]] { rc =>
+            Document.Node[Binding[F, S, M]] { rc =>
               reporter.error(s"Render is not defined for $state")
               rc.openNode(XmlNs.html, "body")
               rc.addTextNode("Render is not defined for the state. ")

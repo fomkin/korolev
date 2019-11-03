@@ -48,18 +48,18 @@ object Context {
 
     import EventPhase._
 
-    type Effect = Context.Effect[F, S, M]
+    type Binding = Context.Binding[F, S, M]
     type Event = Context.Event[F, S, M]
     type EventFactory[T] = T => Event
     type Transition = korolev.Transition[S]
-    type Render = PartialFunction[S, Document.Node[Effect]]
+    type Render = PartialFunction[S, Document.Node[Binding]]
     type ElementId = Context.ElementId[F]
     type Access = Context.Access[F, AccessType, M]
     type UnscopedAccess = Context.Access[F, S, M]
     type EventResult = F[Unit]
-    type Document = levsha.Document[Effect]
-    type Node = levsha.Document.Node[Effect]
-    type Attr = levsha.Document.Attr[Effect]
+    type Document = levsha.Document[Binding]
+    type Node = levsha.Document.Node[Binding]
+    type Attr = levsha.Document.Attr[Binding]
 
     val symbolDsl = new KorolevTemplateDsl[F, S, M]()
 
@@ -291,7 +291,7 @@ object Context {
     */
   abstract class Access[F[_]: Async, S, M] extends BaseAccess[F, S, M] with EventAccess[F, S, M]
 
-  sealed abstract class Effect[F[_]: Async, +S, +M]
+  sealed abstract class Binding[F[_]: Async, +S, +M]
 
   abstract class PropertyHandler[F[_]: Async] {
     @deprecated("""Use "propertyName" instead of 'propertyName""", "0.13.0")
@@ -329,7 +329,7 @@ object Context {
       parameters: P,
       eventHandler: (Access[F, AS, M], E) => F[Unit]
     )
-    extends Effect[F, AS, M] {
+    extends Binding[F, AS, M] {
 
     def createInstance(node: Id,
                        sessionId: QualifiedSessionId,
@@ -345,13 +345,13 @@ object Context {
   final case class Event[F[_]: Async, S, M](
       `type`: String,
       phase: EventPhase,
-      effect: Access[F, S, M] => F[Unit]) extends Effect[F, S, M]
+      effect: Access[F, S, M] => F[Unit]) extends Binding[F, S, M]
 
   final case class Delay[F[_]: Async, S, M](
       duration: FiniteDuration,
-      effect: Access[F, S, M] => F[Unit]) extends Effect[F, S, M]
+      effect: Access[F, S, M] => F[Unit]) extends Binding[F, S, M]
 
-  final class ElementId[F[_]: Async](val name: Option[String]) extends Effect[F, Nothing, Nothing] {
+  final class ElementId[F[_]: Async](val name: Option[String]) extends Binding[F, Nothing, Nothing] {
     override def equals(obj: Any): Boolean = obj match {
       case other: ElementId[F] => if (name.isDefined) name == other.name else super.equals(other)
       case _ => false

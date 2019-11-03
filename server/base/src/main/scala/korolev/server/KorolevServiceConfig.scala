@@ -27,10 +27,10 @@ case class KorolevServiceConfig[F[_]: Async, S, M](
   stateStorage: korolev.state.StateStorage[F, S] = null, // By default it StateStorage.DefaultStateStorage
   router: Router[F, S] = Router.empty[F, S],
   rootPath: String = "/",
-  render: S => Document.Node[Context.Effect[F, S, M]] = (_: S) => levsha.dsl.html.body(),
-  head: S => Seq[Document.Node[Context.Effect[F, S, M]]] = (_: S) => Seq.empty,
-  connectionLostWidget: Document.Node[Context.Effect[F, S, M]] =
-    KorolevServiceConfig.defaultConnectionLostWidget[Context.Effect[F, S, M]],
+  render: S => Document.Node[Context.Binding[F, S, M]] = (_: S) => levsha.dsl.html.body(),
+  head: S => Seq[Document.Node[Context.Binding[F, S, M]]] = (_: S) => Seq.empty,
+  connectionLostWidget: Document.Node[Context.Binding[F, S, M]] =
+    KorolevServiceConfig.defaultConnectionLostWidget[Context.Binding[F, S, M]],
   maxFormDataEntrySize: Int = 1024 * 1024 * 8,
   envConfigurator: EnvConfigurator[F, S, M] = EnvConfigurator.default[F, S, M],
   idGenerator: IdGenerator[F] = IdGenerator.default[F](),

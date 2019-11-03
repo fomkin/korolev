@@ -18,27 +18,27 @@ package korolev
 
 import korolev.utils.HtmlUtil
 import levsha.Document
-import Context.Effect
+import Context.Binding
 import levsha.dsl.SymbolDsl
 
 /**
   * Levsha DSL with enrichments.
   */
-final class KorolevTemplateDsl[F[_]: Async, S, M] extends SymbolDsl[Effect[F, S, M]] {
+final class KorolevTemplateDsl[F[_]: Async, S, M] extends SymbolDsl[Binding[F, S, M]] {
 
   implicit final class KorolevSymbolOps(s: Symbol) {
 
     /** define style attribute (for pixels) */
-    def @=[T: Numeric](value: T): Document.Attr[Effect[F, S, M]] =
+    def @=[T: Numeric](value: T): Document.Attr[Binding[F, S, M]] =
       @=(s"${value}px")
 
     /** define style attribute */
-    def @=(value: String): Document.Attr[Effect[F, S, M]] = Document.Attr { rc =>
+    def @=(value: String): Document.Attr[Binding[F, S, M]] = Document.Attr { rc =>
       rc.setStyle(s.name, value)
     }
 
     /** define property */
-    def :=(value: String): Document.Attr[Effect[F, S, M]] = Document.Attr { rc =>
+    def :=(value: String): Document.Attr[Binding[F, S, M]] = Document.Attr { rc =>
       rc.setAttr(levsha.XmlNs.html, HtmlUtil.camelCaseToSnakeCase(s.name, '^', 0), value)
     }
   }
@@ -46,6 +46,6 @@ final class KorolevTemplateDsl[F[_]: Async, S, M] extends SymbolDsl[Effect[F, S,
   /**
     * Make 'a tag non-clickable
     */
-  val disableHref: Document.Attr[Effect[F, S, M]] =
+  val disableHref: Document.Attr[Binding[F, S, M]] =
     'onclick /= "return false"
 }
