@@ -16,8 +16,8 @@
 
 package korolev.server
 
-import korolev.state.{Extension, IdGenerator}
-import korolev.{Async, Context, Reporter, Router}
+import korolev.state.IdGenerator
+import korolev.{Async, Context, Extension, Reporter, Router}
 import levsha.Document
 
 import scala.concurrent.duration._
