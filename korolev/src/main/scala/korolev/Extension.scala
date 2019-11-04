@@ -19,14 +19,34 @@ package korolev
 import Extension.Handlers
 
 trait Extension[F[_], S, M] {
+
+  /**
+   * Invokes then new sessions created
+   * @return
+   */
   def setup(access: Context.BaseAccess[F, S, M]): F[Handlers[F, S, M]]
 }
 
 object Extension {
 
   abstract class Handlers[F[_]: Async, S, M] {
+
+    /**
+     * Invokes when state updated.
+     * @return
+     */
     def onState(state: S): F[Unit] = Async[F].unit
+
+    /**
+     * Invokes when message published.
+     * @see Context.BaseAccess.publish
+     */
     def onMessage(message: M): F[Unit] = Async[F].unit
+
+    /**
+     * Invokes when user closes tab.
+     * @return
+     */
     def onDestroy(): F[Unit] = Async[F].unit
   }
 
@@ -39,6 +59,12 @@ object Extension {
   }
 
   object Handlers {
+
+    /**
+     * @param onState Invokes when state updated.
+     * @param onMessage Invokes when message published.
+     * @param onDestroy Invokes when user closes tab.
+     */
     def apply[F[_]: Async, S, M](onState: S => F[Unit] = null,
                                  onMessage: M => F[Unit] = null,
                                  onDestroy: () => F[Unit] = null): Handlers[F, S, M] =
