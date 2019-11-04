@@ -98,6 +98,9 @@ final class ClientSideApi[F[_]: Async](connection: Connection[F], reporter: Repo
     promise.async
   }
 
+  def resetForm(id: Id): Unit =
+    connection.send(Procedure.RestForm.code, id.mkString)
+
   def changePageUrl(path: Path): Unit =
     connection.send(Procedure.ChangePageUrl.code, path.toString)
 
@@ -275,11 +278,12 @@ object ClientSideApi {
     case object EvalJs extends Procedure(10) // (code)
     case object ExtractEventData extends Procedure(11) // (descriptor, renderNum)
     case object UploadFiles extends Procedure(12) // (id, descriptor)
+    case object RestForm extends Procedure(13) // (id)
 
     val All = Set(
       SetRenderNum, CleanRoot, ListenEvent, ExtractProperty,
       ModifyDom, Focus, ChangePageUrl, UploadForm, ReloadCss,
-      KeepAlive, EvalJs, ExtractEventData
+      KeepAlive, EvalJs, ExtractEventData, UploadFiles, RestForm
     )
 
     def apply(n: Int): Option[Procedure] =

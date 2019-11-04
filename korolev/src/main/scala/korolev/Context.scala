@@ -89,6 +89,9 @@ object Context {
         def downloadFilesAsStream(id: Context.ElementId[F]): F[List[File[LazyBytes[F]]]] =
           access.downloadFilesAsStream(id)
 
+        def resetForm(id: Context.ElementId[F]): F[Unit] =
+          access.resetForm(id)
+
         def state: F[S2] = Async[F].map(access.state)(read)
 
         def transition(f: korolev.Transition[S2]): F[Unit] =
@@ -243,6 +246,12 @@ object Context {
       * to keep in memory (especially when count of users is more than one).
       */
     def downloadFilesAsStream(id: ElementId[F]): F[List[File[LazyBytes[F]]]]
+
+    /**
+      * Purge inputs in given form.
+      * @param id form element id binding
+      */
+    def resetForm(id: ElementId[F]): F[Unit]
 
     /**
       * Gives current state.

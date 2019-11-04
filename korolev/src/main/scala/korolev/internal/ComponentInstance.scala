@@ -175,6 +175,12 @@ final class ComponentInstance
       promise.async
     }
 
+
+    def resetForm(elementId: ElementId[F]): F[Unit] =
+      getId(elementId).map { id =>
+        frontend.resetForm(id)
+      }
+
     def evalJs(code: String): F[String] = frontend.evalJs(code)
 
     def eventData: F[String] = {
