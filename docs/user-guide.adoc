@@ -391,7 +391,7 @@ def render(state: Boolean) =
 
 https://github.com/fomkin/korolev/blob/v0.13.0/examples/delay/src/main/scala/DelayExample.scala[See full example]
 
-=== Environment configurator
+=== Extensions
 
 Korolev is not just request-response, but also push. One of the big advantages of Korolev is the ability to display server side events without additional code. Consider example where we have a page with some sort of notifications list.
 
@@ -414,18 +414,25 @@ Also, we have a message queue which has a topic with notifications for current u
 -------------------------------------------------------------------------------
 val notificationQueue = ...
 
+val notificationsExtension = Extension { access =>
+  for {
+    subscription <- notificationQueue subscribe { notification =>
+      access.transition(s =>
+        s.copy(notifications = notification :: s.notifications)
+      )
+    }
+  } yield Extension.Handlers(onDestroy = subscription.stop())
+}
+
 KorolevServiceConfig(
   ...
-  envConfigurator = EnvConfigurator { access =>
-    val subscription = notificationQueue subscribe { notification =>
-      access.transition(s => s.copy(notifications = notification :: s.notifications))
-    }
-    EnvConfigurator.Env(onDestroy = subscription.stop())
-  }
+  extensions = List(notificationsExtension)
 )
 -------------------------------------------------------------------------------
 
-Now every invocation of lambda which was passed to `notificationQueue.subscribe` will run the transition which will prepend notifications to the state. Render will be invoked automatically and user will get his page updated.
+Now every session is subscribed to new notifications. Render will be invoked automatically and user will get his page updated.
+
+https://github.com/fomkin/korolev/blob/v0.13.0/examples/extension/src/main/scala/ExtensionExample.scala[See full example]
 
 === Routing
 

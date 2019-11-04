@@ -218,6 +218,13 @@ lazy val contextScopeExample = (project in examples / "context-scope").
   settings(mainClass := Some("ContextScopeExample")).
   dependsOn(`server-akkahttp`)
 
+lazy val extensionExample = (project in examples / "extension")
+  .disablePlugins(HeaderPlugin)
+  .settings(crossVersionSettings)
+  .settings(exampleSettings: _*)
+  .settings(mainClass := Some("ExtensionExample"))
+  .dependsOn(`server-akkahttp`)
+
 lazy val `integration-tests` = project.
   disablePlugins(HeaderPlugin).
   settings(crossVersionSettings).

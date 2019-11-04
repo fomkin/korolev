@@ -16,8 +16,8 @@
 
 package korolev.server
 
-import korolev.state.{EnvConfigurator, IdGenerator}
-import korolev.{Async, Context, Reporter, Router}
+import korolev.state.IdGenerator
+import korolev.{Async, Context, Extension, Reporter, Router}
 import levsha.Document
 
 import scala.concurrent.duration._
@@ -32,7 +32,7 @@ case class KorolevServiceConfig[F[_]: Async, S, M](
   connectionLostWidget: Document.Node[Context.Binding[F, S, M]] =
     KorolevServiceConfig.defaultConnectionLostWidget[Context.Binding[F, S, M]],
   maxFormDataEntrySize: Int = 1024 * 1024 * 8,
-  envConfigurator: EnvConfigurator[F, S, M] = EnvConfigurator.default[F, S, M],
+  extensions: List[Extension[F, S, M]] = Nil,
   idGenerator: IdGenerator[F] = IdGenerator.default[F](),
   heartbeatInterval: FiniteDuration = 5.seconds,
   reporter: Reporter = Reporter.PrintReporter
