@@ -272,6 +272,6 @@ lazy val root = project.in(file(".")).
     simpleExample, routingExample, gameOfLifeExample,
     formDataExample, `file-streaming-example`, delayExample, focusExample,
     webComponentExample, componentExample, akkaHttpExample, contextScopeExample,
-    eventDataExample, `integration-tests`
+    eventDataExample, extensionExample, `integration-tests`
   )
 

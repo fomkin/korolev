@@ -22,6 +22,8 @@ object FormDataExample extends SimpleAkkaHttpKorolevApp(AkkaHttpServerConfig(max
 
   val myForm = elementId()
   val pictureFieldName = "picture"
+  val textFieldName = "text"
+  val multiLineText = "multiLineText"
 
   val service = akkaHttpService{
     KorolevServiceConfig[Future, State, Any](
@@ -52,74 +54,82 @@ object FormDataExample extends SimpleAkkaHttpKorolevApp(AkkaHttpServerConfig(max
           )
         )
       },
-      render = {
-        case Initial =>
-          body (
-            form (`class` := "card",
-              myForm,
-              div (
-                `class` := "card-block",
-                legend ("FormData Example"),
-                p (
-                  label ("Picture"),
-                  input (`type` := "file", name := pictureFieldName)
-                ),
-                p (
-                  button ("Submit")
-                )
+      render = { state =>
+
+        body (
+          form (`class` := "card",
+            myForm,
+            div (
+              `class` := "card-block",
+              legend ("FormData Example"),
+              p (
+                label ("The text"),
+                input (`type` := "text", name := textFieldName)
               ),
-              event("submit") { access =>
-                for {
-                  formData <- access
-                    .downloadFormData(myForm)
-                    .onProgress((loaded, total) => _ => InProgress(loaded, total))
-                    .start()
+              p (
+                label ("The text area"),
+                textarea (name := multiLineText)
+              ),
+              p (
+                label ("Picture"),
+                input (`type` := "file", name := pictureFieldName)
+              ),
+              p (
+                button ("Submit")
+              )
+            ),
+            event("submit") { access =>
+              for {
+                formData <- access
+                  .downloadFormData(myForm)
+                  .onProgress((loaded, total) => _ => InProgress(loaded, total))
+                  .start()
+                _ <- access.resetForm(myForm)
+                _ = println(formData)
+                _ <- access.transition { _ =>
+                  val buffer = formData.bytes(pictureFieldName)
+                  val pictureBase64 = Base64.getEncoder.encodeToString(buffer.array())
+                  val parsedImage = ImageIO.read(new ByteArrayInputStream(buffer.array()))
 
-                  _ = println(formData)
-                  _ <- access.transition { _ =>
-                    val buffer = formData.bytes(pictureFieldName)
-                    val pictureBase64 = Base64.getEncoder.encodeToString(buffer.array())
-                    val parsedImage = ImageIO.read(new ByteArrayInputStream(buffer.array()))
-
-                    formData.contentType(pictureFieldName) match {
-                      case Some(mimeType) =>
-                        Complete(
-                          picture = pictureBase64,
-                          mimeType = mimeType,
-                          width = parsedImage.getWidth,
-                          height = parsedImage.getHeight
-                        )
-                      case None =>
-                        Error("Unknown image format")
-                    }
+                  formData.contentType(pictureFieldName) match {
+                    case Some(mimeType) =>
+                      Complete(
+                        picture = pictureBase64,
+                        mimeType = mimeType,
+                        width = parsedImage.getWidth,
+                        height = parsedImage.getHeight
+                      )
+                    case None =>
+                      Error("Unknown image format")
                   }
                 }
-                  yield ()
-              }
-            )
-          )
-        case InProgress(loaded, total) =>
-          body (
-            div (`class` := "card",
-              div (`class` := "card-block",
-                div (`class` := "progress",
-                  div (
-                    `class` := "progress-bar progress-bar-striped progress-bar-animated",
-                    role := "progress-bar",
-                    width @= s"${(loaded.toDouble / total) * 100}%"
+              } yield ()
+            }
+          ),
+          state match {
+            case Initial => div()
+            case InProgress(loaded, total) =>
+              div (`class` := "card",
+                div (`class` := "card-block",
+                  div (`class` := "progress",
+                    div (
+                      `class` := "progress-bar progress-bar-striped progress-bar-animated",
+                      role := "progress-bar",
+                      width @= s"${(loaded.toDouble / total) * 100}%"
+                    )
                   )
                 )
               )
-            )
-          )
-        case Complete(picture, mimeType, w, h) =>
-          body (
-            div (
-              backgroundImage @= s"url(data:$mimeType;base64,$picture')",
-              width @= s"${w}px",
-              height @= s"${h}px"
-            )
-          )
+            case Complete(picture, mimeType, w, h) =>
+              div (
+                backgroundImage @= s"url(data:$mimeType;base64,$picture')",
+                width @= s"${w}px",
+                height @= s"${h}px"
+              )
+            case Error(msg) =>
+              div(backgroundColor @= "red", color @= "white", msg)
+          }
+        )
       },
       maxFormDataEntrySize = 1024 * 1024 * 20
     )
