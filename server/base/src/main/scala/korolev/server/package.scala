@@ -153,12 +153,24 @@ package object server {
           config.render, config.router, fromScratch = !isOld,
           reporter
         )
-        env <- config.envConfigurator.configure(korolev.topLevelComponentInstance.browserAccess)
+        ba = korolev.topLevelComponentInstance.browserAccess
+        extensionHandlers <- Async[F].sequence(config.extensions.map(e => e.setup(ba)))
       } yield {
 
-        // Subscribe to events to publish them to env
+        // Subscribe to top level state change
+        korolev.topLevelComponentInstance.subscribeStateChange { (node, state) =>
+          if (node == Id.TopLevel) {
+            extensionHandlers.foreach { handler =>
+              handler.onState(state.asInstanceOf[S]).runIgnoreResult
+            }
+          }
+        }
+
+        // Subscribe to events to publish them to extension
         korolev.topLevelComponentInstance.setEventsSubscription { message: M =>
-          env.onMessage(message).runIgnoreResult
+          extensionHandlers.foreach { handler =>
+            handler.onMessage(message).runIgnoreResult
+          }
         }
 
         new KorolevSession[F] {
@@ -210,25 +222,23 @@ package object server {
           }
 
           def destroy(): F[Unit] = {
-            if (aliveRef.getAndSet(false))
-              env.onDestroy()
+            if (aliveRef.getAndSet(false)) {
+              Async[F]
+                .sequence(extensionHandlers.map(_.onDestroy()))
                 .recover {
                   case ex: Throwable =>
                     reporter.error("Error destroying environment", ex)
-                    ()
+                    Nil
                 }
                 .map { _ =>
                   currentPromise.get() foreach { promise =>
                     promise.complete(Failure(new SessionDestroyedException("Session has been closed")))
                   }
-
                   stateStorage.remove(deviceId, sessionId)
                   sessions.remove(sessionKey)
-
                   ()
                 }
-            else
-              Async[F].unit
+            } else Async[F].unit
           }
         }
       }
