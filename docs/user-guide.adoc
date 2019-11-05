@@ -293,7 +293,7 @@ body(
 )
 -----------------------------------
 
-https://github.com/fomkin/korolev/blob/v0.13.0/examples/component/src/main/scala/ComponentExample.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.14.0/examples/component/src/main/scala/ComponentExample.scala[See full example]
 
 === Access element properties
 
@@ -358,7 +358,7 @@ form(
 
 Use `onProgress` callback to handle progress of the form downloading. Function `start` return a `FormData`. Look API documentation for more details.
 
-https://github.com/fomkin/korolev/blob/v0.13.0/examples/form-data/src/main/scala/FormDataExample.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.14.0/examples/form-data/src/main/scala/FormDataExample.scala[See full example]
 
 === Delays
 
@@ -389,7 +389,7 @@ def render(state: Boolean) =
 }
 -----------------------------------
 
-https://github.com/fomkin/korolev/blob/v0.13.0/examples/delay/src/main/scala/DelayExample.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.14.0/examples/delay/src/main/scala/DelayExample.scala[See full example]
 
 === Extensions
 
@@ -432,7 +432,7 @@ KorolevServiceConfig(
 
 Now every session is subscribed to new notifications. Render will be invoked automatically and user will get his page updated.
 
-https://github.com/fomkin/korolev/blob/v0.13.0/examples/extension/src/main/scala/ExtensionExample.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.14.0/examples/extension/src/main/scala/ExtensionExample.scala[See full example]
 
 === Routing
 
@@ -468,7 +468,7 @@ KorolevServiceConfig(
 )
 -------------------------------------------------------------------------------
 
-https://github.com/fomkin/korolev/blob/v0.13.0/examples/routing/src/main/scala/RoutingExample.scala#L93[See full example]
+https://github.com/fomkin/korolev/blob/v0.14.0/examples/routing/src/main/scala/RoutingExample.scala#L93[See full example]
 
 ==== Running at a nested path
 
@@ -525,7 +525,7 @@ Now you have context scoped to Tab2. If this context is imported, you will have 
 
 Sometimes, being in context scope, you need to apply a transition to all state. In this case, you can handle an event using `eventUnscoped` method of the context. You will get `UnscopedAccess` which ignores current context scope.
 
-https://github.com/fomkin/korolev/blob/v0.13.0/examples/context-scope/src/main/scala/ContextScopeExample.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.14.0/examples/context-scope/src/main/scala/ContextScopeExample.scala[See full example]
 
 == JavaScript interoperability
 
@@ -538,7 +538,7 @@ If you need to extend your application with something that you can't implement w
 Korolev doesn't have any specific code to support WebComponents. WebComponent (Custom Elements + Shadow DOM) by design should behave as regular HTML tags. There is no difference between, for example, input or textarea, and any custom element.
 ============
 
-https://github.com/fomkin/korolev/blob/v0.13.0/examples/web-component/src/main/scala/WebComponentExample.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.14.0/examples/web-component/src/main/scala/WebComponentExample.scala[See full example]
 
 === Call JavaScript from server
 
@@ -613,7 +613,7 @@ By default Korolev log all messages to standard output. You can redirect logs to
 
 [source,scala]
 ------------------------------
-libraryDependencies += "com.github.fomkin" %% "korolev-slf4j-support" % "0.13.0"
+libraryDependencies += "com.github.fomkin" %% "korolev-slf4j-support" % "0.14.0"
 ------------------------------
 
 === Akka HTTP
@@ -622,7 +622,7 @@ Korolev provides smooth Akka HTTP integration out of the box. To use it, add a d
 
 [source,scala]
 ------------------------------
-libraryDependencies += "com.github.fomkin" %% "korolev-server-akkahttp" % "0.13.0"
+libraryDependencies += "com.github.fomkin" %% "korolev-server-akkahttp" % "0.14.0"
 ------------------------------
 
 [source,scala]
@@ -647,7 +647,7 @@ val korolevRoute = akkaHttpService(config).apply(AkkaHttpServerConfig())
 
 Then embed the route into your Akka HTTP routes structure.
 
-https://github.com/fomkin/korolev/blob/v0.13.0/examples/akka-http/src/main/scala/AkkaHttpExample.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.14.0/examples/akka-http/src/main/scala/AkkaHttpExample.scala[See full example]
 
 This integration overrides default logging behavior to `akka.event.Logging`.
 
@@ -657,7 +657,7 @@ Cats-effect integration module provides `Async` instance from `cats.effect.Effec
 
 [source,scala]
 ------------------------------
-libraryDependencies += "com.github.fomkin" %% "korolev-cats-effect-support" % "0.13.0"
+libraryDependencies += "com.github.fomkin" %% "korolev-cats-effect-support" % "0.14.0"
 ------------------------------
 
 [source,scala]
@@ -673,7 +673,7 @@ class Config[F[_]: Effect] {
 }
 ------------------------------
 
-https://github.com/fomkin/korolev/blob/v0.13.0/examples/monix/src/main/scala/MonixExample.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.14.0/examples/monix/src/main/scala/MonixExample.scala[See full example]
 
 == Troubleshooting
 
@@ -698,7 +698,7 @@ Now you can see something like this.
 ------------------------------
 
 Message starting with `->` is commands from server. Message started with `<-` is callback and client side events.
-First number is always an procedure or callback code. You can protocol description https://github.com/fomkin/korolev/blob/v0.13.0/korolev/src/main/protocol.md[here].
+First number is always an procedure or callback code. You can protocol description https://github.com/fomkin/korolev/blob/v0.14.0/korolev/src/main/protocol.md[here].
 
 === Reconnections under Kubernetes Ingress
 
