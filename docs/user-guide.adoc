@@ -100,11 +100,11 @@ case class User(
   friends: Seq[String])
 -----------------------------------
 
-State is stored in `StateStorage`.
+State stores in `StateStorage` and initializes in `StageLoader`.
 
 [source,scala]
 -----------------------------------
-StateStorage[Future, MyState].forDeviceId { deviceId =>
+StateLoader.forDeviceId { deviceId =>
   // This hypothetical service method returns Future[User]
   authorizationService.getUserByDeviceId(deviceId) map { user =>
     Authorized(deviceId, user)
@@ -242,7 +242,8 @@ There are two ways to define a component: in functional and in object-oriented s
 val MyComponent = Component[Future, ComponentState, ComponentParameters, EventType](initialState) { (context, parameters, state) =>
 
   import context._
-  import symbolDsl._
+  import levsha.dsl._
+  import html._
 
   div(
     parameters.toString,
@@ -262,7 +263,8 @@ Same component can be defined in object-oriented style.
 object MyComponent extends Component[Future, ComponentState, ComponentParameters, EventType](initialState) {
 
   import context._
-  import symbolDsl._
+  import levsha.dsl._
+  import html._
 
   def render(parameters: ComponentParameters, state: ComponentState): Node = {
     div(
