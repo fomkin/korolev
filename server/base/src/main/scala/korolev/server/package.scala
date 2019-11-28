@@ -297,17 +297,17 @@ package object server {
         sessions.get(makeSessionKey(deviceId, sessionId)) match {
           case Some(session) =>
             Async[F].map(body.toStrictUtf8) { info =>
-              val files = info
-                .split("\n")
-                .flatMap { entry =>
-                  entry.lastIndexOf('/') match {
-                      case -1 =>
-                        None
-                      case slash =>
-                        Some((entry.substring(0, slash), entry.substring(slash + 1).toLong))
-                    }
-                }
-                .toMap
+              val files: Map[SessionId, Long] = if (info.isEmpty) {
+                Map.empty[SessionId, Long]
+              } else {
+                info
+                  .split("\n")
+                  .map { entry =>
+                    val slash = entry.lastIndexOf('/')
+                    (entry.substring(0, slash), entry.substring(slash + 1).toLong)
+                  }
+                  .toMap
+              }
               session.fileDownloadInfo(descriptor, files)
               Response.Http(Response.Status.Ok, None)
             }
