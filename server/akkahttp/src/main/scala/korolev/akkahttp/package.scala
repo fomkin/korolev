@@ -203,7 +203,7 @@ package object akkahttp {
     if (f.isInstanceOf[Future[_]]: @unchecked) f.asInstanceOf[Future[T]]
     else {
       val p = Promise[T]()
-      Async[F].run(f)(p.complete)
+      Async[F].runAsync(f)(p.complete)
       p.future
     }
 }

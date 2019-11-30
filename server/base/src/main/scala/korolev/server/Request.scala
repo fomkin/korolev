@@ -19,8 +19,23 @@ import korolev.{LazyBytes, Router}
 
 final case class Request[F[_]](
   path: Router.Path,
-  params: Map[String, String],
+  param: String => Option[String],
   cookie: String => Option[String],
   headers: Seq[(String, String)],
   body: LazyBytes[F]
 )
+
+object Request {
+  sealed trait Method
+
+  object Method {
+    case object Post extends Method
+    case object Get extends Method
+    case object Put extends Method
+    case object Delete extends Method
+    case object Options extends Method
+    case object Head extends Method
+    case object Trace extends Method
+    case object Connect extends Method
+  }
+}

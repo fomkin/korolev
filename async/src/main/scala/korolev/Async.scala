@@ -18,7 +18,8 @@ package korolev
 
 import scala.annotation.implicitNotFound
 import scala.collection.mutable
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.duration.Duration
+import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
 @implicitNotFound("Instance of Async for ${F} is not found. If you want Future, ensure that execution context is passed to the scope (import korolev.execution.defaultExecutor)")
@@ -33,7 +34,8 @@ trait Async[F[_]] {
   def map[A, B](m: F[A])(f: A => B): F[B]
   def recover[A](m: F[A])(f: PartialFunction[Throwable, A]): F[A]
   def sequence[A](in: List[F[A]]): F[List[A]]
-  def run[A, U](m: F[A])(callback: Try[A] => U): Unit
+  def runAsync[A, U](m: F[A])(callback: Try[A] => U): Unit
+  def run[A](m: F[A], timeout: Duration): A
 }
 
 object Async {
@@ -57,7 +59,8 @@ object Async {
     def fromTry[A](value: => Try[A]): Future[A] = Future.fromTry(value)
     def flatMap[A, B](m: Future[A])(f: A => Future[B]): Future[B] = m.flatMap(f)
     def map[A, B](m: Future[A])(f: A => B): Future[B] = m.map(f)
-    def run[A, U](m: Future[A])(f: Try[A] => U): Unit = m.onComplete(f)
+    def runAsync[A, U](m: Future[A])(f: Try[A] => U): Unit = m.onComplete(f)
+    def run[A](m: Future[A], timeout: Duration): A = Await.result(m, timeout)
     def recover[A](m: Future[A])(f: PartialFunction[Throwable, A]): Future[A] = m.recover(f)
     def sequence[A](in: List[Future[A]]): Future[List[A]] =
       Future.sequence(in)
@@ -92,14 +95,14 @@ object Async {
     def map[B](f: A => B): F[B] = Async[F].map(async)(f)
     def flatMap[B](f: A => F[B]): F[B] = Async[F].flatMap(async)(f)
     def recover(f: PartialFunction[Throwable, A]): F[A] = Async[F].recover[A](async)(f)
-    def run[U](f: Try[A] => U): Unit = Async[F].run(async)(f)
+    def run[U](f: Try[A] => U): Unit = Async[F].runAsync(async)(f)
     def runOrReport[U](f: A => U)(implicit er: Reporter): Unit =
-      Async[F].run(async) {
+      Async[F].runAsync(async) {
         case Success(x) => f(x)
         case Failure(e) => er.error("Unhandled error", e)
       }
     def runIgnoreResult(implicit er: Reporter): Unit =
-      Async[F].run(async) {
+      Async[F].runAsync(async) {
         case Success(_) => // do nothing
         case Failure(e) => er.error("Unhandled error", e)
       }
