@@ -35,7 +35,7 @@ package object server {
 
   type StateLoader[F[_], S] = (DeviceId, Option[Request[F]]) => F[S]
   type MimeTypes = String => Option[String]
-  type KorolevService[F[_]] = PartialFunction[Request[F], F[Response]]
+  type KorolevService[F[_]] = PartialFunction[Request[F], F[Response[F]]]
 
   def korolevService
       [
@@ -56,7 +56,7 @@ package object server {
       else config.stateStorage
     val sessions = TrieMap.empty[String, KorolevSession[F]]
 
-    def renderStatic(request: Request[F]): F[Response] =
+    def renderStatic(request: Request[F]): F[Response[F]] =
       for {
         deviceId <- deviceFromRequest(request)
         sessionId <- config.idGenerator.generateSessionId()
@@ -97,7 +97,7 @@ package object server {
             "content-type" -> htmlContentType,
             "set-cookie" -> s"${Cookies.DeviceId}=$deviceId; Path=${config.rootPath}"
           ),
-          body = Some {
+          maybeBody = Some {
             val sb = mutable.StringBuilder.newBuilder
             val html = sb
               .append("<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.1//EN\" \"http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd\">")
@@ -246,9 +246,9 @@ package object server {
 
     val formDataCodec = new FormDataCodec(config.maxFormDataEntrySize)
 
-    val response404 = Async[F].delay[Response](Response.Http(Response.Status.NotFound, None, Seq.empty))
+    val response404 = Async[F].delay[Response[F]](Response.Http(Response.Status.NotFound))
 
-    val service: PartialFunction[Request[F], F[Response]] = {
+    val service: PartialFunction[Request[F], F[Response[F]]] = {
       case Request(Root / "static", _, _, _, _) => response404
       case Request(path, _, _, _, _) if path.startsWith("static") =>
         val fsPath = path.toString
@@ -281,17 +281,17 @@ package object server {
             boundaryOpt match {
               case None =>
                 val error = "Content-Type should be `multipart/form-data`"
-                val res = Response.Http(Response.Status.BadRequest, error)
+                val res = Response.Http(Response.Status.BadRequest, error, Nil)
                 Async[F].delay(res)
               case Some(boundary) =>
                 r.body.toStrict.map { body =>
                   val formData = Try(formDataCodec.decode(ByteBuffer.wrap(body), boundary))
                   session.resolveFormData(descriptor, formData)
-                  Response.Http(Response.Status.Ok, None)
+                  Response.Http(Response.Status.Ok)
                 }
             }
           case None =>
-            Async[F].delay(Response.Http(Response.Status.BadRequest, "Session doesn't exist"))
+            Async[F].delay(Response.Http(Response.Status.BadRequest, "Session doesn't exist", Nil))
         }
       case Request(Root / "bridge" / deviceId / sessionId / "file" / descriptor / "info", _, _, _, body) =>
         sessions.get(makeSessionKey(deviceId, sessionId)) match {
@@ -309,10 +309,10 @@ package object server {
                   .toMap
               }
               session.fileDownloadInfo(descriptor, files)
-              Response.Http(Response.Status.Ok, None)
+              Response.Http(Response.Status.Ok)
             }
           case None =>
-            Async[F].delay(Response.Http(Response.Status.BadRequest, "Session doesn't exist"))
+            Async[F].delay(Response.Http(Response.Status.BadRequest, "Session doesn't exist", Nil))
         }
       case Request(Root / "bridge" / deviceId / sessionId / "file" / descriptor, _, _, headers, body) =>
         val result =
@@ -323,7 +323,7 @@ package object server {
             session.resolveFile(descriptor, name, Success(body))
           }
         result match {
-          case Some(_) => body.finished.map(_ => Response.Http(Response.Status.Ok, None))
+          case Some(_) => body.finished.map(_ => Response.Http(Response.Status.Ok))
           case None => Async[F].delay(Response.Http(Response.Status.BadRequest))
         }
       case Request(Root / "bridge" / "long-polling" / deviceId / sessionId / "publish", _, _, _, body) =>
@@ -334,10 +334,10 @@ package object server {
               message = new String(bytes, StandardCharsets.UTF_8)
               _ <- session.publish(message)
             } yield {
-              Response.Http(Response.Status.Ok)
+              Response.Http[F](Response.Status.Ok)
             }
           case None =>
-            Async[F].delay(Response.Http(Response.Status.BadRequest, "Session doesn't exist"))
+            Async[F].delay(Response.Http(Response.Status.BadRequest, "Session doesn't exist", Nil))
         }
       case Request(Root / "bridge" / "long-polling" / deviceId / sessionId / "subscribe", _, _, _, _) =>
         val sessionAsync = sessions.get(makeSessionKey(deviceId, sessionId)) match {
@@ -347,14 +347,17 @@ package object server {
         (sessionAsync.flatMap { session =>
           session.nextMessage.map { message =>
             Response.Http(Response.Status.Ok,
-              body = Some(message.getBytes(StandardCharsets.UTF_8)),
-              headers = Seq("Cache-Control" -> "no-cache")
+              maybeBody = Some(message.getBytes(StandardCharsets.UTF_8)),
+              headers = Seq(
+                "Cache-Control" -> "no-cache",
+                "Content-Type" -> "application/json"
+              )
             )
           }
         } recover {
           case _: SessionDestroyedException =>
-            Response.Http(Response.Status.Gone, "Session has been destroyed")
-        }).asInstanceOf[F[Response]]
+            Response.Http(Response.Status.Gone, "Session has been destroyed", Nil)
+        }).asInsxtanceOf[F[Response[F]]]
       case Request(Root / "bridge" / "web-socket" / deviceId / sessionId, _, _, _, _) =>
         val sessionAsync = sessions.get(makeSessionKey(deviceId, sessionId)) match {
           case Some(x) => Async[F].delay(x)

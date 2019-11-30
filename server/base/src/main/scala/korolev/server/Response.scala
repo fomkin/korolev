@@ -18,48 +18,47 @@ package korolev.server
 
 import java.nio.charset.StandardCharsets
 
-sealed trait Response
+import korolev.{Async, LazyBytes}
+
+sealed trait Response[F[_]]
 
 object Response {
 
-  case class Http(status: Status,
-                  body: Option[Array[Byte]] = None,
-                  headers: Seq[(String, String)] = Seq.empty)
-      extends Response
+  case class Http[F[_]](status: Status, body: LazyBytes[F], headers: Seq[(String, String)]) extends Response[F]
 
   object Http {
-    def apply(status: Status, message: String): Http = {
+
+    def apply[F[_]: Async](status: Status): Http[F] = {
+      new Http(status, LazyBytes.empty[F], Nil)
+    }
+
+    def apply[F[_]: Async](status: Status,
+                           maybeBody: Option[Array[Byte]],
+                           headers: Seq[(String, String)]): Http[F] = {
+      val bytes = maybeBody match {
+        case Some(body) => LazyBytes[F](body)
+        case None       => LazyBytes.empty[F]
+      }
+      new Http(status, bytes, headers)
+    }
+
+    def apply[F[_]: Async](status: Status, message: String, headers: Seq[(String, String)]): Http[F] = {
       val bytes = message.getBytes(StandardCharsets.UTF_8)
-      Http(status, Some(bytes))
+      Http[F](status, Some(bytes), headers)
     }
   }
 
-  case class WebSocket(publish: String => Unit,
-                       subscribe: (String => Unit) => Unit,
-                       destroyHandler: () => Unit)
-      extends Response
+  case class WebSocket[F[_]](publish: String => Unit, subscribe: (String => Unit) => Unit, destroyHandler: () => Unit)
+      extends Response[F]
 
-  sealed trait Status {
-    def code: Int
-    def phrase: String
+  case class Status(code: Int, phrase: String) {
+    val codeAsString: String = code.toString
   }
 
   object Status {
-    case object NotFound extends Status {
-      val code = 404
-      val phrase = "Not Found"
-    }
-    case object Ok extends Status {
-      val code = 200
-      val phrase = "OK"
-    }
-    case object BadRequest extends Status {
-      val code = 400
-      val phrase = "Bad Request"
-    }
-    case object Gone extends Status {
-      val code = 410
-      val phrase = "Gone"
-    }
+    val Ok = Status(200, "OK")
+    val NotFound = Status(404, "Not Found")
+    val BadRequest = Status(400, "Bad Request")
+    val Gone = Status(410, "Gone")
   }
 }

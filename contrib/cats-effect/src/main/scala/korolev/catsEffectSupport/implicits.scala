@@ -79,7 +79,7 @@ object implicits {
     def sequence[A](in: List[F[A]]): F[List[A]] =
       Traverse[List].sequence(in)
 
-    def run[A, U](m: F[A])(callback: Try[A] => U): Unit = {
+    def runAsync[A, U](m: F[A])(callback: Try[A] => U): Unit = {
       // FIXME async is always sync, because no context shift by default
       Effect[F]
         .runAsync(m)(result => IO { callback(result.toTry); () })
