@@ -28,7 +28,8 @@ import _root_.akka.util.ByteString
 import korolev.akka.util.LoggingReporter
 import korolev.effect.io.LazyBytes
 import korolev.effect.{Effect, Reporter}
-import korolev.server.{KorolevService, KorolevServiceConfig, Request => KorolevRequest, Response => KorolevResponse}
+import korolev.server.{KorolevService, KorolevServiceConfig, HttpRequest => KorolevHttpRequest, HttpResponse => KorolevHttpResponse}
+import korolev.web.{Path, Request => KorolevRequest, Response => KorolevResponse}
 import korolev.state.{StateDeserializer, StateSerializer}
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -117,7 +118,7 @@ package object akka {
                                      params: Map[String, String],
                                      body: Body): KorolevRequest[Body] =
     KorolevRequest(
-      path = Router.Path.fromString(path),
+      path = Path.fromString(path),
       param = params.get,
       cookie = key => request.cookies.find(_.name == key).map(_.value),
       headers = {
@@ -130,7 +131,7 @@ package object akka {
     )
 
   private def handleHttpResponse[F[_]: Effect](korolevServer: KorolevService[F],
-                                               korolevRequest: KorolevRequest.Http[F])(implicit ec: ExecutionContext): Future[HttpResponse] =
+                                               korolevRequest: KorolevHttpRequest[F])(implicit ec: ExecutionContext): Future[HttpResponse] =
     Effect[F].toFuture(korolevServer.http(korolevRequest)).map {
       case KorolevResponse(status, lazyBytes, responseHeaders) =>
         val (contentTypeOpt, otherHeaders) = getContentTypeAndResponseHeaders(responseHeaders)

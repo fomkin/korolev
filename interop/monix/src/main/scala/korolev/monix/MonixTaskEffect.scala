@@ -70,9 +70,8 @@ class MonixTaskEffect(implicit scheduler: Scheduler) extends Effect[Task] {
     ()
   }
 
-  def run[A](m: Task[A]): A = {
-    m.runSyncUnsafe()
-  }
+  def run[A](m: Task[A]): Either[Throwable, A] =
+    Try(m.runSyncUnsafe()).toEither
 
   def toFuture[A](m: Task[A]): Future[A] =
     m.runToFuture

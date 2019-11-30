@@ -1,4 +1,5 @@
 import java.nio.charset.StandardCharsets
+import java.nio.file.Files
 import java.util
 
 import sbt.{File, IO, Logger}
@@ -34,7 +35,7 @@ object JsUtils {
         options.setLanguageIn(LanguageMode.ECMASCRIPT_2015)
         options.setLanguageOut(LanguageMode.ECMASCRIPT5_STRICT)
         options.setSourceMapIncludeSourcesContent(true)
-        options.setSourceMapLocationMappings(List(new SourceMap.PrefixLocationMapping(source.getAbsolutePath, "korolev/es6")).asJava)
+        options.setSourceMapLocationMappings(List(new SourceMap.PrefixLocationMapping(source.getAbsolutePath, "korolev-sources")).asJava)
         options.setSourceMapOutputPath(sourceMapOutputFile.getName)
         options.setEnvironment(CompilerOptions.Environment.BROWSER)
 
@@ -42,18 +43,30 @@ object JsUtils {
         options
       }
       val result = compiler.compile(externs, inputs, options)
+      compiler.getSourceMap.setWrapperPrefix("(function(){")
       (compiler.toSource, result)
     }
 
     val sourceMapOutput = {
       val stringBuilder = new java.lang.StringBuilder()
-      //stringBuilder.append(")]}")
       compilationResult.sourceMap.appendTo(stringBuilder, sourceMapOutputFile.getName)
       stringBuilder.toString
     }
 
     IO.write(sourceOutputFile, s"(function(){$sourceOutput}).call(this);\n//# sourceMappingURL=/static/korolev-client.min.js.map\n")
     IO.write(sourceMapOutputFile, sourceMapOutput)
-    Seq(sourceOutputFile, sourceMapOutputFile)
+//
+//    val korolevSources = new File(target, "korolev-sources")
+//    val mappingSourceFiles = source
+//      .listFiles()
+//      .filter(_.isFile)
+//      .map { file =>
+//        val targetFile = new File(korolevSources, file.getName)
+//        IO.copyFile(file, targetFile)
+//        targetFile
+//      }
+//
+//    mappingSourceFiles ++
+      Seq(sourceOutputFile, sourceMapOutputFile)
   }
 }

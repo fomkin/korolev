@@ -65,8 +65,8 @@ package object cats {
     def map[A, B](m: IO[A])(f: A => B): IO[B] =
       m.map(f)
 
-    def recover[A](m: IO[A])(f: PartialFunction[Throwable, A]): IO[A] =
-      m.handleErrorWith(e => f.andThen(IO.pure[A] _).applyOrElse(e, IO.raiseError[A] _))
+    def recover[A, AA >: A](m: IO[A])(f: PartialFunction[Throwable, AA]): IO[AA] =
+      m.handleErrorWith(e => f.andThen(IO.pure[AA] _).applyOrElse(e, IO.raiseError[AA] _))
 
     def sequence[A](in: List[IO[A]]): IO[List[A]] =
       Traverse[List].sequence(in)
@@ -75,9 +75,8 @@ package object cats {
       m.unsafeRunAsync(callback)
     }
 
-    def run[A](m: IO[A]): A = {
-      m.unsafeRunSync()
-    }
+    def run[A](m: IO[A]): Either[Throwable, A] =
+      Try(m.unsafeRunSync()).toEither
 
     def toFuture[A](m: IO[A]): Future[A] =
       m.unsafeToFuture()
