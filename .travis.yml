@@ -3,8 +3,8 @@ language: scala
 jdk:
   - openjdk13
 scala:
-  - 2.13.1
-  - 2.12.10
+  - 2.13.2
+  - 2.12.11
 env:
   - SAUCE_USERNAME=yelbota
 branches:

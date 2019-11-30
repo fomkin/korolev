@@ -94,11 +94,8 @@ class ZioEffect[R, E](rts: Runtime[R],
   def runAsync[A](m: ZIO[R, E, A])(callback: Either[Throwable, A] => Unit): Unit =
     rts.unsafeRunAsync(m)(exit => callback(exit.toEither))
 
-  def run[A](m: ZIO[R, E, A]): A =
-    rts.unsafeRunSync(m) match {
-      case Exit.Success(value) => value
-      case Exit.Failure(cause) => throw FiberFailure(cause)
-    }
+  def run[A](m: ZIO[R, E, A]): Either[Throwable, A] =
+    rts.unsafeRunSync(m).toEither
 
   def toFuture[A](m: ZIO[R, E, A]): Future[A] =
     rts.unsafeRunToFuture(m.mapError(unliftError))
