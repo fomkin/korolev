@@ -174,7 +174,7 @@ object Stream {
           if (n == xs.length) {
             finished.complete(Success(()))
           }
-          res
+          Some(res)
         }
       },
       finished = finished.async,
