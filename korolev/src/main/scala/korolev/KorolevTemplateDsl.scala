@@ -19,12 +19,13 @@ package korolev
 import korolev.utils.HtmlUtil
 import levsha.Document
 import Context.Binding
+import korolev.effect.Effect
 import levsha.dsl.SymbolDsl
 
 /**
   * Levsha DSL with enrichments.
   */
-final class KorolevTemplateDsl[F[_]: Async, S, M] extends SymbolDsl[Binding[F, S, M]] {
+final class KorolevTemplateDsl[F[_]: Effect, S, M] extends SymbolDsl[Binding[F, S, M]] {
 
   implicit final class KorolevSymbolOps(s: Symbol) {
 

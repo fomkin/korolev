@@ -19,14 +19,14 @@ package korolev.state
 import java.io.{File, FileInputStream, FileOutputStream}
 import java.util
 
-import korolev.Async
+import korolev.effect.Effect
 import korolev.internal.DevMode
 import levsha.Id
 
 import scala.collection.concurrent.TrieMap
 import scala.util.Failure
 
-abstract class StateStorage[F[_]: Async, S] {
+abstract class StateStorage[F[_]: Effect, S] {
 
   /**
     * Check if state manager for the session is exist
@@ -51,7 +51,7 @@ abstract class StateStorage[F[_]: Async, S] {
 
 object StateStorage {
 
-  final class DefaultStateStorage[F[_]: Async, S: StateSerializer] extends StateStorage[F, S] {
+  final class DefaultStateStorage[F[_]: Effect, S: StateSerializer] extends StateStorage[F, S] {
 
     private val cache = TrieMap.empty[String, StateManager[F]]
     private val forDeletionCacheCapacity = 5000 // TODO export to config
@@ -73,10 +73,10 @@ object StateStorage {
       if (DevMode.isActive) {
         val file = new File(DevMode.sessionsDirectory, key)
         val result = cache.contains(key) || forDeletionCache.containsKey(key) || file.exists()
-        Async[F].delay(result)
+        Effect[F].delay(result)
       } else {
         val result = cache.contains(key) || forDeletionCache.containsKey(key)
-        Async[F].delay(result)
+        Effect[F].delay(result)
       }
     }
 
@@ -86,14 +86,14 @@ object StateStorage {
         case None =>
           Option(mutex.synchronized(forDeletionCache.remove(key))) match {
             case Some(sm) =>
-              Async[F].delay {
+              Effect[F].delay {
                 cache.put(key, sm)
                 sm
               }
             case None =>
-              Async[F].fromTry(Failure(new NoSuchElementException(s"There is no state for $deviceId/$sessionId")))
+              Effect[F].fromTry(Failure(new NoSuchElementException(s"There is no state for $deviceId/$sessionId")))
           }
-        case Some(sm) => Async[F].delay(sm)
+        case Some(sm) => Effect[F].delay(sm)
       }
     }
 
@@ -103,13 +103,13 @@ object StateStorage {
         val directory = new File(DevMode.sessionsDirectory, key)
         val sm = new DevModeStateManager[F](directory)
         cache.put(key, sm)
-        if (directory.exists()) Async[F].delay(sm) // Do not rewrite state manager cache
-        else Async[F].map(sm.write(Id.TopLevel, state))(_ => sm)
+        if (directory.exists()) Effect[F].delay(sm) // Do not rewrite state manager cache
+        else Effect[F].map(sm.write(Id.TopLevel, state))(_ => sm)
       }
       else {
         val sm = new SimpleInMemoryStateManager[F]()
         cache.put(key, sm)
-        Async[F].map(sm.write(Id.TopLevel, state))(_ => sm)
+        Effect[F].map(sm.write(Id.TopLevel, state))(_ => sm)
       }
     }
 
@@ -123,7 +123,7 @@ object StateStorage {
     }
   }
 
-  private final class DevModeStateManager[F[_]: Async](directory: File) extends StateManager[F] {
+  private final class DevModeStateManager[F[_]: Effect](directory: File) extends StateManager[F] {
 
     def getStateFile(node: Id): File =
       new File(directory, node.mkString)
@@ -133,7 +133,7 @@ object StateStorage {
       if (file.exists()) Some(file) else None
     }
 
-    def snapshot: F[StateManager.Snapshot] = Async[F].delay {
+    def snapshot: F[StateManager.Snapshot] = Effect[F].delay {
       new StateManager.Snapshot {
 
         if (!directory.exists())
@@ -152,20 +152,20 @@ object StateStorage {
       }
     }
 
-    def read[T: StateDeserializer](nodeId: Id): F[Option[T]] = Async[F].delay {
+    def read[T: StateDeserializer](nodeId: Id): F[Option[T]] = Effect[F].delay {
       getStateFileOpt(nodeId).flatMap { file =>
         val data = readFile(file)
         implicitly[StateDeserializer[T]].deserialize(data)
       }
     }
 
-    def delete(nodeId: Id): F[Unit] = Async[F].delay {
+    def delete(nodeId: Id): F[Unit] = Effect[F].delay {
       val file = getStateFile(nodeId)
       file.delete()
       ()
     }
 
-    def write[T: StateSerializer](nodeId: Id, value: T): F[Unit] = Async[F].delay {
+    def write[T: StateSerializer](nodeId: Id, value: T): F[Unit] = Effect[F].delay {
       val file = getStateFile(nodeId)
       if (!file.exists()) {
         file.getParentFile.mkdirs()
@@ -185,11 +185,11 @@ object StateStorage {
     }
   }
 
-  private[korolev] final class SimpleInMemoryStateManager[F[_]: Async] extends StateManager[F] {
+  private[korolev] final class SimpleInMemoryStateManager[F[_]: Effect] extends StateManager[F] {
 
     val cache: TrieMap[Id, Any] = TrieMap.empty[Id, Any]
 
-    val snapshot: F[StateManager.Snapshot] = Async[F].pure {
+    val snapshot: F[StateManager.Snapshot] = Effect[F].pure {
       new StateManager.Snapshot {
         def apply[T: StateDeserializer](nodeId: Id): Option[T] = try {
           cache
@@ -203,16 +203,16 @@ object StateStorage {
     }
 
     def read[T: StateDeserializer](nodeId: Id): F[Option[T]] =
-      Async[F].map(snapshot)(_.apply(nodeId))
+      Effect[F].map(snapshot)(_.apply(nodeId))
 
     def delete(nodeId: Id): F[Unit] =
-      Async[F].delay {
+      Effect[F].delay {
         cache.remove(nodeId)
         ()
       }
 
     def write[T: StateSerializer](nodeId: Id, value: T): F[Unit] =
-      Async[F].delay {
+      Effect[F].delay {
         cache.put(nodeId, value)
         ()
       }

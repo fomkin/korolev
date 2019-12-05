@@ -17,6 +17,7 @@
 package korolev
 
 import Extension.Handlers
+import korolev.effect.Effect
 
 trait Extension[F[_], S, M] {
 
@@ -29,30 +30,30 @@ trait Extension[F[_], S, M] {
 
 object Extension {
 
-  abstract class Handlers[F[_]: Async, S, M] {
+  abstract class Handlers[F[_]: Effect, S, M] {
 
     /**
      * Invokes when state updated.
      * @return
      */
-    def onState(state: S): F[Unit] = Async[F].unit
+    def onState(state: S): F[Unit] = Effect[F].unit
 
     /**
      * Invokes when message published.
      * @see Context.BaseAccess.publish
      */
-    def onMessage(message: M): F[Unit] = Async[F].unit
+    def onMessage(message: M): F[Unit] = Effect[F].unit
 
     /**
      * Invokes when user closes tab.
      * @return
      */
-    def onDestroy(): F[Unit] = Async[F].unit
+    def onDestroy(): F[Unit] = Effect[F].unit
   }
 
-  private final class HandlersImpl[F[_]: Async, S, M](_onState: S => F[Unit],
-                                                      _onMessage: M => F[Unit],
-                                                      _onDestroy: () => F[Unit]) extends Handlers[F, S, M] {
+  private final class HandlersImpl[F[_]: Effect, S, M](_onState: S => F[Unit],
+                                                       _onMessage: M => F[Unit],
+                                                       _onDestroy: () => F[Unit]) extends Handlers[F, S, M] {
     override def onState(state: S): F[Unit] = _onState(state)
     override def onMessage(message: M): F[Unit] = _onMessage(message)
     override def onDestroy(): F[Unit] = _onDestroy()
@@ -65,19 +66,19 @@ object Extension {
      * @param onMessage Invokes when message published.
      * @param onDestroy Invokes when user closes tab.
      */
-    def apply[F[_]: Async, S, M](onState: S => F[Unit] = null,
-                                 onMessage: M => F[Unit] = null,
-                                 onDestroy: () => F[Unit] = null): Handlers[F, S, M] =
+    def apply[F[_]: Effect, S, M](onState: S => F[Unit] = null,
+                                  onMessage: M => F[Unit] = null,
+                                  onDestroy: () => F[Unit] = null): Handlers[F, S, M] =
       new HandlersImpl(
-        if (onState == null) _ => Async[F].unit else onState,
-        if (onMessage == null) _ => Async[F].unit else onMessage,
-        if (onDestroy == null) () => Async[F].unit else onDestroy
+        if (onState == null) _ => Effect[F].unit else onState,
+        if (onMessage == null) _ => Effect[F].unit else onMessage,
+        if (onDestroy == null) () => Effect[F].unit else onDestroy
       )
   }
 
   def apply[F[_], S, M](f: Context.BaseAccess[F, S, M] => F[Handlers[F, S, M]]): Extension[F, S, M] =
     (access: Context.BaseAccess[F, S, M]) => f(access)
 
-  def pure[F[_]: Async, S, M](f: Context.BaseAccess[F, S, M] => Handlers[F, S, M]): Extension[F, S, M] =
-    (access: Context.BaseAccess[F, S, M]) => Async[F].pure(f(access))
+  def pure[F[_]: Effect, S, M](f: Context.BaseAccess[F, S, M] => Handlers[F, S, M]): Extension[F, S, M] =
+    (access: Context.BaseAccess[F, S, M]) => Effect[F].pure(f(access))
 }

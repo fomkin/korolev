@@ -16,13 +16,14 @@
 
 package korolev.server
 
+import korolev.effect.{Effect, Reporter}
 import korolev.state.IdGenerator
-import korolev.{Async, Context, Extension, Reporter, Router}
+import korolev.{Context, Extension, Router}
 import levsha.Document
 
 import scala.concurrent.duration._
 
-case class KorolevServiceConfig[F[_]: Async, S, M](
+case class KorolevServiceConfig[F[_]: Effect, S, M](
   stateLoader: StateLoader[F, S],
   stateStorage: korolev.state.StateStorage[F, S] = null, // By default it StateStorage.DefaultStateStorage
   router: Router[F, S] = Router.empty[F, S],

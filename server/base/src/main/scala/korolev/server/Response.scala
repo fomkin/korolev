@@ -18,7 +18,8 @@ package korolev.server
 
 import java.nio.charset.StandardCharsets
 
-import korolev.{Async, LazyBytes}
+import korolev.LazyBytes
+import korolev.effect.Effect
 
 sealed trait Response[F[_]]
 
@@ -28,13 +29,13 @@ object Response {
 
   object Http {
 
-    def apply[F[_]: Async](status: Status): Http[F] = {
+    def apply[F[_]: Effect](status: Status): Http[F] = {
       new Http(status, LazyBytes.empty[F], Nil)
     }
 
-    def apply[F[_]: Async](status: Status,
-                           maybeBody: Option[Array[Byte]],
-                           headers: Seq[(String, String)]): Http[F] = {
+    def apply[F[_]: Effect](status: Status,
+                            maybeBody: Option[Array[Byte]],
+                            headers: Seq[(String, String)]): Http[F] = {
       val bytes = maybeBody match {
         case Some(body) => LazyBytes[F](body)
         case None       => LazyBytes.empty[F]
@@ -42,7 +43,7 @@ object Response {
       new Http(status, bytes, headers)
     }
 
-    def apply[F[_]: Async](status: Status, message: String, headers: Seq[(String, String)]): Http[F] = {
+    def apply[F[_]: Effect](status: Status, message: String, headers: Seq[(String, String)]): Http[F] = {
       val bytes = message.getBytes(StandardCharsets.UTF_8)
       Http[F](status, Some(bytes), headers)
     }

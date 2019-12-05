@@ -16,6 +16,7 @@
 
 package korolev
 
+import korolev.effect.{Effect, Reporter}
 import korolev.internal.{ClientSideApi, ComponentInstance, EventRegistry}
 import korolev.state.{StateDeserializer, StateManager, StateSerializer}
 import levsha._
@@ -27,7 +28,7 @@ import scala.concurrent.duration.FiniteDuration
   * Provides DSLs and effects for application or component
   * @since 0.6.0
   */
-final class Context[F[_]: Async, S: StateSerializer: StateDeserializer, M] extends Context.Scope[F, S, S, M] {
+final class Context[F[_]: Effect, S: StateSerializer: StateDeserializer, M] extends Context.Scope[F, S, S, M] {
   type AccessType = S
   protected val accessScope: Context.Access[F, S, M] => Context.Access[F, S, M] = identity _
 }
@@ -41,10 +42,10 @@ object Context {
     * @tparam S Type of application state
     * @tparam M Type of events
     */
-  def apply[F[_]: Async, S: StateSerializer: StateDeserializer, M] =
+  def apply[F[_]: Effect, S: StateSerializer: StateDeserializer, M] =
     new Context[F, S, M]()
 
-  sealed abstract class Scope[F[_]: Async, S: StateSerializer: StateDeserializer, AccessType, M] {
+  sealed abstract class Scope[F[_]: Effect, S: StateSerializer: StateDeserializer, AccessType, M] {
 
     import EventPhase._
 
@@ -92,7 +93,7 @@ object Context {
         def resetForm(id: Context.ElementId[F]): F[Unit] =
           access.resetForm(id)
 
-        def state: F[S2] = Async[F].map(access.state)(read)
+        def state: F[S2] = Effect[F].map(access.state)(read)
 
         def transition(f: korolev.Transition[S2]): F[Unit] =
           access.transition(s => write((s, f(read(s)))))
@@ -156,7 +157,7 @@ object Context {
         ComponentEntry(component, parameters, (a: Context.Access[F, S, M], e: E) => f(accessScope(a), e))
 
       def silent(parameters: P): ComponentEntry[F, S, M, CS, P, E] =
-        ComponentEntry(component, parameters, (_, _) => Async[F].unit)
+        ComponentEntry(component, parameters, (_, _) => Effect[F].unit)
     }
   }
 
@@ -298,11 +299,11 @@ object Context {
   /**
     * Provides access to make side effects
     */
-  abstract class Access[F[_]: Async, S, M] extends BaseAccess[F, S, M] with EventAccess[F, S, M]
+  abstract class Access[F[_]: Effect, S, M] extends BaseAccess[F, S, M] with EventAccess[F, S, M]
 
-  sealed abstract class Binding[F[_]: Async, +S, +M]
+  sealed abstract class Binding[F[_]: Effect, +S, +M]
 
-  abstract class PropertyHandler[F[_]: Async] {
+  abstract class PropertyHandler[F[_]: Effect] {
     @deprecated("""Use "propertyName" instead of 'propertyName""", "0.13.0")
     def get(propName: Symbol): F[String]
     @deprecated("""Use "propertyName" instead of 'propertyName""", "0.13.0")
@@ -313,7 +314,7 @@ object Context {
 
   final case class File[A](name: String, data: A)
 
-  abstract class FormDataDownloader[F[_]: Async, S] { self =>
+  abstract class FormDataDownloader[F[_]: Effect, S] { self =>
     def onProgress(f: (Int, Int) => Transition[S]): this.type
     def start(): F[FormData]
     def scope[S2](read: PartialFunction[S, S2], write: PartialFunction[(S, S2), S]): FormDataDownloader[F, S2] = {
@@ -330,7 +331,7 @@ object Context {
 
   final case class ComponentEntry
     [
-      F[_]: Async,
+      F[_]: Effect,
       AS: StateSerializer: StateDeserializer, M,
       CS: StateSerializer: StateDeserializer, P, E
     ](
@@ -351,16 +352,16 @@ object Context {
     }
   }
 
-  final case class Event[F[_]: Async, S, M](
+  final case class Event[F[_]: Effect, S, M](
       `type`: String,
       phase: EventPhase,
       effect: Access[F, S, M] => F[Unit]) extends Binding[F, S, M]
 
-  final case class Delay[F[_]: Async, S, M](
+  final case class Delay[F[_]: Effect, S, M](
       duration: FiniteDuration,
       effect: Access[F, S, M] => F[Unit]) extends Binding[F, S, M]
 
-  final class ElementId[F[_]: Async](val name: Option[String]) extends Binding[F, Nothing, Nothing] {
+  final class ElementId[F[_]: Effect](val name: Option[String]) extends Binding[F, Nothing, Nothing] {
     override def equals(obj: Any): Boolean = obj match {
       case other: ElementId[F] => if (name.isDefined) name == other.name else super.equals(other)
       case _ => false

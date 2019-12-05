@@ -18,6 +18,8 @@ package korolev
 
 import java.util.concurrent.Executors
 
+import korolev.effect.Effect
+
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutorService}
 
@@ -28,8 +30,8 @@ package object execution {
   implicit val defaultExecutor: ExecutionContextExecutorService =
     ExecutionContext.fromExecutorService(Executors.newWorkStealingPool())
 
-  implicit def defaultScheduler[F[_]: Async]: Scheduler[F] = {
-    val async = Async[F]
+  implicit def defaultScheduler[F[_]: Effect]: Scheduler[F] = {
+    val async = Effect[F]
     val scheduler = schedulerCache.getOrElseUpdate(async, new JavaTimerScheduler[F])
     scheduler.asInstanceOf[Scheduler[F]]
   }

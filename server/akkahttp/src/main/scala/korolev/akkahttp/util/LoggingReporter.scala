@@ -18,7 +18,7 @@ package korolev.akkahttp.util
 
 import akka.actor.ActorSystem
 import akka.event.{LogSource, Logging}
-import korolev.Reporter
+import korolev.effect.Reporter
 
 final class LoggingReporter(actorSystem: ActorSystem) extends Reporter {
 

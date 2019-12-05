@@ -16,15 +16,16 @@
 
 package korolev.server
 
-import korolev.{Context, Async}
+import korolev.Context
 import Context._
+import korolev.effect.Effect
 import korolev.utils.HtmlUtil
 import levsha.{RenderContext, XmlNs}
 import levsha.impl.{AbstractTextRenderContext, TextPrettyPrintingConfig}
 
 import scala.collection.mutable
 
-final class HtmlRenderContext[F[_]: Async, S, M] extends AbstractTextRenderContext[Binding[F, S, M]] {
+final class HtmlRenderContext[F[_]: Effect, S, M] extends AbstractTextRenderContext[Binding[F, S, M]] {
 
   import HtmlRenderContext._
 

@@ -21,7 +21,11 @@ import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 
-import korolev.Async._
+import korolev.effect.Stream
+import korolev.effect.Effect
+import Effect._
+
+
 import korolev.Context.File
 import korolev.internal.{ApplicationInstance, Connection}
 import korolev.state._
@@ -39,7 +43,7 @@ package object server {
 
   def korolevService
       [
-        F[_]: Async,
+        F[_]: Effect,
         S: StateSerializer: StateDeserializer,
         M
       ] (
@@ -63,7 +67,7 @@ package object server {
         defaultState <- config.stateLoader(deviceId, Some(request))
         state <- config.router.toState
           .lift(request.path)
-          .fold(Async[F].pure(defaultState))(f => f(defaultState))
+          .fold(Effect[F].pure(defaultState))(f => f(defaultState))
         _ <- stateStorage.create(deviceId, sessionId, state)
       } yield {
         val dsl = new levsha.dsl.SymbolDsl[Context.Binding[F, S, M]]()
@@ -128,7 +132,7 @@ package object server {
     def deviceFromRequest(request: Request[F]): F[DeviceId] =
       request.cookie(Cookies.DeviceId) match {
         case None => config.idGenerator.generateDeviceId()
-        case Some(deviceId) => Async[F].delay(deviceId)
+        case Some(deviceId) => Effect[F].delay(deviceId)
       }
 
     def makeSessionKey(deviceId: DeviceId, sessionId: SessionId): String =
@@ -154,7 +158,7 @@ package object server {
           reporter
         )
         ba = korolev.topLevelComponentInstance.browserAccess
-        extensionHandlers <- Async[F].sequence(config.extensions.map(e => e.setup(ba)))
+        extensionHandlers <- Effect[F].sequence(config.extensions.map(e => e.setup(ba)))
       } yield {
 
         // Subscribe to top level state change
@@ -176,8 +180,8 @@ package object server {
         new KorolevSession[F] {
 
           val aliveRef = new AtomicBoolean(true)
-          val currentPromise = new AtomicReference(Option.empty[Async.Promise[F, String]])
-          val fileDownloadInfoMap: mutable.Map[String, Promise[F, LazyBytes[F]]] =
+          val currentPromise = new AtomicReference(Option.empty[Effect.Promise[F, String]])
+          val fileDownloadInfoMap: mutable.Map[String, Promise[F, Stream[F, Array[Byte]]]] =
             mutable.Map.empty // `descriptor/file-name` -> promise(bytes_proxy)
 
           // Put the session to registry
@@ -185,7 +189,7 @@ package object server {
           sessions.put(sessionKey, this)
 
           def publish(message: String): F[Unit] =
-            Async[F].delay(connection.receive(message))
+            Effect[F].delay(connection.receive(message))
 
           def nextMessage: F[String] =
             connection.sent
@@ -197,7 +201,7 @@ package object server {
           def fileDownloadInfoKey(descriptor: String, name: String) =
             s"$descriptor/$name"
 
-          def resolveFile(descriptor: String, name: String, bytes: Try[LazyBytes[F]]): Unit = {
+          def resolveFile(descriptor: String, name: String, bytes: Try[Stream[F, Array[Byte]]]): Unit = {
             val key = fileDownloadInfoKey(descriptor, name)
             fileDownloadInfoMap.remove(key).foreach { promise =>
               promise.complete(bytes)
@@ -207,13 +211,8 @@ package object server {
           def fileDownloadInfo(descriptor: String, filesInfo: Map[String, Long]): Unit = fileDownloadInfoMap.synchronized {
             val files = filesInfo map {
               case (name, size) =>
-                val promise = Async[F].promise[LazyBytes[F]]
-                val proxy = LazyBytes(
-                  pull = () => Async[F].flatMap(promise.async)(_.pull()),
-                  cancel = () => Async[F].flatMap(promise.async)(_.cancel()),
-                  finished = Async[F].flatMap(promise.async)(_.finished),
-                  size = Some(size)
-                )
+                val promise = Effect[F].promise[Stream[F, Array[Byte]]]
+                val proxy = LazyBytes(Stream.proxy(promise.effect), Some(size))
                 val key = fileDownloadInfoKey(descriptor, name)
                 fileDownloadInfoMap.put(key, promise)
                 File(name, proxy)
@@ -223,7 +222,7 @@ package object server {
 
           def destroy(): F[Unit] = {
             if (aliveRef.getAndSet(false)) {
-              Async[F]
+              Effect[F]
                 .sequence(extensionHandlers.map(_.onDestroy()))
                 .recover {
                   case ex: Throwable =>
@@ -238,7 +237,7 @@ package object server {
                   sessions.remove(sessionKey)
                   ()
                 }
-            } else Async[F].unit
+            } else Effect[F].unit
           }
         }
       }
@@ -246,7 +245,7 @@ package object server {
 
     val formDataCodec = new FormDataCodec(config.maxFormDataEntrySize)
 
-    val response404 = Async[F].delay[Response[F]](Response.Http(Response.Status.NotFound))
+    val response404 = Effect[F].delay[Response[F]](Response.Http(Response.Status.NotFound))
 
     val service: PartialFunction[Request[F], F[Response[F]]] = {
       case Request(Root / "static", _, _, _, _) => response404
@@ -264,7 +263,7 @@ package object server {
             val headers = mimeTypes(fileExtension).fold(Seq.empty[(String, String)]) { fe =>
               Seq("content-type" -> fe)
             }
-            Async[F].delay(Response.Http(Response.Status.Ok, Some(bytes), headers))
+            Effect[F].delay(Response.Http(Response.Status.Ok, Some(bytes), headers))
         }
       case r @ Request(Root / "bridge" / deviceId / sessionId / "form-data" / descriptor, _, _, headers, _) =>
         sessions.get(makeSessionKey(deviceId, sessionId)) match {
@@ -282,7 +281,7 @@ package object server {
               case None =>
                 val error = "Content-Type should be `multipart/form-data`"
                 val res = Response.Http(Response.Status.BadRequest, error, Nil)
-                Async[F].delay(res)
+                Effect[F].delay(res)
               case Some(boundary) =>
                 r.body.toStrict.map { body =>
                   val formData = Try(formDataCodec.decode(ByteBuffer.wrap(body), boundary))
@@ -291,12 +290,12 @@ package object server {
                 }
             }
           case None =>
-            Async[F].delay(Response.Http(Response.Status.BadRequest, "Session doesn't exist", Nil))
+            Effect[F].delay(Response.Http(Response.Status.BadRequest, "Session doesn't exist", Nil))
         }
       case Request(Root / "bridge" / deviceId / sessionId / "file" / descriptor / "info", _, _, _, body) =>
         sessions.get(makeSessionKey(deviceId, sessionId)) match {
           case Some(session) =>
-            Async[F].map(body.toStrictUtf8) { info =>
+            Effect[F].map(body.toStrictUtf8) { info =>
               val files: Map[SessionId, Long] = if (info.isEmpty) {
                 Map.empty[SessionId, Long]
               } else {
@@ -312,7 +311,7 @@ package object server {
               Response.Http(Response.Status.Ok)
             }
           case None =>
-            Async[F].delay(Response.Http(Response.Status.BadRequest, "Session doesn't exist", Nil))
+            Effect[F].delay(Response.Http(Response.Status.BadRequest, "Session doesn't exist", Nil))
         }
       case Request(Root / "bridge" / deviceId / sessionId / "file" / descriptor, _, _, headers, body) =>
         val result =
@@ -320,11 +319,11 @@ package object server {
             session <- sessions.get(makeSessionKey(deviceId, sessionId))
             name <- headers.collectFirst { case ("x-name", v) => v }
           } yield {
-            session.resolveFile(descriptor, name, Success(body))
+            session.resolveFile(descriptor, name, Success(body.chunks))
           }
         result match {
-          case Some(_) => body.finished.map(_ => Response.Http(Response.Status.Ok))
-          case None => Async[F].delay(Response.Http(Response.Status.BadRequest))
+          case Some(_) => body.chunks.finished.map(_ => Response.Http(Response.Status.Ok))
+          case None => Effect[F].delay(Response.Http(Response.Status.BadRequest))
         }
       case Request(Root / "bridge" / "long-polling" / deviceId / sessionId / "publish", _, _, _, body) =>
         sessions.get(makeSessionKey(deviceId, sessionId)) match {
@@ -337,11 +336,11 @@ package object server {
               Response.Http[F](Response.Status.Ok)
             }
           case None =>
-            Async[F].delay(Response.Http(Response.Status.BadRequest, "Session doesn't exist", Nil))
+            Effect[F].delay(Response.Http(Response.Status.BadRequest, "Session doesn't exist", Nil))
         }
       case Request(Root / "bridge" / "long-polling" / deviceId / sessionId / "subscribe", _, _, _, _) =>
         val sessionAsync = sessions.get(makeSessionKey(deviceId, sessionId)) match {
-          case Some(x) => Async[F].delay(x)
+          case Some(x) => Effect[F].delay(x)
           case None => createSession(deviceId, sessionId)
         }
         (sessionAsync.flatMap { session =>
@@ -360,7 +359,7 @@ package object server {
         }).asInstanceOf[F[Response[F]]]
       case Request(Root / "bridge" / "web-socket" / deviceId / sessionId, _, _, _, _) =>
         val sessionAsync = sessions.get(makeSessionKey(deviceId, sessionId)) match {
-          case Some(x) => Async[F].delay(x)
+          case Some(x) => Effect[F].delay(x)
           case None => createSession(deviceId, sessionId)
         }
         sessionAsync map { session =>
@@ -395,7 +394,7 @@ package object server {
   }
 
   @deprecated("Use Router.empty instead", "0.12.0")
-  def emptyRouter[F[_]: Async, S]: Router[F, S] = Router.empty[F, S]
+  def emptyRouter[F[_]: Effect, S]: Router[F, S] = Router.empty[F, S]
 
   private[server] object misc {
     val htmlContentType = "text/html; charset=utf-8"

@@ -21,7 +21,9 @@ import java.util.concurrent.atomic.AtomicInteger
 
 import korolev._
 import Context._
-import Async._
+import korolev.effect.{Effect, Reporter}
+import Effect._
+
 import korolev.execution.Scheduler
 import korolev.state.{StateDeserializer, StateManager, StateSerializer}
 import levsha.Document.Node
@@ -46,7 +48,7 @@ import scala.util.{Failure, Success, Try}
   */
 final class ComponentInstance
   [
-    F[_]: Async: Scheduler,
+    F[_]: Effect: Scheduler,
     AS: StateSerializer: StateDeserializer, M,
     CS: StateSerializer: StateDeserializer, P, E
   ](
@@ -63,7 +65,7 @@ final class ComponentInstance
   import ComponentInstance._
   import reporter.Implicit
 
-  private val async = Async[F]
+  private val async = Effect[F]
   private val miscLock = new Object()
   private val subscriptionsLock = new Object()
   private val lastPostDescriptor = new AtomicInteger(0)
@@ -148,7 +150,7 @@ final class ComponentInstance
         val promise = async.promise[FormData]
         frontend.uploadForm(id, descriptor)
         formDataPromises.put(descriptor, promise)
-        promise.async
+        promise.effect
       }
 
       def onProgress(f: (Int, Int) => Transition[CS]): this.type = {
@@ -172,7 +174,7 @@ final class ComponentInstance
       val descriptor = nodeId.mkString + lastPostDescriptor.getAndIncrement()
       frontend.uploadFiles(elements(elementId), descriptor)
       downloadFilePromises.put(descriptor, promise)
-      promise.async
+      promise.effect
     }
 
 
@@ -327,7 +329,7 @@ final class ComponentInstance
     val promise = async.promise[Unit]
     if (transitionInProgress) pendingTransitions.offer((transition, promise))
     else runTransition(transition, promise)
-    promise.async
+    promise.effect
   }
 
   def applyEvent(eventId: EventId): Boolean = {
@@ -428,7 +430,7 @@ private object ComponentInstance {
   import Context.Access
   import Context.Delay
 
-  final class DelayInstance[F[_]: Async: Scheduler, S, M](delay: Delay[F, S, M], reporter: Reporter) {
+  final class DelayInstance[F[_]: Effect: Scheduler, S, M](delay: Delay[F, S, M], reporter: Reporter) {
 
     import reporter.Implicit
 
