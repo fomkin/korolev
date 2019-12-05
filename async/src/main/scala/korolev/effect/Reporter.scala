@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package korolev
+package korolev.effect
 
 /**
   * Korolev INTERNAL reporting subsystem.

@@ -16,7 +16,7 @@
 
 package korolev.internal
 
-import korolev.Async
+import korolev.effect.Effect
 
 import scala.collection.mutable
 
@@ -24,7 +24,7 @@ import scala.collection.mutable
   * Save information about what type of events are already
   * listening on the client
   */
-final class EventRegistry[F[_]: Async](frontend: ClientSideApi[F]) {
+final class EventRegistry[F[_]: Effect](frontend: ClientSideApi[F]) {
 
   private val knownEventTypes = mutable.Set("submit")
 

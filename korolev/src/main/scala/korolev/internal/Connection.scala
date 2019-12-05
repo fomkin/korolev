@@ -18,13 +18,13 @@ package korolev.internal
 
 import java.util.concurrent.ConcurrentLinkedQueue
 
-import korolev.Async
-import korolev.Async._
+import korolev.effect.Effect._
+import korolev.effect.Effect
 
 import scala.annotation.switch
 import scala.util.Success
 
-final class Connection[F[_] : Async] {
+final class Connection[F[_] : Effect] {
 
   import Connection._
 
@@ -82,7 +82,7 @@ final class Connection[F[_] : Async] {
 object Connection {
 
   /** Channel with only one consumer */
-  final class Channel[F[_] : Async, T] {
+  final class Channel[F[_] : Effect, T] {
 
     private val queue = new ConcurrentLinkedQueue[T]()
     private var promise = Option.empty[Promise[F, T]]
@@ -102,16 +102,16 @@ object Connection {
       if (queue.isEmpty) {
         promise match {
           case Some(p) =>
-            p.async
+            p.effect
           case None =>
-            val p = Async[F].promise[T]
+            val p = Effect[F].promise[T]
             promise = Some(p)
-            p.async
+            p.effect
         }
       }
       else {
         val message = queue.poll()
-        Async[F].delay(message)
+        Effect[F].delay(message)
       }
     }
   }

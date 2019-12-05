@@ -8,6 +8,7 @@ import korolev._
 import korolev.akkahttp.{AkkaHttpServerConfig, akkaHttpService}
 import korolev.catsEffectSupport.implicits._
 import cats.syntax.flatMap._
+import korolev.effect.Effect
 import korolev.server._
 import korolev.state.javaSerialization._
 import monix.eval.Task
@@ -27,7 +28,7 @@ object MonixExample extends App {
   Http().bindAndHandle(route, "0.0.0.0", 8080)
 }
 
-class ToDoList[F[_]: Async: Monad] {
+class ToDoList[F[_]: Effect: Monad] {
   val applicationContext: Context[F, State, Any] = {
     Context[F, State, Any]
   }

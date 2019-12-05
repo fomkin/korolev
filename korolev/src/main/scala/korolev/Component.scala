@@ -17,6 +17,7 @@
 package korolev
 
 import korolev.Context._
+import korolev.effect.Effect
 import korolev.execution.Scheduler
 import korolev.state.{StateDeserializer, StateSerializer}
 import levsha.Document.Node
@@ -36,7 +37,7 @@ import scala.util.Random
   */
 abstract class Component
   [
-    F[_]: Async: Scheduler,
+    F[_]: Effect: Scheduler,
     S: StateSerializer: StateDeserializer, P, E
   ](
     val initialState: S,
@@ -69,7 +70,7 @@ object Component {
     * @param f Component renderer
     * @see [[Component]]
     */
-  def apply[F[_]: Async: Scheduler, S: StateSerializer: StateDeserializer, P, E]
+  def apply[F[_]: Effect: Scheduler, S: StateSerializer: StateDeserializer, P, E]
            (initialState: S, id: String = Component.randomId())
            (f: Render[F, S, P, E]): Component[F, S, P, E] = {
     new Component[F, S, P, E](initialState, id) {

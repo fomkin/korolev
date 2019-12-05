@@ -16,10 +16,10 @@
 
 package korolev.state
 
-import korolev.Async
+import korolev.effect.Effect
 import levsha.Id
 
-abstract class StateManager[F[_]: Async] { self =>
+abstract class StateManager[F[_]: Effect] { self =>
   def snapshot: F[StateManager.Snapshot]
   def read[T: StateDeserializer](nodeId: Id): F[Option[T]]
   def delete(nodeId: Id): F[Unit]

@@ -17,16 +17,16 @@
 package korolev.catsEffectSupport
 
 import cats.Traverse
-import korolev.Async
 import cats.effect._
 import cats.instances.list._
+import korolev.effect.Effect
 
 import scala.concurrent.Future
 import scala.util.Try
 
 object implicits {
 
-  implicit def korolevAsyncFromEffect[F[_]: Effect]: Async[F] = new Async[F] {
+  implicit def korolevAsyncFromEffect[F[_]: Effect]: Effect[F] = new Effect[F] {
 
     def pure[A](value: A): F[A] =
       Effect[F].pure(value)
@@ -43,8 +43,8 @@ object implicits {
     def fromTry[A](value: => Try[A]): F[A] =
       Effect[F].fromTry(value)
 
-    def promise[A]: Async.Promise[F, A] = {
-      new korolev.Async.Promise[F, A] {
+    def promise[A]: Effect.Promise[F, A] = {
+      new korolev.Effect.Promise[F, A] {
 
         private var callback: Either[Throwable, A] => Unit = _
 

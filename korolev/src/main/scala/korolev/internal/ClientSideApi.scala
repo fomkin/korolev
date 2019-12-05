@@ -18,11 +18,13 @@ package korolev.internal
 
 import java.util.concurrent.atomic.AtomicInteger
 
-import korolev.{Async, Reporter, Router}
-import korolev.Async._
-import korolev.Router.Path
+import korolev.Router
+import korolev.effect.{Effect, Reporter}
 import levsha.Id
 import levsha.impl.DiffRenderContext.ChangesPerformer
+
+import Effect._
+import Router.Path
 
 import scala.annotation.switch
 import scala.collection.concurrent.TrieMap
@@ -32,13 +34,13 @@ import scala.util.{Failure, Success}
 /**
   * Typed interface to client side
   */
-final class ClientSideApi[F[_]: Async](connection: Connection[F], reporter: Reporter)
+final class ClientSideApi[F[_]: Effect](connection: Connection[F], reporter: Reporter)
   extends ChangesPerformer {
 
   import ClientSideApi._
 
   private val lastDescriptor = new AtomicInteger(0)
-  private val async = Async[F]
+  private val async = Effect[F]
   private val promises = TrieMap.empty[String, Promise[F, String]]
   private val domChangesBuffer = mutable.ArrayBuffer.empty[Any]
 
@@ -82,7 +84,7 @@ final class ClientSideApi[F[_]: Async](connection: Connection[F], reporter: Repo
     val promise = async.promise[String]
     promises.put(descriptor, promise)
     connection.send(Procedure.ExtractProperty.code, descriptor, id.mkString, name)
-    promise.async
+    promise.effect
   }
 
   def setProperty(id: Id, name: String, value: Any): Unit = {
@@ -95,7 +97,7 @@ final class ClientSideApi[F[_]: Async](connection: Connection[F], reporter: Repo
     val promise = async.promise[String]
     promises.put(descriptor, promise)
     connection.send(Procedure.EvalJs.code, descriptor, code)
-    promise.async
+    promise.effect
   }
 
   def resetForm(id: Id): Unit =
@@ -118,7 +120,7 @@ final class ClientSideApi[F[_]: Async](connection: Connection[F], reporter: Repo
     val promise = async.promise[String]
     promises.put(descriptor, promise)
     connection.send(Procedure.ExtractEventData.code, descriptor, renderNum)
-    promise.async
+    promise.effect
   }
 
   def startDomChanges(): Unit = {

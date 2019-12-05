@@ -1,6 +1,6 @@
 package korolev.server
 
-import korolev.Async
+import korolev.effect.Effect
 import korolev.state.DeviceId
 
 object StateLoader {
@@ -11,8 +11,8 @@ object StateLoader {
    * @param initialState State factory
    * @tparam S Type of state
    */
-  def default[F[_] : Async, S](initialState: S): StateLoader[F, S] = {
-    val value = Async[F].pure(initialState)
+  def default[F[_] : Effect, S](initialState: S): StateLoader[F, S] = {
+    val value = Effect[F].pure(initialState)
     (_, _) => value // always return same object
   }
 

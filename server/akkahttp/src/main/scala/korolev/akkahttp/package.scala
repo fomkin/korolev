@@ -16,7 +16,11 @@
 
 package korolev
 
-import akka.{Done, NotUsed}
+import korolev.effect.Effect
+import korolev.effect.Reporter
+import korolev.effect.Stream
+
+import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers.RawHeader
@@ -30,15 +34,16 @@ import korolev.akkahttp.util.{IncomingMessageHandler, LoggingReporter}
 import korolev.execution.defaultExecutor
 import korolev.server.{KorolevService, KorolevServiceConfig, MimeTypes, Request => KorolevRequest, Response => KorolevResponse}
 import korolev.state.{StateDeserializer, StateSerializer}
+import org.reactivestreams.{Subscriber, Subscription}
 
-import scala.concurrent.{Future}
-import scala.util.Success
+import scala.concurrent.Future
+import scala.util.{Failure, Success}
 
 package object akkahttp {
 
   type AkkaHttpService = AkkaHttpServerConfig => Route
 
-  def akkaHttpService[F[_]: Async, S: StateSerializer: StateDeserializer, M]
+  def akkaHttpService[F[_]: Effect, S: StateSerializer: StateDeserializer, M]
       (config: KorolevServiceConfig[F, S, M], mimeTypes: MimeTypes = server.mimeTypes)
       (implicit actorSystem: ActorSystem, materializer: Materializer): AkkaHttpService = { akkaHttpConfig =>
     // If reporter wasn't overridden, use akka-logging reporter.
@@ -55,7 +60,7 @@ package object akkahttp {
 
   private val KeepAliveMessage = TextMessage("[9]")
 
-  private def webSocketRoute[F[_]: Async, S: StateSerializer: StateDeserializer, M]
+  private def webSocketRoute[F[_]: Effect, S: StateSerializer: StateDeserializer, M]
       (korolevServer: KorolevService[F],
        akkaHttpConfig: AkkaHttpServerConfig,
        korolevServiceConfig: KorolevServiceConfig[F, S, M])
@@ -65,7 +70,7 @@ package object akkahttp {
         extractUpgradeToWebSocket { upgrade =>
           val korolevRequest = mkKorolevRequest(request, path.toString, Map.empty, LazyBytes.empty)
 
-          onSuccess(Async[F].toFuture(korolevServer(korolevRequest))) {
+          onSuccess(Effect[F].toFuture(korolevServer(korolevRequest))) {
             case KorolevResponse.WebSocket(publish, subscribe, destroy) =>
               val messageHandler = new IncomingMessageHandler(publish, () => destroy())
               val in = inFlow(akkaHttpConfig.maxRequestBodySize, publish).to(messageHandler.asSink)
@@ -103,7 +108,7 @@ package object akkahttp {
       }
       .collect { case Some(body) => body }
 
-  private def httpGetRoute[F[_]: Async](korolevServer: KorolevService[F]): Route =
+  private def httpGetRoute[F[_]: Effect](korolevServer: KorolevService[F]): Route =
     get {
       extractRequest { request =>
         extractUnmatchedPath { path =>
@@ -116,35 +121,65 @@ package object akkahttp {
       }
     }
 
-  private def httpPostRoute[F[_]](korolevServer: KorolevService[F])(implicit mat: Materializer, async: Async[F]): Route =
+  private def httpPostRoute[F[_]](korolevServer: KorolevService[F])(implicit mat: Materializer, async: Effect[F]): Route =
     post {
       extractRequest { _ =>
         extractUnmatchedPath { path =>
           parameterMap { params =>
             extractRequest { request =>
-              val queue = request
+
+              val subscriber = new Subscriber[Array[Byte]] {
+
+                var subscription: Subscription = _
+                var promise: Effect.Promise[F, Option[Array[Byte]]] = _
+                val completed: Boolean = false
+
+                def onSubscribe(s: Subscription): Unit = {
+                  subscription = s
+                  if (promise != null)
+                    subscription.request(1)
+                }
+
+                def onNext(t: Array[Byte]): Unit =
+                  promise.complete(Success(Some(t)))
+
+                def onError(t: Throwable): Unit =
+                  promise.complete(Failure(t))
+
+                def onComplete(): Unit = {
+                  if (promise != null)
+                    promise.complete(Success(None))
+                  finished.complete(Success(()))
+                }
+
+                val finished: Effect.Promise[F, Unit] = Effect[F].promise[Unit]
+
+                def pull(): F[Option[Array[Byte]]] = {
+                  if (subscription != null)
+                    subscription.request(1)
+                  promise = Effect[F].promise[Option[Array[Byte]]]
+                  promise.effect
+                }
+
+                def cancel(): F[Unit] = {
+                  Effect[F].delay(subscription.cancel())
+                }
+              }
+
+              request
                 .entity
                 .dataBytes
                 .map(_.toArray)
-                .toMat(Sink.queue[Array[Byte]])(Keep.right)
+                .to(Sink.fromSubscriber(subscriber))
                 .run()
-              val finished = async.promise[Unit]
-              val pull = { () =>
-                val future = queue.pull()
-                val promise = async.promise[Option[Array[Byte]]]
-                future.onComplete { `try` =>
-                  if (`try`.isSuccess && `try`.get.isEmpty)
-                    finished.complete(Success(()))
-                  promise.complete(`try`)
-                }
-                promise.async
-              }
-              val body = LazyBytes(
-                pull = pull,
-                cancel = () => async.delay(queue.cancel()),
-                finished = finished.async,
-                size = request.entity.contentLengthOption
+
+              val chunks = Stream[F, Array[Byte]](
+                pull = subscriber.pull,
+                cancel = subscriber.cancel,
+                finished = subscriber.finished.effect,
+                size = None
               )
+              val body = LazyBytes(chunks,  request.entity.contentLengthOption)
               val korolevRequest = mkKorolevRequest(request, path.toString, params, body)
               val responseF = handleHttpResponse(korolevServer, korolevRequest)
               complete(responseF)
@@ -171,23 +206,25 @@ package object akkahttp {
       body = body
     )
 
-  private def handleHttpResponse[F[_]: Async](korolevServer: KorolevService[F],
-                                              korolevRequest: KorolevRequest[F]): Future[HttpResponse] =
-    Async[F].toFuture(korolevServer(korolevRequest)).map {
-      case KorolevResponse.Http(status, streamOpt, responseHeaders) =>
+  private def handleHttpResponse[F[_]: Effect](korolevServer: KorolevService[F],
+                                               korolevRequest: KorolevRequest[F]): Future[HttpResponse] =
+    Effect[F].toFuture(korolevServer(korolevRequest)).map {
+      case KorolevResponse.Http(status, lazyBytes, responseHeaders) =>
         val (contentTypeOpt, otherHeaders) = getContentTypeAndResponseHeaders(responseHeaders)
-        val bytes = Source
-          .unfoldResourceAsync[Array[Byte], LazyBytes[F]](
-            create = () => Future.successful(streamOpt),
-            read = lb => Async[F].toFuture(lb.pull()),
-            close = x => Async[F].toFuture(Async[F].map(x.cancel())(_ => Done))
-          )
+        val bytesSource = Source
+          .unfoldAsync[NotUsed, Array[Byte]](NotUsed) { _ =>
+            Effect[F].toFuture {
+              Effect[F].map(lazyBytes.chunks.pull()) { vOpt =>
+                vOpt.map(v => (NotUsed, v))
+              }
+            }
+          }
           .map(ByteString.apply)
 
         HttpResponse(
           StatusCode.int2StatusCode(status.code),
           otherHeaders,
-          HttpEntity(contentTypeOpt.getOrElse(ContentTypes.NoContentType), bytes)
+          HttpEntity(contentTypeOpt.getOrElse(ContentTypes.NoContentType), bytesSource)
         )
       case _ =>
         throw new RuntimeException // cannot happen

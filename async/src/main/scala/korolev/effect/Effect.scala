@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package korolev
+package korolev.effect
 
 import scala.annotation.implicitNotFound
 import scala.collection.mutable
@@ -22,14 +22,14 @@ import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
-@implicitNotFound("Instance of Async for ${F} is not found. If you want Future, ensure that execution context is passed to the scope (import korolev.execution.defaultExecutor)")
-trait Async[F[_]] {
+@implicitNotFound("Instance of Effect for ${F} is not found. If you want Future, ensure that execution context is passed to the scope (import korolev.execution.defaultExecutor)")
+trait Effect[F[_]] {
   def pure[A](value: A): F[A]
   def delay[A](value: => A): F[A]
   def fork[A](value: => A): F[A]
   def unit: F[Unit]
   def fromTry[A](value: => Try[A]): F[A]
-  def promise[A]: Async.Promise[F, A]
+  def promise[A]: Effect.Promise[F, A]
   def flatMap[A, B](m: F[A])(f: A => F[B]): F[B]
   def map[A, B](m: F[A])(f: A => B): F[B]
   def recover[A](m: F[A])(f: PartialFunction[Throwable, A]): F[A]
@@ -39,20 +39,20 @@ trait Async[F[_]] {
   def toFuture[A](m: F[A]): Future[A]
 }
 
-object Async {
+object Effect {
 
   private val futureInstanceCache =
-    mutable.Map.empty[ExecutionContext, Async[Future]]
+    mutable.Map.empty[ExecutionContext, Effect[Future]]
 
   trait Promise[F[_], A] {
-    def async: F[A]
+    def effect: F[A]
     def complete(`try`: Try[A]): Unit
     def completeAsync(async: F[A]): Unit
   }
 
-  def apply[F[_]: Async]: Async[F] = implicitly[Async[F]]
+  def apply[F[_]: Effect]: Effect[F] = implicitly[Effect[F]]
 
-  private final class FutureAsync(implicit ec: ExecutionContext) extends Async[Future] {
+  private final class FutureEffect(implicit ec: ExecutionContext) extends Effect[Future] {
     val unit: Future[Unit] = Future.successful(())
     def toFuture[A](m: Future[A]): Future[A] = m
     def pure[A](value: A): Future[A] = Future.successful(value)
@@ -69,7 +69,7 @@ object Async {
     def promise[A]: Promise[Future, A] = {
       val promise = scala.concurrent.Promise[A]()
       new Promise[Future, A] {
-        val async: Future[A] = promise.future
+        val effect: Future[A] = promise.future
         def complete(`try`: Try[A]): Unit = {
           promise.complete(`try`)
           ()
@@ -87,24 +87,24 @@ object Async {
     * Creates an Async instance for Future type.
     * Physically one instance per execution context is maintained.
     */
-  implicit def futureAsync(implicit ec: ExecutionContext): Async[Future] = {
+  implicit def futureAsync(implicit ec: ExecutionContext): Effect[Future] = {
     futureInstanceCache.synchronized {
-      futureInstanceCache.getOrElseUpdate(ec, new FutureAsync())
+      futureInstanceCache.getOrElseUpdate(ec, new FutureEffect())
     }
   }
 
-  @inline implicit final class AsyncOps[F[_]: Async, A](async: => F[A]) {
-    def map[B](f: A => B): F[B] = Async[F].map(async)(f)
-    def flatMap[B](f: A => F[B]): F[B] = Async[F].flatMap(async)(f)
-    def recover(f: PartialFunction[Throwable, A]): F[A] = Async[F].recover[A](async)(f)
-    def run[U](f: Try[A] => U): Unit = Async[F].runAsync(async)(f)
+  @inline implicit final class EffectOps[F[_]: Effect, A](async: => F[A]) {
+    def map[B](f: A => B): F[B] = Effect[F].map(async)(f)
+    def flatMap[B](f: A => F[B]): F[B] = Effect[F].flatMap(async)(f)
+    def recover(f: PartialFunction[Throwable, A]): F[A] = Effect[F].recover[A](async)(f)
+    def run[U](f: Try[A] => U): Unit = Effect[F].runAsync(async)(f)
     def runOrReport[U](f: A => U)(implicit er: Reporter): Unit =
-      Async[F].runAsync(async) {
+      Effect[F].runAsync(async) {
         case Success(x) => f(x)
         case Failure(e) => er.error("Unhandled error", e)
       }
     def runIgnoreResult(implicit er: Reporter): Unit =
-      Async[F].runAsync(async) {
+      Effect[F].runAsync(async) {
         case Success(_) => // do nothing
         case Failure(e) => er.error("Unhandled error", e)
       }

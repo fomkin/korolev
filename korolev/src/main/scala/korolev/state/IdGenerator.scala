@@ -18,11 +18,11 @@ package korolev.state
 
 import java.security.SecureRandom
 
-import korolev.Async
+import korolev.effect.Effect
 
 trait IdGenerator[F[_]] {
-  def generateDeviceId()(implicit F: Async[F]): F[DeviceId]
-  def generateSessionId()(implicit F: Async[F]): F[SessionId]
+  def generateDeviceId()(implicit F: Effect[F]): F[DeviceId]
+  def generateSessionId()(implicit F: Effect[F]): F[SessionId]
 }
 
 object IdGenerator {
@@ -36,13 +36,13 @@ object IdGenerator {
 
   private class DefaultIdGenerator[F[_]](deviceIdLength: Int,
                                           sessionIdLength: Int) extends IdGenerator[F] {
-    def generateDeviceId()(implicit F: Async[F]): F[DeviceId] =
-      Async[F].delay {
+    def generateDeviceId()(implicit F: Effect[F]): F[DeviceId] =
+      Effect[F].delay {
         secureRandomString(deviceIdLength)
       }
 
-    def generateSessionId()(implicit F: Async[F]): F[SessionId] =
-      Async[F].delay {
+    def generateSessionId()(implicit F: Effect[F]): F[SessionId] =
+      Effect[F].delay {
         secureRandomString(sessionIdLength)
       }
 

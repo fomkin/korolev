@@ -19,9 +19,10 @@ package korolev.internal
 import java.util.concurrent.atomic.AtomicInteger
 
 import korolev.Context._
-import korolev.Async.AsyncOps
+import korolev.effect.Effect.EffectOps
 import korolev.execution.Scheduler
 import korolev._
+import korolev.effect.{Effect, Reporter}
 import korolev.state.{StateDeserializer, StateManager, StateSerializer}
 import levsha.events.calculateEventPropagation
 import levsha.impl.DiffRenderContext
@@ -29,7 +30,7 @@ import levsha.{Document, Id, XmlNs}
 
 final class ApplicationInstance
   [
-    F[_]: Async: Scheduler,
+    F[_]: Effect: Scheduler,
     S: StateSerializer: StateDeserializer,
     M
   ](
@@ -113,14 +114,14 @@ final class ApplicationInstance
           router
             .toState
             .lift(path)
-            .fold(Async[F].delay(Option.empty[S]))(_(maybeTopLevelState.getOrElse(initialState)).map(Some(_)))
+            .fold(Effect[F].delay(Option.empty[S]))(_(maybeTopLevelState.getOrElse(initialState)).map(Some(_)))
         }
         .flatMap {
           case Some(newState) =>
             stateManager.write(Id.TopLevel, newState)
               .flatMap(_ => onState())
           case None =>
-            Async[F].unit
+            Effect[F].unit
         }
         .runIgnoreResult
     },

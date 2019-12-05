@@ -16,13 +16,14 @@
 
 package korolev.execution
 
-import korolev.{Async, Reporter}
+import korolev.effect.Reporter
+import korolev.effect.{Effect, Reporter}
 
 import scala.annotation.implicitNotFound
 import scala.concurrent.duration.FiniteDuration
 
 @implicitNotFound("Scheduler for ${F} is not found. Ensure that it is passed to the scope (import korolev.execution.defaultScheduler)")
-abstract class Scheduler[F[_] : Async] {
+abstract class Scheduler[F[_] : Effect] {
   import Scheduler._
   def scheduleOnce[T](delay: FiniteDuration)(job: => T)(implicit r: Reporter): JobHandler[F, T]
   def schedule[U](interval: FiniteDuration)(job: => U)(implicit r: Reporter): Cancel
@@ -34,7 +35,7 @@ object Scheduler {
 
   type Cancel = () => Unit
 
-  case class JobHandler[F[_]: Async, T](
+  case class JobHandler[F[_]: Effect, T](
     cancel: Cancel,
     result: F[T]
   )

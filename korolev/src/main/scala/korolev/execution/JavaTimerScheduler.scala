@@ -18,21 +18,22 @@ package korolev.execution
 
 import java.util.{Timer, TimerTask}
 
-import korolev.{Async, Reporter}
-import korolev.Async.AsyncOps
+import korolev.effect.Reporter
+import korolev.effect.Effect.EffectOps
+import korolev.effect.{Effect, Reporter}
 
 import scala.concurrent.duration.FiniteDuration
 import scala.util.Success
 
-final class JavaTimerScheduler[F[_]: Async] extends Scheduler[F] {
+final class JavaTimerScheduler[F[_]: Effect] extends Scheduler[F] {
 
   import Scheduler._
 
   private val timer = new Timer()
-  private val async = Async[F]
+  private val async = Effect[F]
 
   def scheduleOnce[T](delay: FiniteDuration)(job: => T)(implicit r: Reporter): JobHandler[F, T] = {
-    val promise = Async[F].promise[T]
+    val promise = Effect[F].promise[T]
     val task = new TimerTask {
       def run(): Unit = {
         val task = async.fork {
@@ -45,7 +46,7 @@ final class JavaTimerScheduler[F[_]: Async] extends Scheduler[F] {
     timer.schedule(task, delay.toMillis)
     JobHandler(
       cancel = () => { task.cancel(); () },
-      result = promise.async
+      result = promise.effect
     )
   }
 

@@ -16,7 +16,7 @@
 
 package korolev.slf4j
 
-import korolev.Reporter
+import korolev.effect.Reporter
 import org.slf4j.LoggerFactory
 
 object Slf4jReporter extends Reporter {
