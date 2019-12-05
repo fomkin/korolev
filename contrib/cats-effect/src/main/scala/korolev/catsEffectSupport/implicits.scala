@@ -21,6 +21,7 @@ import korolev.Async
 import cats.effect._
 import cats.instances.list._
 
+import scala.concurrent.Future
 import scala.util.Try
 
 object implicits {
@@ -85,5 +86,8 @@ object implicits {
         .runAsync(m)(result => IO { callback(result.toTry); () })
         .unsafeRunSync()
     }
+
+    def toFuture[A](m: F[A]): Future[A] =
+      Effect[F].toIO(m).unsafeToFuture()
   }
 }

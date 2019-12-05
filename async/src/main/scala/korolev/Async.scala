@@ -36,6 +36,7 @@ trait Async[F[_]] {
   def sequence[A](in: List[F[A]]): F[List[A]]
   def runAsync[A, U](m: F[A])(callback: Try[A] => U): Unit
   def run[A](m: F[A], timeout: Duration): A
+  def toFuture[A](m: F[A]): Future[A]
 }
 
 object Async {
@@ -53,6 +54,7 @@ object Async {
 
   private final class FutureAsync(implicit ec: ExecutionContext) extends Async[Future] {
     val unit: Future[Unit] = Future.successful(())
+    def toFuture[A](m: Future[A]): Future[A] = m
     def pure[A](value: A): Future[A] = Future.successful(value)
     def delay[A](value: => A): Future[A] = Future.successful(value)
     def fork[A](value: => A): Future[A] = Future(value)

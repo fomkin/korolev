@@ -357,7 +357,7 @@ package object server {
         } recover {
           case _: SessionDestroyedException =>
             Response.Http(Response.Status.Gone, "Session has been destroyed", Nil)
-        }).asInsxtanceOf[F[Response[F]]]
+        }).asInstanceOf[F[Response[F]]]
       case Request(Root / "bridge" / "web-socket" / deviceId / sessionId, _, _, _, _) =>
         val sessionAsync = sessions.get(makeSessionKey(deviceId, sessionId)) match {
           case Some(x) => Async[F].delay(x)
