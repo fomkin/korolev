@@ -20,16 +20,18 @@ import java.util.concurrent.atomic.AtomicInteger
 
 import korolev.Router
 import korolev.effect.{Effect, Reporter}
+import korolev.effect.syntax._
+
 import levsha.Id
 import levsha.impl.DiffRenderContext.ChangesPerformer
-
-import Effect._
-import Router.Path
 
 import scala.annotation.switch
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
 import scala.util.{Failure, Success}
+
+import Router.Path
+import Effect.Promise
 
 /**
   * Typed interface to client side

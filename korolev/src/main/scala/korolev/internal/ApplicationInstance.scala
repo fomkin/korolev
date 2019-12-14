@@ -19,7 +19,7 @@ package korolev.internal
 import java.util.concurrent.atomic.AtomicInteger
 
 import korolev.Context._
-import korolev.effect.Effect.EffectOps
+import korolev.effect.syntax._
 import korolev.execution.Scheduler
 import korolev._
 import korolev.effect.{Effect, Reporter}

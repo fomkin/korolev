@@ -18,8 +18,7 @@ package korolev.execution
 
 import java.util.{Timer, TimerTask}
 
-import korolev.effect.Reporter
-import korolev.effect.Effect.EffectOps
+import korolev.effect.syntax._
 import korolev.effect.{Effect, Reporter}
 
 import scala.concurrent.duration.FiniteDuration

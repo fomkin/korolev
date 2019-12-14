@@ -23,8 +23,7 @@ import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 
 import korolev.effect.Stream
 import korolev.effect.Effect
-import Effect._
-
+import korolev.effect.syntax._
 
 import korolev.Context.File
 import korolev.internal.{ApplicationInstance, Connection}
@@ -34,6 +33,8 @@ import levsha.Id
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
+
+import Effect.Promise
 
 package object server {
 

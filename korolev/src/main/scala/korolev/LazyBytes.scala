@@ -62,7 +62,7 @@ final case class LazyBytes[F[_]: Effect](chunks: Stream[F, Array[Byte]],
 object LazyBytes {
 
   def apply[F[_]: Effect](bytes: Array[Byte]): LazyBytes[F] = {
-    new LazyBytes(Stream.eval(bytes), Some(bytes.length))
+    new LazyBytes(Stream.eval(bytes), Some(bytes.length.toLong))
   }
 
   def empty[F[_]: Effect]: LazyBytes[F] = {
