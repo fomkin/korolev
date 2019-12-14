@@ -1,6 +1,6 @@
 import korolev._
 import korolev.server._
-import korolev.akkahttp._
+import korolev.akka._
 import korolev.execution._
 import korolev.state.javaSerialization._
 

@@ -1,6 +1,6 @@
 import ViewState.Tab.{About, Blog}
 import korolev._
-import korolev.akkahttp._
+import korolev.akka._
 import korolev.execution._
 import korolev.server._
 import korolev.state.javaSerialization._

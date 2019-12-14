@@ -3,7 +3,7 @@ import akka.http.scaladsl.Http
 import akka.stream.scaladsl.{Sink, Source}
 import akka.stream.{ActorMaterializer, Materializer, OverflowStrategy}
 import korolev._
-import korolev.akkahttp._
+import korolev.akka._
 import korolev.execution._
 import korolev.server._
 import korolev.state.javaSerialization._

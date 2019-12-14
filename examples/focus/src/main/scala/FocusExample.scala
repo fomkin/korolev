@@ -1,5 +1,5 @@
 import korolev._
-import korolev.akkahttp._
+import korolev.akka._
 import korolev.execution._
 import korolev.server._
 

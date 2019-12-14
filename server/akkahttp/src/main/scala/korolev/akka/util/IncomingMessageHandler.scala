@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package korolev.akkahttp.util
+package korolev.akka.util
 
 import akka.NotUsed
 import akka.actor.{Actor, ActorRef, ActorSystem, Props, Status}

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package korolev.akkahttp
+package korolev.akka
 
 case class AkkaHttpServerConfig(maxRequestBodySize: Int = AkkaHttpServerConfig.DefaultMaxRequestBodySize,
                                 outputBufferSize: Int = AkkaHttpServerConfig.DefaultOutputBufferSize)
