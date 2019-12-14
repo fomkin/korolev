@@ -5,7 +5,7 @@ import akka.http.scaladsl.Http
 import akka.stream.{ActorMaterializer, Materializer}
 import cats.Monad
 import korolev._
-import korolev.akkahttp.{AkkaHttpServerConfig, akkaHttpService}
+import korolev.akka.{AkkaHttpServerConfig, akkaHttpService}
 import korolev.catsEffectSupport.implicits._
 import cats.syntax.flatMap._
 import korolev.effect.Effect

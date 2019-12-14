@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package korolev.akkahttp
+package korolev.akka
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http

@@ -20,32 +20,32 @@ import korolev.effect.Effect
 import korolev.effect.Reporter
 import korolev.effect.Stream
 
-import akka.NotUsed
-import akka.actor.ActorSystem
-import akka.http.scaladsl.model._
-import akka.http.scaladsl.model.headers.RawHeader
-import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
-import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.server.Route
-import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
-import akka.stream.{Materializer, OverflowStrategy}
-import akka.util.ByteString
-import korolev.akkahttp.util.{IncomingMessageHandler, LoggingReporter}
-import korolev.execution.defaultExecutor
+import _root_.akka.NotUsed
+import _root_.akka.actor.ActorSystem
+import _root_.akka.http.scaladsl.model._
+import _root_.akka.http.scaladsl.model.headers.RawHeader
+import _root_.akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
+import _root_.akka.http.scaladsl.server.Directives._
+import _root_.akka.http.scaladsl.server.Route
+import _root_.akka.stream.scaladsl.{Flow, Sink, Source}
+import _root_.akka.stream.{Materializer, OverflowStrategy}
+import _root_.akka.util.ByteString
+
+import korolev.akka.util.{IncomingMessageHandler, LoggingReporter}
 import korolev.server.{KorolevService, KorolevServiceConfig, MimeTypes, Request => KorolevRequest, Response => KorolevResponse}
 import korolev.state.{StateDeserializer, StateSerializer}
 import org.reactivestreams.{Subscriber, Subscription}
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
-package object akkahttp {
+package object akka {
 
   type AkkaHttpService = AkkaHttpServerConfig => Route
 
   def akkaHttpService[F[_]: Effect, S: StateSerializer: StateDeserializer, M]
       (config: KorolevServiceConfig[F, S, M], mimeTypes: MimeTypes = server.mimeTypes)
-      (implicit actorSystem: ActorSystem, materializer: Materializer): AkkaHttpService = { akkaHttpConfig =>
+      (implicit actorSystem: ActorSystem, materializer: Materializer, ec: ExecutionContext): AkkaHttpService = { akkaHttpConfig =>
     // If reporter wasn't overridden, use akka-logging reporter.
     val actualConfig =
       if (config.reporter != Reporter.PrintReporter) config
@@ -64,7 +64,7 @@ package object akkahttp {
       (korolevServer: KorolevService[F],
        akkaHttpConfig: AkkaHttpServerConfig,
        korolevServiceConfig: KorolevServiceConfig[F, S, M])
-      (implicit actorSystem: ActorSystem, materializer: Materializer): Route =
+      (implicit actorSystem: ActorSystem, materializer: Materializer, ec: ExecutionContext): Route =
     extractRequest { request =>
       extractUnmatchedPath { path =>
         extractUpgradeToWebSocket { upgrade =>
@@ -94,7 +94,7 @@ package object akkahttp {
     }
 
   private def inFlow(maxMessageSize: Int, publish: String => Unit)
-                    (implicit materializer: Materializer): Flow[Message, String, NotUsed] =
+                    (implicit materializer: Materializer, ec: ExecutionContext): Flow[Message, String, NotUsed] =
     Flow[Message]
       .mapAsync(1) {
         case TextMessage.Strict(text) =>
@@ -108,7 +108,7 @@ package object akkahttp {
       }
       .collect { case Some(body) => body }
 
-  private def httpGetRoute[F[_]: Effect](korolevServer: KorolevService[F]): Route =
+  private def httpGetRoute[F[_]: Effect](korolevServer: KorolevService[F])(implicit ec: ExecutionContext): Route =
     get {
       extractRequest { request =>
         extractUnmatchedPath { path =>
@@ -121,7 +121,7 @@ package object akkahttp {
       }
     }
 
-  private def httpPostRoute[F[_]](korolevServer: KorolevService[F])(implicit mat: Materializer, async: Effect[F]): Route =
+  private def httpPostRoute[F[_]](korolevServer: KorolevService[F])(implicit mat: Materializer, async: Effect[F], ec: ExecutionContext): Route =
     post {
       extractRequest { _ =>
         extractUnmatchedPath { path =>
@@ -207,7 +207,7 @@ package object akkahttp {
     )
 
   private def handleHttpResponse[F[_]: Effect](korolevServer: KorolevService[F],
-                                               korolevRequest: KorolevRequest[F]): Future[HttpResponse] =
+                                               korolevRequest: KorolevRequest[F])(implicit ec: ExecutionContext): Future[HttpResponse] =
     Effect[F].toFuture(korolevServer(korolevRequest)).map {
       case KorolevResponse.Http(status, lazyBytes, responseHeaders) =>
         val (contentTypeOpt, otherHeaders) = getContentTypeAndResponseHeaders(responseHeaders)

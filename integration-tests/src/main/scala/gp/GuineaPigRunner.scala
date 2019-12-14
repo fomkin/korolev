@@ -1,7 +1,7 @@
 package gp
 
 import akka.http.scaladsl.Http
-import korolev.akkahttp._
+import korolev.akka._
 import korolev.execution._
 import korolev.state.javaSerialization._
 import org.openqa.selenium.remote.DesiredCapabilities

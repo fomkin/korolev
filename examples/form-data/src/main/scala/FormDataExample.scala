@@ -3,8 +3,8 @@ import java.util.Base64
 
 import javax.imageio.ImageIO
 import korolev._
-import korolev.akkahttp.{AkkaHttpServerConfig, SimpleAkkaHttpKorolevApp}
-import korolev.akkahttp._
+import korolev.akka.{AkkaHttpServerConfig, SimpleAkkaHttpKorolevApp}
+import korolev.akka._
 import korolev.server._
 import korolev.execution._
 import korolev.state.javaSerialization._

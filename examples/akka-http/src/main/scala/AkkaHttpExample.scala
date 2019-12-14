@@ -2,7 +2,7 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.stream.{ActorMaterializer, Materializer}
 import korolev._
-import korolev.akkahttp._
+import korolev.akka._
 import korolev.execution._
 import korolev.server._
 import korolev.state.javaSerialization._
