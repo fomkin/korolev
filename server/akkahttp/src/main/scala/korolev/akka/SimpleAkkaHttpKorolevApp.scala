@@ -19,7 +19,6 @@ package korolev.akka
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.stream.{ActorMaterializer, Materializer}
-import korolev.execution._
 
 abstract class SimpleAkkaHttpKorolevApp(config: AkkaHttpServerConfig = null) {
 

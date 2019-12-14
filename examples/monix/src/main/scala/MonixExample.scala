@@ -1,40 +1,24 @@
-import java.util.concurrent.Executors
-
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.stream.{ActorMaterializer, Materializer}
-import cats.Monad
-import korolev._
+import cats.effect.IO
+import korolev.Context
 import korolev.akka.{AkkaHttpServerConfig, akkaHttpService}
-import korolev.catsEffectSupport.implicits._
-import cats.syntax.flatMap._
-import korolev.effect.Effect
-import korolev.server._
+import korolev.cats.IOEffect
+import korolev.execution.defaultExecutor
+import korolev.server.{KorolevServiceConfig, StateLoader}
 import korolev.state.javaSerialization._
-import monix.eval.Task
-import monix.execution.ExecutionModel.AlwaysAsyncExecution
-import monix.execution.Scheduler
 
 object MonixExample extends App {
+
   private implicit val actorSystem: ActorSystem = ActorSystem()
   private implicit val materializer: Materializer = ActorMaterializer()
 
-  implicit val taskScheduler: Scheduler = Scheduler(
-    Executors.newScheduledThreadPool(10),
-    AlwaysAsyncExecution
-  )
-
-  private val route = akkaHttpService(new ToDoList[Task]().config).apply(AkkaHttpServerConfig())
-  Http().bindAndHandle(route, "0.0.0.0", 8080)
-}
-
-class ToDoList[F[_]: Effect: Monad] {
-  val applicationContext: Context[F, State, Any] = {
-    Context[F, State, Any]
+  val applicationContext: Context[IO, State, Any] = {
+    Context[IO, State, Any]
   }
 
   import applicationContext._
-
   import levsha.dsl._
   import html._
 
@@ -42,7 +26,7 @@ class ToDoList[F[_]: Effect: Monad] {
   private val inputId = elementId()
   private val editInputId = elementId()
 
-  val config = KorolevServiceConfig[F, State, Any](
+  val config = KorolevServiceConfig[IO, State, Any](
     stateLoader = StateLoader.default(State()),
     render = state => {
       body(
@@ -121,6 +105,10 @@ class ToDoList[F[_]: Effect: Monad] {
       )
     }
   )
+
+  private val route = akkaHttpService(config).apply(AkkaHttpServerConfig())
+
+  Http().bindAndHandle(route, "0.0.0.0", 8080)
 }
 
 case class State(

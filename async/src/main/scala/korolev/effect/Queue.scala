@@ -70,7 +70,7 @@ object Queue {
           }
           Effect[F].flatMap(xx)(identity)
         },
-        finished = finished.effect,
+        consumed = finished.effect,
         cancel = close,
         size = None
       )

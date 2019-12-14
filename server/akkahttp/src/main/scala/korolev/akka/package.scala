@@ -176,7 +176,7 @@ package object akka {
               val chunks = Stream[F, Array[Byte]](
                 pull = subscriber.pull,
                 cancel = subscriber.cancel,
-                finished = subscriber.finished.effect,
+                consumed = subscriber.finished.effect,
                 size = None
               )
               val body = LazyBytes(chunks,  request.entity.contentLengthOption)
@@ -213,18 +213,20 @@ package object akka {
         val (contentTypeOpt, otherHeaders) = getContentTypeAndResponseHeaders(responseHeaders)
         val bytesSource = Source
           .unfoldAsync[NotUsed, Array[Byte]](NotUsed) { _ =>
-            Effect[F].toFuture {
+            Effect[F].toFuture(
               Effect[F].map(lazyBytes.chunks.pull()) { vOpt =>
                 vOpt.map(v => (NotUsed, v))
               }
-            }
+            )
           }
           .map(ByteString.apply)
-
         HttpResponse(
           StatusCode.int2StatusCode(status.code),
           otherHeaders,
-          HttpEntity(contentTypeOpt.getOrElse(ContentTypes.NoContentType), bytesSource)
+          lazyBytes.bytesLength match {
+            case Some(bytesLength) => HttpEntity(contentTypeOpt.getOrElse(ContentTypes.NoContentType), bytesLength, bytesSource)
+            case None => HttpEntity(contentTypeOpt.getOrElse(ContentTypes.NoContentType), bytesSource)
+          }
         )
       case _ =>
         throw new RuntimeException // cannot happen
