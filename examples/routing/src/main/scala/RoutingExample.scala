@@ -15,7 +15,7 @@ object RoutingExample extends SimpleAkkaHttpKorolevApp {
 
   val inputId = elementId()
 
-  val service = akkaHttpService{
+  val service = akkaHttpService {
     KorolevServiceConfig [Future, State, Any](
       stateLoader = StateLoader.default(State()),
       head = _ => {

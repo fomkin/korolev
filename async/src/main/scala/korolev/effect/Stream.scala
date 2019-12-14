@@ -2,11 +2,10 @@ package korolev.effect
 
 import scala.util.Success
 
-final case class Stream[F[_]: Effect, A](
-   pull: () => F[Option[A]],
-   finished: F[Unit],
-   cancel: () => F[Unit],
-   size: Option[Long]) { lhs =>
+final case class Stream[F[_]: Effect, A](pull: () => F[Option[A]],
+                                         consumed: F[Unit],
+                                         cancel: () => F[Unit],
+                                         size: Option[Long]) { lhs =>
 
   /**
     * @see concat
@@ -28,7 +27,7 @@ final case class Stream[F[_]: Effect, A](
         if (maybeValue.nonEmpty) Effect[F].pure(maybeValue)
         else rhs.pull()
       },
-      finished = rhs.finished,
+      consumed = rhs.consumed,
       cancel = () => {
         val lc = lhs.cancel()
         val rc = rhs.cancel()
@@ -44,7 +43,7 @@ final case class Stream[F[_]: Effect, A](
       pull = () => Effect[F].map(lhs.pull()) { maybeValue =>
         maybeValue.map(f)
       },
-      finished = lhs.finished,
+      consumed = lhs.consumed,
       cancel = lhs.cancel,
       size = lhs.size
     )
@@ -81,7 +80,7 @@ final case class Stream[F[_]: Effect, A](
     }
     Stream[F, B](
       pull = () => aux(),
-      finished = lhs.finished,
+      consumed = lhs.consumed,
       cancel = lhs.cancel,
       size = None
     )
@@ -160,7 +159,7 @@ object Stream {
           Some(res)
         }
       },
-      finished = finished.effect,
+      consumed = finished.effect,
       cancel = () => Effect[F].delay {
         canceled = true
         finished.complete(Success(()))
@@ -176,7 +175,7 @@ object Stream {
     Stream(
       pull = () => Effect[F].flatMap(eventuallyStream)(_.pull()),
       cancel = () => Effect[F].flatMap(eventuallyStream)(_.cancel()),
-      finished = Effect[F].flatMap(eventuallyStream)(_.finished),
+      consumed = Effect[F].flatMap(eventuallyStream)(_.consumed),
       size = None
     )
   }

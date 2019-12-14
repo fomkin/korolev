@@ -28,6 +28,7 @@ final class Hub[F[_]: Effect, T](stream: Stream[F, T], bufferSize: Int) extends 
 
   // Run this stream with puller.
   Effect[F].runAsync(stream.foreach(puller)) {
+    // TODO rewrite with async
     case Success(_) => queues.forEach(q => Effect[F].run(q.close(), 1.hour))
     case Failure(e) => queues.forEach(q => Effect[F].run(q.fail(e), 1.hour))
   }
@@ -35,7 +36,7 @@ final class Hub[F[_]: Effect, T](stream: Stream[F, T], bufferSize: Int) extends 
   def apply(): F[Stream[F, T]] = Effect[F].delay {
     val queue = Queue[F, T](bufferSize)
     queues.add(queue)
-    Effect[F].runAsync(queue.stream.finished) { _ =>
+    Effect[F].runAsync(queue.stream.consumed) { _ =>
       // Remove queue if it was canceled/closed
       queues.remove(queue)
     }

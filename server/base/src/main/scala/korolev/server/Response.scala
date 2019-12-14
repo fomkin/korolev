@@ -34,18 +34,15 @@ object Response {
     }
 
     def apply[F[_]: Effect](status: Status,
-                            maybeBody: Option[Array[Byte]],
+                            body: Array[Byte],
                             headers: Seq[(String, String)]): Http[F] = {
-      val bytes = maybeBody match {
-        case Some(body) => LazyBytes[F](body)
-        case None       => LazyBytes.empty[F]
-      }
-      new Http(status, bytes, headers)
+      new Http(status, LazyBytes[F](body), headers)
     }
 
-    def apply[F[_]: Effect](status: Status, message: String, headers: Seq[(String, String)]): Http[F] = {
-      val bytes = message.getBytes(StandardCharsets.UTF_8)
-      Http[F](status, Some(bytes), headers)
+    def apply[F[_]: Effect](status: Status,
+                            message: String,
+                            headers: Seq[(String, String)]): Http[F] = {
+      Http[F](status, message.getBytes(StandardCharsets.UTF_8), headers)
     }
   }
 

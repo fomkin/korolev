@@ -22,6 +22,10 @@ import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, ExecutionContext, Future, TimeoutException}
 import scala.util.Try
 
+/**
+  * Korolev's internal presentation of effect (such as Future, cats.effect.IO, Monix or ZIO tasks).
+  * Contains enough functionality to make Korolev works.
+  */
 @implicitNotFound("Instance of Effect for ${F} is not found. If you want Future, ensure that execution context is passed to the scope (import korolev.execution.defaultExecutor)")
 trait Effect[F[_]] {
   def pure[A](value: A): F[A]

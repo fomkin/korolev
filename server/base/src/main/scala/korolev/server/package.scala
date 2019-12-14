@@ -102,7 +102,7 @@ package object server {
             "content-type" -> htmlContentType,
             "set-cookie" -> s"${Cookies.DeviceId}=$deviceId; Path=${config.rootPath}"
           ),
-          maybeBody = Some {
+          body = {
             val sb = mutable.StringBuilder.newBuilder
             val html = sb
               .append("<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.1//EN\" \"http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd\">")
@@ -260,11 +260,11 @@ package object server {
               case -1 => "bin"
               case index => fileName.substring(index + 1)
             }
-            val bytes = inputStreamToBytes(stream)
+            val bytes = inputStreamToBytes(stream) // TODO could be lazy
             val headers = mimeTypes(fileExtension).fold(Seq.empty[(String, String)]) { fe =>
               Seq("content-type" -> fe)
             }
-            Effect[F].delay(Response.Http(Response.Status.Ok, Some(bytes), headers))
+            Effect[F].delay(Response.Http(Response.Status.Ok, bytes, headers))
         }
       case r @ Request(Root / "bridge" / deviceId / sessionId / "form-data" / descriptor, _, _, headers, _) =>
         sessions.get(makeSessionKey(deviceId, sessionId)) match {
@@ -323,7 +323,7 @@ package object server {
             session.resolveFile(descriptor, name, Success(body.chunks))
           }
         result match {
-          case Some(_) => body.chunks.finished.map(_ => Response.Http(Response.Status.Ok))
+          case Some(_) => body.chunks.consumed.map(_ => Response.Http(Response.Status.Ok))
           case None => Effect[F].delay(Response.Http(Response.Status.BadRequest))
         }
       case Request(Root / "bridge" / "long-polling" / deviceId / sessionId / "publish", _, _, _, body) =>
@@ -347,7 +347,7 @@ package object server {
         (sessionAsync.flatMap { session =>
           session.nextMessage.map { message =>
             Response.Http(Response.Status.Ok,
-              maybeBody = Some(message.getBytes(StandardCharsets.UTF_8)),
+              body = message.getBytes(StandardCharsets.UTF_8),
               headers = Seq(
                 "Cache-Control" -> "no-cache",
                 "Content-Type" -> "application/json"
