@@ -18,11 +18,12 @@ package korolev.internal
 
 import java.util.concurrent.ConcurrentLinkedQueue
 
-import korolev.effect.Effect._
 import korolev.effect.Effect
 
 import scala.annotation.switch
 import scala.util.Success
+
+import Effect.Promise
 
 final class Connection[F[_] : Effect] {
 

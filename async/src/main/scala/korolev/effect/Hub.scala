@@ -11,9 +11,6 @@ import scala.util.{Failure, Success}
   * contains same elements as the parent stream.
   * This is helpful when you want to consume
   * content of the stream in few different places/
-  * {{{
-  *
-  * }}}
   */
 final class Hub[F[_]: Effect, T](stream: Stream[F, T], bufferSize: Int) extends (() => F[Stream[F, T]]) {
 

@@ -22,11 +22,11 @@ object FileStreamingExample extends SimpleAkkaHttpKorolevApp {
 
   def onUploadClick(access: Access) = {
     access.downloadFilesAsStream(fileInput).flatMap { files =>
-      access.transition(_.copy(files.map(x => (x.name, (0L, x.data.size.getOrElse(0L)))).toMap, inProgress = true)).flatMap { _ =>
+      access.transition(_.copy(files.map(x => (x.name, (0L, x.data.bytesLength.getOrElse(0L)))).toMap, inProgress = true)).flatMap { _ =>
         Future.sequence {
           files.map { file =>
-            val size = file.data.size.getOrElse(0L)
-            def loop(acc: Long): Future[Unit] = file.data.pull() flatMap {
+            val size = file.data.bytesLength.getOrElse(0L)
+            def loop(acc: Long): Future[Unit] = file.data.chunks.pull() flatMap {
               case Some(bytes) =>
                 val loaded = acc + bytes.length
                 val w = new FileOutputStream(new File(file.name), true)

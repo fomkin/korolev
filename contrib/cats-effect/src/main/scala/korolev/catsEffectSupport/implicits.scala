@@ -19,14 +19,15 @@ package korolev.catsEffectSupport
 import cats.Traverse
 import cats.effect._
 import cats.instances.list._
-import korolev.effect.Effect
+import korolev.effect.{Effect => KEffect}
 
 import scala.concurrent.Future
+import scala.concurrent.duration.Duration
 import scala.util.Try
 
 object implicits {
 
-  implicit def korolevAsyncFromEffect[F[_]: Effect]: Effect[F] = new Effect[F] {
+  implicit def korolevAsyncFromEffect[F[_]: Effect]: KEffect[F] = new KEffect[F] {
 
     def pure[A](value: A): F[A] =
       Effect[F].pure(value)
@@ -43,12 +44,12 @@ object implicits {
     def fromTry[A](value: => Try[A]): F[A] =
       Effect[F].fromTry(value)
 
-    def promise[A]: Effect.Promise[F, A] = {
-      new korolev.Effect.Promise[F, A] {
+    def promise[A]: KEffect.Promise[F, A] = {
+      new KEffect.Promise[F, A] {
 
         private var callback: Either[Throwable, A] => Unit = _
 
-        val async: F[A] = Effect[F].async { cb =>
+        val effect: F[A] = Effect[F].async { cb =>
           this.synchronized {
             callback = cb
             this.notify()
@@ -85,6 +86,10 @@ object implicits {
       Effect[F]
         .runAsync(m)(result => IO { callback(result.toTry); () })
         .unsafeRunSync()
+    }
+
+    def run[A](m: F[A], timeout: Duration): Option[A] = {
+      Effect[F].toIO(m).unsafeRunTimed(timeout)
     }
 
     def toFuture[A](m: F[A]): Future[A] =

@@ -19,8 +19,8 @@ package korolev.effect
 import scala.annotation.implicitNotFound
 import scala.collection.mutable
 import scala.concurrent.duration.Duration
-import scala.concurrent.{Await, ExecutionContext, Future}
-import scala.util.{Failure, Success, Try}
+import scala.concurrent.{Await, ExecutionContext, Future, TimeoutException}
+import scala.util.Try
 
 @implicitNotFound("Instance of Effect for ${F} is not found. If you want Future, ensure that execution context is passed to the scope (import korolev.execution.defaultExecutor)")
 trait Effect[F[_]] {
@@ -35,7 +35,7 @@ trait Effect[F[_]] {
   def recover[A](m: F[A])(f: PartialFunction[Throwable, A]): F[A]
   def sequence[A](in: List[F[A]]): F[List[A]]
   def runAsync[A, U](m: F[A])(callback: Try[A] => U): Unit
-  def run[A](m: F[A], timeout: Duration): A
+  def run[A](m: F[A], timeout: Duration): Option[A]
   def toFuture[A](m: F[A]): Future[A]
 }
 
@@ -62,7 +62,11 @@ object Effect {
     def flatMap[A, B](m: Future[A])(f: A => Future[B]): Future[B] = m.flatMap(f)
     def map[A, B](m: Future[A])(f: A => B): Future[B] = m.map(f)
     def runAsync[A, U](m: Future[A])(f: Try[A] => U): Unit = m.onComplete(f)
-    def run[A](m: Future[A], timeout: Duration): A = Await.result(m, timeout)
+    def run[A](m: Future[A], timeout: Duration): Option[A] = try {
+      Some(Await.result(m, timeout))
+    } catch {
+      case _: TimeoutException => None
+    }
     def recover[A](m: Future[A])(f: PartialFunction[Throwable, A]): Future[A] = m.recover(f)
     def sequence[A](in: List[Future[A]]): Future[List[A]] =
       Future.sequence(in)
@@ -91,22 +95,5 @@ object Effect {
     futureInstanceCache.synchronized {
       futureInstanceCache.getOrElseUpdate(ec, new FutureEffect())
     }
-  }
-
-  @inline implicit final class EffectOps[F[_]: Effect, A](async: => F[A]) {
-    def map[B](f: A => B): F[B] = Effect[F].map(async)(f)
-    def flatMap[B](f: A => F[B]): F[B] = Effect[F].flatMap(async)(f)
-    def recover(f: PartialFunction[Throwable, A]): F[A] = Effect[F].recover[A](async)(f)
-    def run[U](f: Try[A] => U): Unit = Effect[F].runAsync(async)(f)
-    def runOrReport[U](f: A => U)(implicit er: Reporter): Unit =
-      Effect[F].runAsync(async) {
-        case Success(x) => f(x)
-        case Failure(e) => er.error("Unhandled error", e)
-      }
-    def runIgnoreResult(implicit er: Reporter): Unit =
-      Effect[F].runAsync(async) {
-        case Success(_) => // do nothing
-        case Failure(e) => er.error("Unhandled error", e)
-      }
   }
 }
