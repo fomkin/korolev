@@ -14,18 +14,13 @@
  * limitations under the License.
  */
 
-package korolev.server
+package korolev
 
-import korolev.FormData
-import korolev.effect.{Effect, Stream}
+import korolev.state.{DeviceId, SessionId}
 
-import scala.util.Try
-
-private[server] abstract class KorolevSession[F[_]: Effect] {
-  def publish(message: String): F[Unit]
-  def nextMessage: F[String]
-  def destroy(): F[Unit]
-  def resolveFormData(descriptor: String, formData: Try[FormData]): Unit
-  def resolveFile(descriptor: String, name: String, bytes: Try[Stream[F, Array[Byte]]]): Unit
-  def fileDownloadInfo(descriptor: String, files: Map[String, Long]): Unit
+/**
+  * Qualified Session Identifier
+  */
+case class Qsid(deviceId: DeviceId, id: SessionId) {
+  override lazy val toString: String = s"$deviceId-$id"
 }

@@ -1,6 +1,7 @@
 package korolev.server
 
 import korolev.effect.Effect
+import korolev.server.Request.RequestHeader
 import korolev.state.DeviceId
 
 object StateLoader {
@@ -35,9 +36,9 @@ object StateLoader {
     (deviceId, _) => initialState(deviceId)
 
   /**
-   * State depnds on deviceId and HTTP-request. Second one
+   * State depends on deviceId and HTTP-request. Second one
    * could be None if case when user reconnected to
    * restarted application and state wasn't restored.
    */
-  def apply[F[_], S](f: (DeviceId, Option[Request[F]]) => F[S]): StateLoader[F, S] = f
+  def apply[F[_], S](f: (DeviceId, Option[RequestHeader]) => F[S]): StateLoader[F, S] = f
 }

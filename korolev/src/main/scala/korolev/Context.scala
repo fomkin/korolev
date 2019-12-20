@@ -17,7 +17,7 @@
 package korolev
 
 import korolev.effect.{Effect, Reporter}
-import korolev.internal.{ClientSideApi, ComponentInstance, EventRegistry}
+import korolev.internal.{Frontend, ComponentInstance, EventRegistry}
 import korolev.state.{StateDeserializer, StateManager, StateSerializer}
 import levsha._
 import levsha.events.EventPhase
@@ -98,7 +98,7 @@ object Context {
         def transition(f: korolev.Transition[S2]): F[Unit] =
           access.transition(s => write((s, f(read(s)))))
 
-        def sessionId: F[QualifiedSessionId] = access.sessionId
+        def sessionId: F[Qsid] = access.sessionId
 
         def evalJs(code: String): F[String] = access.evalJs(code)
       }
@@ -272,7 +272,7 @@ object Context {
     /**
       * Gives current session id.
       */
-    def sessionId: F[QualifiedSessionId]
+    def sessionId: F[Qsid]
 
     /**
       * Execute arbitrary JavaScript code on client and get stringified JSON back.
@@ -342,8 +342,8 @@ object Context {
     extends Binding[F, AS, M] {
 
     def createInstance(node: Id,
-                       sessionId: QualifiedSessionId,
-                       frontend: ClientSideApi[F],
+                       sessionId: Qsid,
+                       frontend: Frontend[F],
                        eventRegistry: EventRegistry[F],
                        stateManager: StateManager[F],
                        getRenderNum: () => Int,

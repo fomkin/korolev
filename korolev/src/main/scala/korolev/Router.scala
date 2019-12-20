@@ -35,7 +35,7 @@ final case class Router[F[_], S](
 object Router {
 
   sealed trait Path {
-    override def toString: String = {
+    def mkString: String = {
       @tailrec def aux(acc: List[String], path: Path): List[String] = path match {
         case Root => acc
         case prev / s => aux(s :: acc, prev)

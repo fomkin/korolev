@@ -81,6 +81,8 @@ object StateStorage {
     }
 
     def get(deviceId: DeviceId, sessionId: SessionId): F[StateManager[F]] = {
+      def errored = Effect[F]
+        .fail[StateManager[F]](new NoSuchElementException(s"There is no state for $deviceId/$sessionId"))
       val key = mkKey(deviceId, sessionId)
       cache.get(key) match {
         case None =>
@@ -91,7 +93,14 @@ object StateStorage {
                 sm
               }
             case None =>
-              Effect[F].fromTry(Failure(new NoSuchElementException(s"There is no state for $deviceId/$sessionId")))
+              if (DevMode.isActive) {
+                val directory = new File(DevMode.sessionsDirectory, key)
+                if (directory.exists()) {
+                  val sm = new DevModeStateManager[F](directory)
+                  cache.put(key, sm)
+                  Effect[F].delay(sm)
+                } else errored
+              } else errored
           }
         case Some(sm) => Effect[F].delay(sm)
       }

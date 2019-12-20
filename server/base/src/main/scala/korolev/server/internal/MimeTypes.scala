@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-package korolev.server
+package korolev.server.internal
 
-object mimeTypes extends (String => Option[String]) {
+private[korolev] object MimeTypes extends (String => Option[String]) {
 
   def apply(key: String): Option[String] = default.get(key)
 

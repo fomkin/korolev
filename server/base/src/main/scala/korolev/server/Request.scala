@@ -16,16 +16,27 @@
 
 package korolev.server
 import korolev.{LazyBytes, Router}
+import korolev.effect.Stream
 
-final case class Request[F[_]](
-  path: Router.Path,
-  param: String => Option[String],
-  cookie: String => Option[String],
-  headers: Seq[(String, String)],
-  body: LazyBytes[F]
-)
+final case class Request[Body](path: Router.Path,
+                               param: String => Option[String],
+                               cookie: String => Option[String],
+                               headers: Seq[(String, String)],
+                               body: Body)
+    extends Request.RequestHeader
 
 object Request {
+
+  type Http[F[_]] = Request[LazyBytes[F]]
+  type WebSocket[F[_]] = Request[Stream[F, String]]
+
+  sealed trait RequestHeader {
+    def path: Router.Path
+    def param: String => Option[String]
+    def cookie: String => Option[String]
+    def headers: Seq[(String, String)]
+  }
+
   sealed trait Method
 
   object Method {

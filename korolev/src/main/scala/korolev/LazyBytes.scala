@@ -16,6 +16,7 @@
 
 package korolev
 
+import java.io.InputStream
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 
@@ -25,7 +26,7 @@ final case class LazyBytes[F[_]: Effect](chunks: Stream[F, Array[Byte]],
                                          bytesLength: Option[Long]) {
 
   /**
-    * Folds all data to one byte array. Completes [[finished]].
+    * Folds all data to one byte array. Completes [[chunks.consumed]].
     */
   def toStrict: F[Array[Byte]] = {
     def aux(acc: List[Array[Byte]]): F[List[Array[Byte]]] = {
@@ -48,7 +49,7 @@ final case class LazyBytes[F[_]: Effect](chunks: Stream[F, Array[Byte]],
   }
 
   /**
-    * Drops all data. Completes [[finished]].
+    * Drops all data. Completes [[chunks.consumed]].
     */
   def discard(): F[Unit] = {
     def aux(): F[Unit] = Effect[F].flatMap(chunks.pull()) { x =>
@@ -63,6 +64,25 @@ object LazyBytes {
 
   def apply[F[_]: Effect](bytes: Array[Byte]): LazyBytes[F] = {
     new LazyBytes(Stream.eval(bytes), Some(bytes.length.toLong))
+  }
+
+  def apply[F[_]: Effect](inputStream: InputStream, chunkSize: Int = 8192): LazyBytes[F] = {
+    val total = inputStream.available().toLong
+    val stream = new Stream[F, Array[Byte]] {
+      val size: Option[Long] = Some(total / chunkSize)
+      val consumed: F[Unit] = Effect[F].unit // TODO
+      def pull(): F[Option[Array[Byte]]] = Effect[F].delay {
+        if (inputStream.available() > 0) {
+          val chunk = new Array[Byte](Math.min(inputStream.available(), chunkSize))
+          inputStream.read(chunk)
+          Some(chunk)
+        } else {
+          None
+        }
+      }
+      def cancel(): F[Unit] = Effect[F].unit // TODO
+    }
+    new LazyBytes(stream, Some(total))
   }
 
   def empty[F[_]: Effect]: LazyBytes[F] = {

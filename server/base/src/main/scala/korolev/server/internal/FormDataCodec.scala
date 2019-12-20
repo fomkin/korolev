@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package korolev.server
+package korolev.server.internal
 
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
@@ -23,7 +23,7 @@ import korolev.FormData
 
 import scala.annotation.tailrec
 
-final class FormDataCodec(maxPartSize: Int) {
+private[korolev] final class FormDataCodec(maxPartSize: Int) {
 
   import FormDataCodec._
 
@@ -116,7 +116,7 @@ final class FormDataCodec(maxPartSize: Int) {
   }
 }
 
-object FormDataCodec {
+private[korolev] object FormDataCodec {
   private sealed trait DecoderState
   private case object Buffering extends DecoderState
   private case object Headers extends DecoderState

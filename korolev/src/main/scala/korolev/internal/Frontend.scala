@@ -19,7 +19,7 @@ package korolev.internal
 import java.util.concurrent.atomic.AtomicInteger
 
 import korolev.Router
-import korolev.effect.{Effect, Reporter}
+import korolev.effect.{Effect, Reporter, Stream, Queue}
 import korolev.effect.syntax._
 
 import levsha.Id
@@ -31,19 +31,19 @@ import scala.collection.mutable
 import scala.util.{Failure, Success}
 
 import Router.Path
-import Effect.Promise
+import Effect.StrictPromise
 
 /**
   * Typed interface to client side
   */
-final class ClientSideApi[F[_]: Effect](connection: Connection[F], reporter: Reporter)
-  extends ChangesPerformer {
+final class Frontend[F[_]: Effect](reporter: Reporter,
+                                   incomingMessages: Stream[F, String]) extends ChangesPerformer {
 
-  import ClientSideApi._
+  import Frontend._
 
   private val lastDescriptor = new AtomicInteger(0)
   private val async = Effect[F]
-  private val promises = TrieMap.empty[String, Promise[F, String]]
+  private val promises = TrieMap.empty[String, StrictPromise[F, String]]
   private val domChangesBuffer = mutable.ArrayBuffer.empty[Any]
 
   private var onHistory: HistoryCallback = _
@@ -69,59 +69,104 @@ final class ClientSideApi[F[_]: Effect](connection: Connection[F], reporter: Rep
     this.onFormDataProgress = onFormDataProgress
   }
 
+  private val outgoingQueue = Queue[F, String]()
+
+  val outgoingMessages: Stream[F, String] = outgoingQueue.stream
+
+  def send(args: Any*): Unit = {
+
+    def escape(sb: StringBuilder, s: String, unicode: Boolean): Unit = {
+      sb.append('"')
+      var i = 0
+      val len = s.length
+      while (i < len) {
+        (s.charAt(i): @switch) match {
+          case '"'  => sb.append("\\\"")
+          case '\\' => sb.append("\\\\")
+          case '\b' => sb.append("\\b")
+          case '\f' => sb.append("\\f")
+          case '\n' => sb.append("\\n")
+          case '\r' => sb.append("\\r")
+          case '\t' => sb.append("\\t")
+          case c =>
+            if (c < ' ' || (c > '~' && unicode)) sb.append("\\u%04x" format c.toInt)
+            else sb.append(c)
+        }
+        i += 1
+      }
+      sb.append('"')
+      ()
+    }
+
+    val sb = StringBuilder.newBuilder
+    sb.append('[')
+    args.foreach {
+      case s: String =>
+        escape(sb, s, unicode = true)
+        sb.append(',')
+      case x =>
+        sb.append(x.toString)
+        sb.append(',')
+    }
+    sb.update(sb.length - 1, ' ') // replace last comma to space
+    sb.append(']')
+
+    outgoingQueue.offer(sb.mkString)
+  }
+
   def listenEvent(name: String, preventDefault: Boolean): Unit =
-    connection.send(Procedure.ListenEvent.code, name, preventDefault)
+    send(Procedure.ListenEvent.code, name, preventDefault)
 
   def uploadForm(id: Id, descriptor: String): Unit =
-    connection.send(Procedure.UploadForm.code, id.mkString, descriptor)
+    send(Procedure.UploadForm.code, id.mkString, descriptor)
 
   def uploadFiles(id: Id, descriptor: String): Unit =
-    connection.send(Procedure.UploadFiles.code, id.mkString, descriptor)
+    send(Procedure.UploadFiles.code, id.mkString, descriptor)
 
   def focus(id: Id): Unit =
-    connection.send(Procedure.Focus.code, id.mkString)
+    send(Procedure.Focus.code, id.mkString)
 
   def extractProperty(id: Id, name: String): F[String] = {
     val descriptor = lastDescriptor.getAndIncrement().toString
-    val promise = async.promise[String]
+    val promise = async.strictPromise[String]
     promises.put(descriptor, promise)
-    connection.send(Procedure.ExtractProperty.code, descriptor, id.mkString, name)
+    send(Procedure.ExtractProperty.code, descriptor, id.mkString, name)
     promise.effect
   }
 
   def setProperty(id: Id, name: String, value: Any): Unit = {
     // TODO setProperty should be dedicated
-    connection.send(Procedure.ModifyDom.code, ModifyDomProcedure.SetAttr.code, id.mkString, 0, name, value, true)
+    send(Procedure.ModifyDom.code, ModifyDomProcedure.SetAttr.code, id.mkString, 0, name, value, true)
   }
 
   def evalJs(code: String): F[String] = {
     val descriptor = lastDescriptor.getAndIncrement().toString
-    val promise = async.promise[String]
+    val promise = async.strictPromise[String]
     promises.put(descriptor, promise)
-    connection.send(Procedure.EvalJs.code, descriptor, code)
+    send(Procedure.EvalJs.code, descriptor, code)
     promise.effect
   }
 
   def resetForm(id: Id): Unit =
-    connection.send(Procedure.RestForm.code, id.mkString)
+    send(Procedure.RestForm.code, id.mkString)
 
   def changePageUrl(path: Path): Unit =
-    connection.send(Procedure.ChangePageUrl.code, path.toString)
+    send(Procedure.ChangePageUrl.code, path.mkString)
 
   def setRenderNum(i: Int): Unit =
-    connection.send(Procedure.SetRenderNum.code, i)
+    send(Procedure.SetRenderNum.code, i)
 
   def cleanRoot(): Unit =
-    connection.send(Procedure.CleanRoot.code)
+    send(Procedure.CleanRoot.code)
 
   def reloadCss(): Unit =
-    connection.send(Procedure.ReloadCss.code)
+    send(Procedure.ReloadCss.code)
 
   def extractEventData(renderNum: Int): F[String] = {
     val descriptor = lastDescriptor.getAndIncrement().toString
-    val promise = async.promise[String]
+    val promise = async.strictPromise[String]
     promises.put(descriptor, promise)
-    connection.send(Procedure.ExtractEventData.code, descriptor, renderNum)
+    send(Procedure.ExtractEventData.code, descriptor, renderNum)
     promise.effect
   }
 
@@ -130,7 +175,7 @@ final class ClientSideApi[F[_]: Effect](connection: Connection[F], reporter: Rep
   }
 
   def flushDomChanges(): Unit = {
-    connection.send(domChangesBuffer.toSeq: _*)
+    send(domChangesBuffer.toSeq: _*)
     domChangesBuffer.clear()
   }
 
@@ -147,7 +192,6 @@ final class ClientSideApi[F[_]: Effect](connection: Connection[F], reporter: Rep
       else xmlNs
     domChangesBuffer.append(ModifyDomProcedure.Create.code, parent, id.mkString, pXmlns, tag)
   }
-
 
   def removeStyle(id: Id, name: String): Unit = {
     domChangesBuffer.append(ModifyDomProcedure.RemoveStyle.code, id.mkString, name)
@@ -189,12 +233,12 @@ final class ClientSideApi[F[_]: Effect](connection: Connection[F], reporter: Rep
         charsConsumed = 2
         (s.charAt(i + 1): @switch) match {
           case '\\' => sb.append('\\')
-          case '"' => sb.append('"')
-          case 'b' => sb.append('\b')
-          case 'f' => sb.append('\f')
-          case 'n' => sb.append('\n')
-          case 'r' => sb.append('\r')
-          case 't' => sb.append('\t')
+          case '"'  => sb.append('"')
+          case 'b'  => sb.append('\b')
+          case 'f'  => sb.append('\f')
+          case 'n'  => sb.append('\n')
+          case 'r'  => sb.append('\r')
+          case 't'  => sb.append('\t')
           case 'u' =>
             val code = s.substring(i + 2, i + 6)
             charsConsumed = 6
@@ -206,8 +250,8 @@ final class ClientSideApi[F[_]: Effect](connection: Connection[F], reporter: Rep
     sb.result()
   }
 
-  private def onReceive(): Unit = connection.received.run {
-    case Success(json) =>
+  private def onReceive(): Unit = incomingMessages.pull().run {
+    case Success(Some(json)) =>
       val tokens = json
         .substring(1, json.length - 1) // remove brackets
         .split(",", 2) // split to tokens
@@ -227,7 +271,7 @@ final class ClientSideApi[F[_]: Effect](connection: Connection[F], reporter: Rep
           val Array(descriptor, propertyType, value) = args.split(":", 3)
           val result = propertyType.toInt match {
             case PropertyType.Error.code => Failure(ClientSideException(value))
-            case _ => Success(value)
+            case _                       => Success(value)
           }
           promises
             .remove(descriptor)
@@ -250,9 +294,10 @@ final class ClientSideApi[F[_]: Effect](connection: Connection[F], reporter: Rep
               }
             }
         case CallbackType.Heartbeat.code =>
-          // ignore
+        // ignore
       }
       onReceive()
+    case Success(None) => ()
     case Failure(e) =>
       reporter.error("Unable to receive message from client", e)
   }
@@ -260,7 +305,7 @@ final class ClientSideApi[F[_]: Effect](connection: Connection[F], reporter: Rep
   onReceive()
 }
 
-object ClientSideApi {
+object Frontend {
 
   type HistoryCallback = Path => Unit
   type EventCallback = (Int, Id, String) => Unit
@@ -285,9 +330,20 @@ object ClientSideApi {
     case object RestForm extends Procedure(13) // (id)
 
     val All = Set(
-      SetRenderNum, CleanRoot, ListenEvent, ExtractProperty,
-      ModifyDom, Focus, ChangePageUrl, UploadForm, ReloadCss,
-      KeepAlive, EvalJs, ExtractEventData, UploadFiles, RestForm
+      SetRenderNum,
+      CleanRoot,
+      ListenEvent,
+      ExtractProperty,
+      ModifyDom,
+      Focus,
+      ChangePageUrl,
+      UploadForm,
+      ReloadCss,
+      KeepAlive,
+      EvalJs,
+      ExtractEventData,
+      UploadFiles,
+      RestForm
     )
 
     def apply(n: Int): Option[Procedure] =
@@ -334,7 +390,13 @@ object ClientSideApi {
     case object ExtractEventDataResponse extends CallbackType(5) // `$descriptor:$dataJson`
     case object Heartbeat extends CallbackType(6) // `$descriptor:$anyvalue`
 
-    final val All = Set(DomEvent, FormDataProgress, ExtractPropertyResponse, History, EvalJsResponse, ExtractEventDataResponse, Heartbeat)
+    final val All = Set(DomEvent,
+                        FormDataProgress,
+                        ExtractPropertyResponse,
+                        History,
+                        EvalJsResponse,
+                        ExtractEventDataResponse,
+                        Heartbeat)
 
     def apply(n: Int): Option[CallbackType] =
       All.find(_.code == n)

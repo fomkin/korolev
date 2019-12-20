@@ -19,10 +19,9 @@ package korolev
 import _root_.cats.Traverse
 import _root_.cats.effect._
 import _root_.cats.instances.list._
-
 import korolev.effect.{Effect => KEffect}
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.concurrent.duration.Duration
 import scala.util.Try
 
@@ -36,6 +35,8 @@ package object cats {
     def delay[A](value: => A): IO[A] =
       IO.delay(value)
 
+    def fail[A](e: Throwable): IO[A] = IO.raiseError(e)
+
     // TODO
     def fork[A](value: => A): IO[A] =
       IO.delay(value)
@@ -46,25 +47,26 @@ package object cats {
     def fromTry[A](value: => Try[A]): IO[A] =
       IO.fromTry(value)
 
-    def promise[A]: KEffect.Promise[IO, A] = {
-      new KEffect.Promise[IO, A] {
+    def strictPromise[A]: KEffect.StrictPromise[IO, A] = {
+      new KEffect.StrictPromise[IO, A] {
 
-        private var callback: Either[Throwable, A] => Unit = _
-        val effect: IO[A] = {
-          val io: IO[A] = IO.async(cb => callback = cb)
-          io.unsafeRunAsyncAndForget()
-          io
-        }
+        private val promise = Promise[A]()
 
-        def complete(`try`: Try[A]): Unit = {
-          callback(`try`.toEither)
-        }
+        private val cs = IO.contextShift(ExecutionContext.global)
 
-        def completeAsync(async: IO[A]): Unit = {
-          async.unsafeRunAsync(callback)
-        }
+        val effect: IO[A] = IO.fromFuture(IO.pure(promise.future))(cs)
+
+        def complete(`try`: Try[A]): Unit = promise.complete(`try`)
+
+        def completeAsync(async: IO[A]): Unit = promise.completeWith(async.unsafeToFuture())
       }
     }
+
+    def promise[A](cb: (Either[Throwable, A] => Unit) => Unit): IO[A] =
+      IO.async(cb)
+
+    def promiseF[A](cb: (Either[Throwable, A] => Unit) => IO[Unit]): IO[A] =
+      IO.asyncF(cb)
 
     def flatMap[A, B](m: IO[A])(f: A => IO[B]): IO[B] =
       m.flatMap(f)

@@ -33,7 +33,7 @@ import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
 
 import Context._
-import Effect.Promise
+import Effect.StrictPromise
 
 /**
   * Component state holder and effects performer
@@ -54,14 +54,14 @@ final class ComponentInstance
     AS: StateSerializer: StateDeserializer, M,
     CS: StateSerializer: StateDeserializer, P, E
   ](
-    nodeId: Id,
-    sessionId: QualifiedSessionId,
-    frontend: ClientSideApi[F],
-    eventRegistry: EventRegistry[F],
-    stateManager: StateManager[F],
-    getRenderNum: () => Int,
-    val component: Component[F, CS, P, E],
-    reporter: Reporter
+     nodeId: Id,
+     sessionId: Qsid,
+     frontend: Frontend[F],
+     eventRegistry: EventRegistry[F],
+     stateManager: StateManager[F],
+     getRenderNum: () => Int,
+     val component: Component[F, CS, P, E],
+     reporter: Reporter
   ) { self =>
 
   import ComponentInstance._
@@ -78,12 +78,12 @@ final class ComponentInstance
   private val elements = mutable.Map.empty[ElementId[F], Id]
   private val events = mutable.Map.empty[EventId, Event[F, CS, E]]
   private val nestedComponents = mutable.Map.empty[Id, ComponentInstance[F, CS, E, _, _, _]]
-  private val formDataPromises = mutable.Map.empty[String, Promise[F, FormData]]
-  private val downloadFilePromises = mutable.Map.empty[String, Promise[F, List[File[LazyBytes[F]]]]]
+  private val formDataPromises = mutable.Map.empty[String, StrictPromise[F, FormData]]
+  private val downloadFilePromises = mutable.Map.empty[String, StrictPromise[F, List[File[LazyBytes[F]]]]]
   private val formDataProgressTransitions = mutable.Map.empty[String, (Int, Int) => Transition[CS]]
 
   private val stateChangeSubscribers = mutable.ArrayBuffer.empty[(Id, Any) => Unit]
-  private val pendingTransitions = new ConcurrentLinkedQueue[(Transition[CS], Promise[F, Unit])]()
+  private val pendingTransitions = new ConcurrentLinkedQueue[(Transition[CS], StrictPromise[F, Unit])]()
 
   @volatile private var eventSubscription = Option.empty[E => _]
   @volatile private var transitionInProgress = false
@@ -140,7 +140,7 @@ final class ComponentInstance
       state.map(_.getOrElse(throw new RuntimeException("State is empty")))
     }
 
-    def sessionId: F[QualifiedSessionId] = async.delay(self.sessionId)
+    def sessionId: F[Qsid] = async.delay(self.sessionId)
 
     def transition(f: Transition[CS]): F[Unit] = applyTransition(f)
 
@@ -149,7 +149,7 @@ final class ComponentInstance
       private val descriptor = nodeId.mkString + lastPostDescriptor.getAndIncrement()
 
       def start(): F[FormData] = getId(element) flatMap { id =>
-        val promise = async.promise[FormData]
+        val promise = async.strictPromise[FormData]
         frontend.uploadForm(id, descriptor)
         formDataPromises.put(descriptor, promise)
         promise.effect
@@ -172,7 +172,7 @@ final class ComponentInstance
     }
 
     def downloadFilesAsStream(elementId: ElementId[F]): F[List[File[LazyBytes[F]]]] = {
-      val promise = async.promise[List[File[LazyBytes[F]]]]
+      val promise = async.strictPromise[List[File[LazyBytes[F]]]]
       val descriptor = nodeId.mkString + lastPostDescriptor.getAndIncrement()
       frontend.uploadFiles(elements(elementId), descriptor)
       downloadFilePromises.put(descriptor, promise)
@@ -300,7 +300,7 @@ final class ComponentInstance
   }
 
   def applyTransition(transition: Transition[CS]): F[Unit] = {
-    def runTransition(transition: Transition[CS], promise: Promise[F, Unit]): Unit = {
+    def runTransition(transition: Transition[CS], promise: StrictPromise[F, Unit]): Unit = {
       transitionInProgress = true
       stateManager.read[CS](nodeId) flatMap { maybeState =>
         val state = maybeState.getOrElse(component.initialState)
@@ -328,7 +328,7 @@ final class ComponentInstance
       }
     }
 
-    val promise = async.promise[Unit]
+    val promise = async.strictPromise[Unit]
     if (transitionInProgress) pendingTransitions.offer((transition, promise))
     else runTransition(transition, promise)
     promise.effect

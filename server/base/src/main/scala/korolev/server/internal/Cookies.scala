@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
-package korolev.server
+package korolev.server.internal
 
-private[server] class SessionDestroyedException(s: String) extends Exception(s)
+private[korolev] object Cookies {
+  val DeviceId = "deviceId"
+}
