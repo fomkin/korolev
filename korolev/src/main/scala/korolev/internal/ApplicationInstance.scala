@@ -34,14 +34,14 @@ final class ApplicationInstance
     S: StateSerializer: StateDeserializer,
     M
   ](
-    sessionId: QualifiedSessionId,
-    connection: Connection[F],
-    stateManager: StateManager[F],
-    initialState: S,
-    render: S => Document.Node[Binding[F, S, M]],
-    router: Router[F, S],
-    fromScratch: Boolean,
-    reporter: Reporter
+     sessionId: Qsid,
+     val frontend: Frontend[F],
+     stateManager: StateManager[F],
+     initialState: S,
+     render: S => Document.Node[Binding[F, S, M]],
+     router: Router[F, S],
+     fromScratch: Boolean,
+     reporter: Reporter
   ) { application =>
 
   import reporter.Implicit
@@ -49,7 +49,6 @@ final class ApplicationInstance
   private val devMode = new DevMode.ForRenderContext(sessionId.toString, fromScratch)
   private val currentRenderNum = new AtomicInteger(0)
   private val renderContext = DiffRenderContext[Binding[F, S, M]](savedBuffer = devMode.loadRenderContext())
-  private val frontend = new ClientSideApi[F](connection, reporter)
 
   val topLevelComponentInstance: ComponentInstance[F, S, M, S, Any, M] = {
     val eventRegistry = new EventRegistry[F](frontend)

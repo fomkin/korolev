@@ -1,7 +1,7 @@
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 
-import korolev.server.FormDataCodec
+import korolev.server.internal.FormDataCodec
 import org.scalatest.{FlatSpec, Matchers}
 
 class FormDataCodecSpec extends FlatSpec with Matchers {

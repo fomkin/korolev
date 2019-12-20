@@ -32,7 +32,7 @@ final class JavaTimerScheduler[F[_]: Effect] extends Scheduler[F] {
   private val async = Effect[F]
 
   def scheduleOnce[T](delay: FiniteDuration)(job: => T)(implicit r: Reporter): JobHandler[F, T] = {
-    val promise = Effect[F].promise[T]
+    val promise = Effect[F].strictPromise[T]
     val task = new TimerTask {
       def run(): Unit = {
         val task = async.fork {

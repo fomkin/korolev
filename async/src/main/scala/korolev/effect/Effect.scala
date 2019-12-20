@@ -30,16 +30,19 @@ import scala.util.Try
 trait Effect[F[_]] {
   def pure[A](value: A): F[A]
   def delay[A](value: => A): F[A]
+  def fail[A](e: Throwable): F[A]
   def fork[A](value: => A): F[A]
   def unit: F[Unit]
   def fromTry[A](value: => Try[A]): F[A]
-  def promise[A]: Effect.Promise[F, A]
+  def strictPromise[A]: Effect.StrictPromise[F, A]
+  def promise[A](cb: (Either[Throwable, A] => Unit) => Unit): F[A]
+  def promiseF[A](cb: (Either[Throwable, A] => Unit) => F[Unit]): F[A]
   def flatMap[A, B](m: F[A])(f: A => F[B]): F[B]
   def map[A, B](m: F[A])(f: A => B): F[B]
   def recover[A](m: F[A])(f: PartialFunction[Throwable, A]): F[A]
   def sequence[A](in: List[F[A]]): F[List[A]]
   def runAsync[A, U](m: F[A])(callback: Try[A] => U): Unit
-  def run[A](m: F[A], timeout: Duration): Option[A]
+  def run[A](m: F[A], timeout: Duration = Duration.Inf): Option[A]
   def toFuture[A](m: F[A]): Future[A]
 }
 
@@ -48,7 +51,9 @@ object Effect {
   private val futureInstanceCache =
     mutable.Map.empty[ExecutionContext, Effect[Future]]
 
-  trait Promise[F[_], A] {
+  type Promise[A] = Either[Throwable, A] => Unit
+
+  trait StrictPromise[F[_], A] {
     def effect: F[A]
     def complete(`try`: Try[A]): Unit
     def completeAsync(async: F[A]): Unit
@@ -59,6 +64,7 @@ object Effect {
   private final class FutureEffect(implicit ec: ExecutionContext) extends Effect[Future] {
     val unit: Future[Unit] = Future.successful(())
     def toFuture[A](m: Future[A]): Future[A] = m
+    def fail[A](e: Throwable): Future[A] = Future.failed(e)
     def pure[A](value: A): Future[A] = Future.successful(value)
     def delay[A](value: => A): Future[A] = Future.successful(value)
     def fork[A](value: => A): Future[A] = Future(value)
@@ -74,19 +80,29 @@ object Effect {
     def recover[A](m: Future[A])(f: PartialFunction[Throwable, A]): Future[A] = m.recover(f)
     def sequence[A](in: List[Future[A]]): Future[List[A]] =
       Future.sequence(in)
-    def promise[A]: Promise[Future, A] = {
+    def strictPromise[A]: StrictPromise[Future, A] = {
       val promise = scala.concurrent.Promise[A]()
-      new Promise[Future, A] {
+      new StrictPromise[Future, A] {
         val effect: Future[A] = promise.future
         def complete(`try`: Try[A]): Unit = {
           promise.complete(`try`)
           ()
         }
-
         def completeAsync(async: Future[A]): Unit = {
           promise.completeWith(async)
           ()
         }
+      }
+    }
+    def promise[A](cb: (Either[Throwable, A] => Unit) => Unit): Future[A] = {
+      val promise = scala.concurrent.Promise[A]()
+      cb(or => promise.complete(or.toTry))
+      promise.future
+    }
+    def promiseF[A](cb: (Either[Throwable, A] => Unit) => Future[Unit]): Future[A] = {
+      val promise = scala.concurrent.Promise[A]()
+      cb(or => promise.complete(or.toTry)).flatMap { _ =>
+        promise.future
       }
     }
   }
@@ -100,4 +116,5 @@ object Effect {
       futureInstanceCache.getOrElseUpdate(ec, new FutureEffect())
     }
   }
+
 }

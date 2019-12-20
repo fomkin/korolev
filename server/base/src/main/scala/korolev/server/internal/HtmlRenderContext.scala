@@ -14,8 +14,14 @@
  * limitations under the License.
  */
 
-package korolev
+package korolev.server.internal
 
-object Cookies {
-  val DeviceId = "deviceId"
+import korolev.Context._
+import korolev.effect.Effect
+import levsha.impl.{AbstractTextRenderContext, TextPrettyPrintingConfig}
+
+private[korolev] final class HtmlRenderContext[F[_]: Effect, S]
+  extends AbstractTextRenderContext[Binding[F, S, _]] {
+  val prettyPrinting: TextPrettyPrintingConfig =
+    TextPrettyPrintingConfig.noPrettyPrinting
 }

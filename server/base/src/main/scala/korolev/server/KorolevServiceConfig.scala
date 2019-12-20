@@ -44,7 +44,6 @@ object KorolevServiceConfig {
   def defaultConnectionLostWidget[MiscType]: Document.Node[MiscType] = {
     import levsha.dsl._
     import html._
-
     optimize {
       div(
         position @= "fixed",
