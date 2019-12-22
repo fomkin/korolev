@@ -1,77 +1,13 @@
 package korolev.akka
 
 import akka.NotUsed
+import akka.stream.OverflowStrategy
 import akka.stream.scaladsl.{Sink, Source}
+import korolev.akka.util.{KorolevStreamPublisher, KorolevStreamSubscriber}
 import korolev.effect.{Effect, Stream}
-import org.reactivestreams.{Subscriber, Subscription}
+import org.reactivestreams.Publisher
 
 object Converters {
-
-  final class KorolevStreamSubscriber[F[_]: Effect,T] extends Stream[F, T] with Subscriber[T] {
-
-    private var subscription: Subscription = _
-
-    private var pullCallback: Either[Throwable, Option[T]] => Unit = _
-
-    private var consumedCallback: Either[Throwable, Unit] => Unit = _
-
-    private var completeValue: Either[Throwable, Unit] = _
-
-    def onSubscribe(subscription: Subscription): Unit = {
-      this.subscription = subscription
-      if (pullCallback != null)
-        subscription.request(1)
-    }
-
-    def onNext(value: T): Unit = {
-      val cb = pullCallback
-      pullCallback = null
-      cb(Right(Some(value)))
-    }
-
-    def onError(error: Throwable): Unit = {
-      completeWith(Left(error))
-      val cb = pullCallback
-      pullCallback = null
-      cb(Left(error))
-    }
-
-    def onComplete(): Unit = {
-      completeWith(Right(()))
-      val cb = pullCallback
-      pullCallback = null
-      cb(Right(None))
-    }
-
-    private def completeWith(that: Either[Throwable, Unit]): Unit = {
-      completeValue = that
-      if (consumedCallback != null) {
-        val cb = consumedCallback
-        consumedCallback = null
-        cb(that)
-      }
-    }
-
-    def pull(): F[Option[T]] = Effect[F].promise { cb =>
-      if (completeValue == null) {
-        pullCallback = cb
-        if (subscription != null) {
-          subscription.request(1)
-        }
-      } else {
-        cb(completeValue.map(_ => None))
-      }
-    }
-
-    def cancel(): F[Unit] = Effect[F].delay(subscription.cancel())
-
-    val consumed: F[Unit] = Effect[F].promise { cb =>
-      if (completeValue != null) cb(completeValue)
-      else consumedCallback = cb
-    }
-
-    val size: Option[Long] = None
-  }
 
   implicit final class SinkCompanionOps(value: Sink.type) {
     def korolevStream[F[_]: Effect, T]: Sink[T, Stream[F, T]] = {
@@ -82,14 +18,33 @@ object Converters {
     }
   }
 
-  implicit final class KorolevStreamsOps[F[_]: Effect, T](value: Stream[F, T]) {
-    def asSource: Source[T, NotUsed] = Source
-      .unfoldAsync[NotUsed, T](NotUsed) { _ =>
-        Effect[F].toFuture(
-          Effect[F].map(value.pull()) { vOpt =>
-            vOpt.map(v => (NotUsed, v))
-          }
-        )
-      }
+  implicit final class StreamCompanionOps(value: Stream.type) {
+    def fromPublisher[F[_]: Effect, T](publisher: Publisher[T]): Stream[F, T] = {
+      val result = new KorolevStreamSubscriber[F, T]()
+      publisher.subscribe(result)
+      result
+    }
+  }
+
+  implicit final class KorolevStreamsOps[F[_]: Effect, T](stream: Stream[F, T]) {
+
+    /**
+      * Converts korolev [[korolev.effect.Stream]] to [[Publisher]].
+      *
+      * If `fanout` is `true`, the `Publisher` will support multiple `Subscriber`s and
+      * the size of the `inputBuffer` configured for this operator becomes the maximum number of elements that
+      * the fastest [[org.reactivestreams.Subscriber]] can be ahead of the slowest one before slowing
+      * the processing down due to back pressure.
+      *
+      * If `fanout` is `false` then the `Publisher` will only support a single `Subscriber` and
+      * reject any additional `Subscriber`s with [[korolev.akka.util.KorolevStreamPublisher.MultipleSubscribersProhibitedException]].
+      */
+    def asPublisher(fanout: Boolean = false): Publisher[T] =
+      new KorolevStreamPublisher(stream, fanout)
+
+    def asAkkaSource: Source[T, NotUsed] = {
+      val publisher = new KorolevStreamPublisher(stream, fanout = false)
+      Source.fromPublisher(publisher)
+    }
   }
 }
