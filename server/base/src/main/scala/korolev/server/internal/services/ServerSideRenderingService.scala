@@ -27,7 +27,7 @@ private[korolev] final class ServerSideRenderingService[F[_]: Effect, S](session
       val rootPath = config.rootPath
       val clw = connectionLostWidgetHtml()
       val heartbeatInterval = config.heartbeatInterval.toMillis
-      val kfg = s"window['kfg']={sid:'${qsid.id}',r:'$rootPath',clw:'$clw',heartbeatInterval:$heartbeatInterval}"
+      val kfg = s"window['kfg']={sid:'${qsid.sessionId}',r:'$rootPath',clw:'$clw',heartbeatInterval:$heartbeatInterval}"
 
       import levsha.dsl._
       import html._

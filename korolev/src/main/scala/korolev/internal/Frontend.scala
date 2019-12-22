@@ -19,31 +19,27 @@ package korolev.internal
 import java.util.concurrent.atomic.AtomicInteger
 
 import korolev.Router
-import korolev.effect.{Effect, Reporter, Stream, Queue}
+import korolev.Router.Path
 import korolev.effect.syntax._
 
+import korolev.effect.{AsyncTable, Effect, Queue, Reporter, Stream}
 import levsha.Id
 import levsha.impl.DiffRenderContext.ChangesPerformer
 
 import scala.annotation.switch
-import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
 import scala.util.{Failure, Success}
-
-import Router.Path
-import Effect.StrictPromise
 
 /**
   * Typed interface to client side
   */
-final class Frontend[F[_]: Effect](reporter: Reporter,
-                                   incomingMessages: Stream[F, String]) extends ChangesPerformer {
+final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit reporter: Reporter)
+    extends ChangesPerformer {
 
   import Frontend._
 
   private val lastDescriptor = new AtomicInteger(0)
-  private val async = Effect[F]
-  private val promises = TrieMap.empty[String, StrictPromise[F, String]]
+  private val promises = AsyncTable.empty[F, String, String]
   private val domChangesBuffer = mutable.ArrayBuffer.empty[Any]
 
   private var onHistory: HistoryCallback = _
@@ -73,7 +69,10 @@ final class Frontend[F[_]: Effect](reporter: Reporter,
 
   val outgoingMessages: Stream[F, String] = outgoingQueue.stream
 
-  def send(args: Any*): Unit = {
+  def send(args: Any*): Unit =
+    sendF(args: _*).runIgnoreResult
+
+  def sendF(args: Any*): F[Unit] = {
 
     def escape(sb: StringBuilder, s: String, unicode: Boolean): Unit = {
       sb.append('"')
@@ -126,12 +125,15 @@ final class Frontend[F[_]: Effect](reporter: Reporter,
   def focus(id: Id): Unit =
     send(Procedure.Focus.code, id.mkString)
 
+  private def nextDescriptor() =
+    Effect[F].delay(lastDescriptor.getAndIncrement().toString)
+
   def extractProperty(id: Id, name: String): F[String] = {
-    val descriptor = lastDescriptor.getAndIncrement().toString
-    val promise = async.strictPromise[String]
-    promises.put(descriptor, promise)
-    send(Procedure.ExtractProperty.code, descriptor, id.mkString, name)
-    promise.effect
+    for {
+      descriptor <- nextDescriptor()
+      _ <- sendF(Procedure.ExtractProperty.code, descriptor, id.mkString, name)
+      result <- promises.get(descriptor)
+    } yield result
   }
 
   def setProperty(id: Id, name: String, value: Any): Unit = {
@@ -139,13 +141,12 @@ final class Frontend[F[_]: Effect](reporter: Reporter,
     send(Procedure.ModifyDom.code, ModifyDomProcedure.SetAttr.code, id.mkString, 0, name, value, true)
   }
 
-  def evalJs(code: String): F[String] = {
-    val descriptor = lastDescriptor.getAndIncrement().toString
-    val promise = async.strictPromise[String]
-    promises.put(descriptor, promise)
-    send(Procedure.EvalJs.code, descriptor, code)
-    promise.effect
-  }
+  def evalJs(code: String): F[String] =
+    for {
+      descriptor <- nextDescriptor()
+      _ <- sendF(Procedure.EvalJs.code, descriptor, code)
+      result <- promises.get(descriptor)
+    } yield result
 
   def resetForm(id: Id): Unit =
     send(Procedure.RestForm.code, id.mkString)
@@ -162,13 +163,12 @@ final class Frontend[F[_]: Effect](reporter: Reporter,
   def reloadCss(): Unit =
     send(Procedure.ReloadCss.code)
 
-  def extractEventData(renderNum: Int): F[String] = {
-    val descriptor = lastDescriptor.getAndIncrement().toString
-    val promise = async.strictPromise[String]
-    promises.put(descriptor, promise)
-    send(Procedure.ExtractEventData.code, descriptor, renderNum)
-    promise.effect
-  }
+  def extractEventData(renderNum: Int): F[String] =
+    for {
+      descriptor <- nextDescriptor()
+      _ <- sendF(Procedure.ExtractEventData.code, descriptor, renderNum)
+      result <- promises.get(descriptor)
+    } yield result
 
   def startDomChanges(): Unit = {
     domChangesBuffer.append(Procedure.ModifyDom.code)
@@ -252,6 +252,7 @@ final class Frontend[F[_]: Effect](reporter: Reporter,
 
   private def onReceive(): Unit = incomingMessages.pull().run {
     case Success(Some(json)) =>
+      println(json)
       val tokens = json
         .substring(1, json.length - 1) // remove brackets
         .split(",", 2) // split to tokens
@@ -269,30 +270,35 @@ final class Frontend[F[_]: Effect](reporter: Reporter,
           onFormDataProgress(descriptor, loaded.toInt, total.toInt)
         case CallbackType.ExtractPropertyResponse.code =>
           val Array(descriptor, propertyType, value) = args.split(":", 3)
-          val result = propertyType.toInt match {
-            case PropertyType.Error.code => Failure(ClientSideException(value))
-            case _                       => Success(value)
+          propertyType.toInt match {
+            case PropertyType.Error.code =>
+              promises
+                .fail(descriptor, ClientSideException(value))
+                .flatMap(_ => promises.remove(descriptor))
+            case _ =>
+              promises
+                .put(descriptor, value)
+                .flatMap(_ => promises.remove(descriptor))
           }
-          promises
-            .remove(descriptor)
-            .foreach(_.complete(result))
         case CallbackType.ExtractEventDataResponse.code =>
           val Array(descriptor, value) = args.split(":", 2)
-          promises.remove(descriptor).foreach(_.complete(Success(value)))
+          promises
+            .put(descriptor, value)
+            .flatMap(_ => promises.remove(descriptor))
         case CallbackType.History.code =>
           onHistory(Router.Path.fromString(args))
         case CallbackType.EvalJsResponse.code =>
           val Array(descriptor, status, json) = args.split(":", 3)
-          promises
-            .remove(descriptor)
-            .foreach { promise =>
-              status.toInt match {
-                case EvalJsStatus.Success.code =>
-                  promise.complete(Success(json))
-                case EvalJsStatus.Failure.code =>
-                  promise.complete(Failure(ClientSideException("JavaScript evaluation error")))
-              }
-            }
+          status.toInt match {
+            case EvalJsStatus.Success.code =>
+              promises
+                .put(descriptor, json)
+                .flatMap(_ => promises.remove(descriptor))
+            case EvalJsStatus.Failure.code =>
+              promises
+                .fail(descriptor, ClientSideException("JavaScript evaluation error"))
+                .flatMap(_ => promises.remove(descriptor))
+          }
         case CallbackType.Heartbeat.code =>
         // ignore
       }

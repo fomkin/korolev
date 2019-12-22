@@ -15,7 +15,7 @@ object Queue {
 
     def offer(item: T): F[Unit] =
       Effect[F].delay {
-        this.synchronized {
+        underlyingQueue.synchronized {
           if (underlyingQueue.size == maxSize) {
             // Remove head from queue if max size reached
             underlyingQueue.dequeue()
@@ -53,23 +53,17 @@ object Queue {
 
     val stream: Stream[F, T] = new Stream[F, T] {
 
-      def pull(): F[Option[T]] = {
-        val effect = Effect[F].delay {
-          this.synchronized {
-            if (!closed) {
-              pending = null // Reset pending request
-              if (underlyingQueue.nonEmpty) {
-                Effect[F].delay(Option(underlyingQueue.dequeue()))
-              } else {
-                createPendingRequest()
-              }
-            }
-            else {
-              Effect[F].pure(Option.empty[T])
+      def pull(): F[Option[T]] = Effect[F].promise { cb =>
+        underlyingQueue.synchronized {
+          if (closed) cb(Right(None)) else {
+            if (underlyingQueue.nonEmpty) {
+              val elem = underlyingQueue.dequeue()
+              cb(Right(Some(elem)))
+            } else {
+              pending = cb
             }
           }
         }
-        Effect[F].flatMap(effect)(identity)
       }
 
       val consumed: F[Unit] = Effect[F].promise[Unit] { cb =>
@@ -88,22 +82,6 @@ object Queue {
     var pending: Effect.Promise[Option[T]] = _
     var finished: Effect.Promise[Unit] = _
     val underlyingQueue: mutable.Queue[T] = mutable.Queue.empty[T]
-
-    def createPendingRequest(): F[Option[T]] = {
-      Effect[F].promise[Option[T]] { cb =>
-        this.synchronized {
-          if (underlyingQueue.nonEmpty) {
-            // Element had been added to queue
-            // between pull() invocation and effect run.
-            // Resolve promise immediately.
-            cb(Right(Option(underlyingQueue.dequeue())))
-          } else {
-            // Save callback to invoke in the future
-            pending = cb
-          }
-        }
-      }
-    }
   }
 
   def apply[F[_]: Effect, T](maxSize: Int = Int.MaxValue): Queue[F, T] =

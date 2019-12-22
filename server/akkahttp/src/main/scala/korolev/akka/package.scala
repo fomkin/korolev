@@ -16,7 +16,6 @@
 
 package korolev
 
-import _root_.akka.NotUsed
 import _root_.akka.actor.ActorSystem
 import _root_.akka.http.scaladsl.model._
 import _root_.akka.http.scaladsl.model.headers.RawHeader
@@ -24,7 +23,7 @@ import _root_.akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
 import _root_.akka.http.scaladsl.server.Directives._
 import _root_.akka.http.scaladsl.server.Route
 import _root_.akka.stream.Materializer
-import _root_.akka.stream.scaladsl.{Flow, Sink}
+import _root_.akka.stream.scaladsl.{Flow, Keep, Sink}
 import _root_.akka.util.ByteString
 
 import korolev.akka.util.LoggingReporter
@@ -69,7 +68,7 @@ package object akka {
           val korolevRequest = mkKorolevRequest(request, path.toString, Map.empty, inStream)
           onSuccess(Effect[F].toFuture(korolevServer.ws(korolevRequest))) {
             case KorolevResponse(_, outStream, _) =>
-              val outSource = outStream.asSource
+              val outSource = outStream.asAkkaSource
               val response = upgrade.handleMessagesWithSinkSource(
                 inSink = Flow[Message]
                   .mapConcat {
@@ -104,24 +103,20 @@ package object akka {
 
   private def httpPostRoute[F[_]](korolevServer: KorolevService[F])(implicit mat: Materializer, async: Effect[F], ec: ExecutionContext): Route =
     post {
-      extractRequest { _ =>
-        extractUnmatchedPath { path =>
-          parameterMap { params =>
-            extractRequest { request =>
-              val (stream, sink) = Sink
-                .korolevStream[F, Array[Byte]]
-                .preMaterialize()
-              request
-                .entity
-                .dataBytes
-                .map(_.toArray)
-                .to(sink)
-                .run()
-              val body = LazyBytes(stream, request.entity.contentLengthOption)
-              val korolevRequest = mkKorolevRequest(request, path.toString, params, body)
-              val responseF = handleHttpResponse(korolevServer, korolevRequest)
-              complete(responseF)
-            }
+      extractUnmatchedPath { path =>
+        parameterMap { params =>
+          extractRequest { request =>
+            val sink = Sink.korolevStream[F, Array[Byte]]
+            val stream = request
+              .entity
+              .dataBytes
+              .map(_.toArray)
+              .toMat(sink)(Keep.right)
+              .run()
+            val body = LazyBytes(stream, request.entity.contentLengthOption)
+            val korolevRequest = mkKorolevRequest(request, path.toString, params, body)
+            val responseF = handleHttpResponse(korolevServer, korolevRequest)
+            complete(responseF)
           }
         }
       }
@@ -149,7 +144,7 @@ package object akka {
     Effect[F].toFuture(korolevServer.http(korolevRequest)).map {
       case KorolevResponse(status, lazyBytes, responseHeaders) =>
         val (contentTypeOpt, otherHeaders) = getContentTypeAndResponseHeaders(responseHeaders)
-        val bytesSource = lazyBytes.chunks.asSource.map(ByteString.apply)
+        val bytesSource = lazyBytes.chunks.asAkkaSource.map(ByteString.apply)
         HttpResponse(
           StatusCode.int2StatusCode(status.code),
           otherHeaders,

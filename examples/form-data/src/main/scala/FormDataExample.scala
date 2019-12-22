@@ -85,7 +85,6 @@ object FormDataExample extends SimpleAkkaHttpKorolevApp(AkkaHttpServerConfig(max
                   .onProgress((loaded, total) => _ => InProgress(loaded, total))
                   .start()
                 _ <- access.resetForm(myForm)
-                _ = println(formData)
                 _ <- access.transition { _ =>
                   val buffer = formData.bytes(pictureFieldName)
                   val pictureBase64 = Base64.getEncoder.encodeToString(buffer.array())
