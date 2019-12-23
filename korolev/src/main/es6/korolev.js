@@ -3,7 +3,7 @@ import { getDeviceId } from './utils.js';
 /** @enum {number} */
 export const CallbackType = {
   DOM_EVENT: 0, // `$renderNum:$elementId:$eventType`
-  FORM_DATA_PROGRESS: 1, // `$descriptor:$loaded:$total`
+  //FORM_DATA_PROGRESS: 1, // `$descriptor:$loaded:$total`
   EXTRACT_PROPERTY_RESPONSE: 2, // `$descriptor:$propertyType:$value`
   HISTORY: 3, // URL
   EVALJS_RESPONSE: 4, // `$descriptor:$status:$value`
@@ -325,10 +325,10 @@ export class Korolev {
       '/form-data' +
       '/' + descriptor;
     request.open("POST", uri, true);
-    request.upload.onprogress = function(event) {
-      var arg = [descriptor, event.loaded, event.total].join(':');
-      self.callback(CallbackType.FORM_DATA_PROGRESS, arg);
-    };
+//    request.upload.onprogress = function(event) {
+//      var arg = [descriptor, event.loaded, event.total].join(':');
+//      self.callback(CallbackType.FORM_DATA_PROGRESS, arg);
+//    };
     request.send(formData);
   }
 

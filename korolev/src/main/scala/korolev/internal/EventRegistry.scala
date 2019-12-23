@@ -17,6 +17,7 @@
 package korolev.internal
 
 import korolev.effect.Effect
+import korolev.effect.syntax._
 
 import scala.collection.mutable
 
@@ -33,10 +34,12 @@ final class EventRegistry[F[_]: Effect](frontend: Frontend[F]) {
     * all events of the type. If event already listening
     * on the client side, client will be not notified again.
     */
-  def registerEventType(`type`: String): Unit = knownEventTypes.synchronized {
-    if (!knownEventTypes.contains(`type`)) {
-      knownEventTypes += `type`
-      frontend.listenEvent(`type`, preventDefault = false)
+  def registerEventType(`type`: String): F[Unit] = knownEventTypes.synchronized {
+    if (knownEventTypes.contains(`type`)) Effect[F].unit else {
+      for {
+        _ <- Effect[F].delay(knownEventTypes += `type`)
+        _ <- frontend.listenEvent(`type`, preventDefault = false)
+      } yield ()
     }
   }
 }

@@ -29,7 +29,7 @@ import levsha.{Id, StatefulRenderContext, XmlNs}
 import levsha.events.EventId
 
 import scala.collection.mutable
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Success}
 import Context._
 import Effect.StrictPromise
 import korolev.effect.io.LazyBytes
@@ -77,9 +77,7 @@ final class ComponentInstance
   private val elements = mutable.Map.empty[ElementId[F], Id]
   private val events = mutable.Map.empty[EventId, Event[F, CS, E]]
   private val nestedComponents = mutable.Map.empty[Id, ComponentInstance[F, CS, E, _, _, _]]
-  private val formDataPromises = mutable.Map.empty[String, StrictPromise[F, FormData]]
   private val downloadFilePromises = mutable.Map.empty[String, StrictPromise[F, List[File[LazyBytes[F]]]]]
-  private val formDataProgressTransitions = mutable.Map.empty[String, (Int, Int) => Transition[CS]]
 
   private val stateChangeSubscribers = mutable.ArrayBuffer.empty[(Id, Any) => Unit]
   private val pendingTransitions = new ConcurrentLinkedQueue[(Transition[CS], StrictPromise[F, Unit])]()
@@ -143,22 +141,11 @@ final class ComponentInstance
 
     def transition(f: Transition[CS]): F[Unit] = applyTransition(f)
 
-    def downloadFormData(element: ElementId[F]): FormDataDownloader[F, CS] = new FormDataDownloader[F, CS] {
-
-      private val descriptor = nodeId.mkString + lastPostDescriptor.getAndIncrement()
-
-      def start(): F[FormData] = getId(element) flatMap { id =>
-        val promise = async.strictPromise[FormData]
-        frontend.uploadForm(id, descriptor)
-        formDataPromises.put(descriptor, promise)
-        promise.effect
-      }
-
-      def onProgress(f: (Int, Int) => Transition[CS]): this.type = {
-        formDataProgressTransitions.put(descriptor, f)
-        this
-      }
-    }
+    def downloadFormData(element: ElementId[F]): F[FormData] =
+      for {
+        id <- getId(element)
+        formData <- frontend.uploadForm(id)
+      } yield formData
 
     def downloadFiles(id: ElementId[F]): F[List[File[Array[Byte]]]] = {
       downloadFilesAsStream(id).flatMap { lazyFileList =>
@@ -193,7 +180,7 @@ final class ComponentInstance
 
   private def applyEventResult(effect: F[Unit]): Unit = {
     // Run effect
-    effect.run {
+    effect.runAsync {
       case Failure(e) => reporter.error("Exception during applying transition", e)
       case Success(_) => ()
     }
@@ -257,7 +244,9 @@ final class ComponentInstance
           case event @ Event(eventType, phase, _) =>
             val id = rc.currentContainerId
             events.put(EventId(id, eventType, phase), event)
-            eventRegistry.registerEventType(event.`type`)
+            eventRegistry
+              .registerEventType(event.`type`)
+              .runAsyncForget
           case element: ElementId[F] =>
             val id = rc.currentContainerId
             elements.put(element, id)
@@ -276,7 +265,7 @@ final class ComponentInstance
               case Some(n: ComponentInstance[F, CS, E, Any, Any, Any]) if n.component.id == entry.component.id =>
                 // Use nested component instance
                 markedComponentInstances += id
-                n.setEventsSubscription((e: Any) => entry.eventHandler(browserAccess, e).runIgnoreResult)
+                n.setEventsSubscription((e: Any) => entry.eventHandler(browserAccess, e).runAsyncForget)
                 n.applyRenderContext(entry.parameters, proxy, snapshot)
               case _ =>
                 val n = entry.createInstance(id, sessionId, frontend, eventRegistry, stateManager, getRenderNum, reporter)
@@ -289,7 +278,7 @@ final class ComponentInstance
                     f(id, state)
                   }
                 }
-                n.setEventsSubscription((e: Any) => entry.eventHandler(browserAccess, e).runIgnoreResult)
+                n.setEventsSubscription((e: Any) => entry.eventHandler(browserAccess, e).runAsyncForget)
                 n.applyRenderContext(entry.parameters, proxy, snapshot)
             }
         }
@@ -318,7 +307,7 @@ final class ComponentInstance
               reporter.error("Exception happened when applying transition", e)
             }
         }
-      } runOrReport { _ =>
+      } runAsyncSuccess { _ =>
         promise.complete(Success(()))
         Option(pendingTransitions.poll()) match {
           case Some((t, p)) => runTransition(t, p)
@@ -361,7 +350,7 @@ final class ComponentInstance
       case (id, nested) =>
         if (!markedComponentInstances.contains(id)) {
           nestedComponents.remove(id)
-          stateManager.delete(id).runIgnoreResult
+          stateManager.delete(id).runAsyncForget
         }
         else nested.dropObsoleteMisc()
     }
@@ -385,22 +374,6 @@ final class ComponentInstance
     }
   }
 
-  def resolveFormData(descriptor: String, formData: Try[FormData]): Unit = miscLock.synchronized {
-    formDataPromises.get(descriptor) match {
-      case Some(promise) =>
-        promise.complete(formData)
-        // Remove promise and onProgress handler
-        // when formData loading is complete
-        formDataProgressTransitions.remove(descriptor)
-        formDataPromises.remove(descriptor)
-        ()
-      case None =>
-        nestedComponents.values.foreach { nested =>
-          nested.resolveFormData(descriptor, formData)
-        }
-    }
-  }
-
   def resolveFile(descriptor: String, files: List[File[LazyBytes[F]]]): Unit = miscLock.synchronized {
     downloadFilePromises.get(descriptor) match {
       case Some(promise) =>
@@ -410,18 +383,6 @@ final class ComponentInstance
         nestedComponents.values.foreach { nested =>
           nested.resolveFile(descriptor, files)
         }
-    }
-  }
-
-  def handleFormDataProgress(descriptor: String, loaded: Int, total: Int): Unit = miscLock.synchronized {
-    formDataProgressTransitions.get(descriptor) match {
-      case None =>
-        nestedComponents.values.foreach { nested =>
-          nested.handleFormDataProgress(descriptor, loaded, total)
-        }
-      case Some(f) =>
-        applyTransition(f(loaded.toInt, total.toInt))
-          .runIgnoreResult
     }
   }
 }
@@ -448,7 +409,7 @@ private object ComponentInstance {
       handler = Some {
         Scheduler[F].scheduleOnce(delay.duration) {
           finished = true
-          delay.effect(access).runIgnoreResult
+          delay.effect(access).runAsyncForget
         }
       }
     }

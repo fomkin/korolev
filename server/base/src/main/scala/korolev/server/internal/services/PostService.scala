@@ -35,7 +35,7 @@ private[korolev] final class PostService[F[_]: Effect](reporter: Reporter,
       formBytes <- data.toStrict
       boundary <- extractBoundary()
       tryFormData = Try(formDataCodec.decode(ByteBuffer.wrap(formBytes), boundary))
-      _ <- Effect[F].delay(app.topLevelComponentInstance.resolveFormData(descriptor, tryFormData))
+      _ <- app.frontend.resolveFormData(descriptor, tryFormData.toEither)
     } yield {
       commonService.simpleOkResponse
     }

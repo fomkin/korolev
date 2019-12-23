@@ -1,7 +1,3 @@
-import java.io.ByteArrayInputStream
-import java.util.Base64
-
-import javax.imageio.ImageIO
 import korolev._
 import korolev.akka.{AkkaHttpServerConfig, SimpleAkkaHttpKorolevApp}
 import korolev.akka._
@@ -27,7 +23,7 @@ object FormDataExample extends SimpleAkkaHttpKorolevApp(AkkaHttpServerConfig(max
 
   val service = akkaHttpService{
     KorolevServiceConfig[Future, State, Any](
-      stateLoader = StateLoader.default(State.empty),
+      stateLoader = StateLoader.default(State()),
       head = _ => {
         Seq(
           link(
@@ -71,62 +67,31 @@ object FormDataExample extends SimpleAkkaHttpKorolevApp(AkkaHttpServerConfig(max
                 textarea (name := multiLineText)
               ),
               p (
-                label ("Picture"),
-                input (`type` := "file", name := pictureFieldName)
-              ),
-              p (
                 button ("Submit")
               )
             ),
             event("submit") { access =>
               for {
-                formData <- access
-                  .downloadFormData(myForm)
-                  .onProgress((loaded, total) => _ => InProgress(loaded, total))
-                  .start()
+                formData <- access.downloadFormData(myForm)
                 _ <- access.resetForm(myForm)
-                _ <- access.transition { _ =>
-                  val buffer = formData.bytes(pictureFieldName)
-                  val pictureBase64 = Base64.getEncoder.encodeToString(buffer.array())
-                  val parsedImage = ImageIO.read(new ByteArrayInputStream(buffer.array()))
-
-                  formData.contentType(pictureFieldName) match {
-                    case Some(mimeType) =>
-                      Complete(
-                        picture = pictureBase64,
-                        mimeType = mimeType,
-                        width = parsedImage.getWidth,
-                        height = parsedImage.getHeight
-                      )
-                    case None =>
-                      Error("Unknown image format")
-                  }
-                }
+                _ <- access.transition(_ => State(Some(formData), None))
               } yield ()
             }
           ),
-          state match {
-            case Initial => div()
-            case InProgress(loaded, total) =>
-              div (`class` := "card",
-                div (`class` := "card-block",
-                  div (`class` := "progress",
-                    div (
-                      `class` := "progress-bar progress-bar-striped progress-bar-animated",
-                      role := "progress-bar",
-                      width @= s"${(loaded.toDouble / total) * 100}%"
+          state.formData match {
+            case Some(formData) =>
+              table(
+                tbody(
+                  formData.content map { entry =>
+                    tr(
+                      td(entry.name),
+                      td(entry.asString)
                     )
-                  )
+                  }
                 )
               )
-            case Complete(picture, mimeType, w, h) =>
-              div (
-                backgroundImage @= s"url(data:$mimeType;base64,$picture')",
-                width @= s"${w}px",
-                height @= s"${h}px"
-              )
-            case Error(msg) =>
-              div(backgroundColor @= "red", color @= "white", msg)
+            case None =>
+              div()
           }
         )
       },
@@ -135,14 +100,9 @@ object FormDataExample extends SimpleAkkaHttpKorolevApp(AkkaHttpServerConfig(max
   }
 }
 
-sealed trait State
-
-case object Initial extends State
-case class InProgress(loaded: Int, total: Int) extends State
-case class Complete(picture: String, mimeType: String, width: Int, height: Int) extends State
-case class Error(message: String) extends State
+case class State(formData: Option[FormData] = None,
+                 error: Option[String] = None)
 
 object State {
-  def empty: State = Initial
   val globalContext = Context[Future, State, Any]
 }

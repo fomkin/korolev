@@ -31,7 +31,7 @@ final case class FormData(content: Seq[Entry]) {
   def bytes(name: String): ByteBuffer = bytesOpt(name).get
 
   def bytesOpt(name: String): Option[ByteBuffer] = {
-    apply(name).map(_.content)
+    apply(name).map(_.value)
   }
 
   def contentType(name: String): Option[String] = {
@@ -48,9 +48,7 @@ final case class FormData(content: Seq[Entry]) {
 
 object FormData {
 
-  case class Entry(
-      name: String,
-      content: ByteBuffer,
-      headers: Seq[(String, String)]
-  )
+  case class Entry(name: String, value: ByteBuffer, headers: Seq[(String, String)]) {
+    lazy val asString: String = new String(value.array(), StandardCharsets.UTF_8)
+  }
 }
