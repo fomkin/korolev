@@ -18,10 +18,10 @@ package korolev.server
 
 import java.nio.charset.StandardCharsets
 
-import korolev.LazyBytes
 import korolev.effect.Effect
 import korolev.server.Response.Status
 import korolev.effect.Stream
+import korolev.effect.io.LazyBytes
 
 final case class Response[Body](
     status: Status,

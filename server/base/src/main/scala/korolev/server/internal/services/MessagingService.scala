@@ -5,7 +5,8 @@ import korolev.effect.{Effect, Queue, Reporter, Stream}
 import korolev.server.Request.RequestHeader
 import korolev.server.Response
 import korolev.server.Response.Status
-import korolev.{LazyBytes, Qsid}
+import korolev.Qsid
+import korolev.effect.io.LazyBytes
 
 import scala.collection.mutable
 

@@ -1,5 +1,7 @@
 package korolev.effect
 
+import java.io.Closeable
+
 import syntax._
 
 abstract class Stream[F[_]: Effect, A] { lhs =>
@@ -106,10 +108,20 @@ abstract class Stream[F[_]: Effect, A] { lhs =>
   def flatMapConcat[B](f: A => Stream[F, B]): Stream[F, B] =
     flatMapMerge(1)(f)
 
-  def fold[B](default: B)(f: (B, A) => F[B]): F[B] = {
+  def foldAsync[B](default: B)(f: (B, A) => F[B]): F[B] = {
     def aux(acc: B): F[B] = {
       Effect[F].flatMap(pull()) {
         case Some(value) => Effect[F].flatMap(f(acc, value))(acc => aux(acc))
+        case None => Effect[F].pure(acc)
+      }
+    }
+    aux(default)
+  }
+
+  def fold[B](default: B)(f: (B, A) => B): F[B] = {
+    def aux(acc: B): F[B] = {
+      Effect[F].flatMap(pull()) {
+        case Some(value) => aux(f(acc, value))
         case None => Effect[F].pure(acc)
       }
     }
@@ -146,6 +158,9 @@ abstract class Stream[F[_]: Effect, A] { lhs =>
     val size: Option[Long] = lhs.size
   }
 
+  def to[U](f: Stream[F, A] => F[U]): F[U] =
+    f(this)
+
   def foreach(f: A => F[Unit]): F[Unit] = {
     def aux(): F[Unit] = {
       Effect[F].flatMap(pull()) {
@@ -172,7 +187,7 @@ object Stream {
     new Stream[F, T] {
       var n = 0
       var canceled = false
-      var consumedCallback: Either[Throwable, Unit] => Unit = null
+      var consumedCallback: Either[Throwable, Unit] => Unit = _
       def pull(): F[Option[T]] = Effect[F].delay {
         if (canceled || n == xs.length) {
           None
@@ -191,7 +206,7 @@ object Stream {
         if (consumedCallback != null)
           consumedCallback(Right(()))
       }
-      val size: Option[Long] = Some(xs.length)
+      val size: Option[Long] = Some(xs.length.toLong)
       val consumed: F[Unit] = Effect[F].promise[Unit] { cb =>
         if (canceled || n == xs.length) cb(Right(()))
         else consumedCallback = cb
@@ -209,4 +224,57 @@ object Stream {
       val size: Option[Long] = None
     }
   }
+
+  def unfoldResource[F[_]: Effect, R <: Closeable, S, T](create: => F[R],
+                                                         calcSize: R => F[Option[Long]],
+                                                         default: S,
+                                                         loop: (R, S) => F[(S, Option[T])]): F[Stream[F, T]] =
+
+    for {
+      resource <- create
+      maybeSize <- calcSize(resource)
+    } yield {
+
+      var state = default
+      var finishedWith: Either[Throwable, Unit] = null
+      var consumedPromise: Effect.Promise[Unit] = null
+
+      def finishWith(r: Either[Throwable, Unit]): Unit = {
+        resource.close()
+        finishedWith = r
+        if (consumedPromise != null)
+          consumedPromise(r)
+      }
+
+      new Stream[F, T] {
+        val size: Option[Long] = maybeSize
+        val consumed: F[Unit] = Effect[F].promise { cb =>
+          if (finishedWith != null) cb(finishedWith)
+          else consumedPromise = cb
+        }
+        def pull(): F[Option[T]] = Effect[F]
+          .delay {
+            if (finishedWith != null)
+              throw new IllegalStateException("This stream already finished")
+          }
+          .flatMap(_ => loop(resource, state))
+          .map {
+            case (newState, None) =>
+              state = newState
+              finishWith(Right(()))
+              None
+            case (newState, maybeElem) =>
+              state = newState
+              maybeElem
+          }
+          .recover {
+            case error =>
+              finishWith(Left(error))
+              throw error
+          }
+        def cancel(): F[Unit] = Effect[F].delay {
+          finishWith(Right(()))
+        }
+      }
+    }
 }

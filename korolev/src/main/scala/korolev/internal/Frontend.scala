@@ -252,7 +252,6 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
 
   private def onReceive(): Unit = incomingMessages.pull().run {
     case Success(Some(json)) =>
-      println(json)
       val tokens = json
         .substring(1, json.length - 1) // remove brackets
         .split(",", 2) // split to tokens

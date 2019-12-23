@@ -1,8 +1,10 @@
 package korolev.server.internal.services
 
-import korolev.LazyBytes
 import korolev.Router._
 import korolev.effect.Effect
+import korolev.effect.io.LazyBytes
+import korolev.effect.syntax._
+
 import korolev.server.{Headers, Response}
 import korolev.server.internal.MimeTypes
 
@@ -10,12 +12,11 @@ private[korolev] final class FilesService[F[_]: Effect](commonService: CommonSer
 
   import commonService._
 
-  def resourceFromClasspath(path: Path): F[Response.Http[F]] = Effect[F].delay {
+  def resourceFromClasspath(path: Path): F[Response.Http[F]] = {
     val fsPath = path.mkString
     val maybeResourceStream = Option(this.getClass.getResourceAsStream(fsPath))
-    maybeResourceStream.fold(notFoundResponse) { javaSyncStream =>
+    maybeResourceStream.fold(notFoundResponseF) { javaSyncStream =>
       val _ / fileName = path
-      val bytes = LazyBytes(javaSyncStream)
       val fileExtension = fileName.lastIndexOf('.') match {
         case -1    => "bin" // default file extension
         case index => fileName.substring(index + 1)
@@ -24,7 +25,9 @@ private[korolev] final class FilesService[F[_]: Effect](commonService: CommonSer
         case Some(mimeType) => Seq(Headers.ContentType -> mimeType)
         case None           => Nil
       }
-      Response(Response.Status.Ok, bytes, headers)
+      LazyBytes(javaSyncStream) map { lazyBytes =>
+        Response(Response.Status.Ok, lazyBytes, headers)
+      }
     }
   }
 }

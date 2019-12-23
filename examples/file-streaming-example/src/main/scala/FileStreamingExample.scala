@@ -1,7 +1,8 @@
-import java.io.{File, FileOutputStream}
+import java.nio.file.Paths
 
 import korolev._
 import korolev.akka._
+import korolev.effect.io.FileIO
 import korolev.execution._
 import korolev.server._
 import korolev.state.javaSerialization._
@@ -21,39 +22,32 @@ object FileStreamingExample extends SimpleAkkaHttpKorolevApp {
 
   val fileInput = elementId()
 
-  val dir = new File("downloads")
-  dir.mkdirs()
-
   def onUploadClick(access: Access) = {
+
+    def showProgress(fileName: String, loaded: Long, total: Long) = access
+      .transition { state =>
+        val updated = state.progress + ((fileName, (loaded, total)))
+        state.copy(progress = updated)
+      }
+
     for {
       files <- access.downloadFilesAsStream(fileInput)
       _ <- access.transition(_.copy(progress = files.map(x => (x.name, (0L, x.data.bytesLength.getOrElse(0L)))).toMap, inProgress = true))
       _ <- Future.sequence {
         files.map { file =>
           val size = file.data.bytesLength.getOrElse(0L)
-          //val w = new FileOutputStream(new File(dir, file.name), true)
-          //val w = new FileOutputStream(new File("/dev/null"))
-          def loop(acc: Long): Future[Unit] = file.data.chunks.pull() flatMap {
-            case Some(bytes) =>
-              val loaded = acc + bytes.length
-              //w.write(bytes)
-              access
-                .transition { state =>
-                  val updated = state.progress + ((file.name, (loaded, size)))
-                  state.copy(progress = updated)
-                }
-                .flatMap(_ => loop(loaded))
-//              loop(loaded)
-            case None =>
-//              w.flush()
-//              w.close()
-              Future.unit
-          }
-          loop(0L)
+          // File will be saved in 'downloads' directory
+          // in the root of the example project
+          val path = Paths.get("downloads", file.name)
+          file.data.chunks
+            .over(0L) {
+              case (acc, chunk) =>
+                val loaded = chunk.fold(acc)(_.length.toLong + acc)
+                showProgress(file.name, loaded, size)
+                  .map(_ => loaded)
+            }
+            .to(FileIO.write(path))
         }
-      }.recover {
-        case e =>
-          e.printStackTrace()
       }
       _ <- access.transition(_.copy(inProgress = false))
     } yield ()
