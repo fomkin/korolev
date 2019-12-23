@@ -44,26 +44,31 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
   private val formDataPromises = AsyncTable.empty[F, String, FormData]
   private val filesPromises = AsyncTable.empty[F, String, List[File[LazyBytes[F]]]]
 
-  private var onHistory: HistoryCallback = _
-  private var onEvent: EventCallback = _
-
-  /**
-    * @param onEvent            (renderNum, target, eventType) => Unit
-    */
-  def setHandlers(onHistory: HistoryCallback,
-                  onEvent: EventCallback): Unit = {
-    this.onHistory = onHistory
-    this.onEvent = onEvent
-  }
-
   private val outgoingQueue = Queue[F, String]()
+
+  private val List(rawDomEvents, rawBrowserHistoryChanges, rawClientMessages) = incomingMessages
+    .map(parseMessage)
+    .sort(3) {
+      case (CallbackType.DomEvent.code, _) => 0
+      case (CallbackType.History.code, _) => 1
+      case _ => 2
+    }
 
   val outgoingMessages: Stream[F, String] = outgoingQueue.stream
 
-  def send(args: Any*): Unit =
-    sendF(args: _*).runAsyncForget
+  val domEventMessages: Stream[F, Frontend.DomEventMessage] =
+    rawDomEvents.map {
+      case (_, args) =>
+        val Array(renderNum, target, tpe) = args.split(':')
+        DomEventMessage(renderNum.toInt, Id(target), tpe)
+    }
 
-  def sendF(args: Any*): F[Unit] = {
+  val browserHistoryMessages: Stream[F, Path] =
+    rawBrowserHistoryChanges.map {
+      case (_, args) => Router.Path.fromString(args)
+    }
+
+  private def send(args: Any*): F[Unit] = {
 
     def escape(sb: StringBuilder, s: String, unicode: Boolean): Unit = {
       sb.append('"')
@@ -105,24 +110,24 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
   }
 
   def listenEvent(name: String, preventDefault: Boolean): F[Unit] =
-    sendF(Procedure.ListenEvent.code, name, preventDefault)
+    send(Procedure.ListenEvent.code, name, preventDefault)
 
   def uploadForm(id: Id): F[FormData] =
     for {
       descriptor <- nextDescriptor()
-      _ <- sendF(Procedure.UploadForm.code, id.mkString, descriptor)
+      _ <- send(Procedure.UploadForm.code, id.mkString, descriptor)
       result <- formDataPromises.get(descriptor)
     } yield result
 
   def uploadFiles(id: Id): F[List[File[LazyBytes[F]]]] =
     for {
       descriptor <- nextDescriptor()
-      _ <- sendF(Procedure.UploadFiles.code, id.mkString, descriptor)
+      _ <- send(Procedure.UploadFiles.code, id.mkString, descriptor)
       files <- filesPromises.get(descriptor)
     } yield files
 
   def focus(id: Id): F[Unit] =
-    sendF(Procedure.Focus.code, id.mkString)
+    send(Procedure.Focus.code, id.mkString)
 
   private def nextDescriptor() =
     Effect[F].delay(lastDescriptor.getAndIncrement().toString)
@@ -130,42 +135,42 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
   def extractProperty(id: Id, name: String): F[String] = {
     for {
       descriptor <- nextDescriptor()
-      _ <- sendF(Procedure.ExtractProperty.code, descriptor, id.mkString, name)
+      _ <- send(Procedure.ExtractProperty.code, descriptor, id.mkString, name)
       result <- stringPromises.get(descriptor)
     } yield result
   }
 
   def setProperty(id: Id, name: String, value: Any): F[Unit] = {
     // TODO setProperty should be dedicated
-    sendF(Procedure.ModifyDom.code, ModifyDomProcedure.SetAttr.code, id.mkString, 0, name, value, true)
+    send(Procedure.ModifyDom.code, ModifyDomProcedure.SetAttr.code, id.mkString, 0, name, value, true)
   }
 
   def evalJs(code: String): F[String] =
     for {
       descriptor <- nextDescriptor()
-      _ <- sendF(Procedure.EvalJs.code, descriptor, code)
+      _ <- send(Procedure.EvalJs.code, descriptor, code)
       result <- stringPromises.get(descriptor)
     } yield result
 
   def resetForm(id: Id): F[Unit] =
-    sendF(Procedure.RestForm.code, id.mkString)
+    send(Procedure.RestForm.code, id.mkString)
 
-  def changePageUrl(path: Path): Unit =
+  def changePageUrl(path: Path): F[Unit] =
     send(Procedure.ChangePageUrl.code, path.mkString)
 
   def setRenderNum(i: Int): F[Unit] =
-    sendF(Procedure.SetRenderNum.code, i)
+    send(Procedure.SetRenderNum.code, i)
 
   def cleanRoot(): F[Unit] =
-    sendF(Procedure.CleanRoot.code)
+    send(Procedure.CleanRoot.code)
 
   def reloadCss(): F[Unit] =
-    sendF(Procedure.ReloadCss.code)
+    send(Procedure.ReloadCss.code)
 
   def extractEventData(renderNum: Int): F[String] =
     for {
       descriptor <- nextDescriptor()
-      _ <- sendF(Procedure.ExtractEventData.code, descriptor, renderNum)
+      _ <- send(Procedure.ExtractEventData.code, descriptor, renderNum)
       result <- stringPromises.get(descriptor)
     } yield result
 
@@ -176,12 +181,22 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
           remoteDomChangesPerformer.buffer.append(Procedure.ModifyDom.code)
           f(remoteDomChangesPerformer)
         }
-      _ <- sendF(remoteDomChangesPerformer.buffer.toSeq: _*)
+      _ <- send(remoteDomChangesPerformer.buffer.toSeq: _*)
       _ <- Effect[F].delay(remoteDomChangesPerformer.buffer.clear())
     } yield ()
 
+  def resolveFiles(descriptor: String, files: List[File[LazyBytes[F]]]): F[Unit] =
+    filesPromises
+      .put(descriptor, files)
+      .flatMap(_ => filesPromises.remove(descriptor))
+
+  def resolveFormData(descriptor: String, formData: Either[Throwable, FormData]): F[Unit] =
+    formDataPromises
+      .putEither(descriptor, formData)
+      .flatMap(_ => formDataPromises.remove(descriptor))
+
   private def unescapeJsonString(s: String): String = {
-    val sb = StringBuilder.newBuilder
+    val sb = new StringBuilder()
     var i = 1
     val len = s.length - 1
     while (i < len) {
@@ -211,31 +226,21 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
     sb.result()
   }
 
-  def resolveFiles(descriptor: String, files: List[File[LazyBytes[F]]]): F[Unit] =
-    filesPromises
-      .put(descriptor, files)
-      .flatMap(_ => filesPromises.remove(descriptor))
+  private def parseMessage(json: String) = {
+    val tokens = json
+      .substring(1, json.length - 1) // remove brackets
+      .split(",", 2) // split to tokens
+    val callbackType = tokens(0)
+    val args =
+      if (tokens.length > 1) unescapeJsonString(tokens(1))
+      else ""
+    (callbackType.toInt, args)
+  }
 
-  def resolveFormData(descriptor: String, formData: Either[Throwable, FormData]): F[Unit] =
-    formDataPromises
-      .putEither(descriptor, formData)
-      .flatMap(_ => formDataPromises.remove(descriptor))
-
-  private def onReceive(): Unit = incomingMessages.pull().runAsync {
-    case Success(Some(json)) =>
-      val tokens = json
-        .substring(1, json.length - 1) // remove brackets
-        .split(",", 2) // split to tokens
-      val callbackType = tokens(0)
-      val args =
-        if (tokens.length > 1) unescapeJsonString(tokens(1))
-        else ""
-
-      callbackType.toInt match {
-        case CallbackType.DomEvent.code =>
-          val Array(renderNum, target, tpe) = args.split(':')
-          onEvent(renderNum.toInt, Id(target), tpe)
-        case CallbackType.FormDataProgress.code =>
+  private def onReceive(): Unit = rawClientMessages.pull().runAsync {
+    case Success(Some((callbackType, args))) =>
+      callbackType match {
+//        case CallbackType.FormDataProgress.code =>
 //          val Array(descriptor, loaded, total) = args.split(':')
 //          onFormDataProgress(descriptor, loaded.toInt, total.toInt)
         case CallbackType.ExtractPropertyResponse.code =>
@@ -255,8 +260,6 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
           stringPromises
             .put(descriptor, value)
             .flatMap(_ => stringPromises.remove(descriptor))
-        case CallbackType.History.code =>
-          onHistory(Router.Path.fromString(args))
         case CallbackType.EvalJsResponse.code =>
           val Array(descriptor, status, json) = args.split(":", 3)
           status.toInt match {
@@ -283,8 +286,9 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
 
 object Frontend {
 
-  type HistoryCallback = Path => Unit
-  type EventCallback = (Int, Id, String) => Unit
+  final case class DomEventMessage(renderNum: Int,
+                                   target: Id,
+                                   eventType: String)
 
   sealed abstract class Procedure(final val code: Int)
 

@@ -1,6 +1,7 @@
 package korolev.effect
 
 import java.io.Closeable
+import java.util.concurrent.atomic.AtomicBoolean
 
 import syntax._
 
@@ -160,6 +161,67 @@ abstract class Stream[F[_]: Effect, A] { lhs =>
 
   def to[U](f: Stream[F, A] => F[U]): F[U] =
     f(this)
+
+  /**
+    * Sort elements of the stream between "racks".
+    *
+    * {{{
+    *   val List(girls, boys, queers) = persons.sort(3) {
+    *     case person if person.isFemale => 0
+    *     case person if person.isMale => 1
+    *     case person => 2
+    *   }
+    * }}}
+
+    * @param numRacks Number of racks.
+    * @param f Takes element of the stream return number of rack.
+    * @return List of streams appropriate to racks.
+    */
+  def sort(numRacks: Int)(f: A => Int): List[Stream[F, A]] = {
+    val values = new Array[Option[A]](numRacks)
+    val promises = new Array[Effect.Promise[Option[A]]](numRacks)
+    val inProgress = new AtomicBoolean(false)
+    (0 until numRacks).toList map { i =>
+      new Stream[F, A] {
+        def pull(): F[Option[A]] =
+          Effect[F].promiseF { cb =>
+            val maybeItem = values(i)
+            if (maybeItem != null && maybeItem.isEmpty) {
+              Effect[F].delay(cb(Right(maybeItem)))
+            } else if (maybeItem != null && maybeItem.nonEmpty) {
+              cb(Right(maybeItem))
+              Effect[F].delay(values(i) = null)
+            } else {
+              promises(i) = cb
+              if (inProgress.compareAndSet(false, true)) {
+                Effect[F].map(lhs.pull()) {
+                  case maybeItem @ Some(item) =>
+                    inProgress.compareAndSet(true, false)
+                    val j = f(item)
+                    val cb = promises(j)
+                    if (cb != null) {
+                      cb(Right(maybeItem))
+                      promises(j) = null
+                    } else {
+                      values(j) = maybeItem
+                    }
+                  case None =>
+                    inProgress.compareAndSet(true, false)
+                    for (j <- 0 until numRacks)
+                      values(j) = None
+                    promises.foreach(_(Right(None)))
+                }
+              } else {
+                Effect[F].unit
+              }
+            }
+          }
+        def cancel(): F[Unit] = lhs.cancel()
+        def consumed: F[Unit] = lhs.consumed
+        def size: Option[Long] = None
+      }
+    }
+  }
 
   def foreach(f: A => F[Unit]): F[Unit] = {
     def aux(): F[Unit] = {
