@@ -28,34 +28,24 @@ import levsha.Id
 import levsha.impl.DiffRenderContext.ChangesPerformer
 
 import scala.annotation.switch
-import scala.collection.mutable
 import scala.util.{Failure, Success}
 
 /**
   * Typed interface to client side
   */
-final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit reporter: Reporter)
-    extends ChangesPerformer {
+final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit reporter: Reporter) {
 
   import Frontend._
 
   private val lastDescriptor = new AtomicInteger(0)
+  private val remoteDomChangesPerformer = new RemoteDomChangesPerformer()
 
   private val stringPromises = AsyncTable.empty[F, String, String]
   private val formDataPromises = AsyncTable.empty[F, String, FormData]
   private val filesPromises = AsyncTable.empty[F, String, List[File[LazyBytes[F]]]]
 
-  private val domChangesBuffer = mutable.ArrayBuffer.empty[Any]
-
   private var onHistory: HistoryCallback = _
   private var onEvent: EventCallback = _
-
-  private def isProperty(name: String) =
-    name.charAt(0) == '^'
-
-  private def escapeName(name: String, truncate: Boolean) =
-    if (truncate) name.substring(1)
-    else name
 
   /**
     * @param onEvent            (renderNum, target, eventType) => Unit
@@ -131,8 +121,8 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
       files <- filesPromises.get(descriptor)
     } yield files
 
-  def focus(id: Id): Unit =
-    send(Procedure.Focus.code, id.mkString)
+  def focus(id: Id): F[Unit] =
+    sendF(Procedure.Focus.code, id.mkString)
 
   private def nextDescriptor() =
     Effect[F].delay(lastDescriptor.getAndIncrement().toString)
@@ -145,9 +135,9 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
     } yield result
   }
 
-  def setProperty(id: Id, name: String, value: Any): Unit = {
+  def setProperty(id: Id, name: String, value: Any): F[Unit] = {
     // TODO setProperty should be dedicated
-    send(Procedure.ModifyDom.code, ModifyDomProcedure.SetAttr.code, id.mkString, 0, name, value, true)
+    sendF(Procedure.ModifyDom.code, ModifyDomProcedure.SetAttr.code, id.mkString, 0, name, value, true)
   }
 
   def evalJs(code: String): F[String] =
@@ -157,8 +147,8 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
       result <- stringPromises.get(descriptor)
     } yield result
 
-  def resetForm(id: Id): Unit =
-    send(Procedure.RestForm.code, id.mkString)
+  def resetForm(id: Id): F[Unit] =
+    sendF(Procedure.RestForm.code, id.mkString)
 
   def changePageUrl(path: Path): Unit =
     send(Procedure.ChangePageUrl.code, path.mkString)
@@ -179,54 +169,16 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
       result <- stringPromises.get(descriptor)
     } yield result
 
-  def startDomChanges(): Unit = {
-    domChangesBuffer.append(Procedure.ModifyDom.code)
-  }
-
-  def flushDomChanges(): Unit = {
-    send(domChangesBuffer.toSeq: _*)
-    domChangesBuffer.clear()
-  }
-
-  def remove(id: Id): Unit =
-    domChangesBuffer.append(ModifyDomProcedure.Remove.code, id.parent.get.mkString, id.mkString)
-
-  def createText(id: Id, text: String): Unit =
-    domChangesBuffer.append(ModifyDomProcedure.CreateText.code, id.parent.get.mkString, id.mkString, text)
-
-  def create(id: Id, xmlNs: String, tag: String): Unit = {
-    val parent = id.parent.fold("0")(_.mkString)
-    val pXmlns =
-      if (xmlNs eq levsha.XmlNs.html.uri) 0
-      else xmlNs
-    domChangesBuffer.append(ModifyDomProcedure.Create.code, parent, id.mkString, pXmlns, tag)
-  }
-
-  def removeStyle(id: Id, name: String): Unit = {
-    domChangesBuffer.append(ModifyDomProcedure.RemoveStyle.code, id.mkString, name)
-  }
-
-  def setStyle(id: Id, name: String, value: String): Unit = {
-    domChangesBuffer.append(ModifyDomProcedure.SetStyle.code, id.mkString, name, value)
-  }
-
-  def setAttr(id: Id, xmlNs: String, name: String, value: String): Unit = {
-    val p = isProperty(name)
-    val n = escapeName(name, p)
-    val pXmlns =
-      if (xmlNs eq levsha.XmlNs.html.uri) 0
-      else xmlNs
-    domChangesBuffer.append(ModifyDomProcedure.SetAttr.code, id.mkString, pXmlns, n, value, p)
-  }
-
-  def removeAttr(id: Id, xmlNs: String, name: String): Unit = {
-    val p = isProperty(name)
-    val n = escapeName(name, p)
-    val pXmlns =
-      if (xmlNs eq levsha.XmlNs.html.uri) 0
-      else xmlNs
-    domChangesBuffer.append(ModifyDomProcedure.RemoveAttr.code, id.mkString, pXmlns, n, p)
-  }
+  def performDomChanges(f: ChangesPerformer => Unit): F[Unit] =
+    for {
+      _ <- Effect[F]
+        .delay {
+          remoteDomChangesPerformer.buffer.append(Procedure.ModifyDom.code)
+          f(remoteDomChangesPerformer)
+        }
+      _ <- sendF(remoteDomChangesPerformer.buffer.toSeq: _*)
+      _ <- Effect[F].delay(remoteDomChangesPerformer.buffer.clear())
+    } yield ()
 
   private def unescapeJsonString(s: String): String = {
     val sb = StringBuilder.newBuilder

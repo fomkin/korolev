@@ -66,7 +66,13 @@ object Effect {
     def toFuture[A](m: Future[A]): Future[A] = m
     def fail[A](e: Throwable): Future[A] = Future.failed(e)
     def pure[A](value: A): Future[A] = Future.successful(value)
-    def delay[A](value: => A): Future[A] = Future.successful(value)
+    def delay[A](value: => A): Future[A] =
+      try {
+        Future.successful(value)
+      } catch {
+        case error: Throwable =>
+          Future.failed(error)
+      }
     def fork[A](value: => A): Future[A] = Future(value)
     def fromTry[A](value: => Try[A]): Future[A] = Future.fromTry(value)
     def flatMap[A, B](m: Future[A])(f: A => Future[B]): Future[B] = m.flatMap(f)

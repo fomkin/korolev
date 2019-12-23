@@ -92,9 +92,9 @@ final class ApplicationInstance
       )
 
       // Infer changes
-      frontend.startDomChanges()
-      renderContext.diff(frontend)
-      frontend.flushDomChanges()
+      frontend
+        .performDomChanges(renderContext.diff)
+        .runAsyncForget
 
       if (devMode.isActive)
         devMode.saveRenderContext(renderContext)
@@ -157,9 +157,9 @@ final class ApplicationInstance
       if (devMode.hasSavedRenderContext) {
         renderContext.swap()
         topLevelComponentInstance.applyRenderContext((), renderContext, snapshot)
-        frontend.startDomChanges()
-        renderContext.diff(frontend)
-        frontend.flushDomChanges()
+        frontend
+          .performDomChanges(renderContext.diff)
+          .runAsyncForget
         devMode.saveRenderContext(renderContext)
       } else {
 

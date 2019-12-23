@@ -114,14 +114,14 @@ final class ComponentInstance
 
         def set(propName: String, value: Any): F[Unit] = idF.flatMap { id =>
           // XmlNs argument is empty cause it will be ignored
-          Effect[F].delay(frontend.setProperty(id, propName, value))
+          frontend.setProperty(id, propName, value)
         }
       }
     }
 
     def focus(element: ElementId[F]): F[Unit] =
       getId(element).flatMap { id =>
-        Effect[F].delay(frontend.focus(id))
+        frontend.focus(id)
       }
 
     def publish(message: E): F[Unit] =
@@ -160,7 +160,7 @@ final class ComponentInstance
       } yield streams
 
     def resetForm(elementId: ElementId[F]): F[Unit] =
-      getId(elementId).map { id =>
+      getId(elementId).flatMap { id =>
         frontend.resetForm(id)
       }
 
