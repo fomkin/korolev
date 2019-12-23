@@ -19,10 +19,12 @@ package korolev.internal
 import java.util.concurrent.atomic.AtomicInteger
 
 import korolev.Context._
+import korolev.Router.Path
 import korolev.effect.syntax._
 import korolev.execution.Scheduler
 import korolev._
 import korolev.effect.{Effect, Reporter}
+import korolev.internal.Frontend.DomEventMessage
 import korolev.state.{StateDeserializer, StateManager, StateSerializer}
 import levsha.events.calculateEventPropagation
 import levsha.impl.DiffRenderContext
@@ -81,7 +83,7 @@ final class ApplicationInstance
       // Set page url if router exists
       router.fromState
         .lift(snapshot(Id.TopLevel).getOrElse(initialState))
-        .foreach(path => frontend.changePageUrl(path))
+        .foreach(path => frontend.changePageUrl(path).runAsyncForget)
 
       // Prepare render context
       renderContext.swap()
@@ -109,34 +111,40 @@ final class ApplicationInstance
     }
   }
 
-  frontend.setHandlers(
-    onHistory = { path =>
-      stateManager
-        .read[S](Id.TopLevel)
-        .flatMap { maybeTopLevelState =>
-          router
-            .toState
-            .lift(path)
-            .fold(Effect[F].delay(Option.empty[S]))(_(maybeTopLevelState.getOrElse(initialState)).map(Some(_)))
-        }
-        .flatMap {
-          case Some(newState) =>
-            stateManager.write(Id.TopLevel, newState)
-              .flatMap(_ => onState())
-          case None =>
-            Effect[F].unit
-        }
-        .runAsyncForget
-    },
-    onEvent = { (renderNum, target, tpe) =>
-      if (currentRenderNum.get == renderNum) {
-        calculateEventPropagation(target, tpe) forall { eventId =>
-          topLevelComponentInstance.applyEvent(eventId)
-        }
-        ()
+  private def onHistory(path: Path): F[Unit] =
+    stateManager
+      .read[S](Id.TopLevel)
+      .flatMap { maybeTopLevelState =>
+        router
+          .toState
+          .lift(path)
+          .fold(Effect[F].delay(Option.empty[S]))(_(maybeTopLevelState.getOrElse(initialState)).map(Some(_)))
       }
-    }
-  )
+      .flatMap {
+        case Some(newState) =>
+          stateManager.write(Id.TopLevel, newState)
+            .flatMap(_ => onState())
+        case None =>
+          Effect[F].unit
+      }
+
+  private def onEvent(dem: DomEventMessage) =
+    if (currentRenderNum.get == dem.renderNum) {
+      calculateEventPropagation(dem.target, dem.eventType) forall { eventId =>
+        topLevelComponentInstance.applyEvent(eventId)
+      }
+      Effect[F].unit // TODO
+    } else Effect[F].unit  // TODO
+
+  frontend
+    .browserHistoryMessages
+    .foreach(onHistory)
+    .runAsyncForget
+
+  frontend
+    .domEventMessages
+    .foreach(onEvent)
+    .runAsyncForget
 
   def initialize(reload: Boolean): F[Unit] = {
 
