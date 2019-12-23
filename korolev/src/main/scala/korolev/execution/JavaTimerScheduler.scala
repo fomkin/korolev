@@ -39,7 +39,7 @@ final class JavaTimerScheduler[F[_]: Effect] extends Scheduler[F] {
           val result = job // Execute a job
           promise.complete(Success(result))
         }
-        task.runIgnoreResult
+        task.runAsyncForget
       }
     }
     timer.schedule(task, delay.toMillis)
@@ -51,7 +51,7 @@ final class JavaTimerScheduler[F[_]: Effect] extends Scheduler[F] {
 
   def schedule[U](interval: FiniteDuration)(job: => U)(implicit r: Reporter): Cancel = {
     val task = new TimerTask {
-      def run(): Unit = async.fork(job).runIgnoreResult
+      def run(): Unit = async.fork(job).runAsyncForget
     }
     val millis = interval.toMillis
     timer.schedule(task, millis, millis)

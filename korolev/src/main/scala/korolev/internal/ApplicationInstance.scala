@@ -122,7 +122,7 @@ final class ApplicationInstance
           case None =>
             Effect[F].unit
         }
-        .runIgnoreResult
+        .runAsyncForget
     },
     onEvent = { (renderNum, target, tpe) =>
       if (currentRenderNum.get == renderNum) {
@@ -131,13 +131,12 @@ final class ApplicationInstance
         }
         ()
       }
-    },
-    onFormDataProgress = topLevelComponentInstance.handleFormDataProgress
+    }
   )
 
   frontend.setRenderNum(0)
 
-  stateManager.snapshot runOrReport { snapshot =>
+  stateManager.snapshot runAsyncSuccess { snapshot =>
     // Content should be created from scratch
     // Remove all element from document.body
     if (fromScratch)
@@ -173,10 +172,10 @@ final class ApplicationInstance
     }
 
     topLevelComponentInstance.subscribeStateChange { (_, _) =>
-      onState().runIgnoreResult
+      onState().runAsyncForget
     }
 
     if (fromScratch)
-      onState().runIgnoreResult
+      onState().runAsyncForget
   }
 }

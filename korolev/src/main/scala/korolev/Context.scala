@@ -82,8 +82,8 @@ object Context {
         def publish(message: M): F[Unit] =
           access.publish(message)
 
-        def downloadFormData(id: Context.ElementId[F]): FormDataDownloader[F, S2] =
-          access.downloadFormData(id).scope(read, write)
+        def downloadFormData(id: Context.ElementId[F]): F[FormData] =
+          access.downloadFormData(id)
 
         def downloadFiles(id: Context.ElementId[F]): F[List[File[Array[Byte]]]] =
           access.downloadFiles(id)
@@ -214,15 +214,15 @@ object Context {
       */
     def publish(message: M): F[Unit]
 
-    /** Downloads form from client
+    /**
+      * Downloads form from the client. Useful when when you
+      * want to read big amount of fields. Do not use this
+      * method for downloading files, however it is possible.
+      *
       * {{{
-      * event('submit) { access =>
+      * event(submit) { access =>
       *   access
       *     .downloadFormData(myForm)
-      *     .onProgress { (loaded, total) =>
-      *       // transition …
-      *     }
-      *     .start
       *     .flatMap { formData =>
       *       val picture = data.file("picture") // Array[Byte]
       *       val title = data.text("title") // String
@@ -235,10 +235,12 @@ object Context {
       * @param id form elementId
       * @return
       */
-    def downloadFormData(id: ElementId[F]): FormDataDownloader[F, S]
+    def downloadFormData(id: ElementId[F]): F[FormData]
 
     /**
-      * Download selected file list from input correspondent to given element id.
+      * Download the selected file list from input appropriate
+      * to given element id. Use this method carefully because
+      * all files are saving to RAM.
       */
     def downloadFiles(id: ElementId[F]): F[List[File[Array[Byte]]]]
 
@@ -314,21 +316,6 @@ object Context {
   }
 
   final case class File[A](name: String, data: A)
-
-  abstract class FormDataDownloader[F[_]: Effect, S] { self =>
-    def onProgress(f: (Int, Int) => Transition[S]): this.type
-    def start(): F[FormData]
-    def scope[S2](read: PartialFunction[S, S2], write: PartialFunction[(S, S2), S]): FormDataDownloader[F, S2] = {
-      new FormDataDownloader[F, S2] {
-        def onProgress(f: (Int, Int) => Transition[S2]): this.type = {
-          self.onProgress((a, b) => (s: S) => write((s, f(a, b)(read(s)))))
-          this
-        }
-        def start(): F[FormData] =
-          self.start()
-      }
-    }
-  }
 
   final case class ComponentEntry
     [

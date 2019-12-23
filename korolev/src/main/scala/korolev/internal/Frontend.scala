@@ -18,17 +18,16 @@ package korolev.internal
 
 import java.util.concurrent.atomic.AtomicInteger
 
-import korolev.Router
+import korolev.{FormData, Router}
 import korolev.Router.Path
 import korolev.effect.syntax._
-
 import korolev.effect.{AsyncTable, Effect, Queue, Reporter, Stream}
 import levsha.Id
 import levsha.impl.DiffRenderContext.ChangesPerformer
 
 import scala.annotation.switch
 import scala.collection.mutable
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 
 /**
   * Typed interface to client side
@@ -39,11 +38,13 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
   import Frontend._
 
   private val lastDescriptor = new AtomicInteger(0)
-  private val promises = AsyncTable.empty[F, String, String]
+
+  private val stringPromises = AsyncTable.empty[F, String, String]
+  private val formDataPromises = AsyncTable.empty[F, String, FormData]
+
   private val domChangesBuffer = mutable.ArrayBuffer.empty[Any]
 
   private var onHistory: HistoryCallback = _
-  private var onFormDataProgress: FormDataProgressCallback = _
   private var onEvent: EventCallback = _
 
   private def isProperty(name: String) =
@@ -55,14 +56,11 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
 
   /**
     * @param onEvent            (renderNum, target, eventType) => Unit
-    * @param onFormDataProgress (descriptor, loaded, total)
     */
   def setHandlers(onHistory: HistoryCallback,
-                  onEvent: EventCallback,
-                  onFormDataProgress: FormDataProgressCallback): Unit = {
+                  onEvent: EventCallback): Unit = {
     this.onHistory = onHistory
     this.onEvent = onEvent
-    this.onFormDataProgress = onFormDataProgress
   }
 
   private val outgoingQueue = Queue[F, String]()
@@ -70,7 +68,7 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
   val outgoingMessages: Stream[F, String] = outgoingQueue.stream
 
   def send(args: Any*): Unit =
-    sendF(args: _*).runIgnoreResult
+    sendF(args: _*).runAsyncForget
 
   def sendF(args: Any*): F[Unit] = {
 
@@ -113,11 +111,15 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
     outgoingQueue.offer(sb.mkString)
   }
 
-  def listenEvent(name: String, preventDefault: Boolean): Unit =
-    send(Procedure.ListenEvent.code, name, preventDefault)
+  def listenEvent(name: String, preventDefault: Boolean): F[Unit] =
+    sendF(Procedure.ListenEvent.code, name, preventDefault)
 
-  def uploadForm(id: Id, descriptor: String): Unit =
-    send(Procedure.UploadForm.code, id.mkString, descriptor)
+  def uploadForm(id: Id): F[FormData] =
+    for {
+      descriptor <- nextDescriptor()
+      _ <- sendF(Procedure.UploadForm.code, id.mkString, descriptor)
+      result <- formDataPromises.get(descriptor)
+    } yield result
 
   def uploadFiles(id: Id, descriptor: String): Unit =
     send(Procedure.UploadFiles.code, id.mkString, descriptor)
@@ -132,7 +134,7 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
     for {
       descriptor <- nextDescriptor()
       _ <- sendF(Procedure.ExtractProperty.code, descriptor, id.mkString, name)
-      result <- promises.get(descriptor)
+      result <- stringPromises.get(descriptor)
     } yield result
   }
 
@@ -145,7 +147,7 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
     for {
       descriptor <- nextDescriptor()
       _ <- sendF(Procedure.EvalJs.code, descriptor, code)
-      result <- promises.get(descriptor)
+      result <- stringPromises.get(descriptor)
     } yield result
 
   def resetForm(id: Id): Unit =
@@ -167,7 +169,7 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
     for {
       descriptor <- nextDescriptor()
       _ <- sendF(Procedure.ExtractEventData.code, descriptor, renderNum)
-      result <- promises.get(descriptor)
+      result <- stringPromises.get(descriptor)
     } yield result
 
   def startDomChanges(): Unit = {
@@ -250,7 +252,12 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
     sb.result()
   }
 
-  private def onReceive(): Unit = incomingMessages.pull().run {
+  def resolveFormData(descriptor: String, formData: Either[Throwable, FormData]): F[Unit] =
+    formDataPromises
+      .putEither(descriptor, formData)
+      .flatMap(_ => formDataPromises.remove(descriptor))
+
+  private def onReceive(): Unit = incomingMessages.pull().runAsync {
     case Success(Some(json)) =>
       val tokens = json
         .substring(1, json.length - 1) // remove brackets
@@ -265,38 +272,38 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
           val Array(renderNum, target, tpe) = args.split(':')
           onEvent(renderNum.toInt, Id(target), tpe)
         case CallbackType.FormDataProgress.code =>
-          val Array(descriptor, loaded, total) = args.split(':')
-          onFormDataProgress(descriptor, loaded.toInt, total.toInt)
+//          val Array(descriptor, loaded, total) = args.split(':')
+//          onFormDataProgress(descriptor, loaded.toInt, total.toInt)
         case CallbackType.ExtractPropertyResponse.code =>
           val Array(descriptor, propertyType, value) = args.split(":", 3)
           propertyType.toInt match {
             case PropertyType.Error.code =>
-              promises
+              stringPromises
                 .fail(descriptor, ClientSideException(value))
-                .flatMap(_ => promises.remove(descriptor))
+                .flatMap(_ => stringPromises.remove(descriptor))
             case _ =>
-              promises
+              stringPromises
                 .put(descriptor, value)
-                .flatMap(_ => promises.remove(descriptor))
+                .flatMap(_ => stringPromises.remove(descriptor))
           }
         case CallbackType.ExtractEventDataResponse.code =>
           val Array(descriptor, value) = args.split(":", 2)
-          promises
+          stringPromises
             .put(descriptor, value)
-            .flatMap(_ => promises.remove(descriptor))
+            .flatMap(_ => stringPromises.remove(descriptor))
         case CallbackType.History.code =>
           onHistory(Router.Path.fromString(args))
         case CallbackType.EvalJsResponse.code =>
           val Array(descriptor, status, json) = args.split(":", 3)
           status.toInt match {
             case EvalJsStatus.Success.code =>
-              promises
+              stringPromises
                 .put(descriptor, json)
-                .flatMap(_ => promises.remove(descriptor))
+                .flatMap(_ => stringPromises.remove(descriptor))
             case EvalJsStatus.Failure.code =>
-              promises
+              stringPromises
                 .fail(descriptor, ClientSideException("JavaScript evaluation error"))
-                .flatMap(_ => promises.remove(descriptor))
+                .flatMap(_ => stringPromises.remove(descriptor))
           }
         case CallbackType.Heartbeat.code =>
         // ignore
@@ -314,7 +321,6 @@ object Frontend {
 
   type HistoryCallback = Path => Unit
   type EventCallback = (Int, Id, String) => Unit
-  type FormDataProgressCallback = (String, Int, Int) => Unit
 
   sealed abstract class Procedure(final val code: Int)
 

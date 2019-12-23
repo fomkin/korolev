@@ -88,7 +88,7 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
         config.reporter
       )
     } yield {
-      incoming.consumed.run { _ =>
+      incoming.consumed.runAsync { _ =>
         stateStorage.remove(qsid.deviceId, qsid.sessionId)
         apps.remove(qsid)
       } // TODO use .start

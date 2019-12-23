@@ -63,7 +63,7 @@ final class KorolevStreamPublisher[F[_] : Effect, T](stream: Stream[F, T],
         }
       } yield ()
 
-    loop().runIgnoreResult
+    loop().runAsyncForget
 
     def request(n: Long): Unit = {
       counter.setUnsafe(n)
@@ -72,13 +72,13 @@ final class KorolevStreamPublisher[F[_] : Effect, T](stream: Stream[F, T],
     def cancel(): Unit = {
       stream
         .cancel()
-        .runIgnoreResult
+        .runAsyncForget
     }
   }
 
   def subscribe(subscriber: Subscriber[_ >: T]): Unit = {
     if (hub != null) {
-      hub().runOrReport { newStream =>
+      hub().runAsyncSuccess { newStream =>
         val subscription = new StreamSubscription(newStream, subscriber)
         subscriber.onSubscribe(subscription)
       }
