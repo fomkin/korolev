@@ -27,16 +27,17 @@ private[korolev] object DevMode {
   private val DevModeDirectoryKey = "korolev.dev.directory"
   private val DevModeDefaultDirectory = "target/korolev/"
 
-  class ForRenderContext(identifier: String, fromScratch: Boolean) {
+  class ForRenderContext(identifier: String) {
 
     lazy val file = new File(DevMode.renderStateDirectory, identifier)
 
-    lazy val hasSavedRenderContext = DevMode.isActive && file.exists && !fromScratch
+    lazy val saved: Boolean =
+      DevMode.isActive && file.exists
 
     def isActive = DevMode.isActive
 
     def loadRenderContext() =
-      if (hasSavedRenderContext) {
+      if (saved) {
         val nioFile = new RandomAccessFile(file, "r")
         val channel = nioFile.getChannel
         try {
@@ -52,12 +53,13 @@ private[korolev] object DevMode {
         None
       }
 
-    def saveRenderContext(renderContext: DiffRenderContext[_]) = {
+    def saveRenderContext(renderContext: DiffRenderContext[_]): Unit = {
       val nioFile = new RandomAccessFile(file, "rw")
       val channel = nioFile.getChannel
       try {
         val buffer = renderContext.save()
         channel.write(buffer)
+        ()
       } finally {
         nioFile.close()
         channel.close()

@@ -153,14 +153,14 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
   def changePageUrl(path: Path): Unit =
     send(Procedure.ChangePageUrl.code, path.mkString)
 
-  def setRenderNum(i: Int): Unit =
-    send(Procedure.SetRenderNum.code, i)
+  def setRenderNum(i: Int): F[Unit] =
+    sendF(Procedure.SetRenderNum.code, i)
 
-  def cleanRoot(): Unit =
-    send(Procedure.CleanRoot.code)
+  def cleanRoot(): F[Unit] =
+    sendF(Procedure.CleanRoot.code)
 
-  def reloadCss(): Unit =
-    send(Procedure.ReloadCss.code)
+  def reloadCss(): F[Unit] =
+    sendF(Procedure.ReloadCss.code)
 
   def extractEventData(renderNum: Int): F[String] =
     for {

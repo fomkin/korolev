@@ -75,7 +75,7 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
       maybeInitialState <- stateManager.read[S](levsha.Id.TopLevel)
       // Top level state should exists. See 'initAppState'.
       initialState = maybeInitialState.get
-      fromScratch = !exists
+      reload = !exists
       frontend = new Frontend[F](incoming)
       app = new ApplicationInstance[F, S, M](
         qsid,
@@ -84,9 +84,9 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
         initialState,
         config.render,
         config.router,
-        fromScratch,
         config.reporter
       )
+      _ <- app.initialize(reload)
     } yield {
       incoming.consumed.runAsync { _ =>
         stateStorage.remove(qsid.deviceId, qsid.sessionId)
