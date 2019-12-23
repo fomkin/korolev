@@ -15,8 +15,9 @@
  */
 
 package korolev.server
-import korolev.{LazyBytes, Router}
+import korolev.Router
 import korolev.effect.Stream
+import korolev.effect.io.LazyBytes
 
 final case class Request[Body](path: Router.Path,
                                param: String => Option[String],

@@ -24,16 +24,15 @@ import korolev.effect.{Effect, Reporter}
 import korolev.effect.syntax._
 import korolev.execution.Scheduler
 import korolev.state.{StateDeserializer, StateManager, StateSerializer}
-
 import levsha.Document.Node
 import levsha.{Id, StatefulRenderContext, XmlNs}
 import levsha.events.EventId
 
 import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
-
 import Context._
 import Effect.StrictPromise
+import korolev.effect.io.LazyBytes
 
 /**
   * Component state holder and effects performer

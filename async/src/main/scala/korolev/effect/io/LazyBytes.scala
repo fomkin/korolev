@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package korolev
+package korolev.effect.io
 
 import java.io.InputStream
 import java.nio.ByteBuffer
@@ -66,23 +66,23 @@ object LazyBytes {
     new LazyBytes(Stream.eval(bytes), Some(bytes.length.toLong))
   }
 
-  def apply[F[_]: Effect](inputStream: InputStream, chunkSize: Int = 8192): LazyBytes[F] = {
+  def apply[F[_]: Effect](inputStream: InputStream, chunkSize: Int = 8192): F[LazyBytes[F]] = {
     val total = inputStream.available().toLong
-    val stream = new Stream[F, Array[Byte]] {
-      val size: Option[Long] = Some(total / chunkSize)
-      val consumed: F[Unit] = Effect[F].unit // TODO
-      def pull(): F[Option[Array[Byte]]] = Effect[F].delay {
+    val streamF = Stream.unfoldResource[F, InputStream, Unit, Array[Byte]](
+      default = (),
+      create = Effect[F].pure(inputStream),
+      calcSize = _ => Effect[F].pure(Some(total / chunkSize)),
+      loop = (inputStream, _) => Effect[F].delay {
         if (inputStream.available() > 0) {
           val chunk = new Array[Byte](Math.min(inputStream.available(), chunkSize))
           inputStream.read(chunk)
-          Some(chunk)
+          ((), Some(chunk))
         } else {
-          None
+          ((), None)
         }
       }
-      def cancel(): F[Unit] = Effect[F].unit // TODO
-    }
-    new LazyBytes(stream, Some(total))
+    )
+    Effect[F].map(streamF)(LazyBytes(_, Some(total)))
   }
 
   def empty[F[_]: Effect]: LazyBytes[F] = {

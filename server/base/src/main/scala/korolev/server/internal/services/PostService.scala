@@ -3,7 +3,8 @@ package korolev.server.internal.services
 import java.nio.ByteBuffer
 
 import korolev.effect.AsyncTable.AlreadyContainsKeyException
-import korolev.{Context, LazyBytes, Qsid}
+import korolev.effect.io.LazyBytes
+import korolev.{Context, Qsid}
 import korolev.effect.{AsyncTable, Effect, Reporter, Stream}
 import korolev.server.Response
 import korolev.effect.syntax._

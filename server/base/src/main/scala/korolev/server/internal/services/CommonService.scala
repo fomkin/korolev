@@ -1,7 +1,7 @@
 package korolev.server.internal.services
 
-import korolev.LazyBytes
 import korolev.effect.Effect
+import korolev.effect.io.LazyBytes
 import korolev.server.Response
 
 private[korolev] final class CommonService[F[_]: Effect] {

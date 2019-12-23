@@ -16,8 +16,9 @@
 
 package korolev
 
+import korolev.effect.io.LazyBytes
 import korolev.effect.{Effect, Reporter}
-import korolev.internal.{Frontend, ComponentInstance, EventRegistry}
+import korolev.internal.{ComponentInstance, EventRegistry, Frontend}
 import korolev.state.{StateDeserializer, StateManager, StateSerializer}
 import levsha._
 import levsha.events.EventPhase

@@ -25,8 +25,8 @@ import _root_.akka.http.scaladsl.server.Route
 import _root_.akka.stream.Materializer
 import _root_.akka.stream.scaladsl.{Flow, Keep, Sink}
 import _root_.akka.util.ByteString
-
 import korolev.akka.util.LoggingReporter
+import korolev.effect.io.LazyBytes
 import korolev.effect.{Effect, Reporter}
 import korolev.server.{KorolevService, KorolevServiceConfig, Request => KorolevRequest, Response => KorolevResponse}
 import korolev.state.{StateDeserializer, StateSerializer}
