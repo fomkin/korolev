@@ -26,6 +26,7 @@ import korolev.effect.{Effect, Reporter}
 import korolev.state.{StateDeserializer, StateManager, StateSerializer}
 import levsha.events.calculateEventPropagation
 import levsha.impl.DiffRenderContext
+import levsha.impl.DiffRenderContext.ChangesPerformer
 import levsha.{Document, Id, XmlNs}
 
 final class ApplicationInstance
@@ -40,15 +41,16 @@ final class ApplicationInstance
      initialState: S,
      render: S => Document.Node[Binding[F, S, M]],
      router: Router[F, S],
-     fromScratch: Boolean,
      reporter: Reporter
   ) { application =>
 
   import reporter.Implicit
 
-  private val devMode = new DevMode.ForRenderContext(sessionId.toString, fromScratch)
+  private val devMode = new DevMode.ForRenderContext(sessionId.toString)
   private val currentRenderNum = new AtomicInteger(0)
-  private val renderContext = DiffRenderContext[Binding[F, S, M]](savedBuffer = devMode.loadRenderContext())
+  private val renderContext = {
+    DiffRenderContext[Binding[F, S, M]](savedBuffer = devMode.loadRenderContext())
+  }
 
   val topLevelComponentInstance: ComponentInstance[F, S, M, S, Any, M] = {
     val eventRegistry = new EventRegistry[F](frontend)
@@ -101,7 +103,9 @@ final class ApplicationInstance
 
       // Make korolev ready to next render
       topLevelComponentInstance.dropObsoleteMisc()
-      frontend.setRenderNum(currentRenderNum.incrementAndGet())
+      frontend
+        .setRenderNum(currentRenderNum.incrementAndGet())
+        .runAsyncForget
     }
   }
 
@@ -134,48 +138,86 @@ final class ApplicationInstance
     }
   )
 
-  frontend.setRenderNum(0)
+  def initialize(reload: Boolean): F[Unit] = {
 
-  stateManager.snapshot runAsyncSuccess { snapshot =>
-    // Content should be created from scratch
-    // Remove all element from document.body
-    if (fromScratch)
-      frontend.cleanRoot()
-
-    // If dev mode is enabled and active
-    // CSS should be reloaded
-    if (devMode.isActive)
-      frontend.reloadCss()
-
-    // Perform initial rendering
-    if (fromScratch) {
-      renderContext.openNode(levsha.XmlNs.html, "body")
-      renderContext.closeNode("body")
-      renderContext.diff(DiffRenderContext.DummyChangesPerformer)
-    } else {
-
-      if (devMode.hasSavedRenderContext) {
-        renderContext.swap()
-        topLevelComponentInstance.applyRenderContext((), renderContext, snapshot)
-        frontend
-          .performDomChanges(renderContext.diff)
-          .runAsyncForget
-        devMode.saveRenderContext(renderContext)
-      } else {
-
-        topLevelComponentInstance.applyRenderContext((), renderContext, snapshot)
-        renderContext.diff(DiffRenderContext.DummyChangesPerformer)
-
-        if (devMode.isActive)
-          devMode.saveRenderContext(renderContext)
+    // Subscriber to application state changes
+    def subscribe() = Effect[F].delay {
+      topLevelComponentInstance.subscribeStateChange { (_, _) =>
+        onState().runAsyncForget
       }
     }
 
-    topLevelComponentInstance.subscribeStateChange { (_, _) =>
-      onState().runAsyncForget
-    }
+    // If dev mode is enabled and active
+    // CSS should be reloaded
+    def reloadCssIfNecessary() =
+      if (devMode.isActive) frontend.reloadCss()
+      else Effect[F].unit
 
-    if (fromScratch)
-      onState().runAsyncForget
+    // If dev mode is enabled
+    // save render context after every diff()
+    def saveRenderContextIfNecessary(): F[Unit] =
+      if (devMode.isActive) Effect[F].delay(devMode.saveRenderContext(renderContext))
+      else Effect[F].unit
+
+    // After 'cleanRoot' DiffRenderContext should
+    // be noticed about actual DOM state.
+    def renderEmptyBody() =
+      Effect[F].delay {
+        renderContext.openNode(levsha.XmlNs.html, "body")
+        renderContext.closeNode("body")
+        renderContext.diff(DiffRenderContext.DummyChangesPerformer)
+      }
+
+    // Render current state using 'performDiff'.
+    def render(performDiff: (ChangesPerformer => Unit) => F[Unit]) =
+      for {
+        snapshot <- stateManager.snapshot
+        _ <- Effect[F].delay(topLevelComponentInstance.applyRenderContext((), renderContext, snapshot))
+        _ <- performDiff(renderContext.diff)
+        _ <- saveRenderContextIfNecessary()
+      } yield ()
+
+    if (reload) {
+
+      // Reload opened page after
+      // server restart
+      for {
+        _ <- frontend.setRenderNum(0)
+        _ <- frontend.cleanRoot()
+        _ <- reloadCssIfNecessary()
+        _ <- renderEmptyBody()
+        _ <- subscribe()
+        _ <- onState()
+      } yield ()
+
+    } else if (devMode.saved) {
+
+      // Initialize with
+      // 1. Old page in users browser
+      // 2. Has saved render context
+      for {
+        _ <- frontend.setRenderNum(0)
+        _ <- reloadCssIfNecessary()
+        _ <- Effect[F].delay(renderContext.swap())
+        // Serialized render context exists.
+        // It means that user is looking at page
+        // generated by old code. The code may
+        // consist changes in render, so we
+        // should deliver them to the user.
+        _ <- render(frontend.performDomChanges)
+        _ <- subscribe()
+      } yield ()
+
+    } else {
+
+      // Initialize with pre-rendered page
+      // THIS IS COMMON INITIALIZATION SCENARIO
+      for {
+        _ <- frontend.setRenderNum(0)
+        _ <- reloadCssIfNecessary()
+        _ <- render(f => Effect[F].delay(f(DiffRenderContext.DummyChangesPerformer)))
+        _ <- subscribe()
+      } yield ()
+    }
   }
 }
