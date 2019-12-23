@@ -66,7 +66,7 @@ private[korolev] final class PostService[F[_]: Effect](reporter: Reporter,
           val bytes = LazyBytes(Stream.proxy(promise), Some(size))
           Context.File(fileName, bytes)
       }
-      _ <- Effect[F].delay(app.topLevelComponentInstance.resolveFile(descriptor, files))
+      _ <- app.frontend.resolveFiles(descriptor, files)
     } yield
       commonService.simpleOkResponse
   }
