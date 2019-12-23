@@ -48,13 +48,13 @@ package object akka {
       else config.copy(reporter = new LoggingReporter(actorSystem))
 
     val korolevServer = korolev.server.korolevService(actualConfig)
+    val wsRouter = configureWsRoute(korolevServer, akkaHttpConfig, actualConfig)
+    val httpRoute = configureHttpRoute(korolevServer)
 
-    webSocketRoute(korolevServer, akkaHttpConfig, actualConfig) ~
-      httpGetRoute(korolevServer) ~
-      httpPostRoute(korolevServer)
+    wsRouter ~ httpRoute
   }
 
-  private def webSocketRoute[F[_]: Effect, S: StateSerializer: StateDeserializer, M]
+  private def configureWsRoute[F[_]: Effect, S: StateSerializer: StateDeserializer, M]
       (korolevServer: KorolevService[F],
        akkaHttpConfig: AkkaHttpServerConfig,
        korolevServiceConfig: KorolevServiceConfig[F, S, M])
@@ -88,36 +88,26 @@ package object akka {
       }
     }
 
-  private def httpGetRoute[F[_]: Effect](korolevServer: KorolevService[F])(implicit ec: ExecutionContext): Route =
-    get {
-      extractRequest { request =>
-        extractUnmatchedPath { path =>
-          parameterMap { params =>
-            val korolevRequest = mkKorolevRequest(request, path.toString, params, LazyBytes.empty)
-            val responseF = handleHttpResponse(korolevServer, korolevRequest)
-            complete(responseF)
-          }
-        }
-      }
-    }
-
-  private def httpPostRoute[F[_]](korolevServer: KorolevService[F])(implicit mat: Materializer, async: Effect[F], ec: ExecutionContext): Route =
-    post {
-      extractUnmatchedPath { path =>
-        parameterMap { params =>
-          extractRequest { request =>
-            val sink = Sink.korolevStream[F, Array[Byte]]
-            val stream = request
-              .entity
-              .dataBytes
-              .map(_.toArray)
-              .toMat(sink)(Keep.right)
-              .run()
-            val body = LazyBytes(stream, request.entity.contentLengthOption)
-            val korolevRequest = mkKorolevRequest(request, path.toString, params, body)
-            val responseF = handleHttpResponse(korolevServer, korolevRequest)
-            complete(responseF)
-          }
+  private def configureHttpRoute[F[_]](korolevServer: KorolevService[F])(implicit mat: Materializer, async: Effect[F], ec: ExecutionContext): Route =
+    extractUnmatchedPath { path =>
+      parameterMap { params =>
+        extractRequest { request =>
+          val sink = Sink.korolevStream[F, Array[Byte]]
+          val body =
+            if (request.method == HttpMethods.GET) {
+              LazyBytes.empty[F]
+            } else {
+              val stream = request
+                .entity
+                .dataBytes
+                .map(_.toArray)
+                .toMat(sink)(Keep.right)
+                .run()
+              LazyBytes(stream, request.entity.contentLengthOption)
+            }
+          val korolevRequest = mkKorolevRequest(request, path.toString, params, body)
+          val responseF = handleHttpResponse(korolevServer, korolevRequest)
+          complete(responseF)
         }
       }
     }
