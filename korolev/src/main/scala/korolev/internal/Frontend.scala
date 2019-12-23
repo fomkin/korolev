@@ -18,8 +18,10 @@ package korolev.internal
 
 import java.util.concurrent.atomic.AtomicInteger
 
+import korolev.Context.File
 import korolev.{FormData, Router}
 import korolev.Router.Path
+import korolev.effect.io.LazyBytes
 import korolev.effect.syntax._
 import korolev.effect.{AsyncTable, Effect, Queue, Reporter, Stream}
 import levsha.Id
@@ -27,7 +29,7 @@ import levsha.impl.DiffRenderContext.ChangesPerformer
 
 import scala.annotation.switch
 import scala.collection.mutable
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Success}
 
 /**
   * Typed interface to client side
@@ -41,6 +43,7 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
 
   private val stringPromises = AsyncTable.empty[F, String, String]
   private val formDataPromises = AsyncTable.empty[F, String, FormData]
+  private val filesPromises = AsyncTable.empty[F, String, List[File[LazyBytes[F]]]]
 
   private val domChangesBuffer = mutable.ArrayBuffer.empty[Any]
 
@@ -121,8 +124,12 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
       result <- formDataPromises.get(descriptor)
     } yield result
 
-  def uploadFiles(id: Id, descriptor: String): Unit =
-    send(Procedure.UploadFiles.code, id.mkString, descriptor)
+  def uploadFiles(id: Id): F[List[File[LazyBytes[F]]]] =
+    for {
+      descriptor <- nextDescriptor()
+      _ <- sendF(Procedure.UploadFiles.code, id.mkString, descriptor)
+      files <- filesPromises.get(descriptor)
+    } yield files
 
   def focus(id: Id): Unit =
     send(Procedure.Focus.code, id.mkString)
@@ -251,6 +258,11 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
     }
     sb.result()
   }
+
+  def resolveFiles(descriptor: String, files: List[File[LazyBytes[F]]]): F[Unit] =
+    filesPromises
+      .put(descriptor, files)
+      .flatMap(_ => filesPromises.remove(descriptor))
 
   def resolveFormData(descriptor: String, formData: Either[Throwable, FormData]): F[Unit] =
     formDataPromises

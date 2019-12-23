@@ -17,7 +17,6 @@
 package korolev.internal
 
 import java.util.concurrent.ConcurrentLinkedQueue
-import java.util.concurrent.atomic.AtomicInteger
 
 import korolev._
 import korolev.effect.{Effect, Reporter}
@@ -66,10 +65,8 @@ final class ComponentInstance
   import ComponentInstance._
   import reporter.Implicit
 
-  private val async = Effect[F]
   private val miscLock = new Object()
   private val subscriptionsLock = new Object()
-  private val lastPostDescriptor = new AtomicInteger(0)
 
   private val markedDelays = mutable.Set.empty[Id] // Set of the delays which are should survive
   private val markedComponentInstances = mutable.Set.empty[Id]
@@ -77,7 +74,6 @@ final class ComponentInstance
   private val elements = mutable.Map.empty[ElementId[F], Id]
   private val events = mutable.Map.empty[EventId, Event[F, CS, E]]
   private val nestedComponents = mutable.Map.empty[Id, ComponentInstance[F, CS, E, _, _, _]]
-  private val downloadFilePromises = mutable.Map.empty[String, StrictPromise[F, List[File[LazyBytes[F]]]]]
 
   private val stateChangeSubscribers = mutable.ArrayBuffer.empty[(Id, Any) => Unit]
   private val pendingTransitions = new ConcurrentLinkedQueue[(Transition[CS], StrictPromise[F, Unit])]()
@@ -89,7 +85,7 @@ final class ComponentInstance
 
     private def noElementException[T]: F[T] = {
       val exception = new Exception("No element matched for accessor")
-      async.fromTry(Failure(exception))
+      Effect[F].fromTry(Failure(exception))
     }
 
     private def getId(elementId: ElementId[F]): F[Id] = {
@@ -99,7 +95,7 @@ final class ComponentInstance
       miscLock.synchronized {
         elements
           .get(elementId)
-          .fold(noElementException[Id])(id => async.delay(id))
+          .fold(noElementException[Id])(id => Effect[F].delay(id))
       }
     }
 
@@ -118,18 +114,18 @@ final class ComponentInstance
 
         def set(propName: String, value: Any): F[Unit] = idF.flatMap { id =>
           // XmlNs argument is empty cause it will be ignored
-          async.delay(frontend.setProperty(id, propName, value))
+          Effect[F].delay(frontend.setProperty(id, propName, value))
         }
       }
     }
 
     def focus(element: ElementId[F]): F[Unit] =
       getId(element).flatMap { id =>
-        async.delay(frontend.focus(id))
+        Effect[F].delay(frontend.focus(id))
       }
 
     def publish(message: E): F[Unit] =
-      async.delay(eventSubscription.foreach(f => f(message)))
+      Effect[F].delay(eventSubscription.foreach(f => f(message)))
 
     def state: F[CS] = {
       val state = stateManager.read[CS](nodeId)
@@ -137,7 +133,7 @@ final class ComponentInstance
       state.map(_.getOrElse(throw new RuntimeException("State is empty")))
     }
 
-    def sessionId: F[Qsid] = async.delay(self.sessionId)
+    def sessionId: F[Qsid] = Effect[F].delay(self.sessionId)
 
     def transition(f: Transition[CS]): F[Unit] = applyTransition(f)
 
@@ -149,7 +145,7 @@ final class ComponentInstance
 
     def downloadFiles(id: ElementId[F]): F[List[File[Array[Byte]]]] = {
       downloadFilesAsStream(id).flatMap { lazyFileList =>
-        async.sequence {
+        Effect[F].sequence {
           lazyFileList.map { lazyFile =>
             lazyFile.data.toStrict.map(x => File(lazyFile.name, x))
           }
@@ -157,14 +153,11 @@ final class ComponentInstance
       }
     }
 
-    def downloadFilesAsStream(elementId: ElementId[F]): F[List[File[LazyBytes[F]]]] = {
-      val promise = async.strictPromise[List[File[LazyBytes[F]]]]
-      val descriptor = nodeId.mkString + lastPostDescriptor.getAndIncrement()
-      frontend.uploadFiles(elements(elementId), descriptor)
-      downloadFilePromises.put(descriptor, promise)
-      promise.effect
-    }
-
+    def downloadFilesAsStream(elementId: ElementId[F]): F[List[File[LazyBytes[F]]]] =
+      for {
+        id <- getId(elementId)
+        streams <- frontend.uploadFiles(id)
+      } yield streams
 
     def resetForm(elementId: ElementId[F]): F[Unit] =
       getId(elementId).map { id =>
@@ -299,11 +292,11 @@ final class ComponentInstance
           }
         } catch {
           case e: MatchError =>
-            async.delay {
+            Effect[F].delay {
               reporter.warning("Transition doesn't fit the state", e)
             }
           case e: Throwable =>
-            async.delay {
+            Effect[F].delay {
               reporter.error("Exception happened when applying transition", e)
             }
         }
@@ -316,7 +309,7 @@ final class ComponentInstance
       }
     }
 
-    val promise = async.strictPromise[Unit]
+    val promise = Effect[F].strictPromise[Unit]
     if (transitionInProgress) pendingTransitions.offer((transition, promise))
     else runTransition(transition, promise)
     promise.effect
@@ -371,18 +364,6 @@ final class ComponentInstance
       case (id, delay) =>
         if (delay.isFinished)
           delays.remove(id)
-    }
-  }
-
-  def resolveFile(descriptor: String, files: List[File[LazyBytes[F]]]): Unit = miscLock.synchronized {
-    downloadFilePromises.get(descriptor) match {
-      case Some(promise) =>
-        downloadFilePromises.remove(descriptor)
-        promise.complete(Success(files))
-      case None =>
-        nestedComponents.values.foreach { nested =>
-          nested.resolveFile(descriptor, files)
-        }
     }
   }
 }
