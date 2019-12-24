@@ -10,12 +10,13 @@ import korolev.server.Response
 import korolev.effect.syntax._
 import korolev.server.internal.{BadRequestException, FormDataCodec}
 
-import scala.util.Try
+import scala.concurrent.ExecutionContext
 
 private[korolev] final class PostService[F[_]: Effect](reporter: Reporter,
                                                        sessionsService: SessionsService[F, _, _],
                                                        commonService: CommonService[F],
-                                                       formDataCodec: FormDataCodec) {
+                                                       formDataCodec: FormDataCodec)
+                                                      (implicit ec: ExecutionContext) {
 
   def formData(qsid: Qsid, descriptor: String, headers: Seq[(String, String)], data: LazyBytes[F]): F[Response.Http[F]] = {
 
@@ -30,12 +31,23 @@ private[korolev] final class PostService[F[_]: Effect](reporter: Reporter,
       }
       .fold(Effect[F].fail[String](new Exception("Content-Type should be `multipart/form-data`")))(Effect[F].pure)
 
+    def parseFormData(formBytes: Array[Byte], boundary: String) = Effect[F].fork {
+      Effect[F].delay {
+        try {
+          Right(formDataCodec.decode(ByteBuffer.wrap(formBytes), boundary))
+        } catch {
+          case error: Throwable =>
+            Left(error)
+        }
+      }
+    }
+
     for {
       app <- sessionsService.findApp(qsid)
       formBytes <- data.toStrict
       boundary <- extractBoundary()
-      tryFormData = Try(formDataCodec.decode(ByteBuffer.wrap(formBytes), boundary))
-      _ <- app.frontend.resolveFormData(descriptor, tryFormData.toEither)
+      errorOrFormData <- parseFormData(formBytes, boundary)
+      _ <- app.frontend.resolveFormData(descriptor, errorOrFormData)
     } yield {
       commonService.simpleOkResponse
     }

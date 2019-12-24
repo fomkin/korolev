@@ -18,7 +18,7 @@ package korolev
 
 import korolev.effect.io.LazyBytes
 import korolev.effect.{Effect, Reporter}
-import korolev.internal.{ComponentInstance, EventRegistry, Frontend}
+import korolev.internal.{ComponentInstance, EventRegistry, Frontend, Scheduler}
 import korolev.state.{StateDeserializer, StateManager, StateSerializer}
 import levsha._
 import levsha.events.EventPhase
@@ -336,8 +336,9 @@ object Context {
                        stateManager: StateManager[F],
                        getRenderNum: () => Int,
                        notifyStateChange: (Id, Any) => F[Unit],
+                       scheduler: Scheduler[F],
                        reporter: Reporter): ComponentInstance[F, AS, M, CS, P, E] = {
-      new ComponentInstance(node, sessionId, frontend, eventRegistry, stateManager, getRenderNum, component, notifyStateChange, reporter)
+      new ComponentInstance(node, sessionId, frontend, eventRegistry, stateManager, getRenderNum, component, notifyStateChange, scheduler, reporter)
     }
   }
 

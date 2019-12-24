@@ -21,7 +21,6 @@ import java.util.concurrent.atomic.AtomicInteger
 import korolev.Context._
 import korolev.Router.Path
 import korolev.effect.syntax._
-import korolev.execution.Scheduler
 import korolev._
 import korolev.effect.{Effect, Reporter}
 import korolev.internal.Frontend.DomEventMessage
@@ -33,7 +32,7 @@ import levsha.{Document, Id, XmlNs}
 
 final class ApplicationInstance
   [
-    F[_]: Effect: Scheduler,
+    F[_]: Effect,
     S: StateSerializer: StateDeserializer,
     M
   ](
@@ -43,6 +42,7 @@ final class ApplicationInstance
      initialState: S,
      render: S => Document.Node[Binding[F, S, M]],
      router: Router[F, S],
+     scheduler: Scheduler[F],
      reporter: Reporter
   ) { application =>
 
@@ -76,7 +76,7 @@ final class ApplicationInstance
       Id.TopLevel, sessionId, frontend, eventRegistry,
       stateManager, () => currentRenderNum.get(), component,
       notifyStateChange = (_, _) => onState(),
-      reporter
+      scheduler, reporter
     )
   }
 

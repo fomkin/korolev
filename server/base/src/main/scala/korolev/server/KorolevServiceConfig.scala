@@ -21,6 +21,7 @@ import korolev.state.IdGenerator
 import korolev.{Context, Extension, Router}
 import levsha.Document
 
+import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
 case class KorolevServiceConfig[F[_]: Effect, S, M](
@@ -32,12 +33,12 @@ case class KorolevServiceConfig[F[_]: Effect, S, M](
   head: S => Seq[Document.Node[Context.Binding[F, S, M]]] = (_: S) => Seq.empty,
   connectionLostWidget: Document.Node[Context.Binding[F, S, M]] =
     KorolevServiceConfig.defaultConnectionLostWidget[Context.Binding[F, S, M]],
-  maxFormDataEntrySize: Int = 1024 * 1024 * 8,
+  maxFormDataEntrySize: Int = 1024 * 8,
   extensions: List[Extension[F, S, M]] = Nil,
   idGenerator: IdGenerator[F] = IdGenerator.default[F](),
   heartbeatInterval: FiniteDuration = 5.seconds,
   reporter: Reporter = Reporter.PrintReporter
-)
+)(implicit val executionContext: ExecutionContext)
 
 object KorolevServiceConfig {
 

@@ -1,10 +1,10 @@
 import korolev._
 import korolev.akka._
-import korolev.execution._
 import korolev.server._
 import korolev.state.javaSerialization._
 
 import scala.concurrent.Future
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.Random
 
 object ComponentExample extends SimpleAkkaHttpKorolevApp {

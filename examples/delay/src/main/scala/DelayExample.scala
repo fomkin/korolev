@@ -1,11 +1,11 @@
 import korolev._
 import korolev.akka._
-import korolev.execution._
 import korolev.server._
 import korolev.state.javaSerialization._
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
+import scala.concurrent.ExecutionContext.Implicits.global
 
 object DelayExample extends SimpleAkkaHttpKorolevApp {
 
