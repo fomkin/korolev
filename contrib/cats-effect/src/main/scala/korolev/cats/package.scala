@@ -47,6 +47,11 @@ package object cats {
     def fromTry[A](value: => Try[A]): IO[A] =
       IO.fromTry(value)
 
+
+    def start[A](m: IO[A])(implicit ec: ExecutionContext): IO[KEffect.Fiber[IO, A]] = m
+      .start(IO.contextShift(ec))
+      .map(fiber => () => fiber.join)
+
     def strictPromise[A]: KEffect.StrictPromise[IO, A] = {
       new KEffect.StrictPromise[IO, A] {
 

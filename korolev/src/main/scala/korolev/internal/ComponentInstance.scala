@@ -76,25 +76,21 @@ final class ComponentInstance
   // Why we use '() => F[Unit]'? Because should
   // support scala.concurrent.Future which is has
   // strict semantic (runs immediately).
-  private val pendingEffects = Queue[F, () => F[Unit]]()
+  private val immediatePendingEffects = Queue[F, () => F[Unit]]()
 
   @volatile private var eventSubscription = Option.empty[E => _]
 
   private[korolev] object browserAccess extends Access[F, CS, E] {
 
-    private def noElementException[T]: F[T] = {
-      val exception = new Exception("No element matched for accessor")
-      Effect[F].fromTry(Failure(exception))
-    }
-
-    private def getId(elementId: ElementId[F]): F[Id] = {
+    private def getId(elementId: ElementId[F]): F[Id] = Effect[F].delay {
       // miscLock synchronization required
       // because prop handler methods can be
       // invoked during render.
       miscLock.synchronized {
-        elements
-          .get(elementId)
-          .fold(noElementException[Id])(id => Effect[F].delay(id))
+        elements.get(elementId) match {
+          case None => throw new Exception("No element matched for accessor")
+          case Some(id) => id
+        }
       }
     }
 
@@ -165,9 +161,7 @@ final class ComponentInstance
 
     def evalJs(code: String): F[String] = frontend.evalJs(code)
 
-    def eventData: F[String] = {
-      frontend.extractEventData(getRenderNum())
-    }
+    def eventData: F[String] = frontend.extractEventData(getRenderNum())
   }
 
   /**
@@ -211,7 +205,7 @@ final class ComponentInstance
           case event @ Event(eventType, phase, _) =>
             val id = rc.currentContainerId
             events.put(EventId(id, eventType, phase), event)
-            pendingEffects.offerUnsafe(() => eventRegistry.registerEventType(event.`type`))
+            eventRegistry.registerEventType(event.`type`)
           case element: ElementId[F] =>
             val id = rc.currentContainerId
             elements.put(element, id)
@@ -257,14 +251,18 @@ final class ComponentInstance
         _ <- stateManager.write(nodeId, newState)
         _ <- notifyStateChange(nodeId, newState)
       } yield ()
-    pendingEffects.offer(effect)
+    immediatePendingEffects.offer(effect)
   }
 
   def applyEvent(eventId: EventId): Boolean = {
     events.get(eventId) match {
       case Some(event: Event[F, CS, E]) =>
-        val effect = () => event.effect(browserAccess)
-        pendingEffects.offerUnsafe(effect)
+        // A user defines the event effect, so we
+        // don't control the time of execution.
+        // We shouldn't block the application if
+        // the user's code waits for something
+        // for a long time.
+        event.effect(browserAccess).runAsyncForget
         false
       case None =>
         nestedComponents.values.forall { nested =>
@@ -314,14 +312,14 @@ final class ComponentInstance
   }
 
   /**
-    * Close 'pendingEffects' in this component and
+    * Close 'immediatePendingEffects' in this component and
     * all nested components.
     *
     * MUST be invoked after closing connection.
     */
   def destroy(): F[Unit] =
     for {
-      _ <- pendingEffects.close()
+      _ <- immediatePendingEffects.close()
       _ <- nestedComponents
         .values
         .toList
@@ -330,7 +328,8 @@ final class ComponentInstance
         .unit
     } yield ()
 
-  pendingEffects
+  // Execute effects sequentially
+  immediatePendingEffects
     .stream
     .foreach(_.apply())
     .runAsyncForget

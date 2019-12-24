@@ -1,5 +1,7 @@
 package korolev.effect
 
+import korolev.effect.Effect.Fiber
+
 import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success, Try}
 
@@ -14,7 +16,7 @@ object syntax {
     def unit: F[Unit] = Effect[F].map(effect)(_ => ())
     def flatMap[B](f: A => F[B]): F[B] = Effect[F].flatMap(effect)(f)
     def recover(f: PartialFunction[Throwable, A]): F[A] = Effect[F].recover[A](effect)(f)
-    //def start()(implicit ec: ExecutionContext): F[Effect.Fiber[F, A]] = Effect[F].start(effect)
+    def start()(implicit ec: ExecutionContext): F[Fiber[F, A]] = Effect[F].start(effect)
     def runAsync[U](f: Try[A] => U): Unit = Effect[F].runAsync(effect)(f)
     def runAsyncSuccess[U](f: A => U)(implicit er: Reporter): Unit =
       Effect[F].runAsync(effect) {

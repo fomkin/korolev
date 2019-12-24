@@ -15,6 +15,8 @@ import scala.util.Random
 private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: StateDeserializer, M](
     config: KorolevServiceConfig[F, S, M]) {
 
+  // TODO remove to config
+  import scala.concurrent.ExecutionContext.Implicits.global
   import config.reporter.Implicit
 
   type App = ApplicationInstance[F, S, M]
@@ -103,9 +105,10 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
       // TODO add state subscription to run extensions
       // TODO add event subscription to pass them to extensions
       _ <- app.initialize(reload)
+      _ <- handleAppClose(frontend, app).start
     } yield {
       // TODO use .start
-      handleAppClose(frontend, app).runAsyncForget
+
       apps.put(qsid, Right(app))
       app
     }
