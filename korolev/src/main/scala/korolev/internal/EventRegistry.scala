@@ -16,7 +16,7 @@
 
 package korolev.internal
 
-import korolev.effect.Effect
+import korolev.effect.{Effect, Reporter}
 import korolev.effect.syntax._
 
 import scala.collection.mutable
@@ -25,7 +25,7 @@ import scala.collection.mutable
   * Save information about what type of events are already
   * listening on the client
   */
-final class EventRegistry[F[_]: Effect](frontend: Frontend[F]) {
+final class EventRegistry[F[_]: Effect](frontend: Frontend[F])(implicit reporter: Reporter) {
 
   private val knownEventTypes = mutable.Set("submit")
 
@@ -34,12 +34,12 @@ final class EventRegistry[F[_]: Effect](frontend: Frontend[F]) {
     * all events of the type. If event already listening
     * on the client side, client will be not notified again.
     */
-  def registerEventType(`type`: String): F[Unit] = knownEventTypes.synchronized {
-    if (knownEventTypes.contains(`type`)) Effect[F].unit else {
-      for {
-        _ <- Effect[F].delay(knownEventTypes += `type`)
-        _ <- frontend.listenEvent(`type`, preventDefault = false)
-      } yield ()
+  def registerEventType(`type`: String): Unit = knownEventTypes.synchronized {
+    if (!knownEventTypes.contains(`type`)) {
+      knownEventTypes += `type`
+      frontend
+        .listenEvent(`type`, preventDefault = false)
+        .runAsyncForget
     }
   }
 }

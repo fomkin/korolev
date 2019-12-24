@@ -16,6 +16,8 @@
 
 package korolev.effect
 
+import korolev.effect.Effect.Fiber
+
 import scala.annotation.implicitNotFound
 import scala.collection.mutable
 import scala.concurrent.duration.Duration
@@ -40,6 +42,7 @@ trait Effect[F[_]] {
   def flatMap[A, B](m: F[A])(f: A => F[B]): F[B]
   def map[A, B](m: F[A])(f: A => B): F[B]
   def recover[A](m: F[A])(f: PartialFunction[Throwable, A]): F[A]
+  def start[A](m: F[A])(implicit ec: ExecutionContext): F[Fiber[F, A]]
   def sequence[A](in: List[F[A]]): F[List[A]]
   def runAsync[A, U](m: F[A])(callback: Try[A] => U): Unit
   def run[A](m: F[A], timeout: Duration = Duration.Inf): Option[A]
@@ -52,6 +55,10 @@ object Effect {
     mutable.Map.empty[ExecutionContext, Effect[Future]]
 
   type Promise[A] = Either[Throwable, A] => Unit
+
+  trait Fiber[F[_], A] {
+    def join(): F[A]
+  }
 
   trait StrictPromise[F[_], A] {
     def effect: F[A]
@@ -86,6 +93,8 @@ object Effect {
     def recover[A](m: Future[A])(f: PartialFunction[Throwable, A]): Future[A] = m.recover(f)
     def sequence[A](in: List[Future[A]]): Future[List[A]] =
       Future.sequence(in)
+    def start[A](m: Future[A])(implicit ec: ExecutionContext): Future[Fiber[Future, A]] =
+      Future.successful(() => m)
     def strictPromise[A]: StrictPromise[Future, A] = {
       val promise = scala.concurrent.Promise[A]()
       new StrictPromise[Future, A] {
