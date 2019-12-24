@@ -74,42 +74,48 @@ final class ApplicationInstance
     }
     new ComponentInstance[F, S, M, S, Any, M](
       Id.TopLevel, sessionId, frontend, eventRegistry,
-      stateManager, () => currentRenderNum.get(), component, reporter
+      stateManager, () => currentRenderNum.get(), component,
+      notifyStateChange = (_, _) => onState(),
+      reporter
     )
   }
 
-  private def onState(): F[Unit] = stateManager.snapshot.map { snapshot =>
-    renderContext.synchronized {
+  /**
+    * If dev mode is enabled save render context
+    */
+  private def saveRenderContextIfNecessary(): F[Unit] =
+    if (devMode.isActive) Effect[F].delay(devMode.saveRenderContext(renderContext))
+    else Effect[F].unit
+
+  private def nextRenderNum(): F[Int] =
+    Effect[F].delay(currentRenderNum.incrementAndGet())
+
+  private def onState(): F[Unit] =
+    for {
+      snapshot <- stateManager.snapshot
       // Set page url if router exists
-      router.fromState
-        .lift(snapshot(Id.TopLevel).getOrElse(initialState))
-        .foreach(path => frontend.changePageUrl(path).runAsyncForget)
-
-      // Prepare render context
-      renderContext.swap()
-
-      // Perform rendering
-      topLevelComponentInstance.applyRenderContext(
-        parameters = (), // Boxed unit as parameter. Top level component doesn't need parameters
-        snapshot = snapshot,
-        rc = renderContext
-      )
-
-      // Infer changes
-      frontend
-        .performDomChanges(renderContext.diff)
-        .runAsyncForget
-
-      if (devMode.isActive)
-        devMode.saveRenderContext(renderContext)
-
+      _ <-  router.fromState
+          .lift(snapshot(Id.TopLevel).getOrElse(initialState))
+          .fold(Effect[F].unit)(path => frontend.changePageUrl(path))
+      _ <- Effect[F].delay {
+        // Prepare render context
+        renderContext.swap()
+        // Perform rendering
+        topLevelComponentInstance.applyRenderContext(
+          parameters = (), // Boxed unit as parameter. Top level component doesn't need parameters
+          snapshot = snapshot,
+          rc = renderContext
+        )
+      }
+      // Infer and perform changes
+      _ <- frontend.performDomChanges(renderContext.diff)
+      _ <- saveRenderContextIfNecessary()
       // Make korolev ready to next render
-      topLevelComponentInstance.dropObsoleteMisc()
-      frontend
-        .setRenderNum(currentRenderNum.incrementAndGet())
-        .runAsyncForget
-    }
-  }
+      renderNum <- nextRenderNum()
+      _ <- Effect[F].delay(topLevelComponentInstance.dropObsoleteMisc())
+      _ <- frontend.setRenderNum(renderNum)
+    } yield ()
+
 
   private def onHistory(path: Path): F[Unit] =
     stateManager
@@ -128,13 +134,15 @@ final class ApplicationInstance
           Effect[F].unit
       }
 
-  private def onEvent(dem: DomEventMessage) =
-    if (currentRenderNum.get == dem.renderNum) {
-      calculateEventPropagation(dem.target, dem.eventType) forall { eventId =>
-        topLevelComponentInstance.applyEvent(eventId)
+  private def onEvent(dem: DomEventMessage): F[Unit] =
+    Effect[F].delay {
+      if (currentRenderNum.get == dem.renderNum) {
+        calculateEventPropagation(dem.target, dem.eventType) forall { eventId =>
+          topLevelComponentInstance.applyEvent(eventId)
+        }
+        ()
       }
-      Effect[F].unit // TODO
-    } else Effect[F].unit  // TODO
+    }
 
   frontend
     .browserHistoryMessages
@@ -148,23 +156,10 @@ final class ApplicationInstance
 
   def initialize(reload: Boolean): F[Unit] = {
 
-    // Subscriber to application state changes
-    def subscribe() = Effect[F].delay {
-      topLevelComponentInstance.subscribeStateChange { (_, _) =>
-        onState().runAsyncForget
-      }
-    }
-
     // If dev mode is enabled and active
     // CSS should be reloaded
     def reloadCssIfNecessary() =
       if (devMode.isActive) frontend.reloadCss()
-      else Effect[F].unit
-
-    // If dev mode is enabled
-    // save render context after every diff()
-    def saveRenderContextIfNecessary(): F[Unit] =
-      if (devMode.isActive) Effect[F].delay(devMode.saveRenderContext(renderContext))
       else Effect[F].unit
 
     // After 'cleanRoot' DiffRenderContext should
@@ -194,7 +189,6 @@ final class ApplicationInstance
         _ <- frontend.cleanRoot()
         _ <- reloadCssIfNecessary()
         _ <- renderEmptyBody()
-        _ <- subscribe()
         _ <- onState()
       } yield ()
 
@@ -213,7 +207,6 @@ final class ApplicationInstance
         // consist changes in render, so we
         // should deliver them to the user.
         _ <- render(frontend.performDomChanges)
-        _ <- subscribe()
       } yield ()
 
     } else {
@@ -224,7 +217,6 @@ final class ApplicationInstance
         _ <- frontend.setRenderNum(0)
         _ <- reloadCssIfNecessary()
         _ <- render(f => Effect[F].delay(f(DiffRenderContext.DummyChangesPerformer)))
-        _ <- subscribe()
       } yield ()
     }
   }

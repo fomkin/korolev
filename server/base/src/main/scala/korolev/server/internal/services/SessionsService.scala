@@ -2,7 +2,7 @@ package korolev.server.internal.services
 
 import korolev.Qsid
 import korolev.effect.syntax._
-import korolev.effect.{Effect, Reporter, Stream}
+import korolev.effect.{Effect, Stream}
 import korolev.internal.{ApplicationInstance, Frontend}
 import korolev.server.KorolevServiceConfig
 import korolev.server.Request.RequestHeader
@@ -14,6 +14,8 @@ import scala.util.Random
 
 private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: StateDeserializer, M](
     config: KorolevServiceConfig[F, S, M]) {
+
+  import config.reporter.Implicit
 
   type App = ApplicationInstance[F, S, M]
 
@@ -66,7 +68,19 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
 
   private val apps = TrieMap.empty[Qsid, Either[InitInProgress, App]]
 
-  private def appsFactory(qsid: Qsid, rh: RequestHeader, incoming: Stream[F, String]) =
+  private def appsFactory(qsid: Qsid, rh: RequestHeader, incoming: Stream[F, String]) = {
+
+    def handleAppClose(frontend: Frontend[F], app: ApplicationInstance[F, _, _]) =
+      for {
+        _ <- incoming.consumed
+        _ <- frontend.outgoingMessages.cancel()
+        _ <- app.topLevelComponentInstance.destroy()
+        _ <- Effect[F].delay {
+          stateStorage.remove(qsid.deviceId, qsid.sessionId)
+          apps.remove(qsid)
+        }
+      } yield ()
+
     for {
       exists <- stateStorage.exists(qsid.deviceId, qsid.sessionId)
       stateManager <-
@@ -86,18 +100,16 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
         config.router,
         config.reporter
       )
+      // TODO add state subscription to run extensions
+      // TODO add event subscription to pass them to extensions
       _ <- app.initialize(reload)
     } yield {
-      incoming.consumed.runAsync { _ =>
-        stateStorage.remove(qsid.deviceId, qsid.sessionId)
-        apps.remove(qsid)
-      } // TODO use .start
+      // TODO use .start
+      handleAppClose(frontend, app).runAsyncForget
       apps.put(qsid, Right(app))
       app
     }
-
-  private implicit val reporter: Reporter =
-    config.reporter
+  }
 
   private val stateStorage =
     if (config.stateStorage == null) new StateStorage.DefaultStateStorage[F, S]()

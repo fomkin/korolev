@@ -16,10 +16,8 @@
 
 package korolev.internal
 
-import java.util.concurrent.ConcurrentLinkedQueue
-
 import korolev._
-import korolev.effect.{Effect, Reporter}
+import korolev.effect.{Effect, Queue, Reporter}
 import korolev.effect.syntax._
 import korolev.execution.Scheduler
 import korolev.state.{StateDeserializer, StateManager, StateSerializer}
@@ -28,10 +26,10 @@ import levsha.{Id, StatefulRenderContext, XmlNs}
 import levsha.events.EventId
 
 import scala.collection.mutable
-import scala.util.{Failure, Success}
 import Context._
-import Effect.StrictPromise
 import korolev.effect.io.LazyBytes
+
+import scala.util.Failure
 
 /**
   * Component state holder and effects performer
@@ -59,6 +57,7 @@ final class ComponentInstance
      stateManager: StateManager[F],
      getRenderNum: () => Int,
      val component: Component[F, CS, P, E],
+     notifyStateChange: (Id, Any) => F[Unit],
      reporter: Reporter
   ) { self =>
 
@@ -66,7 +65,6 @@ final class ComponentInstance
   import reporter.Implicit
 
   private val miscLock = new Object()
-  private val subscriptionsLock = new Object()
 
   private val markedDelays = mutable.Set.empty[Id] // Set of the delays which are should survive
   private val markedComponentInstances = mutable.Set.empty[Id]
@@ -75,11 +73,12 @@ final class ComponentInstance
   private val events = mutable.Map.empty[EventId, Event[F, CS, E]]
   private val nestedComponents = mutable.Map.empty[Id, ComponentInstance[F, CS, E, _, _, _]]
 
-  private val stateChangeSubscribers = mutable.ArrayBuffer.empty[(Id, Any) => Unit]
-  private val pendingTransitions = new ConcurrentLinkedQueue[(Transition[CS], StrictPromise[F, Unit])]()
+  // Why we use '() => F[Unit]'? Because should
+  // support scala.concurrent.Future which is has
+  // strict semantic (runs immediately).
+  private val pendingEffects = Queue[F, () => F[Unit]]()
 
   @volatile private var eventSubscription = Option.empty[E => _]
-  @volatile private var transitionInProgress = false
 
   private[korolev] object browserAccess extends Access[F, CS, E] {
 
@@ -171,38 +170,13 @@ final class ComponentInstance
     }
   }
 
-  private def applyEventResult(effect: F[Unit]): Unit = {
-    // Run effect
-    effect.runAsync {
-      case Failure(e) => reporter.error("Exception during applying transition", e)
-      case Success(_) => ()
-    }
-  }
-
-  private def createUnsubscribe[T](from: mutable.Buffer[T], that: T) = { () =>
-    subscriptionsLock.synchronized { from -= that; () }
-  }
-
-  /**
-    * Subscribe to component instance state changes.
-    * Callback will be invoked for every state change.
-    */
-  def subscribeStateChange(callback: (Id, Any) => Unit): () => Unit = {
-    subscriptionsLock.synchronized {
-      stateChangeSubscribers += callback
-      createUnsubscribe(stateChangeSubscribers, callback)
-    }
-  }
-
   /**
     * Subscribes to component instance events.
     * Callback will be invoked on call of `access.publish()` in the
     * component instance context.
     */
   def setEventsSubscription(callback: E => _): Unit = {
-    subscriptionsLock.synchronized {
-      eventSubscription = Some(callback)
-    }
+    eventSubscription = Some(callback)
   }
 
   def applyRenderContext(parameters: P,
@@ -237,9 +211,7 @@ final class ComponentInstance
           case event @ Event(eventType, phase, _) =>
             val id = rc.currentContainerId
             events.put(EventId(id, eventType, phase), event)
-            eventRegistry
-              .registerEventType(event.`type`)
-              .runAsyncForget
+            pendingEffects.offerUnsafe(() => eventRegistry.registerEventType(event.`type`))
           case element: ElementId[F] =>
             val id = rc.currentContainerId
             elements.put(element, id)
@@ -261,16 +233,13 @@ final class ComponentInstance
                 n.setEventsSubscription((e: Any) => entry.eventHandler(browserAccess, e).runAsyncForget)
                 n.applyRenderContext(entry.parameters, proxy, snapshot)
               case _ =>
-                val n = entry.createInstance(id, sessionId, frontend, eventRegistry, stateManager, getRenderNum, reporter)
+                val n = entry.createInstance(
+                  id, sessionId, frontend, eventRegistry,
+                  stateManager, getRenderNum, notifyStateChange,
+                  reporter
+                )
                 markedComponentInstances += id
                 nestedComponents.put(id, n)
-                n.subscribeStateChange { (id, state) =>
-                  // Propagate nested component instance state change event
-                  // to high-level component instance
-                  stateChangeSubscribers.foreach { f =>
-                    f(id, state)
-                  }
-                }
                 n.setEventsSubscription((e: Any) => entry.eventHandler(browserAccess, e).runAsyncForget)
                 n.applyRenderContext(entry.parameters, proxy, snapshot)
             }
@@ -281,44 +250,21 @@ final class ComponentInstance
   }
 
   def applyTransition(transition: Transition[CS]): F[Unit] = {
-    def runTransition(transition: Transition[CS], promise: StrictPromise[F, Unit]): Unit = {
-      transitionInProgress = true
-      stateManager.read[CS](nodeId) flatMap { maybeState =>
-        val state = maybeState.getOrElse(component.initialState)
-        try {
-          val newState = transition(state)
-          stateManager.write(nodeId, newState).map { _ =>
-            stateChangeSubscribers.foreach(_.apply(nodeId, state))
-          }
-        } catch {
-          case e: MatchError =>
-            Effect[F].delay {
-              reporter.warning("Transition doesn't fit the state", e)
-            }
-          case e: Throwable =>
-            Effect[F].delay {
-              reporter.error("Exception happened when applying transition", e)
-            }
-        }
-      } runAsyncSuccess { _ =>
-        promise.complete(Success(()))
-        Option(pendingTransitions.poll()) match {
-          case Some((t, p)) => runTransition(t, p)
-          case None => transitionInProgress = false
-        }
-      }
-    }
-
-    val promise = Effect[F].strictPromise[Unit]
-    if (transitionInProgress) pendingTransitions.offer((transition, promise))
-    else runTransition(transition, promise)
-    promise.effect
+    val effect = () =>
+      for {
+        state <- stateManager.read[CS](nodeId)
+        newState = transition(state.getOrElse(component.initialState))
+        _ <- stateManager.write(nodeId, newState)
+        _ <- notifyStateChange(nodeId, newState)
+      } yield ()
+    pendingEffects.offer(effect)
   }
 
   def applyEvent(eventId: EventId): Boolean = {
     events.get(eventId) match {
       case Some(event: Event[F, CS, E]) =>
-        applyEventResult(event.effect(browserAccess))
+        val effect = () => event.effect(browserAccess)
+        pendingEffects.offerUnsafe(effect)
         false
       case None =>
         nestedComponents.values.forall { nested =>
@@ -366,6 +312,28 @@ final class ComponentInstance
           delays.remove(id)
     }
   }
+
+  /**
+    * Close 'pendingEffects' in this component and
+    * all nested components.
+    *
+    * MUST be invoked after closing connection.
+    */
+  def destroy(): F[Unit] =
+    for {
+      _ <- pendingEffects.close()
+      _ <- nestedComponents
+        .values
+        .toList
+        .map(_.destroy())
+        .sequence
+        .unit
+    } yield ()
+
+  pendingEffects
+    .stream
+    .foreach(_.apply())
+    .runAsyncForget
 }
 
 private object ComponentInstance {
