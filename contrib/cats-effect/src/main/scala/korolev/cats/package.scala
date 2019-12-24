@@ -86,9 +86,8 @@ package object cats {
     def sequence[A](in: List[IO[A]]): IO[List[A]] =
       Traverse[List].sequence(in)
 
-    def runAsync[A, U](m: IO[A])(callback: Try[A] => U): Unit = {
-      val toTry: Either[Throwable, A] => Try[A] = _.toTry
-      val cb: Either[Throwable, A] => Unit = callback.compose(toTry).andThen(_ => ())
+    def runAsync[A, U](m: IO[A])(callback: Either[Throwable, A] => U): Unit = {
+      val cb: Either[Throwable, A] => Unit = callback.andThen(_ => ())
       m.unsafeRunAsync(cb)
     }
 

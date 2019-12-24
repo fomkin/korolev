@@ -32,7 +32,6 @@ trait Effect[F[_]] {
   def pure[A](value: A): F[A]
   def delay[A](value: => A): F[A]
   def fail[A](e: Throwable): F[A]
-  def fork[A](m: F[A])(implicit ec: ExecutionContext): F[A]
   def unit: F[Unit]
   def fromTry[A](value: => Try[A]): F[A]
   def strictPromise[A]: Effect.StrictPromise[F, A]
@@ -44,8 +43,11 @@ trait Effect[F[_]] {
   /** Keep in mind that when [[F]] has strict semantic, effect should
     * created inside 'start()' brackets. */
   def start[A](create: => F[A])(implicit ec: ExecutionContext): F[Fiber[F, A]]
+  /** Keep in mind that when [[F]] has strict semantic, effect should
+    * created inside 'fork()' brackets. */
+  def fork[A](m: => F[A])(implicit ec: ExecutionContext): F[A]
   def sequence[A](in: List[F[A]]): F[List[A]]
-  def runAsync[A, U](m: F[A])(callback: Try[A] => U): Unit
+  def runAsync[A, U](m: F[A])(callback: Either[Throwable, A] => U): Unit
   def run[A](m: F[A], timeout: Duration = Duration.Inf): Option[A]
   def toFuture[A](m: F[A]): Future[A]
 }
@@ -83,12 +85,13 @@ object Effect {
         case error: Throwable =>
           Future.failed(error)
       }
-    def fork[A](m: Future[A])(implicit ec: ExecutionContext): Future[A] =
+    def fork[A](m: => Future[A])(implicit ec: ExecutionContext): Future[A] =
       Future(m)(ec).flatten
     def fromTry[A](value: => Try[A]): Future[A] = Future.fromTry(value)
     def flatMap[A, B](m: Future[A])(f: A => Future[B]): Future[B] = m.flatMap(f)
     def map[A, B](m: Future[A])(f: A => B): Future[B] = m.map(f)
-    def runAsync[A, U](m: Future[A])(f: Try[A] => U): Unit = m.onComplete(f)
+    def runAsync[A, U](m: Future[A])(f: Either[Throwable, A] => U): Unit =
+      m.onComplete(x => f(x.toEither))
     def run[A](m: Future[A], timeout: Duration): Option[A] = try {
       Some(Await.result(m, timeout))
     } catch {

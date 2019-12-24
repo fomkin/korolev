@@ -3,7 +3,7 @@ package korolev.server.internal.services
 import korolev.Qsid
 import korolev.effect.syntax._
 import korolev.effect.{Effect, Stream}
-import korolev.internal.{ApplicationInstance, Frontend}
+import korolev.internal.{ApplicationInstance, Frontend, Scheduler}
 import korolev.server.KorolevServiceConfig
 import korolev.server.Request.RequestHeader
 import korolev.server.internal.{BadRequestException, Cookies}
@@ -16,7 +16,7 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
     config: KorolevServiceConfig[F, S, M]) {
 
   // TODO remove to config
-  import scala.concurrent.ExecutionContext.Implicits.global
+  import config.executionContext
   import config.reporter.Implicit
 
   type App = ApplicationInstance[F, S, M]
@@ -100,6 +100,7 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
         initialState,
         config.render,
         config.router,
+        scheduler,
         config.reporter
       )
       // TODO add state subscription to run extensions
@@ -115,6 +116,8 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
   private val stateStorage =
     if (config.stateStorage == null) new StateStorage.DefaultStateStorage[F, S]()
     else config.stateStorage
+
+  private val scheduler = new Scheduler[F]()
 
   private case class InitInProgress(request: Int)
 

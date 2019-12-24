@@ -2,8 +2,6 @@ package korolev.effect
 
 import java.util.concurrent.ConcurrentSkipListSet
 
-import scala.util.{Failure, Success}
-
 /**
   * A function which returns new streams which
   * contains same elements as the parent stream.
@@ -26,8 +24,8 @@ final class Hub[F[_]: Effect, T](stream: Stream[F, T], bufferSize: Int) extends 
   // TODO pulling process should be demand based
   Effect[F].runAsync(stream.foreach(puller)) {
     // TODO rewrite with async
-    case Success(_) => queues.forEach(q => Effect[F].run(q.close()))
-    case Failure(e) => queues.forEach(q => Effect[F].run(q.fail(e)))
+    case Right(_) => queues.forEach(q => Effect[F].run(q.close()))
+    case Left(e) => queues.forEach(q => Effect[F].run(q.fail(e)))
   }
 
   def apply(): F[Stream[F, T]] = Effect[F].delay {

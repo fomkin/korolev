@@ -1,9 +1,8 @@
 import korolev._
 import korolev.server._
 import korolev.akka._
-import korolev.execution._
 import korolev.state.javaSerialization._
-
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 object EventDataExample extends SimpleAkkaHttpKorolevApp {

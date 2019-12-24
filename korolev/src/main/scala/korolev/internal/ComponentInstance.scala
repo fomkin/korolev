@@ -19,7 +19,6 @@ package korolev.internal
 import korolev._
 import korolev.effect.{Effect, Queue, Reporter}
 import korolev.effect.syntax._
-import korolev.execution.Scheduler
 import korolev.state.{StateDeserializer, StateManager, StateSerializer}
 import levsha.Document.Node
 import levsha.{Id, StatefulRenderContext, XmlNs}
@@ -44,7 +43,7 @@ import korolev.effect.io.LazyBytes
   */
 final class ComponentInstance
   [
-    F[_]: Effect: Scheduler,
+    F[_]: Effect,
     AS: StateSerializer: StateDeserializer, M,
     CS: StateSerializer: StateDeserializer, P, E
   ](
@@ -56,6 +55,7 @@ final class ComponentInstance
      getRenderNum: () => Int,
      val component: Component[F, CS, P, E],
      notifyStateChange: (Id, Any) => F[Unit],
+     scheduler: Scheduler[F],
      reporter: Reporter
   ) { self =>
 
@@ -212,7 +212,7 @@ final class ComponentInstance
             val id = rc.currentContainerId
             markedDelays += id
             if (!delays.contains(id)) {
-              val delayInstance = new DelayInstance(delay, reporter)
+              val delayInstance = new DelayInstance(delay, scheduler, reporter)
               delays.put(id, delayInstance)
               delayInstance.start(browserAccess)
             }
@@ -228,7 +228,7 @@ final class ComponentInstance
                 val n = entry.createInstance(
                   id, sessionId, frontend, eventRegistry,
                   stateManager, getRenderNum, notifyStateChange,
-                  reporter
+                  scheduler, reporter
                 )
                 markedComponentInstances += id
                 nestedComponents.put(id, n)
@@ -338,7 +338,9 @@ private object ComponentInstance {
   import Context.Access
   import Context.Delay
 
-  final class DelayInstance[F[_]: Effect: Scheduler, S, M](delay: Delay[F, S, M], reporter: Reporter) {
+  final class DelayInstance[F[_]: Effect, S, M](delay: Delay[F, S, M],
+                                                scheduler: Scheduler[F],
+                                                reporter: Reporter) {
 
     import reporter.Implicit
 
@@ -353,9 +355,9 @@ private object ComponentInstance {
 
     def start(access: Access[F, S, M]): Unit = {
       handler = Some {
-        Scheduler[F].scheduleOnce(delay.duration) {
+        scheduler.scheduleOnce(delay.duration) {
           finished = true
-          delay.effect(access).runAsyncForget
+          delay.effect(access)
         }
       }
     }

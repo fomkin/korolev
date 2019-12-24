@@ -1,11 +1,11 @@
 import ViewState.Tab.{About, Blog}
 import korolev._
 import korolev.akka._
-import korolev.execution._
 import korolev.server._
 import korolev.state.javaSerialization._
 
 import scala.concurrent.Future
+import scala.concurrent.ExecutionContext.Implicits.global
 
 object ContextScopeExample extends SimpleAkkaHttpKorolevApp {
 

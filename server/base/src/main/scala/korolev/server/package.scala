@@ -29,6 +29,8 @@ package object server {
   def korolevService[F[_]: Effect, S: StateSerializer: StateDeserializer, M](
       config: KorolevServiceConfig[F, S, M]): KorolevService[F] = {
 
+    import config.executionContext
+
     val commonService = new CommonService[F]()
     val filesService = new FilesService[F](commonService)
     val sessionsService = new SessionsService[F, S, M](config)

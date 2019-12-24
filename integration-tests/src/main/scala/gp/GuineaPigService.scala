@@ -2,7 +2,7 @@ package gp
 
 import korolev._
 import korolev.server._
-import korolev.execution._
+import scala.concurrent.ExecutionContext.Implicits.global
 import korolev.state.javaSerialization._
 
 import org.slf4j.LoggerFactory
@@ -174,7 +174,6 @@ object GuineaPigService {
               event("submit") { access =>
                 access
                   .downloadFormData(uploadFormId)
-                  .start()
                   .flatMap { result =>
                     access.transition {
                       case s =>

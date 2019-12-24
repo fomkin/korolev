@@ -2,7 +2,7 @@ package gp
 
 import akka.http.scaladsl.Http
 import korolev.akka._
-import korolev.execution._
+import scala.concurrent.ExecutionContext.Implicits.global
 import korolev.state.javaSerialization._
 import org.openqa.selenium.remote.DesiredCapabilities
 import tools._

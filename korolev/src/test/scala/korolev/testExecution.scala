@@ -1,8 +1,7 @@
 package korolev
 
-import korolev.execution.Scheduler
-import Scheduler._
 import korolev.effect.{Effect, Reporter}
+import korolev.internal.Scheduler
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration

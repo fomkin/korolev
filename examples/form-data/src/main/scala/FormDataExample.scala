@@ -2,7 +2,7 @@ import korolev._
 import korolev.akka.{AkkaHttpServerConfig, SimpleAkkaHttpKorolevApp}
 import korolev.akka._
 import korolev.server._
-import korolev.execution._
+import scala.concurrent.ExecutionContext.Implicits.global
 import korolev.state.javaSerialization._
 import levsha.XmlNs
 

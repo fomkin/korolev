@@ -3,7 +3,7 @@ import java.nio.file.Paths
 import korolev._
 import korolev.akka._
 import korolev.effect.io.FileIO
-import korolev.execution._
+import scala.concurrent.ExecutionContext.Implicits.global
 import korolev.server._
 import korolev.state.javaSerialization._
 
