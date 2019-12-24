@@ -19,6 +19,8 @@ package korolev
 import _root_.cats.Traverse
 import _root_.cats.effect._
 import _root_.cats.instances.list._
+import _root_.cats.syntax.all._
+
 import korolev.effect.{Effect => KEffect}
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
@@ -37,9 +39,8 @@ package object cats {
 
     def fail[A](e: Throwable): IO[A] = IO.raiseError(e)
 
-    // TODO
-    def fork[A](value: => A): IO[A] =
-      IO.delay(value)
+    def fork[A](m: IO[A])(implicit ec: ExecutionContext): IO[A] =
+      IO.contextShift(ec).shift *> m
 
     def unit: IO[Unit] =
       IO.unit
@@ -48,7 +49,7 @@ package object cats {
       IO.fromTry(value)
 
 
-    def start[A](m: IO[A])(implicit ec: ExecutionContext): IO[KEffect.Fiber[IO, A]] = m
+    def start[A](m: => IO[A])(implicit ec: ExecutionContext): IO[KEffect.Fiber[IO, A]] = m
       .start(IO.contextShift(ec))
       .map(fiber => () => fiber.join)
 

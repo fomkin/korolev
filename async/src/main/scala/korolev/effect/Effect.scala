@@ -19,7 +19,6 @@ package korolev.effect
 import korolev.effect.Effect.Fiber
 
 import scala.annotation.implicitNotFound
-import scala.collection.mutable
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, ExecutionContext, Future, TimeoutException}
 import scala.util.Try
@@ -33,7 +32,7 @@ trait Effect[F[_]] {
   def pure[A](value: A): F[A]
   def delay[A](value: => A): F[A]
   def fail[A](e: Throwable): F[A]
-  def fork[A](value: => A): F[A]
+  def fork[A](m: F[A])(implicit ec: ExecutionContext): F[A]
   def unit: F[Unit]
   def fromTry[A](value: => Try[A]): F[A]
   def strictPromise[A]: Effect.StrictPromise[F, A]
@@ -42,7 +41,9 @@ trait Effect[F[_]] {
   def flatMap[A, B](m: F[A])(f: A => F[B]): F[B]
   def map[A, B](m: F[A])(f: A => B): F[B]
   def recover[A](m: F[A])(f: PartialFunction[Throwable, A]): F[A]
-  def start[A](m: F[A])(implicit ec: ExecutionContext): F[Fiber[F, A]]
+  /** Keep in mind that when [[F]] has strict semantic, effect should
+    * created inside 'start()' brackets. */
+  def start[A](create: => F[A])(implicit ec: ExecutionContext): F[Fiber[F, A]]
   def sequence[A](in: List[F[A]]): F[List[A]]
   def runAsync[A, U](m: F[A])(callback: Try[A] => U): Unit
   def run[A](m: F[A], timeout: Duration = Duration.Inf): Option[A]
@@ -50,9 +51,6 @@ trait Effect[F[_]] {
 }
 
 object Effect {
-
-  private val futureInstanceCache =
-    mutable.Map.empty[ExecutionContext, Effect[Future]]
 
   type Promise[A] = Either[Throwable, A] => Unit
 
@@ -68,8 +66,13 @@ object Effect {
 
   def apply[F[_]: Effect]: Effect[F] = implicitly[Effect[F]]
 
-  private final class FutureEffect(implicit ec: ExecutionContext) extends Effect[Future] {
-    val unit: Future[Unit] = Future.successful(())
+  final class FutureEffect extends Effect[Future] {
+    private implicit val immediateEc: ExecutionContext = new ExecutionContext {
+      // Run on the same thread
+      def execute(runnable: Runnable): Unit = runnable.run()
+      def reportFailure(cause: Throwable): Unit = cause.printStackTrace()
+    }
+    val unit: Future[Unit] = Future.unit
     def toFuture[A](m: Future[A]): Future[A] = m
     def fail[A](e: Throwable): Future[A] = Future.failed(e)
     def pure[A](value: A): Future[A] = Future.successful(value)
@@ -80,7 +83,8 @@ object Effect {
         case error: Throwable =>
           Future.failed(error)
       }
-    def fork[A](value: => A): Future[A] = Future(value)
+    def fork[A](m: Future[A])(implicit ec: ExecutionContext): Future[A] =
+      Future(m)(ec).flatten
     def fromTry[A](value: => Try[A]): Future[A] = Future.fromTry(value)
     def flatMap[A, B](m: Future[A])(f: A => Future[B]): Future[B] = m.flatMap(f)
     def map[A, B](m: Future[A])(f: A => B): Future[B] = m.map(f)
@@ -93,8 +97,8 @@ object Effect {
     def recover[A](m: Future[A])(f: PartialFunction[Throwable, A]): Future[A] = m.recover(f)
     def sequence[A](in: List[Future[A]]): Future[List[A]] =
       Future.sequence(in)
-    def start[A](m: Future[A])(implicit ec: ExecutionContext): Future[Fiber[Future, A]] =
-      Future.successful(() => m)
+    def start[A](create: => Future[A])(implicit ec: ExecutionContext): Future[Fiber[Future, A]] =
+      Future.successful(() => Future(create)(ec).flatten)
     def strictPromise[A]: StrictPromise[Future, A] = {
       val promise = scala.concurrent.Promise[A]()
       new StrictPromise[Future, A] {
@@ -122,14 +126,6 @@ object Effect {
     }
   }
 
-  /**
-    * Creates an Async instance for Future type.
-    * Physically one instance per execution context is maintained.
-    */
-  implicit def futureAsync(implicit ec: ExecutionContext): Effect[Future] = {
-    futureInstanceCache.synchronized {
-      futureInstanceCache.getOrElseUpdate(ec, new FutureEffect())
-    }
-  }
-
+  implicit val futureEffect: Effect[Future] =
+    new FutureEffect()
 }
