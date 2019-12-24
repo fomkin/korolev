@@ -29,8 +29,6 @@ import scala.collection.mutable
 import Context._
 import korolev.effect.io.LazyBytes
 
-import scala.util.Failure
-
 /**
   * Component state holder and effects performer
   *

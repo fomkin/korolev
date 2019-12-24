@@ -23,7 +23,7 @@ final class KorolevStreamPublisher[F[_] : Effect, T](stream: Stream[F, T],
     val res = Right(())
 
     def decOrLock(): F[Unit] = Effect[F].promise[Unit] { cb =>
-      this.synchronized {
+      this.synchronized { // FIXME use CAS?
         if (n == 0) {
           pending = cb
         } else {

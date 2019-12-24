@@ -22,24 +22,22 @@ import korolev.effect.syntax._
 import korolev.effect.{Effect, Reporter}
 
 import scala.concurrent.duration.FiniteDuration
-import scala.util.Success
 
 final class JavaTimerScheduler[F[_]: Effect] extends Scheduler[F] {
 
   import Scheduler._
 
   private val timer = new Timer()
-  private val async = Effect[F]
 
   def scheduleOnce[T](delay: FiniteDuration)(job: => T)(implicit r: Reporter): JobHandler[F, T] = {
     val promise = Effect[F].strictPromise[T]
     val task = new TimerTask {
       def run(): Unit = {
-        val task = async.fork {
-          val result = job // Execute a job
-          promise.complete(Success(result))
-        }
-        task.runAsyncForget
+        val result = Effect[F]
+          .unit
+          .fork()
+          .map(_ => job)
+        promise.completeAsync(result)
       }
     }
     timer.schedule(task, delay.toMillis)
@@ -51,7 +49,12 @@ final class JavaTimerScheduler[F[_]: Effect] extends Scheduler[F] {
 
   def schedule[U](interval: FiniteDuration)(job: => U)(implicit r: Reporter): Cancel = {
     val task = new TimerTask {
-      def run(): Unit = async.fork(job).runAsyncForget
+      def run(): Unit =
+        Effect[F]
+          .unit
+          .fork()
+          .map(_ => job)
+          .runAsyncForget
     }
     val millis = interval.toMillis
     timer.schedule(task, millis, millis)

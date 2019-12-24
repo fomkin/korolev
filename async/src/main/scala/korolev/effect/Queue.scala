@@ -3,7 +3,7 @@ package korolev.effect
 import scala.collection.mutable
 
 final class Queue[F[_]: Effect, T](maxSize: Int) {
-  
+
   def offer(item: T): F[Unit] =
     Effect[F].delay(offerUnsafe(item))
 
@@ -14,8 +14,9 @@ final class Queue[F[_]: Effect, T](maxSize: Int) {
         underlyingQueue.dequeue()
       }
       if (pending != null) {
-        pending(Right(Some(item)))
+        val cb = pending
         pending = null
+        cb(Right(Some(item)))
       } else {
         underlyingQueue.enqueue(item)
       }
@@ -23,10 +24,11 @@ final class Queue[F[_]: Effect, T](maxSize: Int) {
 
   def close(): F[Unit] =
     Effect[F].delay {
-      this.synchronized {
+      this.synchronized { // FIXME sync on underlyingQueue?
         if (pending != null) {
-          pending(Right(None))
+          val cb = pending
           pending = null
+          cb(Right(None))
         }
         if (finished != null)
           finished(Right(()))
@@ -43,7 +45,7 @@ final class Queue[F[_]: Effect, T](maxSize: Int) {
       }
     }
 
-  val stream: Stream[F, T] = new Stream[F, T] {
+  private final class QueueStream extends Stream[F, T] {
 
     def pull(): F[Option[T]] = Effect[F].promise { cb =>
       underlyingQueue.synchronized {
@@ -69,9 +71,11 @@ final class Queue[F[_]: Effect, T](maxSize: Int) {
     val size: Option[Long] = None
   }
 
+  val stream: Stream[F, T] = new QueueStream()
+
   private var closed = false
   private var error: Throwable = _
-  private var pending: Effect.Promise[Option[T]] = _
+  @volatile private var pending: Effect.Promise[Option[T]] = _
   private var finished: Effect.Promise[Unit] = _
   private val underlyingQueue: mutable.Queue[T] = mutable.Queue.empty[T]
 }

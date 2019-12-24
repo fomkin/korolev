@@ -68,7 +68,7 @@ abstract class Stream[F[_]: Effect, A] { lhs =>
   def flatMapMerge[B](concurrency: Int)(f: A => Stream[F, B]): Stream[F, B] = new Stream[F, B]{
     val streams: Array[Stream[F, B]] = new Array(concurrency)
     var takeFromCounter = 0
-    def aux(): F[Option[B]] = {
+    def aux(): F[Option[B]] = { // FIXME should be lazy
       val takeFrom = takeFromCounter % concurrency
       val underlying = streams(takeFrom)
       takeFromCounter += 1
@@ -200,8 +200,8 @@ abstract class Stream[F[_]: Effect, A] { lhs =>
                     val j = f(item)
                     val cb = promises(j)
                     if (cb != null) {
-                      cb(Right(maybeItem))
                       promises(j) = null
+                      cb(Right(maybeItem))
                     } else {
                       values(j) = maybeItem
                     }

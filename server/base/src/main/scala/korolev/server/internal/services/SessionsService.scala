@@ -105,10 +105,8 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
       // TODO add state subscription to run extensions
       // TODO add event subscription to pass them to extensions
       _ <- app.initialize(reload)
-      _ <- handleAppClose(frontend, app).start
+      _ <- Effect[F].start(handleAppClose(frontend, app))
     } yield {
-      // TODO use .start
-
       apps.put(qsid, Right(app))
       app
     }
