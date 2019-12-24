@@ -23,12 +23,12 @@ import korolev.{FormData, Router}
 import korolev.Router.Path
 import korolev.effect.io.LazyBytes
 import korolev.effect.syntax._
+
 import korolev.effect.{AsyncTable, Effect, Queue, Reporter, Stream}
 import levsha.Id
 import levsha.impl.DiffRenderContext.ChangesPerformer
 
 import scala.annotation.switch
-import scala.util.{Failure, Success}
 
 /**
   * Typed interface to client side
@@ -237,51 +237,43 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
     (callbackType.toInt, args)
   }
 
-  private def onReceive(): Unit = rawClientMessages.pull().runAsync {
-    case Success(Some((callbackType, args))) =>
-      callbackType match {
-//        case CallbackType.FormDataProgress.code =>
-//          val Array(descriptor, loaded, total) = args.split(':')
-//          onFormDataProgress(descriptor, loaded.toInt, total.toInt)
-        case CallbackType.ExtractPropertyResponse.code =>
-          val Array(descriptor, propertyType, value) = args.split(":", 3)
-          propertyType.toInt match {
-            case PropertyType.Error.code =>
-              stringPromises
-                .fail(descriptor, ClientSideException(value))
-                .flatMap(_ => stringPromises.remove(descriptor))
-            case _ =>
-              stringPromises
-                .put(descriptor, value)
-                .flatMap(_ => stringPromises.remove(descriptor))
-          }
-        case CallbackType.ExtractEventDataResponse.code =>
-          val Array(descriptor, value) = args.split(":", 2)
-          stringPromises
-            .put(descriptor, value)
-            .flatMap(_ => stringPromises.remove(descriptor))
-        case CallbackType.EvalJsResponse.code =>
-          val Array(descriptor, status, json) = args.split(":", 3)
-          status.toInt match {
-            case EvalJsStatus.Success.code =>
-              stringPromises
-                .put(descriptor, json)
-                .flatMap(_ => stringPromises.remove(descriptor))
-            case EvalJsStatus.Failure.code =>
-              stringPromises
-                .fail(descriptor, ClientSideException("JavaScript evaluation error"))
-                .flatMap(_ => stringPromises.remove(descriptor))
-          }
-        case CallbackType.Heartbeat.code =>
-        // ignore
-      }
-      onReceive()
-    case Success(None) => ()
-    case Failure(e) =>
-      reporter.error("Unable to receive message from client", e)
-  }
-
-  onReceive()
+  rawClientMessages
+    .foreach {
+      case (CallbackType.Heartbeat.code, _) =>
+        Effect[F].unit
+      case (CallbackType.ExtractPropertyResponse.code, args) =>
+        val Array(descriptor, propertyType, value) = args.split(":", 3)
+        propertyType.toInt match {
+          case PropertyType.Error.code =>
+            stringPromises
+              .fail(descriptor, ClientSideException(value))
+              .flatMap(_ => stringPromises.remove(descriptor))
+          case _ =>
+            stringPromises
+              .put(descriptor, value)
+              .flatMap(_ => stringPromises.remove(descriptor))
+        }
+      case (CallbackType.ExtractEventDataResponse.code, args) =>
+        val Array(descriptor, value) = args.split(":", 2)
+        stringPromises
+          .put(descriptor, value)
+          .flatMap(_ => stringPromises.remove(descriptor))
+      case (CallbackType.EvalJsResponse.code, args) =>
+        val Array(descriptor, status, json) = args.split(":", 3)
+        status.toInt match {
+          case EvalJsStatus.Success.code =>
+            stringPromises
+              .put(descriptor, json)
+              .flatMap(_ => stringPromises.remove(descriptor))
+          case EvalJsStatus.Failure.code =>
+            stringPromises
+              .fail(descriptor, ClientSideException("JavaScript evaluation error"))
+              .flatMap(_ => stringPromises.remove(descriptor))
+        }
+      case (callbackType, args) =>
+        Effect[F].fail(UnknownCallbackException(callbackType, args))
+    }
+    .runAsyncForget
 }
 
 object Frontend {
@@ -382,4 +374,6 @@ object Frontend {
   }
 
   case class ClientSideException(message: String) extends Exception(message)
+  case class UnknownCallbackException(callbackType: Int, args: String)
+    extends Exception(s"Unknown callback $callbackType with args '$args' received")
 }

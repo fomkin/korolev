@@ -335,8 +335,9 @@ object Context {
                        eventRegistry: EventRegistry[F],
                        stateManager: StateManager[F],
                        getRenderNum: () => Int,
+                       notifyStateChange: (Id, Any) => F[Unit],
                        reporter: Reporter): ComponentInstance[F, AS, M, CS, P, E] = {
-      new ComponentInstance(node, sessionId, frontend, eventRegistry, stateManager, getRenderNum, component, reporter)
+      new ComponentInstance(node, sessionId, frontend, eventRegistry, stateManager, getRenderNum, component, notifyStateChange, reporter)
     }
   }
 
