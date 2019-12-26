@@ -24,7 +24,6 @@ import korolev.effect.{Effect => KEffect}
 
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.{ExecutionContext, Future}
-import scala.concurrent.duration.Duration
 import scala.util.Try
 
 package object cats {
@@ -72,13 +71,12 @@ package object cats {
     def sequence[A](in: List[IO[A]]): IO[List[A]] =
       Traverse[List].sequence(in)
 
-    def runAsync[A, U](m: IO[A])(callback: Either[Throwable, A] => U): Unit = {
-      val cb: Either[Throwable, A] => Unit = callback.andThen(_ => ())
-      m.unsafeRunAsync(cb)
+    def runAsync[A](m: IO[A])(callback: Either[Throwable, A] => Unit): Unit = {
+      m.unsafeRunAsync(callback)
     }
 
-    def run[A](m: IO[A], timeout: Duration): Option[A] = {
-      m.unsafeRunTimed(timeout)
+    def run[A](m: IO[A]): A = {
+      m.unsafeRunSync()
     }
 
     def toFuture[A](m: IO[A]): Future[A] =
