@@ -28,6 +28,7 @@ val publishSettings = Seq(
 
 val commonSettings = publishSettings ++ Seq(
   addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
+  addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.0" cross CrossVersion.full),
   git.useGitDescribe := true,
   organization := "com.github.fomkin",
   libraryDependencies ++= Seq(
@@ -105,12 +106,23 @@ lazy val slf4j = project.
 
 lazy val cats = project.
   enablePlugins(GitVersioning).
-  in(file("interop/cats-effect")).
+  in(file("interop/cats")).
   settings(crossVersionSettings).
   settings(commonSettings: _*).
   settings(
     normalizedName := "korolev-cats",
     libraryDependencies += "org.typelevel" %% "cats-effect" % "2.0.0"
+  ).
+  dependsOn(effect)
+
+lazy val zio = project.
+  enablePlugins(GitVersioning).
+  in(file("interop/zio")).
+  settings(crossVersionSettings).
+  settings(commonSettings: _*).
+  settings(
+    normalizedName := "korolev-zio",
+    libraryDependencies += "dev.zio" %% "zio" % "1.0.0-RC17"
   ).
   dependsOn(effect)
 
@@ -257,7 +269,7 @@ lazy val root = project.in(file(".")).
   settings(dontPublishSettings:_*).
   aggregate(
     korolev, effect,
-    akka, cats, slf4j,
+    akka, cats, zio, slf4j,
     simpleExample, routingExample, gameOfLifeExample,
     formDataExample, `file-streaming-example`, delayExample, focusExample,
     webComponentExample, componentExample, akkaHttpExample, contextScopeExample,
