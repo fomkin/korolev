@@ -1,7 +1,7 @@
 package korolev.effect.io
 
 import java.io.{BufferedReader, FileInputStream, FileOutputStream, FileReader}
-import java.nio.file.{Files, Path}
+import java.nio.file.Path
 
 import korolev.effect.syntax._
 import korolev.effect.{Effect, Stream}
@@ -17,7 +17,6 @@ object FileIO {
     Stream.unfoldResource[F, BufferedReader, Unit, String](
       default = (),
       create = Effect[F].delay(new BufferedReader(new FileReader(path.toFile))),
-      calcSize = _ => Effect[F].delay(Option(Files.size(path))),
       loop = (reader, _) => Effect[F].delay {
         ((), Option(reader.readLine()))
       }

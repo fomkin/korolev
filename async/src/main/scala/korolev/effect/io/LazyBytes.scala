@@ -49,7 +49,7 @@ final case class LazyBytes[F[_]: Effect](chunks: Stream[F, Array[Byte]],
   }
 
   /**
-    * Drops all data. Completes [[chunks.consumed]].
+    * Drops all data.
     */
   def discard(): F[Unit] = {
     def aux(): F[Unit] = Effect[F].flatMap(chunks.pull()) { x =>
@@ -71,7 +71,6 @@ object LazyBytes {
     val streamF = Stream.unfoldResource[F, InputStream, Unit, Array[Byte]](
       default = (),
       create = Effect[F].pure(inputStream),
-      calcSize = _ => Effect[F].pure(Some(total / chunkSize)),
       loop = (inputStream, _) => Effect[F].delay {
         if (inputStream.available() > 0) {
           val chunk = new Array[Byte](Math.min(inputStream.available(), chunkSize))

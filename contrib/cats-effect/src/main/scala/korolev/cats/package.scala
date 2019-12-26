@@ -23,7 +23,7 @@ import _root_.cats.syntax.all._
 import korolev.effect.{Effect => KEffect}
 
 import scala.collection.concurrent.TrieMap
-import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.Duration
 import scala.util.Try
 

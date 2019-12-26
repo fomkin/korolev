@@ -12,11 +12,9 @@ import korolev.effect.syntax._
   */
 final class Hub[F[_]: Effect, T](upstream: Stream[F, T], bufferSize: Int) {
 
-  private val queues = new ConcurrentSkipListSet[Queue[F, T]]()
-
-  private val inProgress = new AtomicBoolean(false)
-
   @volatile private var closed = false
+  private val queues = new ConcurrentSkipListSet[Queue[F, T]]()
+  private val inProgress = new AtomicBoolean(false)
 
   private final class StreamOnePullAtTime(thisQueue: Queue[F, T]) extends Stream[F, T] {
 
@@ -53,8 +51,6 @@ final class Hub[F[_]: Effect, T](upstream: Stream[F, T], bufferSize: Int) {
       }
 
     def cancel(): F[Unit] = thisQueue.close()
-    def consumed: F[Unit] = ???
-    def size: Option[Long] = ???
   }
 
   private final class QueueRemoveFromHubOnClose extends Queue[F, T](bufferSize) {

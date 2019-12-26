@@ -26,23 +26,24 @@ class Queue[F[_]: Effect, T](maxSize: Int) {
     Effect[F].delay(closeUnsafe())
 
   def closeUnsafe(): Unit =
-    this.synchronized { // FIXME sync on underlyingQueue?
+    underlyingQueue.synchronized {
       if (pending != null) {
         val cb = pending
         pending = null
         cb(Right(None))
       }
-      if (finished != null)
-        finished(Right(()))
       closed = true
     }
 
   def fail(e: Throwable): F[Unit] =
     Effect[F].delay {
-      this.synchronized {
-        if (finished != null)
-          finished(Left(e))
+      underlyingQueue.synchronized {
         error = e
+        if (pending != null) {
+          val cb = pending
+          pending = null
+          cb(Left(e))
+        }
       }
     }
 
@@ -50,7 +51,8 @@ class Queue[F[_]: Effect, T](maxSize: Int) {
 
     def pull(): F[Option[T]] = Effect[F].promise { cb =>
       underlyingQueue.synchronized {
-        if (closed) cb(Right(None)) else {
+        if (error != null) cb(Left(error))
+        else if (closed) cb(Right(None)) else {
           if (underlyingQueue.nonEmpty) {
             val elem = underlyingQueue.dequeue()
             cb(Right(Some(elem)))
@@ -61,23 +63,14 @@ class Queue[F[_]: Effect, T](maxSize: Int) {
       }
     }
 
-    val consumed: F[Unit] = Effect[F].promise[Unit] { cb =>
-      if (error != null) cb(Left(error))
-      else if (closed) cb(Right(()))
-      else finished = cb
-    }
-
     def cancel(): F[Unit] = close()
-
-    val size: Option[Long] = None
   }
 
   val stream: Stream[F, T] = new QueueStream()
 
-  private var closed = false
-  private var error: Throwable = _
+  @volatile private var closed = false
+  @volatile private var error: Throwable = _
   @volatile private var pending: Effect.Promise[Option[T]] = _
-  private var finished: Effect.Promise[Unit] = _
   private val underlyingQueue: mutable.Queue[T] = mutable.Queue.empty[T]
 }
 
