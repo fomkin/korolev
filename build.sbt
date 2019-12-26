@@ -49,13 +49,6 @@ val exampleSettings = commonSettings ++ dontPublishSettings ++ Seq(
   libraryDependencies += "org.slf4j" % "slf4j-simple" % "1.7.+"
 )
 
-lazy val server = (project in file("server") / "base").
-  enablePlugins(GitVersioning).
-  settings(crossVersionSettings).
-  settings(commonSettings: _*).
-  settings(normalizedName := "korolev-server").
-  dependsOn(korolev)
-
 lazy val akka = (project in file("interop") / "akka").
   enablePlugins(GitVersioning).
   settings(crossVersionSettings).
@@ -68,7 +61,7 @@ lazy val akka = (project in file("interop") / "akka").
       "com.typesafe.akka" %% "akka-http" % "10.1.10"
     )
   ).
-  dependsOn(server)
+  dependsOn(korolev)
 
 lazy val effect = project.
   enablePlugins(GitVersioning).
@@ -264,8 +257,7 @@ lazy val root = project.in(file(".")).
   settings(dontPublishSettings:_*).
   aggregate(
     korolev, effect,
-    server, akka,
-    cats, slf4j,
+    akka, cats, slf4j,
     simpleExample, routingExample, gameOfLifeExample,
     formDataExample, `file-streaming-example`, delayExample, focusExample,
     webComponentExample, componentExample, akkaHttpExample, contextScopeExample,
