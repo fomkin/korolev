@@ -34,7 +34,6 @@ trait Effect[F[_]] {
   def fail[A](e: Throwable): F[A]
   def unit: F[Unit]
   def fromTry[A](value: => Try[A]): F[A]
-  def strictPromise[A]: Effect.StrictPromise[F, A]
   def promise[A](cb: (Either[Throwable, A] => Unit) => Unit): F[A]
   def promiseF[A](cb: (Either[Throwable, A] => Unit) => F[Unit]): F[A]
   def flatMap[A, B](m: F[A])(f: A => F[B]): F[B]
@@ -58,12 +57,6 @@ object Effect {
 
   trait Fiber[F[_], A] {
     def join(): F[A]
-  }
-
-  trait StrictPromise[F[_], A] {
-    def effect: F[A]
-    def complete(`try`: Try[A]): Unit
-    def completeAsync(async: F[A]): Unit
   }
 
   def apply[F[_]: Effect]: Effect[F] = implicitly[Effect[F]]
@@ -100,21 +93,9 @@ object Effect {
     def recover[A](m: Future[A])(f: PartialFunction[Throwable, A]): Future[A] = m.recover(f)
     def sequence[A](in: List[Future[A]]): Future[List[A]] =
       Future.sequence(in)
-    def start[A](create: => Future[A])(implicit ec: ExecutionContext): Future[Fiber[Future, A]] =
-      Future.successful(() => Future(create)(ec).flatten)
-    def strictPromise[A]: StrictPromise[Future, A] = {
-      val promise = scala.concurrent.Promise[A]()
-      new StrictPromise[Future, A] {
-        val effect: Future[A] = promise.future
-        def complete(`try`: Try[A]): Unit = {
-          promise.complete(`try`)
-          ()
-        }
-        def completeAsync(async: Future[A]): Unit = {
-          promise.completeWith(async)
-          ()
-        }
-      }
+    def start[A](create: => Future[A])(implicit ec: ExecutionContext): Future[Fiber[Future, A]] = {
+      val f = Future(create)(ec).flatten
+      Future.successful(() => f)
     }
     def promise[A](cb: (Either[Throwable, A] => Unit) => Unit): Future[A] = {
       val promise = scala.concurrent.Promise[A]()

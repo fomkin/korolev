@@ -141,7 +141,6 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
   }
 
   def setProperty(id: Id, name: String, value: Any): F[Unit] = {
-    // TODO setProperty should be dedicated
     send(Procedure.ModifyDom.code, ModifyDomProcedure.SetAttr.code, id.mkString, 0, name, value, true)
   }
 
@@ -188,12 +187,12 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
   def resolveFiles(descriptor: String, files: List[File[LazyBytes[F]]]): F[Unit] =
     filesPromises
       .put(descriptor, files)
-      .flatMap(_ => filesPromises.remove(descriptor))
+      .after(filesPromises.remove(descriptor))
 
   def resolveFormData(descriptor: String, formData: Either[Throwable, FormData]): F[Unit] =
     formDataPromises
       .putEither(descriptor, formData)
-      .flatMap(_ => formDataPromises.remove(descriptor))
+      .after(formDataPromises.remove(descriptor))
 
   private def unescapeJsonString(s: String): String = {
     val sb = new StringBuilder()
@@ -247,28 +246,28 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
           case PropertyType.Error.code =>
             stringPromises
               .fail(descriptor, ClientSideException(value))
-              .flatMap(_ => stringPromises.remove(descriptor))
+              .after(stringPromises.remove(descriptor))
           case _ =>
             stringPromises
               .put(descriptor, value)
-              .flatMap(_ => stringPromises.remove(descriptor))
+              .after(stringPromises.remove(descriptor))
         }
       case (CallbackType.ExtractEventDataResponse.code, args) =>
         val Array(descriptor, value) = args.split(":", 2)
         stringPromises
           .put(descriptor, value)
-          .flatMap(_ => stringPromises.remove(descriptor))
+          .after(stringPromises.remove(descriptor))
       case (CallbackType.EvalJsResponse.code, args) =>
         val Array(descriptor, status, json) = args.split(":", 3)
         status.toInt match {
           case EvalJsStatus.Success.code =>
             stringPromises
               .put(descriptor, json)
-              .flatMap(_ => stringPromises.remove(descriptor))
+              .after(stringPromises.remove(descriptor))
           case EvalJsStatus.Failure.code =>
             stringPromises
               .fail(descriptor, ClientSideException("JavaScript evaluation error"))
-              .flatMap(_ => stringPromises.remove(descriptor))
+              .after(stringPromises.remove(descriptor))
         }
       case (callbackType, args) =>
         Effect[F].fail(UnknownCallbackException(callbackType, args))

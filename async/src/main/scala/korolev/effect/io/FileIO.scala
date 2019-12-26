@@ -32,10 +32,10 @@ object FileIO {
   def write[F[_]: Effect](path: Path, append: Boolean = false): Stream[F, Array[Byte]] => F[Unit] = { stream =>
     val outputStream = new FileOutputStream(path.toFile, append)
     def aux(): F[Unit] = {
-      Effect[F].flatMap(stream.pull()) {
+      stream.pull().flatMap {
         case Some(chunk) => Effect[F]
           .delay(outputStream.write(chunk))
-          .flatMap(_ => aux())
+          .after(aux())
           .recover {
             case error =>
               outputStream.close()

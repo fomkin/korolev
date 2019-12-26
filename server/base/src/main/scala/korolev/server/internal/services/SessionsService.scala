@@ -1,6 +1,6 @@
 package korolev.server.internal.services
 
-import korolev.Qsid
+import korolev.{Extension, Qsid}
 import korolev.effect.syntax._
 import korolev.effect.{Effect, Stream}
 import korolev.internal.{ApplicationInstance, Frontend, Scheduler}
@@ -15,7 +15,6 @@ import scala.util.Random
 private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: StateDeserializer, M](
     config: KorolevServiceConfig[F, S, M]) {
 
-  // TODO remove to config
   import config.executionContext
   import config.reporter.Implicit
 
@@ -72,16 +71,32 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
 
   private def appsFactory(qsid: Qsid, rh: RequestHeader, incoming: Stream[F, String]) = {
 
-    def handleAppClose(frontend: Frontend[F], app: ApplicationInstance[F, _, _]) =
+    type ExtensionsHandlers = List[Extension.Handlers[F, S, M]]
+
+    def handleAppClose(frontend: Frontend[F], app: App, ehs: ExtensionsHandlers) =
       for {
         _ <- incoming.consumed
         _ <- frontend.outgoingMessages.cancel()
         _ <- app.topLevelComponentInstance.destroy()
+        _ <- ehs.map(_.onDestroy()).sequence
         _ <- Effect[F].delay {
           stateStorage.remove(qsid.deviceId, qsid.sessionId)
           apps.remove(qsid)
         }
       } yield ()
+
+    def handleStateChange(app: App, ehs: ExtensionsHandlers): F[Unit] =
+      app.stateStream.foreach { case (id, state) =>
+        if (id != levsha.Id.TopLevel) Effect[F].unit else ehs
+          .map(_.onState(state.asInstanceOf[S]))
+          .sequence
+          .unit
+      }
+
+    def handleMessages(app: App, ehs: ExtensionsHandlers): F[Unit] =
+        app.messagesStream.foreach { m =>
+          ehs.map(_.onMessage(m)).sequence.unit
+        }
 
     for {
       exists <- stateStorage.exists(qsid.deviceId, qsid.sessionId)
@@ -103,10 +118,12 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
         scheduler,
         config.reporter
       )
-      // TODO add state subscription to run extensions
-      // TODO add event subscription to pass them to extensions
+      browserAccess = app.topLevelComponentInstance.browserAccess
+      ehs <- config.extensions.map(_.setup(browserAccess)).sequence
+      _ <- Effect[F].start(handleStateChange(app, ehs))
+      _ <- Effect[F].start(handleMessages(app, ehs))
+      _ <- Effect[F].start(handleAppClose(frontend, app, ehs))
       _ <- app.initialize(reload)
-      _ <- Effect[F].start(handleAppClose(frontend, app))
     } yield {
       apps.put(qsid, Right(app))
       app
@@ -114,7 +131,7 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
   }
 
   private val stateStorage =
-    if (config.stateStorage == null) new StateStorage.DefaultStateStorage[F, S]()
+    if (config.stateStorage == null) StateStorage[F, S]()
     else config.stateStorage
 
   private val scheduler = new Scheduler[F]()

@@ -78,7 +78,7 @@ final class KorolevStreamPublisher[F[_] : Effect, T](stream: Stream[F, T],
 
   def subscribe(subscriber: Subscriber[_ >: T]): Unit = {
     if (hub != null) {
-      hub().runAsyncSuccess { newStream =>
+      hub.newStream().runAsyncSuccess { newStream =>
         val subscription = new StreamSubscription(newStream, subscriber)
         subscriber.onSubscribe(subscription)
       }
