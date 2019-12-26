@@ -83,7 +83,8 @@ private[korolev] final class PostService[F[_]: Effect](reporter: Reporter,
       commonService.simpleOkResponse
   }
 
-  def file(qsid: Qsid, descriptor: String, headers: Seq[(String, String)], body: LazyBytes[F]): F[Response.Http[F]] =
+  def file(qsid: Qsid, descriptor: String, headers: Seq[(String, String)], body: LazyBytes[F]): F[Response.Http[F]] = {
+    val (consumed, chunks) = body.chunks.handleConsumed
     for {
       _ <- Effect[F].delay {
         headers.collectFirst { case ("x-name", v) => v } match {
@@ -91,7 +92,7 @@ private[korolev] final class PostService[F[_]: Effect](reporter: Reporter,
           case Some(fileName) =>
             val id = FileId(qsid, descriptor, fileName)
             files
-              .put(id, body.chunks)
+              .put(id, chunks)
               .after(files.remove(id))
               .recover {
                 case AlreadyContainsKeyException(_) =>
@@ -101,8 +102,9 @@ private[korolev] final class PostService[F[_]: Effect](reporter: Reporter,
       }
       // Do not response until chunks are not
       // consumed inside an application
-      _ <- body.chunks.consumed
+      _ <- consumed
     } yield commonService.simpleOkResponse
+  }
 
   private val files = AsyncTable.empty[F, FileId, Stream[F, Array[Byte]]]
 

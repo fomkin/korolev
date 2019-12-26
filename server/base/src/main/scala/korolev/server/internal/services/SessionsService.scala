@@ -19,6 +19,7 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
   import config.reporter.Implicit
 
   type App = ApplicationInstance[F, S, M]
+  type ExtensionsHandlers = List[Extension.Handlers[F, S, M]]
 
   def initSession(rh: RequestHeader): F[Qsid] =
     for {
@@ -69,13 +70,13 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
 
   private val apps = TrieMap.empty[Qsid, Either[InitInProgress, App]]
 
-  private def appsFactory(qsid: Qsid, rh: RequestHeader, incoming: Stream[F, String]) = {
+  private def appsFactory(qsid: Qsid, rh: RequestHeader, incomingStream: Stream[F, String]) = {
 
-    type ExtensionsHandlers = List[Extension.Handlers[F, S, M]]
+    val (incomingConsumed, incoming) = incomingStream.handleConsumed
 
     def handleAppClose(frontend: Frontend[F], app: App, ehs: ExtensionsHandlers) =
       for {
-        _ <- incoming.consumed
+        _ <- incomingConsumed
         _ <- frontend.outgoingMessages.cancel()
         _ <- app.topLevelComponentInstance.destroy()
         _ <- ehs.map(_.onDestroy()).sequence

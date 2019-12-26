@@ -11,10 +11,6 @@ abstract class Stream[F[_]: Effect, A] { lhs =>
   
   def cancel() : F[Unit]
 
-  def consumed: F[Unit]
-
-  def size: Option[Long]
-  
   /**
     * @see concat
     */
@@ -30,12 +26,7 @@ abstract class Stream[F[_]: Effect, A] { lhs =>
     * @return
     */
   def concat(rhs: Stream[F, A]): Stream[F, A] = new Stream[F, A] {
-    val consumed: F[Unit] = rhs.consumed
-    val size: Option[Long] =
-      for (ls <- lhs.size; rs <- rhs.size)
-        yield ls + rs
-    
-    def pull(): F[Option[A]] = 
+    def pull(): F[Option[A]] =
       Effect[F].flatMap(lhs.pull()) { maybeValue =>
         if (maybeValue.nonEmpty) Effect[F].pure(maybeValue)
         else rhs.pull()
@@ -48,8 +39,6 @@ abstract class Stream[F[_]: Effect, A] { lhs =>
   }
 
   def map[B](f: A => B): Stream[F, B] = new Stream[F, B] {
-    val consumed: F[Unit] = lhs.consumed
-    val size: Option[Long] = lhs.size
     def cancel(): F[Unit] = lhs.cancel()
     def pull(): F[Option[B]] = Effect[F]
       .map(lhs.pull()) { maybeValue => maybeValue.map(f) }
@@ -87,8 +76,6 @@ abstract class Stream[F[_]: Effect, A] { lhs =>
     }
     def pull(): F[Option[B]] = aux()
     def cancel(): F[Unit] = lhs.cancel()
-    val consumed: F[Unit] = lhs.consumed
-    val size: Option[Long] = None
   }
 
   /**
@@ -155,8 +142,6 @@ abstract class Stream[F[_]: Effect, A] { lhs =>
         }
       }
     def cancel(): F[Unit] = lhs.cancel()
-    val consumed: F[Unit] = lhs.consumed
-    val size: Option[Long] = lhs.size
   }
 
   def to[U](f: Stream[F, A] => F[U]): F[U] =
@@ -217,10 +202,32 @@ abstract class Stream[F[_]: Effect, A] { lhs =>
             }
           }
         def cancel(): F[Unit] = lhs.cancel()
-        def consumed: F[Unit] = lhs.consumed
-        def size: Option[Long] = None
       }
     }
+  }
+
+  def handleConsumed: (F[Unit], Stream[F, A]) = {
+    var consumed = false
+    var callback: Effect.Promise[Unit] = null
+    val handler = Effect[F].promise[Unit] { cb =>
+      if (consumed) cb(Right(()))
+      else callback = cb
+    }
+    val downstream = new Stream[F, A] {
+      def pull(): F[Option[A]] = lhs.pull().map {
+        case None =>
+          consumed = true
+          if (callback != null) {
+            val cb = callback
+            callback = null
+            cb(Right(()))
+          }
+          None
+        case maybeItem => maybeItem
+      }
+      def cancel(): F[Unit] = lhs.cancel()
+    }
+    (handler, downstream)
   }
 
   def foreach(f: A => F[Unit]): F[Unit] = {
@@ -240,8 +247,6 @@ object Stream {
     new Stream[F, T] {
       val pull: F[Option[T]] = Effect[F].pure(Option.empty[T])
       val cancel: F[Unit] = Effect[F].unit
-      val consumed: F[Unit] = Effect[F].unit
-      val size: Option[Long] = Some(0L)
     }
   }
 
@@ -249,93 +254,49 @@ object Stream {
     new Stream[F, T] {
       var n = 0
       var canceled = false
-      var consumedCallback: Either[Throwable, Unit] => Unit = _
       def pull(): F[Option[T]] = Effect[F].delay {
         if (canceled || n == xs.length) {
           None
         } else {
           val res = xs(n)
           n += 1
-          if (n == xs.length) {
-            if (consumedCallback != null)
-              consumedCallback(Right(()))
-          }
           Some(res)
         }
       }
       def cancel(): F[Unit] = Effect[F].delay {
         canceled = true
-        if (consumedCallback != null)
-          consumedCallback(Right(()))
-      }
-      val size: Option[Long] = Some(xs.length.toLong)
-      val consumed: F[Unit] = Effect[F].promise[Unit] { cb =>
-        if (canceled || n == xs.length) cb(Right(()))
-        else consumedCallback = cb
       }
     }
 
   /**
-    * Immediately gives same stream as `eventuallyStream`. Erases size.
+    * Immediately gives same stream as `eventuallyStream`.
     */
   def proxy[F[_]: Effect, T](eventuallyStream: F[Stream[F, T]]): Stream[F, T] = {
     new Stream[F, T] {
       def pull(): F[Option[T]] = Effect[F].flatMap(eventuallyStream)(_.pull())
       def cancel(): F[Unit] = Effect[F].flatMap(eventuallyStream)(_.cancel())
-      val consumed: F[Unit] = Effect[F].flatMap(eventuallyStream)(_.consumed)
-      val size: Option[Long] = None
     }
   }
 
   def unfoldResource[F[_]: Effect, R <: Closeable, S, T](create: => F[R],
-                                                         calcSize: R => F[Option[Long]],
                                                          default: S,
                                                          loop: (R, S) => F[(S, Option[T])]): F[Stream[F, T]] =
 
-    for {
-      resource <- create
-      maybeSize <- calcSize(resource)
-    } yield {
-
-      var state = default
-      var finishedWith: Either[Throwable, Unit] = null
-      var consumedPromise: Effect.Promise[Unit] = null
-
-      def finishWith(r: Either[Throwable, Unit]): Unit = {
-        resource.close()
-        finishedWith = r
-        if (consumedPromise != null)
-          consumedPromise(r)
-      }
-
+    create.map { resource =>
       new Stream[F, T] {
-        val size: Option[Long] = maybeSize
-        val consumed: F[Unit] = Effect[F].promise { cb =>
-          if (finishedWith != null) cb(finishedWith)
-          else consumedPromise = cb
-        }
-        def pull(): F[Option[T]] = Effect[F]
-          .delay {
-            if (finishedWith != null)
-              throw new IllegalStateException("This stream already finished")
-          }
-          .after(loop(resource, state))
+        @volatile private var state = default
+        def pull(): F[Option[T]] = loop(resource, state)
           .map {
             case (newState, None) =>
               state = newState
-              finishWith(Right(()))
+              resource.close()
               None
             case (newState, maybeElem) =>
               state = newState
               maybeElem
           }
-          .recover {
-            case error =>
-              finishWith(Left(error))
-              throw error
-          }
         def cancel(): F[Unit] = Effect[F].delay {
-          finishWith(Right(()))
+          resource.close()
         }
       }
     }
