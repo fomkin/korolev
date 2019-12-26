@@ -206,6 +206,13 @@ lazy val catsEffectExample = (project in examples / "cats-effect").
   settings(mainClass := Some("CatsIOExample")).
   dependsOn(cats, akka)
 
+lazy val zioExample = (project in examples / "zio")
+  .disablePlugins(HeaderPlugin)
+  .settings(crossVersionSettings)
+  .settings(exampleSettings: _*)
+  .settings(mainClass := Some("ZioExample"))
+  .dependsOn(zio, akka)
+
 lazy val eventDataExample = (project in examples / "event-data").
   disablePlugins(HeaderPlugin).
   settings(crossVersionSettings).
@@ -273,6 +280,6 @@ lazy val root = project.in(file(".")).
     simpleExample, routingExample, gameOfLifeExample,
     formDataExample, `file-streaming-example`, delayExample, focusExample,
     webComponentExample, componentExample, akkaHttpExample, contextScopeExample,
-    eventDataExample, extensionExample, `integration-tests`
+    eventDataExample, extensionExample, zioExample, `integration-tests`
   )
 

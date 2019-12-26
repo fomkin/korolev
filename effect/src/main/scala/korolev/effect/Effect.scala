@@ -20,7 +20,7 @@ import korolev.effect.Effect.Fiber
 
 import scala.annotation.implicitNotFound
 import scala.concurrent.duration.Duration
-import scala.concurrent.{Await, ExecutionContext, Future, TimeoutException}
+import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.util.Try
 
 /**
