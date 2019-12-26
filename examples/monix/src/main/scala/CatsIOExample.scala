@@ -9,7 +9,7 @@ import korolev.execution.defaultExecutor
 import korolev.server.{KorolevServiceConfig, StateLoader}
 import korolev.state.javaSerialization._
 
-object MonixExample extends App {
+object CatsIOExample extends App {
 
   private implicit val actorSystem: ActorSystem = ActorSystem()
   private implicit val materializer: Materializer = ActorMaterializer()

@@ -56,12 +56,12 @@ lazy val server = (project in file("server") / "base").
   settings(normalizedName := "korolev-server").
   dependsOn(korolev)
 
-lazy val `server-akkahttp` = (project in file("server") / "akkahttp").
+lazy val akka = (project in file("interop") / "akka").
   enablePlugins(GitVersioning).
   settings(crossVersionSettings).
   settings(commonSettings: _*).
   settings(
-    normalizedName := "korolev-server-akkahttp",
+    normalizedName := "korolev-akka",
     libraryDependencies ++= Seq(
       "com.typesafe.akka" %% "akka-actor" % "2.5.26",
       "com.typesafe.akka" %% "akka-stream" % "2.5.26",
@@ -70,11 +70,11 @@ lazy val `server-akkahttp` = (project in file("server") / "akkahttp").
   ).
   dependsOn(server)
 
-lazy val async = project.
+lazy val effect = project.
   enablePlugins(GitVersioning).
   settings(crossVersionSettings).
   settings(commonSettings: _*).
-  settings(normalizedName := "korolev-async")
+  settings(normalizedName := "korolev-effect")
 
 lazy val korolev = project.
   enablePlugins(GitVersioning).
@@ -95,31 +95,31 @@ lazy val korolev = project.
       }
       .taskValue
   ).
-  dependsOn(async)
+  dependsOn(effect)
 
 // Contribs
 
-lazy val `slf4j-support` = project.
+lazy val slf4j = project.
   enablePlugins(GitVersioning).
-  in(file("contrib/slf4j")).
+  in(file("interop/slf4j")).
   settings(crossVersionSettings).
   settings(commonSettings: _*).
   settings(
-    normalizedName := "korolev-slf4j-support",
+    normalizedName := "korolev-slf4j",
     libraryDependencies += "org.slf4j" % "slf4j-api" % "1.7.25"
   ).
-  dependsOn(async)
+  dependsOn(effect)
 
-lazy val `cats-effect-support` = project.
+lazy val cats = project.
   enablePlugins(GitVersioning).
-  in(file("contrib/cats-effect")).
+  in(file("interop/cats-effect")).
   settings(crossVersionSettings).
   settings(commonSettings: _*).
   settings(
-    normalizedName := "korolev-cats-effect-support",
+    normalizedName := "korolev-cats",
     libraryDependencies += "org.typelevel" %% "cats-effect" % "2.0.0"
   ).
-  dependsOn(async)
+  dependsOn(effect)
 
 // Examples
 val examples = file("examples")
@@ -129,101 +129,98 @@ lazy val simpleExample = (project in examples / "simple").
   settings(crossVersionSettings).
   settings(exampleSettings: _*).
   settings(mainClass := Some("SimpleExample")).
-  dependsOn(`server-akkahttp`)
+  dependsOn(akka)
 
 lazy val routingExample = (project in examples / "routing").
   disablePlugins(HeaderPlugin).
   settings(crossVersionSettings).
   settings(exampleSettings: _*).
   settings(mainClass := Some("RoutingExample")).
-  dependsOn(`server-akkahttp`)
+  dependsOn(akka)
 
 lazy val gameOfLifeExample = (project in examples / "game-of-life").
   disablePlugins(HeaderPlugin).
   settings(crossVersionSettings).
   settings(exampleSettings: _*).
   settings(mainClass := Some("GameOfLife")).
-  dependsOn(`server-akkahttp`)
+  dependsOn(akka)
 
 lazy val formDataExample = (project in examples / "form-data").
   disablePlugins(HeaderPlugin).
   settings(crossVersionSettings).
   settings(exampleSettings: _*).
   settings(mainClass := Some("FormDataExample")).
-  dependsOn(`server-akkahttp`)
+  dependsOn(akka)
 
 lazy val `file-streaming-example` = (project in examples / "file-streaming-example").
   disablePlugins(HeaderPlugin).
   settings(crossVersionSettings).
   settings(exampleSettings: _*).
   settings(mainClass := Some("FileStreamingExample")).
-  dependsOn(`server-akkahttp`)
+  dependsOn(akka)
 
 lazy val delayExample = (project in examples / "delay").
   disablePlugins(HeaderPlugin).
   settings(crossVersionSettings).
   settings(exampleSettings: _*).
   settings(mainClass := Some("DelayExample")).
-  dependsOn(`server-akkahttp`)
+  dependsOn(akka)
 
 lazy val focusExample = (project in examples / "focus").
   disablePlugins(HeaderPlugin).
   settings(crossVersionSettings).
   settings(exampleSettings: _*).
   settings(mainClass := Some("FocusExample")).
-  dependsOn(`server-akkahttp`)
+  dependsOn(akka)
 
 lazy val webComponentExample = (project in examples / "web-component").
   disablePlugins(HeaderPlugin).
   settings(crossVersionSettings).
   settings(exampleSettings: _*).
   settings(mainClass := Some("WebComponentExample")).
-  dependsOn(`server-akkahttp`)
+  dependsOn(akka)
 
 lazy val componentExample = (project in examples / "component").
   disablePlugins(HeaderPlugin).
   settings(crossVersionSettings).
   settings(exampleSettings: _*).
   settings(mainClass := Some("ComponentExample")).
-  dependsOn(`server-akkahttp`)
+  dependsOn(akka)
 
 lazy val akkaHttpExample = (project in examples / "akka-http").
   disablePlugins(HeaderPlugin).
   settings(crossVersionSettings).
   settings(exampleSettings: _*).
   settings(mainClass := Some("AkkaHttpExample")).
-  dependsOn(`server-akkahttp`)
+  dependsOn(akka)
 
-lazy val monixExample = (project in examples / "monix").
+lazy val catsEffectExample = (project in examples / "cats-effect").
   disablePlugins(HeaderPlugin).
   settings(crossVersionSettings).
   settings(exampleSettings: _*).
-  settings(mainClass := Some("MonixExample")).
-  settings(
-    libraryDependencies += "io.monix" %% "monix-eval" % "3.0.0"
-  ).
-  dependsOn(`cats-effect-support`, `server-akkahttp`)
+  settings(mainClass := Some("CatsIOExample")).
+  dependsOn(cats, akka)
 
 lazy val eventDataExample = (project in examples / "event-data").
   disablePlugins(HeaderPlugin).
   settings(crossVersionSettings).
   settings(exampleSettings: _*).
   settings(mainClass := Some("EventDataExample")).
-  dependsOn(`server-akkahttp`)
+  dependsOn(akka)
 
 lazy val contextScopeExample = (project in examples / "context-scope").
   disablePlugins(HeaderPlugin).
   settings(crossVersionSettings).
   settings(exampleSettings: _*).
   settings(mainClass := Some("ContextScopeExample")).
-  dependsOn(`server-akkahttp`)
+  dependsOn(akka)
 
 lazy val extensionExample = (project in examples / "extension")
   .disablePlugins(HeaderPlugin)
   .settings(crossVersionSettings)
   .settings(exampleSettings: _*)
   .settings(mainClass := Some("ExtensionExample"))
-  .dependsOn(`server-akkahttp`)
+  .dependsOn(akka)
 
 lazy val `integration-tests` = project.
   disablePlugins(HeaderPlugin).
@@ -240,8 +237,8 @@ lazy val `integration-tests` = project.
       "io.circe" %% "circe-parser" % "0.12.2"
     )
   ).
-  dependsOn(`slf4j-support`).
-  dependsOn(`server-akkahttp`)
+  dependsOn(slf4j).
+  dependsOn(akka)
 
 //lazy val `performance-benchmark` = project.
 //  disablePlugins(HeaderPlugin).
@@ -266,9 +263,9 @@ lazy val root = project.in(file(".")).
   disablePlugins(HeaderPlugin).
   settings(dontPublishSettings:_*).
   aggregate(
-    korolev, async,
-    server, `server-akkahttp`,
-    `cats-effect-support`, `slf4j-support`,
+    korolev, effect,
+    server, akka,
+    cats, slf4j,
     simpleExample, routingExample, gameOfLifeExample,
     formDataExample, `file-streaming-example`, delayExample, focusExample,
     webComponentExample, componentExample, akkaHttpExample, contextScopeExample,
