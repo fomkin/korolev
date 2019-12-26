@@ -24,7 +24,6 @@ import korolev.internal.DevMode
 import levsha.Id
 
 import scala.collection.concurrent.TrieMap
-import scala.util.Failure
 
 abstract class StateStorage[F[_]: Effect, S] {
 
@@ -51,10 +50,10 @@ abstract class StateStorage[F[_]: Effect, S] {
 
 object StateStorage {
 
-  final class DefaultStateStorage[F[_]: Effect, S: StateSerializer] extends StateStorage[F, S] {
+  private [korolev] final class DefaultStateStorage[F[_]: Effect, S: StateSerializer](forDeletionCacheCapacity: Int)
+    extends StateStorage[F, S] {
 
     private val cache = TrieMap.empty[String, StateManager[F]]
-    private val forDeletionCacheCapacity = 5000 // TODO export to config
     private val mutex = new Object()
     private val forDeletionCache = {
       new util.LinkedHashMap[String, StateManager[F]](forDeletionCacheCapacity, 0.7F, true) {
@@ -225,5 +224,9 @@ object StateStorage {
         cache.put(nodeId, value)
         ()
       }
+  }
+
+  def apply[F[_]: Effect, S: StateSerializer](forDeletionCacheCapacity: Int = 5000): StateStorage[F, S] = {
+    new DefaultStateStorage[F, S](forDeletionCacheCapacity)
   }
 }

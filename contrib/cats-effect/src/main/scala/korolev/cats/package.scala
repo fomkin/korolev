@@ -20,9 +20,9 @@ import _root_.cats.Traverse
 import _root_.cats.effect._
 import _root_.cats.instances.list._
 import _root_.cats.syntax.all._
-
 import korolev.effect.{Effect => KEffect}
 
+import scala.collection.concurrent.TrieMap
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.concurrent.duration.Duration
 import scala.util.Try
@@ -30,6 +30,8 @@ import scala.util.Try
 package object cats {
 
   implicit object IOEffect extends KEffect[IO] {
+
+    private val cs = TrieMap.empty[ExecutionContext, ContextShift[IO]]
 
     def pure[A](value: A): IO[A] =
       IO.pure(value)
@@ -39,8 +41,8 @@ package object cats {
 
     def fail[A](e: Throwable): IO[A] = IO.raiseError(e)
 
-    def fork[A](m: IO[A])(implicit ec: ExecutionContext): IO[A] =
-      IO.contextShift(ec).shift *> m
+    def fork[A](m: => IO[A])(implicit ec: ExecutionContext): IO[A] =
+      cs.getOrElseUpdate(ec, IO.contextShift(ec)).shift *> m
 
     def unit: IO[Unit] =
       IO.unit
@@ -48,25 +50,9 @@ package object cats {
     def fromTry[A](value: => Try[A]): IO[A] =
       IO.fromTry(value)
 
-
     def start[A](m: => IO[A])(implicit ec: ExecutionContext): IO[KEffect.Fiber[IO, A]] = m
-      .start(IO.contextShift(ec))
+      .start(cs.getOrElseUpdate(ec, IO.contextShift(ec)))
       .map(fiber => () => fiber.join)
-
-    def strictPromise[A]: KEffect.StrictPromise[IO, A] = {
-      new KEffect.StrictPromise[IO, A] {
-
-        private val promise = Promise[A]()
-
-        private val cs = IO.contextShift(ExecutionContext.global)
-
-        val effect: IO[A] = IO.fromFuture(IO.pure(promise.future))(cs)
-
-        def complete(`try`: Try[A]): Unit = promise.complete(`try`)
-
-        def completeAsync(async: IO[A]): Unit = promise.completeWith(async.unsafeToFuture())
-      }
-    }
 
     def promise[A](cb: (Either[Throwable, A] => Unit) => Unit): IO[A] =
       IO.async(cb)

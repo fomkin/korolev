@@ -1,27 +1,20 @@
-import akka.actor.ActorSystem
-import akka.http.scaladsl.Http
+import akka.stream.OverflowStrategy
 import akka.stream.scaladsl.{Sink, Source}
-import akka.stream.{ActorMaterializer, Materializer, OverflowStrategy}
 import korolev._
 import korolev.akka._
-import scala.concurrent.ExecutionContext.Implicits.global
 import korolev.server._
 import korolev.state.javaSerialization._
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-object ExtensionExample extends App {
+object ExtensionExample extends SimpleAkkaHttpKorolevApp {
 
-  private implicit val actorSystem: ActorSystem = ActorSystem()
-  private implicit val materializer: Materializer = ActorMaterializer()
+  private val ctx = Context[Future, List[String], String]
 
-  val applicationContext = Context[Future, List[String], String]
+  import ctx._
 
-  import applicationContext._
-  import levsha.dsl._
-  import html._
-
-  val (queue, queueSource) = Source
+  private val (queue, queueSource) = Source
     .queue[String](10, OverflowStrategy.fail)
     .preMaterialize()
 
@@ -29,7 +22,7 @@ object ExtensionExample extends App {
     val queueSink = queueSource.runWith(Sink.queue[String])
     def aux(): Future[Unit] = queueSink.pull() flatMap {
       case Some(message) => access
-        .transition(message :: _)
+        .transition(_ :+ message)
         .flatMap(_ => aux())
       case None =>
         Future.unit
@@ -41,32 +34,61 @@ object ExtensionExample extends App {
     )
   }
 
-  private val el = elementId()
+  private def onSubmit(access: Access) = {
+    for {
+      sessionId <- access.sessionId
+      name <- access.valueOf(nameElement)
+      text <- access.valueOf(textElement)
+      userName =
+        if (name.isBlank) s"Anonymous #${sessionId.hashCode().toHexString}"
+        else name
+      _ <-
+        if (text.isBlank) Future.unit
+        else access.publish(s"$userName: $text")
+      _ <- access.property(textElement).set("value", "")
+    } yield ()
+  }
+
+  private val nameElement = elementId()
+  private val textElement = elementId()
 
   private val config = KorolevServiceConfig[Future, List[String], String](
     stateLoader = StateLoader.default(Nil),
     extensions = List(topicListener),
-    render = { xs =>
+    render = { message =>
+
+      import levsha.dsl._
+      import html._
+
       optimize {
         body(
           div(
-            xs map { x =>
+            backgroundColor @= "yellow",
+            padding @= "10px",
+            border @= "1px solid black",
+            "This is a chat. Open this app in few browser tabs or on few different computers"
+          ),
+          div(
+            marginTop @= "10px",
+            padding @= "10px",
+            height @= "250px",
+            backgroundColor @= "#eeeeee",
+            message map { x =>
               div(x)
             }
           ),
-          input(`type` := "text", el),
-          button("Click me!",
-            event("click") { access =>
-              for (s <- access.valueOf(el); _ <- access.publish(s))
-                yield ()
-            }
+          form(
+            marginTop @= "10px",
+            input(`type` := "text", placeholder := "Name", nameElement),
+            input(`type` := "text", placeholder := "Message", textElement),
+            button("Sent"),
+            event("submit")(onSubmit)
           )
         )
       }
     }
   )
 
-  private val route = akkaHttpService(config).apply(AkkaHttpServerConfig())
-
-  Http().bindAndHandle(route, "0.0.0.0", 8080)
+  val service: AkkaHttpService =
+    akkaHttpService(config)
 }

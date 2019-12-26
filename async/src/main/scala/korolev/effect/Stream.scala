@@ -319,7 +319,7 @@ object Stream {
             if (finishedWith != null)
               throw new IllegalStateException("This stream already finished")
           }
-          .flatMap(_ => loop(resource, state))
+          .after(loop(resource, state))
           .map {
             case (newState, None) =>
               state = newState

@@ -92,7 +92,7 @@ private[korolev] final class PostService[F[_]: Effect](reporter: Reporter,
             val id = FileId(qsid, descriptor, fileName)
             files
               .put(id, body.chunks)
-              .flatMap(_ => files.remove(id))
+              .after(files.remove(id))
               .recover {
                 case AlreadyContainsKeyException(_) =>
                   throw BadRequestException("This upload already started")

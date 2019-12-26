@@ -22,7 +22,7 @@ import korolev.Context._
 import korolev.Router.Path
 import korolev.effect.syntax._
 import korolev._
-import korolev.effect.{Effect, Reporter}
+import korolev.effect.{Effect, Stream, Hub, Queue, Reporter}
 import korolev.internal.Frontend.DomEventMessage
 import korolev.state.{StateDeserializer, StateManager, StateSerializer}
 import levsha.events.calculateEventPropagation
@@ -50,6 +50,9 @@ final class ApplicationInstance
 
   private val devMode = new DevMode.ForRenderContext(sessionId.toString)
   private val currentRenderNum = new AtomicInteger(0)
+  private val stateQueue = Queue[F, (Id, Any)]()
+  private val messagesQueue = Queue[F, M]()
+
   private val renderContext = {
     DiffRenderContext[Binding[F, S, M]](savedBuffer = devMode.loadRenderContext())
   }
@@ -72,12 +75,14 @@ final class ApplicationInstance
         }
       }
     }
-    new ComponentInstance[F, S, M, S, Any, M](
+    val componentInstance = new ComponentInstance[F, S, M, S, Any, M](
       Id.TopLevel, sessionId, frontend, eventRegistry,
       stateManager, () => currentRenderNum.get(), component,
-      notifyStateChange = (_, _) => onState(),
+      notifyStateChange = (id, state) => onState() >> stateQueue.offer(id, state),
       scheduler, reporter
     )
+    componentInstance.setEventsSubscription(messagesQueue.offerUnsafe)
+    componentInstance
   }
 
   /**
@@ -128,8 +133,9 @@ final class ApplicationInstance
       }
       .flatMap {
         case Some(newState) =>
-          stateManager.write(Id.TopLevel, newState)
-            .flatMap(_ => onState())
+          stateManager
+            .write(Id.TopLevel, newState)
+            .after(onState())
         case None =>
           Effect[F].unit
       }
@@ -153,6 +159,18 @@ final class ApplicationInstance
     .domEventMessages
     .foreach(onEvent)
     .runAsyncForget
+
+  val stateStream: Stream[F, (Id, Any)] =
+    stateQueue.stream
+
+  val messagesStream: Stream[F, M] =
+    messagesQueue.stream
+
+  def destroy(): F[Unit] = for {
+    _ <- stateQueue.close()
+    _ <- messagesQueue.close()
+    _ <- topLevelComponentInstance.destroy()
+  } yield ()
 
   def initialize(reload: Boolean): F[Unit] = {
 

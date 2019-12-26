@@ -2,7 +2,7 @@ package korolev.effect
 
 import scala.collection.mutable
 
-final class Queue[F[_]: Effect, T](maxSize: Int) {
+class Queue[F[_]: Effect, T](maxSize: Int) {
 
   def offer(item: T): F[Unit] =
     Effect[F].delay(offerUnsafe(item))
@@ -23,17 +23,18 @@ final class Queue[F[_]: Effect, T](maxSize: Int) {
     }
 
   def close(): F[Unit] =
-    Effect[F].delay {
-      this.synchronized { // FIXME sync on underlyingQueue?
-        if (pending != null) {
-          val cb = pending
-          pending = null
-          cb(Right(None))
-        }
-        if (finished != null)
-          finished(Right(()))
-        closed = true
+    Effect[F].delay(closeUnsafe())
+
+  def closeUnsafe(): Unit =
+    this.synchronized { // FIXME sync on underlyingQueue?
+      if (pending != null) {
+        val cb = pending
+        pending = null
+        cb(Right(None))
       }
+      if (finished != null)
+        finished(Right(()))
+      closed = true
     }
 
   def fail(e: Throwable): F[Unit] =
