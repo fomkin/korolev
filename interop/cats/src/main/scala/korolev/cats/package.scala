@@ -66,7 +66,7 @@ package object cats {
       m.map(f)
 
     def recover[A](m: IO[A])(f: PartialFunction[Throwable, A]): IO[A] =
-      m.handleErrorWith(e => f.andThen(IO.pure[A]).applyOrElse(e, IO.raiseError[A]))
+      m.handleErrorWith(e => f.andThen(IO.pure[A] _).applyOrElse(e, IO.raiseError[A] _))
 
     def sequence[A](in: List[IO[A]]): IO[List[A]] =
       Traverse[List].sequence(in)

@@ -58,7 +58,7 @@ package object akka {
       (korolevServer: KorolevService[F],
        akkaHttpConfig: AkkaHttpServerConfig,
        korolevServiceConfig: KorolevServiceConfig[F, S, M])
-      (implicit actorSystem: ActorSystem, materializer: Materializer, ec: ExecutionContext): Route =
+      (implicit materializer: Materializer): Route =
     extractRequest { request =>
       extractUnmatchedPath { path =>
         extractUpgradeToWebSocket { upgrade =>

@@ -93,7 +93,7 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
       ()
     }
 
-    val sb = StringBuilder.newBuilder
+    val sb = new StringBuilder()
     sb.append('[')
     args.foreach {
       case s: String =>

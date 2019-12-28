@@ -342,15 +342,13 @@ private object ComponentInstance {
                                                 scheduler: Scheduler[F],
                                                 reporter: Reporter) {
 
-    import reporter.Implicit
-
     @volatile private var handler = Option.empty[Scheduler.JobHandler[F, _]]
     @volatile private var finished = false
 
     def isFinished: Boolean = finished
 
     def cancel(): Unit = {
-      handler.foreach(_.cancel())
+      handler.foreach(_.cancelUnsafe())
     }
 
     def start(access: Access[F, S, M]): Unit = {
