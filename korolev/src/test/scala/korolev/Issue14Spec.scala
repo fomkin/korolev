@@ -1,6 +1,7 @@
 package korolev
 
-import korolev.internal.{ApplicationInstance, Connection}
+import korolev.effect.{Queue, Reporter}
+import korolev.internal.{ApplicationInstance, Frontend, Scheduler}
 import korolev.state.StateStorage
 import korolev.state.javaSerialization._
 import korolev.testExecution._
@@ -11,17 +12,17 @@ import scala.concurrent.Future
 class Issue14Spec extends FlatSpec with Matchers {
 
   import Issue14Spec.context._
+  import Reporter.PrintReporter.Implicit
 
   "Korolev" should "ignore events from outdated DOM" in {
 
     var counter = 0
 
-    val connection = new Connection[Future]()
-
-    new ApplicationInstance(
+    val incomingMessages = Queue[Future, String]()
+    val frontend = new Frontend[Future](incomingMessages.stream)
+    val app = new ApplicationInstance(
       sessionId = Qsid("", ""),
-      connection = connection,
-      fromScratch = true,
+      frontend = frontend,
       router = Router.empty[Future, String],
       render = {
         Issue14Spec.render(
@@ -41,12 +42,14 @@ class Issue14Spec extends FlatSpec with Matchers {
       },
       stateManager = new StateStorage.SimpleInMemoryStateManager[Future](),
       initialState = "firstState",
-      reporter = Reporter.PrintReporter
+      reporter = Reporter.PrintReporter,
+      scheduler = new Scheduler[Future]()
     )
 
     def fireEvent(data: String) =
-      connection.receive(s"""[0,"$data"]""")
+      incomingMessages.offerUnsafe(s"""[0,"$data"]""")
 
+    app.initialize(true)
     fireEvent("1:1_2_1:mousedown")
     fireEvent("1:1_2_1:mouseup")
     fireEvent("1:1_2_1:click")
