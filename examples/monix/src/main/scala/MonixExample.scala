@@ -2,15 +2,12 @@ import korolev.Context
 import korolev.akka._
 import korolev.server.{KorolevServiceConfig, StateLoader}
 import korolev.state.javaSerialization._
-import korolev.zio.taskEffectInstance
-import zio.{DefaultRuntime, Task, ZIO}
+import korolev.monix._
 
-import scala.concurrent.ExecutionContext.Implicits.global
+import monix.eval.Task
+import monix.execution.Scheduler.Implicits.global
 
-object ZioExample extends SimpleAkkaHttpKorolevApp {
-
-  implicit val runtime = new DefaultRuntime {}
-  implicit val effect = taskEffectInstance(runtime)
+object MonixExample extends SimpleAkkaHttpKorolevApp {
 
   val ctx = Context[Task, Option[String], Any]
 
@@ -45,7 +42,7 @@ object ZioExample extends SimpleAkkaHttpKorolevApp {
       a <- access.valueOf(aInput)
       b <- access.valueOf(bInput)
       _ <-
-        if (a.isBlank || b.isBlank) ZIO.unit
+        if (a.isBlank || b.isBlank) Task.unit
         else access.transition(_ => Some((a.toInt + b.toInt).toString))
     } yield ()
 }

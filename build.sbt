@@ -115,16 +115,30 @@ lazy val cats = project.
   ).
   dependsOn(effect)
 
-lazy val zio = project.
-  enablePlugins(GitVersioning).
-  in(file("interop/zio")).
-  settings(crossVersionSettings).
-  settings(commonSettings: _*).
-  settings(
+lazy val monix = project
+  .enablePlugins(GitVersioning)
+  .in(file("interop/monix"))
+  .settings(crossVersionSettings)
+  .settings(commonSettings: _*)
+  .settings(
+    normalizedName := "korolev-monix",
+    libraryDependencies ++= List(
+      "io.monix" %% "monix-eval" % "3.1.0",
+      "io.monix" %% "monix-execution" % "3.1.0"
+    )
+  )
+  .dependsOn(effect)
+
+lazy val zio = project
+  .enablePlugins(GitVersioning)
+  .in(file("interop/zio"))
+  .settings(crossVersionSettings)
+  .settings(commonSettings: _*)
+  .settings(
     normalizedName := "korolev-zio",
     libraryDependencies += "dev.zio" %% "zio" % "1.0.0-RC17"
-  ).
-  dependsOn(effect)
+  )
+  .dependsOn(effect)
 
 // Examples
 val examples = file("examples")
@@ -199,12 +213,12 @@ lazy val akkaHttpExample = (project in examples / "akka-http").
   settings(mainClass := Some("AkkaHttpExample")).
   dependsOn(akka)
 
-lazy val catsEffectExample = (project in examples / "cats-effect").
-  disablePlugins(HeaderPlugin).
-  settings(crossVersionSettings).
-  settings(exampleSettings: _*).
-  settings(mainClass := Some("CatsIOExample")).
-  dependsOn(cats, akka)
+lazy val catsEffectExample = (project in examples / "cats")
+  .disablePlugins(HeaderPlugin)
+  .settings(crossVersionSettings)
+  .settings(exampleSettings: _*)
+  .settings(mainClass := Some("CatsIOExample"))
+  .dependsOn(cats, akka)
 
 lazy val zioExample = (project in examples / "zio")
   .disablePlugins(HeaderPlugin)
@@ -212,6 +226,13 @@ lazy val zioExample = (project in examples / "zio")
   .settings(exampleSettings: _*)
   .settings(mainClass := Some("ZioExample"))
   .dependsOn(zio, akka)
+
+lazy val monixExample = (project in examples / "monix")
+  .disablePlugins(HeaderPlugin)
+  .settings(crossVersionSettings)
+  .settings(exampleSettings: _*)
+  .settings(mainClass := Some("MonixExample"))
+  .dependsOn(monix, akka)
 
 lazy val eventDataExample = (project in examples / "event-data").
   disablePlugins(HeaderPlugin).
@@ -276,10 +297,11 @@ lazy val root = project.in(file(".")).
   settings(dontPublishSettings:_*).
   aggregate(
     korolev, effect,
-    akka, cats, zio, slf4j,
+    akka, cats, monix, zio, slf4j,
     simpleExample, routingExample, gameOfLifeExample,
     formDataExample, `file-streaming-example`, delayExample, focusExample,
     webComponentExample, componentExample, akkaHttpExample, contextScopeExample,
-    eventDataExample, extensionExample, zioExample, `integration-tests`
+    eventDataExample, extensionExample, `integration-tests`,
+    zioExample, monixExample, catsEffectExample
   )
 

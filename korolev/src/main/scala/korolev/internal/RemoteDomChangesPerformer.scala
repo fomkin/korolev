@@ -21,6 +21,7 @@ private[korolev] class RemoteDomChangesPerformer extends ChangesPerformer {
     buffer += ModifyDomProcedure.CreateText.code
     buffer += id.parent.get.mkString
     buffer += id.mkString
+    buffer += text
   }
 
   def create(id: Id, xmlNs: String, tag: String): Unit = {

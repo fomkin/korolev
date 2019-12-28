@@ -607,30 +607,41 @@ Everything placed in directory named `static` (in the classpath of the applicati
 Korolev is not some sort of CDN node. Avoid serving lots of large files using this feature.
 ============
 
-== Integrations
+== Interoperability
 
 === Slf4j
 
 By default Korolev log all messages to standard output. You can redirect logs to SLF4J backend.
 
+Add the dependency.
+
 [source,scala]
 ------------------------------
-libraryDependencies += "com.github.fomkin" %% "korolev-slf4j-support" % "0.14.0"
+libraryDependencies += "com.github.fomkin" %% "korolev-slf4j" % "0.14.0"
 ------------------------------
 
-=== Akka HTTP
+Configure reporter.
+
+[source,scala]
+------------------------------
+val config = KorolevServiceConfig(
+  ...
+  reporter = korolev.slf4j.Slf4jReporter
+)
+------------------------------
+
+=== Akka
 
 Korolev provides smooth Akka HTTP integration out of the box. To use it, add a dependency:
 
 [source,scala]
 ------------------------------
-libraryDependencies += "com.github.fomkin" %% "korolev-server-akkahttp" % "0.14.0"
+libraryDependencies += "com.github.fomkin" %% "korolev-akka" % "0.14.0"
 ------------------------------
 
 [source,scala]
 ------------------------------
 val service = KorolevServiceConfig[...](
-  reporter = korolev.slf4j.Slf4jReporter,
   ...
 ))
 ------------------------------
@@ -653,29 +664,79 @@ https://github.com/fomkin/korolev/blob/v0.14.0/examples/akka-http/src/main/scala
 
 This integration overrides default logging behavior to `akka.event.Logging`.
 
-=== Cats-effect
+Despite the fact that Akka uses standard Scala futures, the module can
+work we any effect type supported by Korolev
 
-Cats-effect integration module provides `Async` instance from `cats.effect.Effect` instance. To use it, add a dependency:
+=== Effects
+
+In addition to standard Scala Futures, Korolev can work with popular effects libraries: ZIO, Cats Effect, and Monix. To use them, add the dependency and set `F` type parameter of` Context` and `KorolevServiceConfig` to demanded effect type.
+
+==== ZIO
+
+Add dependency for ZIO interop.
 
 [source,scala]
 ------------------------------
-libraryDependencies += "com.github.fomkin" %% "korolev-cats-effect-support" % "0.14.0"
+libraryDependencies += "com.github.fomkin" %% "korolev-zio" % "0.14.0"
 ------------------------------
+
+Initialize your app with ZIO.
 
 [source,scala]
 ------------------------------
-import korolev.catsEffectSupport.implicits._
+import korolev.zio._
 
-class Config[F[_]: Effect] {
-  ...
-  val config = KorolevServiceConfig[F, String, Any](
-    stateLoader = StateLoader.default("Cats"),
-    render = state => body(div("Hello $state"))
-  )
-}
+implicit val runtime = new DefaultRuntime {}
+implicit val zioTaskEffectInstance = taskEffectInstance(runtime)
+val ctx = Context[zio.Task, MyState, Any]
+val config = KorolevServiceConfig[zio.Task, MyState, Any](...)
+------------------------------
+
+Korolev uses `Throwable` inside itself. That means if you want to work with your own, you should provide functions to convert `Throwable` to [[E]] and vice versa.
+
+https://github.com/fomkin/korolev/blob/v0.14.0/examples/zio/src/main/scala/ZioExample.scala[See full example]
+
+==== Monix
+
+Add Monix interop dependency.
+
+[source,scala]
+------------------------------
+libraryDependencies += "com.github.fomkin" %% "korolev-monix" % "0.14.0"
+------------------------------
+
+Initialise your app with Monix. Ensure you have implicit `monix.execution.Scheduler` in the scope.
+
+[source,scala]
+------------------------------
+import korolev.monix._
+
+val ctx = Context[monix.eval.Task, MyState, Any]
+val config = KorolevServiceConfig[monix.eval.Task, MyState, Any](...)
 ------------------------------
 
 https://github.com/fomkin/korolev/blob/v0.14.0/examples/monix/src/main/scala/MonixExample.scala[See full example]
+
+==== Cats IO
+
+Add Cats interop dependency.
+
+[source,scala]
+------------------------------
+libraryDependencies += "com.github.fomkin" %% "korolev-cats" % "0.14.0"
+------------------------------
+
+Initialise your app with IO.
+
+[source,scala]
+------------------------------
+import korolev.monix._
+
+val ctx = Context[IO, MyState, Any]
+val config = KorolevServiceConfig[IO, MyState, Any](...)
+------------------------------
+
+https://github.com/fomkin/korolev/blob/v0.14.0/examples/cats/src/main/scala/CatsIOExample.scala[See full example]
 
 == Troubleshooting
 
