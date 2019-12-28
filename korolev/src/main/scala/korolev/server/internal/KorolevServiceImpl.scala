@@ -51,6 +51,13 @@ private[korolev] final class KorolevServiceImpl[F[_]: Effect](reporter: Reporter
     request match {
       case r @ Request(Root / "bridge" / "web-socket" / deviceId / sessionId, _, _, _, body) =>
         messagingService.webSocketMessaging(Qsid(deviceId, sessionId), r, body)
+      case _ =>
+        webSocketBadRequestF
     }
+  }
+
+  private val webSocketBadRequestF = {
+    val error = BadRequestException("Wrong path. Should be '/bridge/web-socket/<device>/<session>'.")
+    Effect[F].fail[Response.WebSocket[F]](error)
   }
 }

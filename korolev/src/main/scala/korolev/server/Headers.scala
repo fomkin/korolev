@@ -1,7 +1,5 @@
 package korolev.server
 
-import korolev.server.internal.Cookies
-
 object Headers {
 
   final val ContentType = "content-type"

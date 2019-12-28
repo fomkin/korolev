@@ -12,6 +12,7 @@ class Queue[F[_]: Effect, T](maxSize: Int) {
       if (underlyingQueue.size == maxSize) {
         // Remove head from queue if max size reached
         underlyingQueue.dequeue()
+        ()
       }
       if (pending != null) {
         val cb = pending
@@ -19,6 +20,7 @@ class Queue[F[_]: Effect, T](maxSize: Int) {
         cb(Right(Some(item)))
       } else {
         underlyingQueue.enqueue(item)
+        ()
       }
     }
 

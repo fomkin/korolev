@@ -18,7 +18,6 @@ package korolev
 
 import korolev.Context._
 import korolev.effect.Effect
-import korolev.internal.Scheduler
 import korolev.state.{StateDeserializer, StateSerializer}
 import levsha.Document.Node
 

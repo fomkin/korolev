@@ -20,7 +20,7 @@ import java.util.{Timer, TimerTask}
 
 import korolev.effect.Effect.Promise
 import korolev.effect.syntax._
-import korolev.effect.{Effect, Reporter}
+import korolev.effect.Effect
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
@@ -31,7 +31,7 @@ private[korolev] final class Scheduler[F[_]: Effect](implicit ec: ExecutionConte
 
   private val timer = new Timer()
 
-  def scheduleOnce[T](delay: FiniteDuration)(job: => F[T])(implicit r: Reporter): JobHandler[F, T] =
+  def scheduleOnce[T](delay: FiniteDuration)(job: => F[T]): JobHandler[F, T] =
     new JobHandler[F, T] {
 
       @volatile private var completed: Either[Throwable, T] = _
@@ -52,8 +52,10 @@ private[korolev] final class Scheduler[F[_]: Effect](implicit ec: ExecutionConte
         if (completed != null) cb(completed)
         else promise = cb
       }
-      def cancel(): Unit =
+      def cancelUnsafe(): Unit = {
         task.cancel()
+        ()
+      }
 
       timer.schedule(task, delay.toMillis)
     }
@@ -62,7 +64,7 @@ private[korolev] final class Scheduler[F[_]: Effect](implicit ec: ExecutionConte
 object Scheduler {
 
   trait JobHandler[F[_], T] {
-    def cancel(): Unit
+    def cancelUnsafe(): Unit
     def result: F[T]
   }
 }

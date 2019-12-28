@@ -42,7 +42,7 @@ class ZioEffect[R, E](rts: Runtime[R],
     m.map(f)
 
   def recover[A](m: ZIO[R, E, A])(f: PartialFunction[Throwable, A]): ZIO[R, E, A] = {
-    m.catchSome(unliftErrorP.andThen(f).andThen(ZIO.succeed))
+    m.catchSome(unliftErrorP.andThen(f).andThen(ZIO.succeed _))
   }
 
   def start[A](task: => ZIO[R, E, A])(implicit ec: ExecutionContext): ZIO[R, E, Effect.Fiber[ZIO[R, E, *], A]] =
