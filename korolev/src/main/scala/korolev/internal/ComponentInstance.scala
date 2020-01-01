@@ -285,7 +285,10 @@ final class ComponentInstance
       case (id, nested) =>
         if (!markedComponentInstances.contains(id)) {
           nestedComponents.remove(id)
-          stateManager.delete(id).runAsyncForget
+          nested
+            .destroy()
+            .after(stateManager.delete(id))
+            .runAsyncForget
         }
         else nested.dropObsoleteMisc()
     }
