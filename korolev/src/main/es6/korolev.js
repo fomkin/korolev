@@ -336,7 +336,7 @@ export class Korolev {
     * @param {string} id
     * @param {string} descriptor
     */
-  uploadFileList(id, descriptor) {
+  listFiles(id, descriptor) {
     let self = this;
     let input = self.els[id];
     let deviceId = getDeviceId();

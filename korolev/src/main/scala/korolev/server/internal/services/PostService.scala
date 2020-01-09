@@ -19,7 +19,7 @@ package korolev.server.internal.services
 import java.nio.ByteBuffer
 
 import korolev.effect.io.LazyBytes
-import korolev.{Context, Qsid}
+import korolev.Qsid
 import korolev.effect.{Effect, Reporter}
 import korolev.server.Response
 import korolev.effect.syntax._
@@ -83,11 +83,7 @@ private[korolev] final class PostService[F[_]: Effect](reporter: Reporter,
       sizes =
         if (message.isEmpty) List.empty[(String, Long)]
         else parseFilesInfo(message)
-      files = sizes.map {
-        case (fileName, size) =>
-          Context.File(fileName, size)
-      }
-      _ <- app.frontend.resolveFileNames(descriptor, files)
+      _ <- app.frontend.resolveFileNames(descriptor, sizes)
     } yield commonService.simpleOkResponse
   }
 
@@ -99,8 +95,7 @@ private[korolev] final class PostService[F[_]: Effect](reporter: Reporter,
         headers.collectFirst { case ("x-name", v) => v } match {
           case None => Effect[F].pure(Response.Http(Response.Status.BadRequest, "Header 'x-name' should be defined", Nil))
           case Some(fileName) =>
-            val file: Context.File[LazyBytes[F]] = Context.File(fileName, LazyBytes(chunks, None))
-            app.frontend.resolveFile(descriptor, file)
+            app.frontend.resolveFile(descriptor, LazyBytes(chunks, body.bytesLength))
         }
       }
       // Do not response until chunks are not

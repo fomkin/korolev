@@ -32,18 +32,18 @@ object FileStreamingExample extends SimpleAkkaHttpKorolevApp {
 
     for {
       files <- access.downloadFilesAsStream(fileInput)
-      _ <- access.transition(_.copy(progress = files.map(x => (x.name, (0L, x.data.bytesLength.getOrElse(0L)))).toMap, inProgress = true))
+      _ <- access.transition(_.copy(progress = files.map(x => (x._1.fileName, (0L, x._1.size))).toMap, inProgress = true))
       _ <- Future.sequence {
-        files.map { file =>
-          val size = file.data.bytesLength.getOrElse(0L)
+        files.map { case (handler, data) =>
+          val size = data.bytesLength.getOrElse(0L)
           // File will be saved in 'downloads' directory
           // in the root of the example project
-          val path = Paths.get("downloads", file.name)
-          file.data.chunks
+          val path = Paths.get("downloads", handler.fileName)
+          data.chunks
             .over(0L) {
               case (acc, chunk) =>
                 val loaded = chunk.fold(acc)(_.length.toLong + acc)
-                showProgress(file.name, loaded, size)
+                showProgress(handler.fileName, loaded, size)
                   .map(_ => loaded)
             }
             .to(FileIO.write(path))

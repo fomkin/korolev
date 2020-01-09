@@ -23,8 +23,9 @@ From server to the client
  * 9 - Keep-alive message from server (noop)
  * 10 - EvalJs(descriptor, code)
  * 11 - ExtractEventData(descriptor, renderNum)
- * 12 - UploadFile(descriptor, renderNum)
- * 13 - ResetForm(id)
+ * 12 - ListFiles(id, descriptor)
+ * 13 - UploadFile(id, descriptor, fileName)
+ * 14 - ResetForm(id)
 
 ### Modify dom commands
 
