@@ -91,6 +91,12 @@ object Context {
         def downloadFilesAsStream(id: Context.ElementId[F]): F[List[File[LazyBytes[F]]]] =
           access.downloadFilesAsStream(id)
 
+        def downloadFilesList(id: Context.ElementId[F]): F[List[File[Long]]] =
+          access.downloadFilesList(id)
+
+        def downloadFileAsStream(id: Context.ElementId[F], file: File[Long]): F[File[LazyBytes[F]]] =
+          access.downloadFileAsStream(id, file)
+
         def resetForm(id: Context.ElementId[F]): F[Unit] =
           access.resetForm(id)
 
@@ -250,6 +256,16 @@ object Context {
       * to keep in memory (especially when count of users is more than one).
       */
     def downloadFilesAsStream(id: ElementId[F]): F[List[File[LazyBytes[F]]]]
+
+    /**
+      * Get only file list for input
+      */
+    def downloadFilesList(id: ElementId[F]): F[List[File[Long]]]
+
+    /**
+      * Get selected file as a stream from input
+      */
+    def downloadFileAsStream(id: ElementId[F], file: File[Long]): F[File[LazyBytes[F]]]
 
     /**
       * Purge inputs in given form.

@@ -332,11 +332,11 @@ export class Korolev {
     request.send(formData);
   }
 
-   /**
+  /**
     * @param {string} id
     * @param {string} descriptor
     */
-  uploadFiles(id, descriptor) {
+  uploadFileList(id, descriptor) {
     let self = this;
     let input = self.els[id];
     let deviceId = getDeviceId();
@@ -354,15 +354,39 @@ export class Korolev {
     let request = new XMLHttpRequest();
     request.open('POST', uri + "/info", true);
     request.send(files.map((f) => `${f.name}/${f.size}`).join('\n'));
-    request.addEventListener('load', () => {
-      // If info was sent, then send files
-      files.forEach((file) => {
-        let request = new XMLHttpRequest();
-        request.open('POST', uri, true);
-        request.setRequestHeader('x-name', file.name)
-        request.send(file);
-      });
-    })
+  }
+
+  /**
+   * @param {string} id
+   * @param {string} descriptor
+   * @param {string} fileName
+   */
+  uploadFile(id, descriptor, fileName) {
+    let self = this;
+    let input = self.els[id];
+    let deviceId = getDeviceId();
+    let uri = self.config['r'] +
+        'bridge' +
+        '/' + deviceId +
+        '/' + self.config['sid'] +
+        '/file' +
+        '/' + descriptor;
+    var file = null;
+
+    for (var i = 0; i < input.files.length; i++) {
+      if(input.files[i].name == fileName) {
+        file = input.files[i];
+      }
+    }
+
+    if(file) {
+      let request = new XMLHttpRequest();
+      request.open('POST', uri, true);
+      request.setRequestHeader('x-name', file.name)
+      request.send(file);
+    } else {
+      console.error(`Can't find file with name ${name}`);
+    }
   }
 
   resetForm(id) {

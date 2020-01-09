@@ -42,7 +42,9 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
 
   private val stringPromises = AsyncTable.empty[F, String, String]
   private val formDataPromises = AsyncTable.empty[F, String, FormData]
-  private val filesPromises = AsyncTable.empty[F, String, List[File[LazyBytes[F]]]]
+  private val filesPromises = AsyncTable.empty[F, String, File[LazyBytes[F]]]
+  // Store file name and it`s length as data
+  private val fileNamePromises = AsyncTable.empty[F, String, List[File[Long]]]
 
   private val outgoingQueue = Queue[F, String]()
 
@@ -119,12 +121,19 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
       result <- formDataPromises.get(descriptor)
     } yield result
 
-  def uploadFiles(id: Id): F[List[File[LazyBytes[F]]]] =
+  def uploadFileList(id: Id): F[List[File[Long]]] =
     for {
       descriptor <- nextDescriptor()
-      _ <- send(Procedure.UploadFiles.code, id.mkString, descriptor)
-      files <- filesPromises.get(descriptor)
+      _ <- send(Procedure.UploadFilesList.code, id.mkString, descriptor)
+      files <- fileNamePromises.get(descriptor)
     } yield files
+
+  def uploadFile(id: Id, file: File[Long]): F[File[LazyBytes[F]]] =
+    for {
+      descriptor <- nextDescriptor()
+      _ <- send(Procedure.UploadFile.code, id.mkString, descriptor, file.name)
+      file <- filesPromises.get(descriptor)
+    } yield file
 
   def focus(id: Id): F[Unit] =
     send(Procedure.Focus.code, id.mkString)
@@ -184,10 +193,15 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
       _ <- Effect[F].delay(remoteDomChangesPerformer.buffer.clear())
     } yield ()
 
-  def resolveFiles(descriptor: String, files: List[File[LazyBytes[F]]]): F[Unit] =
+  def resolveFile(descriptor: String, file: File[LazyBytes[F]]): F[Unit] =
     filesPromises
-      .put(descriptor, files)
+      .put(descriptor, file)
       .after(filesPromises.remove(descriptor))
+
+  def resolveFileNames(descriptor: String, files: List[File[Long]]): F[Unit] =
+    fileNamePromises
+      .put(descriptor, files)
+      .after(fileNamePromises.remove(descriptor))
 
   def resolveFormData(descriptor: String, formData: Either[Throwable, FormData]): F[Unit] =
     formDataPromises
@@ -296,8 +310,9 @@ object Frontend {
     case object KeepAlive extends Procedure(9) // ()
     case object EvalJs extends Procedure(10) // (code)
     case object ExtractEventData extends Procedure(11) // (descriptor, renderNum)
-    case object UploadFiles extends Procedure(12) // (id, descriptor)
-    case object RestForm extends Procedure(13) // (id)
+    case object UploadFilesList extends Procedure(12) // (id, descriptor)
+    case object UploadFile extends Procedure(13) // (id, descriptor, fileName)
+    case object RestForm extends Procedure(14) // (id)
 
     val All = Set(
       SetRenderNum,
@@ -312,7 +327,8 @@ object Frontend {
       KeepAlive,
       EvalJs,
       ExtractEventData,
-      UploadFiles,
+      UploadFilesList,
+      UploadFile,
       RestForm
     )
 
