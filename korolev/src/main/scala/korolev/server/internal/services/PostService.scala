@@ -18,13 +18,12 @@ package korolev.server.internal.services
 
 import java.nio.ByteBuffer
 
-import korolev.effect.AsyncTable.AlreadyContainsKeyException
 import korolev.effect.io.LazyBytes
 import korolev.{Context, Qsid}
-import korolev.effect.{AsyncTable, Effect, Reporter, Stream}
+import korolev.effect.{Effect, Reporter}
 import korolev.server.Response
 import korolev.effect.syntax._
-import korolev.server.internal.{BadRequestException, FormDataCodec}
+import korolev.server.internal.FormDataCodec
 
 import scala.concurrent.ExecutionContext
 
@@ -78,65 +77,35 @@ private[korolev] final class PostService[F[_]: Effect](reporter: Reporter,
         (entry.substring(0, slash), entry.substring(slash + 1).toLong)
       }
 
-    def createFilePromise(fileName: String, timestamp: Long) =
-      files.get(FileId(qsid, descriptor, fileName, timestamp))
-
     for {
       app <- sessionsService.findApp(qsid)
       message <- body.toStrictUtf8 // file_name/size_in_bytes\n
       sizes =
         if (message.isEmpty) List.empty[(String, Long)]
         else parseFilesInfo(message)
-      timestamp <- Effect[F].delay(System.currentTimeMillis())
       files = sizes.map {
         case (fileName, size) =>
-          val promise = createFilePromise(fileName, timestamp)
-          val bytes = LazyBytes(Stream.proxy(promise), Some(size))
-          Context.File(fileName, bytes)
+          Context.File(fileName, size)
       }
-      _ <- app.frontend.resolveFiles(descriptor, files)
-    } yield
-      commonService.simpleOkResponse
+      _ <- app.frontend.resolveFileNames(descriptor, files)
+    } yield commonService.simpleOkResponse
   }
 
   def file(qsid: Qsid, descriptor: String, headers: Seq[(String, String)], body: LazyBytes[F]): F[Response.Http[F]] = {
     val (consumed, chunks) = body.chunks.handleConsumed
     for {
+      app <- sessionsService.findApp(qsid)
       _ <- Effect[F].delay {
         headers.collectFirst { case ("x-name", v) => v } match {
           case None => Effect[F].pure(Response.Http(Response.Status.BadRequest, "Header 'x-name' should be defined", Nil))
           case Some(fileName) =>
-            val id = FileId(qsid, descriptor, fileName)
-            files
-              .put(id, chunks)
-              .after(files.remove(id))
-              .recover {
-                case AlreadyContainsKeyException(_) =>
-                  throw BadRequestException("This upload already started")
-              }
+            val file: Context.File[LazyBytes[F]] = Context.File(fileName, LazyBytes(chunks, None))
+            app.frontend.resolveFile(descriptor, file)
         }
       }
       // Do not response until chunks are not
       // consumed inside an application
       _ <- consumed
     } yield commonService.simpleOkResponse
-  }
-
-  private val files = AsyncTable.empty[F, FileId, Stream[F, Array[Byte]]]
-
-  private case class FileId(qsid: Qsid,
-                            descriptor: String,
-                            fileName: String,
-                            timestamp: Long = 0) { lhs =>
-    override lazy val hashCode: Int =
-      (qsid, descriptor, fileName).hashCode()
-
-    override def equals(obj: Any): Boolean = obj match {
-      case rhs: FileId =>
-        lhs.qsid == rhs.qsid &&
-          lhs.descriptor == rhs.descriptor &&
-          lhs.fileName == rhs.fileName
-      case _ => false
-    }
   }
 }

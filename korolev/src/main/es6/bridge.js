@@ -55,8 +55,9 @@ export class Bridge {
       case 9: break;
       case 10: k.evalJs.apply(k, commands); break;
       case 11: k.extractEventData.apply(k, commands); break;
-      case 12: k.uploadFiles.apply(k, commands); break;
-      case 13: k.resetForm.apply(k, commands); break;
+      case 12: k.uploadFileList.apply(k, commands); break;
+      case 13: k.uploadFile.apply(k, commands); break;
+      case 14: k.resetForm.apply(k, commands); break;
       default: console.error(`Procedure ${pCode} is undefined`);
     }
   }

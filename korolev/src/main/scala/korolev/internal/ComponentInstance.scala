@@ -136,21 +136,40 @@ final class ComponentInstance
         formData <- frontend.uploadForm(id)
       } yield formData
 
-    def downloadFiles(id: ElementId[F]): F[List[File[Array[Byte]]]] = {
-      downloadFilesAsStream(id).flatMap { lazyFileList =>
+    def downloadFiles(id: ElementId[F]): F[List[File[Array[Byte]]]] =
+      downloadFilesList(id).flatMap { files =>
         Effect[F].sequence {
-          lazyFileList.map { lazyFile =>
-            lazyFile.data.toStrict.map(x => File(lazyFile.name, x))
+          files.map { file =>
+            downloadFileAsStream(id , file).flatMap(_.data.toStrict.map(x => File(file.name, x)))
           }
         }
       }
-    }
 
-    def downloadFilesAsStream(elementId: ElementId[F]): F[List[File[LazyBytes[F]]]] =
+    def downloadFilesAsStream(id: ElementId[F]): F[List[File[LazyBytes[F]]]] =
+      downloadFilesList(id).flatMap { files =>
+        Effect[F].sequence {
+          files.map { file =>
+            downloadFileAsStream(id , file)
+          }
+        }
+      }
+
+    def downloadFilesList(elementId: ElementId[F]): F[List[File[Long]]] =
       for {
         id <- getId(elementId)
-        streams <- frontend.uploadFiles(id)
+        streams <- frontend.uploadFileList(id)
       } yield streams
+
+    /**
+      * Get selected file as a stream from input
+      */
+    def downloadFileAsStream(elementId: ElementId[F], file: File[Long]): F[File[LazyBytes[F]]] = {
+      for {
+        id <- getId(elementId)
+        streams <- frontend.uploadFile(id, file)
+      } yield streams
+    }
+
 
     def resetForm(elementId: ElementId[F]): F[Unit] =
       getId(elementId).flatMap { id =>
