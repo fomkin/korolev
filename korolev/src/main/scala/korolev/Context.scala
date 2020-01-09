@@ -85,17 +85,17 @@ object Context {
         def downloadFormData(id: Context.ElementId[F]): F[FormData] =
           access.downloadFormData(id)
 
-        def downloadFiles(id: Context.ElementId[F]): F[List[File[Array[Byte]]]] =
+        def downloadFiles(id: Context.ElementId[F]): F[List[(FileHandler[F], Array[Byte])]] =
           access.downloadFiles(id)
 
-        def downloadFilesAsStream(id: Context.ElementId[F]): F[List[File[LazyBytes[F]]]] =
+        def downloadFilesAsStream(id: Context.ElementId[F]): F[List[(FileHandler[F], LazyBytes[F])]] =
           access.downloadFilesAsStream(id)
 
-        def downloadFilesList(id: Context.ElementId[F]): F[List[File[Long]]] =
-          access.downloadFilesList(id)
+        def downloadFileAsStream(handler: FileHandler[F]): F[LazyBytes[F]] =
+          access.downloadFileAsStream(handler)
 
-        def downloadFileAsStream(id: Context.ElementId[F], file: File[Long]): F[File[LazyBytes[F]]] =
-          access.downloadFileAsStream(id, file)
+        def listFiles(id: Context.ElementId[F]): F[List[FileHandler[F]]] =
+          access.listFiles(id)
 
         def resetForm(id: Context.ElementId[F]): F[Unit] =
           access.resetForm(id)
@@ -248,24 +248,24 @@ object Context {
       * to given element id. Use this method carefully because
       * all files are saving to RAM.
       */
-    def downloadFiles(id: ElementId[F]): F[List[File[Array[Byte]]]]
+    def downloadFiles(id: ElementId[F]): F[List[(FileHandler[F], Array[Byte])]]
 
     /**
       * Same as [[downloadFiles]] but for stream mode. The method is useful
       * when user want to upload very large files list which is problematic
       * to keep in memory (especially when count of users is more than one).
       */
-    def downloadFilesAsStream(id: ElementId[F]): F[List[File[LazyBytes[F]]]]
-
-    /**
-      * Get only file list for input
-      */
-    def downloadFilesList(id: ElementId[F]): F[List[File[Long]]]
+    def downloadFilesAsStream(id: ElementId[F]): F[List[(FileHandler[F], LazyBytes[F])]]
 
     /**
       * Get selected file as a stream from input
       */
-    def downloadFileAsStream(id: ElementId[F], file: File[Long]): F[File[LazyBytes[F]]]
+    def downloadFileAsStream(handler: FileHandler[F]): F[LazyBytes[F]]
+
+    /**
+      * Get only file list for input
+      */
+    def listFiles(id: ElementId[F]): F[List[FileHandler[F]]]
 
     /**
       * Purge inputs in given form.
@@ -331,7 +331,7 @@ object Context {
     def set(propName: String, value: Any): F[Unit]
   }
 
-  final case class File[A](name: String, data: A)
+  final case class FileHandler[F[_]](fileName: String, size: Long)(private[korolev] val elementId: ElementId[F])
 
   final case class ComponentEntry
     [

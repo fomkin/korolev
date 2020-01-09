@@ -18,12 +18,11 @@ package korolev.internal
 
 import java.util.concurrent.atomic.AtomicInteger
 
-import korolev.Context.File
+import korolev.Context.FileHandler
 import korolev.{FormData, Router}
 import korolev.Router.Path
 import korolev.effect.io.LazyBytes
 import korolev.effect.syntax._
-
 import korolev.effect.{AsyncTable, Effect, Queue, Reporter, Stream}
 import levsha.Id
 import levsha.impl.DiffRenderContext.ChangesPerformer
@@ -42,9 +41,9 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
 
   private val stringPromises = AsyncTable.empty[F, String, String]
   private val formDataPromises = AsyncTable.empty[F, String, FormData]
-  private val filesPromises = AsyncTable.empty[F, String, File[LazyBytes[F]]]
+  private val filesPromises = AsyncTable.empty[F, String, LazyBytes[F]]
   // Store file name and it`s length as data
-  private val fileNamePromises = AsyncTable.empty[F, String, List[File[Long]]]
+  private val fileNamePromises = AsyncTable.empty[F, String, List[(String, Long)]]
 
   private val outgoingQueue = Queue[F, String]()
 
@@ -121,17 +120,17 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
       result <- formDataPromises.get(descriptor)
     } yield result
 
-  def uploadFileList(id: Id): F[List[File[Long]]] =
+  def listFiles(id: Id): F[List[(String, Long)]] =
     for {
       descriptor <- nextDescriptor()
-      _ <- send(Procedure.UploadFilesList.code, id.mkString, descriptor)
+      _ <- send(Procedure.ListFiles.code, id.mkString, descriptor)
       files <- fileNamePromises.get(descriptor)
     } yield files
 
-  def uploadFile(id: Id, file: File[Long]): F[File[LazyBytes[F]]] =
+  def uploadFile(id: Id, handler: FileHandler[F]): F[LazyBytes[F]] =
     for {
       descriptor <- nextDescriptor()
-      _ <- send(Procedure.UploadFile.code, id.mkString, descriptor, file.name)
+      _ <- send(Procedure.UploadFile.code, id.mkString, descriptor, handler.fileName)
       file <- filesPromises.get(descriptor)
     } yield file
 
@@ -193,14 +192,14 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
       _ <- Effect[F].delay(remoteDomChangesPerformer.buffer.clear())
     } yield ()
 
-  def resolveFile(descriptor: String, file: File[LazyBytes[F]]): F[Unit] =
+  def resolveFile(descriptor: String, file: LazyBytes[F]): F[Unit] =
     filesPromises
       .put(descriptor, file)
       .after(filesPromises.remove(descriptor))
 
-  def resolveFileNames(descriptor: String, files: List[File[Long]]): F[Unit] =
+  def resolveFileNames(descriptor: String, handler: List[(String, Long)]): F[Unit] =
     fileNamePromises
-      .put(descriptor, files)
+      .put(descriptor, handler)
       .after(fileNamePromises.remove(descriptor))
 
   def resolveFormData(descriptor: String, formData: Either[Throwable, FormData]): F[Unit] =
@@ -310,7 +309,7 @@ object Frontend {
     case object KeepAlive extends Procedure(9) // ()
     case object EvalJs extends Procedure(10) // (code)
     case object ExtractEventData extends Procedure(11) // (descriptor, renderNum)
-    case object UploadFilesList extends Procedure(12) // (id, descriptor)
+    case object ListFiles extends Procedure(12) // (id, descriptor)
     case object UploadFile extends Procedure(13) // (id, descriptor, fileName)
     case object RestForm extends Procedure(14) // (id)
 
@@ -327,7 +326,7 @@ object Frontend {
       KeepAlive,
       EvalJs,
       ExtractEventData,
-      UploadFilesList,
+      ListFiles,
       UploadFile,
       RestForm
     )

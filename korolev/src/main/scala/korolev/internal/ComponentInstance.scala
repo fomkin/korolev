@@ -136,40 +136,45 @@ final class ComponentInstance
         formData <- frontend.uploadForm(id)
       } yield formData
 
-    def downloadFiles(id: ElementId[F]): F[List[File[Array[Byte]]]] =
-      downloadFilesList(id).flatMap { files =>
+    def downloadFiles(id: ElementId[F]): F[List[(FileHandler[F], Array[Byte])]] = {
+      downloadFilesAsStream(id).flatMap { streams =>
         Effect[F].sequence {
-          files.map { file =>
-            downloadFileAsStream(id , file).flatMap(_.data.toStrict.map(x => File(file.name, x)))
+          streams.map { case (handler, data) =>
+            data.toStrict.map(b => (handler, b))
           }
         }
       }
+    }
 
-    def downloadFilesAsStream(id: ElementId[F]): F[List[File[LazyBytes[F]]]] =
-      downloadFilesList(id).flatMap { files =>
+    def downloadFilesAsStream(id: ElementId[F]): F[List[(FileHandler[F], LazyBytes[F])]] = {
+      listFiles(id).flatMap { handlers =>
         Effect[F].sequence {
-          files.map { file =>
-            downloadFileAsStream(id , file)
+          handlers.map { handler =>
+            downloadFileAsStream(handler).map(f => (handler, f))
           }
         }
       }
-
-    def downloadFilesList(elementId: ElementId[F]): F[List[File[Long]]] =
-      for {
-        id <- getId(elementId)
-        streams <- frontend.uploadFileList(id)
-      } yield streams
+    }
 
     /**
       * Get selected file as a stream from input
       */
-    def downloadFileAsStream(elementId: ElementId[F], file: File[Long]): F[File[LazyBytes[F]]] = {
+    def downloadFileAsStream(handler: FileHandler[F]): F[LazyBytes[F]] = {
       for {
-        id <- getId(elementId)
-        streams <- frontend.uploadFile(id, file)
+        id <- getId(handler.elementId)
+        streams <- frontend.uploadFile(id, handler)
       } yield streams
     }
 
+    def listFiles(elementId: ElementId[F]): F[List[FileHandler[F]]] =
+      for {
+        id <- getId(elementId)
+        files <- frontend.listFiles(id)
+      } yield {
+        files.map { case (fileName, size) =>
+          FileHandler(fileName, size)(elementId)
+        }
+      }
 
     def resetForm(elementId: ElementId[F]): F[Unit] =
       getId(elementId).flatMap { id =>
