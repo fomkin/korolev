@@ -22,6 +22,8 @@ import java.nio.charset.StandardCharsets
 
 import korolev.effect.{Effect, Stream}
 
+import scala.annotation.tailrec
+
 final case class LazyBytes[F[_]: Effect](chunks: Stream[F, Array[Byte]],
                                          bytesLength: Option[Long]) {
 
@@ -74,14 +76,35 @@ object LazyBytes {
       loop = (inputStream, _) => Effect[F].delay {
         if (inputStream.available() > 0) {
           val chunk = new Array[Byte](Math.min(inputStream.available(), chunkSize))
-          inputStream.read(chunk)
-          ((), Some(chunk))
+          val loaded = inputStream.read(chunk)
+
+          if (loaded == chunk.length) {
+            ((), Some(chunk))
+          } else {
+            readMore(chunk, inputStream, loaded, chunkSize - loaded)
+          }
         } else {
           ((), None)
         }
       }
     )
     Effect[F].map(streamF)(LazyBytes(_, Some(total)))
+  }
+
+  @tailrec
+  private[this] def readMore(chunk: Array[Byte], inputStream: InputStream, offset: Int, chunkSize: Int): (Unit, Option[Array[Byte]]) = {
+    if (inputStream.available() > 0) {
+      val len = Math.min(inputStream.available(), chunkSize)
+      val loaded = inputStream.read(chunk, offset, chunkSize)
+
+      if (loaded == len) {
+        ((), Some(chunk))
+      } else {
+        readMore(chunk, inputStream, offset + loaded, chunkSize - loaded)
+      }
+    } else {
+      ((), None)
+    }
   }
 
   def empty[F[_]: Effect]: LazyBytes[F] = {
