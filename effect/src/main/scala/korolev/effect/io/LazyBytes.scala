@@ -72,13 +72,13 @@ object LazyBytes {
 
   def apply[F[_] : Effect](inputStream: InputStream, chunkSize: Int = 8192): F[LazyBytes[F]] = {
     @tailrec
-    def readMore(chunk: Array[Byte], offset: Int, len: Int): (Unit, Option[Array[Byte]]) = {
+    def readStream(chunk: Array[Byte], offset: Int, len: Int): (Unit, Option[Array[Byte]]) = {
       val read = inputStream.read(chunk, offset, len)
 
       if (read == len) {
         ((), Some(chunk))
       } else {
-        readMore(chunk, offset + read, len - read)
+        readStream(chunk, offset + read, len - read)
       }
     }
 
@@ -90,13 +90,8 @@ object LazyBytes {
         if (inputStream.available() > 0) {
           val len = Math.min(inputStream.available(), chunkSize)
           val chunk = new Array[Byte](len)
-          val read = inputStream.read(chunk)
 
-          if (read == len) {
-            ((), Some(chunk))
-          } else {
-            readMore(chunk, read, len - read)
-          }
+          readStream(chunk, 0, len)
         } else {
           ((), None)
         }
