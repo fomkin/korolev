@@ -24,8 +24,8 @@ import korolev.effect.{Effect, Stream}
 
 import scala.annotation.tailrec
 
-final case class LazyBytes[F[_]: Effect](chunks: Stream[F, Array[Byte]],
-                                         bytesLength: Option[Long]) {
+final case class LazyBytes[F[_] : Effect](chunks: Stream[F, Array[Byte]],
+                                          bytesLength: Option[Long]) {
 
   /**
     * Folds all data to one byte array. Completes [[chunks.consumed]].
@@ -37,6 +37,7 @@ final case class LazyBytes[F[_]: Effect](chunks: Stream[F, Array[Byte]],
         case None => Effect[F].delay(acc)
       }
     }
+
     Effect[F].map(aux(Nil)) { xs =>
       val length = xs.foldLeft(0)(_ + _.length)
       xs.foldRight(ByteBuffer.allocate(length))((a, b) => b.put(a)).array()
@@ -58,30 +59,43 @@ final case class LazyBytes[F[_]: Effect](chunks: Stream[F, Array[Byte]],
       if (x.isEmpty) Effect[F].unit
       else aux()
     }
+
     aux()
   }
 }
 
 object LazyBytes {
 
-  def apply[F[_]: Effect](bytes: Array[Byte]): LazyBytes[F] = {
+  def apply[F[_] : Effect](bytes: Array[Byte]): LazyBytes[F] = {
     new LazyBytes(Stream.eval(bytes), Some(bytes.length.toLong))
   }
 
-  def apply[F[_]: Effect](inputStream: InputStream, chunkSize: Int = 8192): F[LazyBytes[F]] = {
+  def apply[F[_] : Effect](inputStream: InputStream, chunkSize: Int = 8192): F[LazyBytes[F]] = {
+    @tailrec
+    def readMore(chunk: Array[Byte], offset: Int, len: Int): (Unit, Option[Array[Byte]]) = {
+      val read = inputStream.read(chunk, offset, len)
+
+      if (read == len) {
+        ((), Some(chunk))
+      } else {
+        readMore(chunk, offset + read, chunkSize - read)
+      }
+    }
+
     val total = inputStream.available().toLong
     val streamF = Stream.unfoldResource[F, InputStream, Unit, Array[Byte]](
       default = (),
       create = Effect[F].pure(inputStream),
       loop = (inputStream, _) => Effect[F].delay {
         if (inputStream.available() > 0) {
-          val chunk = new Array[Byte](Math.min(inputStream.available(), chunkSize))
-          val loaded = inputStream.read(chunk)
+          val len = Math.min(inputStream.available(), chunkSize)
+          val chunk = new Array[Byte](len)
+          val read = inputStream.read(chunk)
 
-          if (loaded == chunk.length) {
+          if (read == len) {
             ((), Some(chunk))
           } else {
-            readMore(chunk, inputStream, loaded, chunkSize - loaded)
+            readMore(chunk, read, len - read)
           }
         } else {
           ((), None)
@@ -91,23 +105,7 @@ object LazyBytes {
     Effect[F].map(streamF)(LazyBytes(_, Some(total)))
   }
 
-  @tailrec
-  private[this] def readMore(chunk: Array[Byte], inputStream: InputStream, offset: Int, chunkSize: Int): (Unit, Option[Array[Byte]]) = {
-    if (inputStream.available() > 0) {
-      val len = Math.min(inputStream.available(), chunkSize)
-      val loaded = inputStream.read(chunk, offset, chunkSize)
-
-      if (loaded == len) {
-        ((), Some(chunk))
-      } else {
-        readMore(chunk, inputStream, offset + loaded, chunkSize - loaded)
-      }
-    } else {
-      ((), None)
-    }
-  }
-
-  def empty[F[_]: Effect]: LazyBytes[F] = {
+  def empty[F[_] : Effect]: LazyBytes[F] = {
     new LazyBytes[F](Stream.empty, Some(0L))
   }
 }
