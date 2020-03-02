@@ -78,7 +78,7 @@ object LazyBytes {
       if (read == len) {
         ((), Some(chunk))
       } else {
-        readMore(chunk, offset + read, chunkSize - read)
+        readMore(chunk, offset + read, len - read)
       }
     }
 
