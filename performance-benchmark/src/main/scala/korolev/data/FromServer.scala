@@ -1,25 +1,25 @@
-package data
+package korolev.data
 
-import akka.typed.ActorRef
-import korolev.internal.ClientSideApi
+import akka.actor.typed.ActorRef
+import korolev.internal.Frontend
 import pushka.Ast
 
 sealed trait FromServer
 
 object FromServer {
 
-  case class Procedure(procedure: ClientSideApi.Procedure, args: List[Any]) extends FromServer
+  case class Procedure(procedure: Frontend.Procedure, args: List[Any]) extends FromServer
 
   object Procedure {
 
     def apply(code: Int, args: List[Any]): Procedure = {
-      new Procedure(ClientSideApi.Procedure(code).get, args)
+      new Procedure(Frontend.Procedure(code).get, args)
     }
 
     def fromJson(ast: List[Ast]): Either[String, Procedure] = try {
       val Ast.Num(procedureId) :: argsAsts = ast
       val code = procedureId.toInt
-      ClientSideApi.Procedure(code) match {
+      Frontend.Procedure(code) match {
         case Some(procedure) =>
           val args = argsAsts.collect {
             case Ast.Str(s) => s

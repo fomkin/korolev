@@ -1,33 +1,38 @@
+package korolev
+
 import java.io.File
 
 import akka.actor.ActorSystem
-import akka.typed.scaladsl.adapter._
-import data.{FromServer, Report, Scenario, ToServer}
-
+import korolev.data.{FromServer, Report, Scenario, ToServer}
+import akka.actor.typed.scaladsl.Behaviors
+import akka.actor.typed.{ActorRef, Behavior}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
+import akka.actor.typed.scaladsl.adapter._
 
 object PerformanceBenchmark extends App {
 
-  def setup(scenario: Scenario) = {
-    import akka.typed.scaladsl.Actor
-    Actor.deferred[ToServer] { ctx =>
+  def setup(scenario: Scenario)(implicit untypedSystem: ActorSystem): Behavior[ToServer] = {
+
+    Behaviors.setup[ToServer] { ctx =>
       val reporter = ctx.spawnAnonymous {
-        Actor.immutable[Report] {
-          case (_, Report.Unexpected(state, expected, gotten)) =>
+        Behaviors.receiveMessagePartial[Report] {
+          case Report.Unexpected(state, expected, gotten) =>
             println(s"${state.scenario.name}:${state.step + 1}: $expected expected, but $gotten gotten")
-            Actor.same
-          case (_, Report.Success(_, metrics)) =>
+            Behaviors.same
+
+          case Report.Success(_, metrics) =>
             val ts = metrics.values.toVector
             val avg = (ts.sum / ts.length) / 1000000d
             val mean = ts.sorted.apply(ts.length / 2) / 1000000d
             val min = ts.min / 1000000d
             val max = ts.max / 1000000d
             println(s"avg: $avg, mean: $mean in [$min, $max]")
-            Actor.same
-          case (_, Report.MessagesFromClosedConnection(message)) =>
+            Behaviors.same
+
+          case Report.MessagesFromClosedConnection(message) =>
             message match {
-              case FromServer.ErrorOccurred(data.Error.ArbitraryThrowable(e)) =>
+              case FromServer.ErrorOccurred(korolev.data.Error.ArbitraryThrowable(e)) =>
                 print(Console.RED)
                 println(s"${e.getMessage}, ${e.getCause}")
                 e.getStackTrace.foreach { s =>
@@ -36,40 +41,46 @@ object PerformanceBenchmark extends App {
                 }
               case _ => println(message)
             }
-            Actor.same
-          case (_, message) =>
+            Behaviors.same
+
+          case message =>
             println(message)
-            Actor.same
+            Behaviors.same
         }
       }
-      def behavior(i: Int) = KorolevConnection("localhost", 8080, None, ssl = false) {
+
+      def behavior(i: Int) = KorolevConnection("localhost", 8000, None, ssl = false) {
         ctx.spawn(ScenarioExecutor(scenario, reporter, Some(1.seconds)), s"executor-$i")
       }
-      for (i <- 1 to 1024) {
+      for (i <- 1 to 512) {
         ctx.spawn(behavior(i), s"bench-$i")
       }
-      Actor.ignore
+
+      Behaviors.ignore
     }
   }
 
   args match {
     case Array(fileName) =>
       val file = new File(fileName)
+
       if (file.isDirectory) {
         println(s"$fileName is a directory")
         sys.exit(1)
       }
+
       if (!file.exists()) {
         println("Given file doesn't exist")
         sys.exit(1)
       } else {
         val system = ActorSystem("performance-benchmark")
+
         ScenarioLoader.fromFile(file) foreach {
           case Left(errors) =>
             system.terminate()
             errors.foreach(println)
           case Right(scenario) =>
-            system.spawn(setup(scenario), "connection")
+            system.spawn(setup(scenario)(system), "connection")
         }
       }
     case _ =>

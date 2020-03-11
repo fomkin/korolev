@@ -1,4 +1,4 @@
-package data
+package korolev.data
 
 sealed trait ScenarioStep
 
