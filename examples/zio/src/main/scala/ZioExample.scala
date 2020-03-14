@@ -3,13 +3,13 @@ import korolev.akka._
 import korolev.server.{KorolevServiceConfig, StateLoader}
 import korolev.state.javaSerialization._
 import korolev.zio.taskEffectInstance
-import zio.{DefaultRuntime, Task, ZIO}
+import zio.{Runtime, Task, ZIO}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
 object ZioExample extends SimpleAkkaHttpKorolevApp {
 
-  implicit val runtime = new DefaultRuntime {}
+  implicit val runtime = Runtime.default
   implicit val effect = taskEffectInstance(runtime)
 
   val ctx = Context[Task, Option[String], Any]

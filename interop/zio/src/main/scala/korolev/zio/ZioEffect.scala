@@ -44,12 +44,29 @@ class ZioEffect[R, E](rts: Runtime[R],
   def fromTry[A](value: => Try[A]): ZIO[R, E, A] =
     Task.fromTry(value).mapError(liftError)
 
-  def promise[A](k: (Either[Throwable, A] => Unit) => Unit): ZIO[R, E, A] =
-    ZIO.effectAsync(kk => k(kk apply _.fold(liftError.andThen(ZIO.fail), ZIO.succeed)))
+  def promise[A](callback: (Either[Throwable, A] => Unit) => Unit): ZIO[R, E, A] =
+    ZIO.effectAsync { register =>
+      callback { either =>
+        register {
+          either match {
+            case Left(error) => ZIO.fail(liftError(error))
+            case Right(value) => ZIO.succeed(value)
+          }
+        }
+      }
+    }
 
-  def promiseF[A](k: (Either[Throwable, A] => Unit) => ZIO[R, E, Unit]): ZIO[R, E, A] = {
-    ZIO.effectAsyncM(kk => k(kk apply _.fold(liftError.andThen(ZIO.fail), ZIO.succeed)))
-  }
+  def promiseF[A](callback: (Either[Throwable, A] => Unit) => ZIO[R, E, Unit]): ZIO[R, E, A] =
+    ZIO.effectAsyncM { register =>
+      callback { either =>
+        register {
+          either match {
+            case Left(error) => ZIO.fail(liftError(error))
+            case Right(value) => ZIO.succeed(value)
+          }
+        }
+      }
+    }
 
   def flatMap[A, B](m: ZIO[R, E, A])(f: A => ZIO[R, E, B]): ZIO[R, E, B] =
     m.flatMap(f)
@@ -57,16 +74,13 @@ class ZioEffect[R, E](rts: Runtime[R],
   def map[A, B](m: ZIO[R, E, A])(f: A => B): ZIO[R, E, B] =
     m.map(f)
 
-  def recover[A](m: ZIO[R, E, A])(f: PartialFunction[Throwable, A]): ZIO[R, E, A] = {
-    m.catchSome(unliftErrorP.andThen(f).andThen(ZIO.succeed _))
-  }
+  def recover[A](m: ZIO[R, E, A])(f: PartialFunction[Throwable, A]): ZIO[R, E, A] =
+    m.catchSome(unliftErrorP.andThen(f).andThen(result => ZIO.succeed(result)))
 
   def start[A](task: => ZIO[R, E, A])(implicit ec: ExecutionContext): ZIO[R, E, Effect.Fiber[ZIO[R, E, *], A]] =
     RIO
       .interruptible(task.mapError(unliftError))
-      .nonDaemon
-      .fork
-      .daemon
+      .forkDaemon
       .map { fiber =>
         () => fiber.join.mapError(liftError)
       }
@@ -75,7 +89,7 @@ class ZioEffect[R, E](rts: Runtime[R],
     m.on(ec)
 
   def sequence[A](in: List[ZIO[R, E, A]]): ZIO[R, E, List[A]] =
-    ZIO.sequence(in)
+    ZIO.collectAll(in)
 
   def runAsync[A](m: ZIO[R, E, A])(callback: Either[Throwable, A] => Unit): Unit =
     rts.unsafeRunAsync(m)(exit => callback(exit.toEither))

@@ -111,7 +111,7 @@ lazy val cats = project.
   settings(commonSettings: _*).
   settings(
     normalizedName := "korolev-cats",
-    libraryDependencies += "org.typelevel" %% "cats-effect" % "2.0.0"
+    libraryDependencies += "org.typelevel" %% "cats-effect" % "2.1.2"
   ).
   dependsOn(effect)
 
@@ -136,7 +136,7 @@ lazy val zio = project
   .settings(commonSettings: _*)
   .settings(
     normalizedName := "korolev-zio",
-    libraryDependencies += "dev.zio" %% "zio" % "1.0.0-RC17"
+    libraryDependencies += "dev.zio" %% "zio" % "1.0.0-RC18-2"
   )
   .dependsOn(effect)
 
