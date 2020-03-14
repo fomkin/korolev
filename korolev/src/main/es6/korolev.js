@@ -31,7 +31,7 @@ export class Korolev {
     this.config = config;
     /** @type {HTMLElement} */
     this.root = document.body;
-    /** @type {Object} */
+    /** @type {Object<Element>} */
     this.els = {};
     /** @type {number} */
     this.renderNum = 0;
@@ -76,7 +76,12 @@ export class Korolev {
     window.addEventListener('popstate', this.historyHandler);
     window.addEventListener('resize', this.windowHandler);
   }
-  
+
+  swapElementInRegistry(a, b) {
+    b.vId = a.vId;
+    this.els[a.vId] = b;
+  }
+
   destroy() {
     // Remove root listeners
     this.rootListeners.forEach((o) => this.root.removeEventListener(o.type, o.listener));
