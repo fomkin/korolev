@@ -16,12 +16,23 @@
 
 package korolev.server.internal
 
+import korolev.Context
 import korolev.Context._
 import korolev.effect.Effect
+import levsha.RenderContext
 import levsha.impl.{AbstractTextRenderContext, TextPrettyPrintingConfig}
 
 private[korolev] final class HtmlRenderContext[F[_]: Effect, S]
   extends AbstractTextRenderContext[Binding[F, S, _]] {
+
   val prettyPrinting: TextPrettyPrintingConfig =
     TextPrettyPrintingConfig.noPrettyPrinting
+
+  override def addMisc(misc: Binding[F, S, _]): Unit = misc match {
+    case ComponentEntry(component, parameters, _) =>
+      val rc = this.asInstanceOf[RenderContext[Context.Binding[F, Any, Any]]]
+      // Static pages always made from scratch
+      component.render(parameters, component.initialState).apply(rc)
+    case _ => ()
+  }
 }

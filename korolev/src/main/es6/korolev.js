@@ -390,7 +390,7 @@ export class Korolev {
       request.setRequestHeader('x-name', file.name)
       request.send(file);
     } else {
-      console.error(`Can't find file with name ${name}`);
+      console.error(`Can't find file with name ${fileName}`);
     }
   }
 
