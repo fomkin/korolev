@@ -35,7 +35,7 @@ final class KorolevTemplateDsl[F[_]: Effect, S, M] extends SymbolDsl[Binding[F, 
 
     /** define style attribute */
     def @=(value: String): Document.Attr[Binding[F, S, M]] = Document.Attr { rc =>
-      rc.setStyle(s.name, value)
+      rc.setStyle(HtmlUtil.camelCaseToSnakeCase(s.name, 0), value)
     }
 
     /** define property */
