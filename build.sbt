@@ -259,7 +259,7 @@ lazy val `integration-tests` = project.
   disablePlugins(HeaderPlugin).
   settings(crossVersionSettings).
   settings(commonSettings).
-  settings(dontPublishSettings:_*).
+  settings(dontPublishSettings: _*).
   settings(
     fork in run := true,
     libraryDependencies ++= Seq(
@@ -276,15 +276,14 @@ lazy val `integration-tests` = project.
 lazy val `performance-benchmark` = project.
   disablePlugins(HeaderPlugin).
   settings(commonSettings).
-  settings(dontPublishSettings:_*).
+  settings(dontPublishSettings: _*).
+  settings(crossVersionSettings).
   settings(
-    addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full),
-    scalaVersion := "2.12.8",
     fork in run := true,
     libraryDependencies ++= Seq(
       "com.typesafe.akka" %% "akka-http" % "10.1.11",
       "com.typesafe.akka" %% "akka-stream" % "2.6.3",
-      "com.typesafe.akka" %% "akka-actor"  % "2.6.3",
+      "com.typesafe.akka" %% "akka-actor" % "2.6.3",
       "com.typesafe.akka" %% "akka-actor-typed" % "2.6.3",
       "com.github.fomkin" %% "pushka-json" % "0.8.0"
     )
@@ -294,7 +293,7 @@ lazy val `performance-benchmark` = project.
 lazy val root = project.in(file(".")).
   settings(crossVersionSettings).
   disablePlugins(HeaderPlugin).
-  settings(dontPublishSettings:_*).
+  settings(dontPublishSettings: _*).
   aggregate(
     korolev, effect,
     akka, cats, monix, zio, slf4j,
