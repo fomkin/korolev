@@ -1,4 +1,4 @@
-package data
+package korolev.data
 
 case class ScenarioState(scenario: Scenario, step: Int) {
 
