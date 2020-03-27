@@ -90,6 +90,8 @@ private[korolev] final class FormDataCodec(maxPartSize: Int) {
       }
 
       state match {
+        case _ if source.position() == source.limit() =>
+          List.empty[FormData.Entry]
         case Buffering if checkDelimiter(end) => updateEntries()
         case Buffering if checkDelimiter(boundaryWithBreaks) =>
           val ue = updateEntries()

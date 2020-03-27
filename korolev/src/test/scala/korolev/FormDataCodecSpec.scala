@@ -45,4 +45,15 @@ class FormDataCodecSpec extends FlatSpec with Matchers {
       ByteBuffer.wrap("<blob2>".getBytes)
     }
   }
+
+  "decode" should "parse empty multipart/form-data body" in {
+    val body = """------WebKitFormBoundaryrBVqcOqR4KNX8jT9--\r\n
+    """.stripMargin
+
+    val bodyBuffer = ByteBuffer.wrap(body.getBytes(StandardCharsets.US_ASCII))
+    val codec = new FormDataCodec(100500)
+    val formData = codec.decode(bodyBuffer, "----WebKitFormBoundaryVLDwcP1YkcvPtjGM")
+
+    formData.bytesOpt("any") should be (None)
+  }
 }
