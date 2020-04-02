@@ -301,6 +301,6 @@ lazy val root = project.in(file(".")).
     formDataExample, `file-streaming-example`, delayExample, focusExample,
     webComponentExample, componentExample, akkaHttpExample, contextScopeExample,
     eventDataExample, extensionExample, `integration-tests`,
-    zioExample, monixExample, catsEffectExample
+    zioExample, monixExample, catsEffectExample, `performance-benchmark`
   )
 
