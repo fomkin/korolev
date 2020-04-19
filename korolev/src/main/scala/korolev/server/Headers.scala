@@ -24,6 +24,6 @@ object Headers {
   final val ContentTypeHtmlUtf8 =
     ContentType -> "text/html; charset=utf-8"
 
-  def setCookie(cookie: String, value: String, path: String): (String, String) =
-    SetCookie -> s"$cookie=$value; Path=$path"
+  def setCookie(cookie: String, value: String, path: String, maxAge: Int): (String, String) =
+    SetCookie -> s"$cookie=$value; path=$path; max-age=$maxAge"
 }
