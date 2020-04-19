@@ -16,9 +16,11 @@
 
 package korolev.effect
 
-import java.util.concurrent.ConcurrentSkipListSet
 import java.util.concurrent.atomic.AtomicBoolean
+
 import korolev.effect.syntax._
+
+import scala.collection.concurrent.TrieMap
 
 /**
   * A function which returns new streams which
@@ -29,7 +31,8 @@ import korolev.effect.syntax._
 final class Hub[F[_]: Effect, T](upstream: Stream[F, T], bufferSize: Int) {
 
   @volatile private var closed = false
-  private val queues = new ConcurrentSkipListSet[Queue[F, T]]()
+
+  private val queues = TrieMap.empty[Queue[F, T], Unit]
   private val inProgress = new AtomicBoolean(false)
 
   private final class StreamOnePullAtTime(thisQueue: Queue[F, T]) extends Stream[F, T] {
@@ -48,13 +51,13 @@ final class Hub[F[_]: Effect, T](upstream: Stream[F, T], bufferSize: Int) {
       .map { maybeItem =>
         maybeItem match {
           case Some(item) =>
-            queues.forEach { queue =>
+            queues.keysIterator.foreach { queue =>
               if (queue != thisQueue)
                 queue.offerUnsafe(item)
             }
           case None =>
             closed = true
-            queues.forEach(_.closeUnsafe())
+            queues.keysIterator.foreach(_.closeUnsafe())
         }
         maybeItem
       }
@@ -81,7 +84,7 @@ final class Hub[F[_]: Effect, T](upstream: Stream[F, T], bufferSize: Int) {
       throw new IllegalStateException("Hub is closed")
     val queue = new QueueRemoveFromHubOnClose()
     val stream = new StreamOnePullAtTime(queue)
-    queues.add(queue)
+    queues.put(queue, ())
     stream
   }
 }

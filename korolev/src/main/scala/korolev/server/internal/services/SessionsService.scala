@@ -61,8 +61,8 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
     Effect[F].delay {
       apps.get(qsid) match {
         case Some(Right(app)) => app
-        case Some(Left(_))    => throw ErrorInitInProgress
-        case _                => throw ErrorSessionNotFound(qsid)
+        case Some(Left(_))    => throw BadRequestException(ErrorInitInProgress)
+        case _                => throw BadRequestException(ErrorSessionNotFound(qsid))
       }
     }
 
@@ -77,7 +77,7 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
           case Right(app) =>
             Effect[F].pure(app)
           case _ =>
-            Effect[F].fail[App](ErrorInitInProgress)
+            Effect[F].fail[App](BadRequestException(ErrorInitInProgress))
         }
       }
     } yield {
@@ -156,8 +156,8 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
   private case class InitInProgress(request: Int)
 
   private def ErrorSessionNotFound(qsid: Qsid) =
-    BadRequestException(s"There is no app instance matched to $qsid")
+    s"There is no app instance matched to $qsid"
 
   private final val ErrorInitInProgress =
-    BadRequestException("Session initialization in progress. Please try again later.")
+    "Session initialization in progress. Please try again later."
 }

@@ -105,6 +105,9 @@ object Context {
         def transition(f: korolev.Transition[S2]): F[Unit] =
           access.transition(s => write((s, f(read(s)))))
 
+        def syncTransition(f: korolev.Transition[S2]): F[Unit] =
+          access.syncTransition(s => write((s, f(read(s)))))
+
         def sessionId: F[Qsid] = access.sessionId
 
         def evalJs(code: String): F[String] = access.evalJs(code)
@@ -282,6 +285,12 @@ object Context {
       * Applies transition to current state.
       */
     def transition(f: Transition[S]): F[Unit]
+
+    /**
+      * Applies transition to current state
+      * and awaits render.
+      */
+    def syncTransition(f: Transition[S]): F[Unit]
 
     /**
       * Applies transition to current state.

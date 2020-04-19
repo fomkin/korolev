@@ -86,7 +86,11 @@ final class ComponentInstance
       // invoked during render.
       miscLock.synchronized {
         elements.get(elementId) match {
-          case None => throw new Exception("No element matched for accessor")
+          case None =>
+            elementId.name match {
+              case Some(name) => throw new Exception(s"No element matched for accessor $name")
+              case None => throw new Exception(s"No element matched for accessor")
+            }
           case Some(id) => id
         }
       }
@@ -128,7 +132,9 @@ final class ComponentInstance
 
     def sessionId: F[Qsid] = Effect[F].delay(self.sessionId)
 
-    def transition(f: Transition[CS]): F[Unit] = applyTransition(f)
+    def transition(f: Transition[CS]): F[Unit] = applyTransition(f, sync = false)
+
+    def syncTransition(f: Transition[CS]): F[Unit] = applyTransition(f, sync = true)
 
     def downloadFormData(element: ElementId[F]): F[FormData] =
       for {
@@ -265,7 +271,7 @@ final class ComponentInstance
     node(proxy)
   }
 
-  def applyTransition(transition: Transition[CS]): F[Unit] = {
+  def applyTransition(transition: Transition[CS], sync: Boolean): F[Unit] = {
     val effect = () =>
       for {
         state <- stateManager.read[CS](nodeId)
@@ -273,7 +279,8 @@ final class ComponentInstance
         _ <- stateManager.write(nodeId, newState)
         _ <- notifyStateChange(nodeId, newState)
       } yield ()
-    immediatePendingEffects.offer(effect)
+    if (sync) effect()
+    else immediatePendingEffects.offer(effect)
   }
 
   def applyEvent(eventId: EventId): Boolean = {
