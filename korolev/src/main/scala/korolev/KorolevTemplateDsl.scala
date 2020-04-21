@@ -16,7 +16,7 @@
 
 package korolev
 
-import korolev.utils.HtmlUtil
+import korolev.util.HtmlUtil
 import levsha.Document
 import Context.Binding
 import korolev.effect.Effect

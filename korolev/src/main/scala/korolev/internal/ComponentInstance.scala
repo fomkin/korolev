@@ -27,6 +27,9 @@ import levsha.events.EventId
 import scala.collection.mutable
 import Context._
 import korolev.effect.io.LazyBytes
+import korolev.util.JsCode
+
+import scala.concurrent.ExecutionContext
 
 /**
   * Component state holder and effects performer
@@ -81,6 +84,10 @@ final class ComponentInstance
   private[korolev] object browserAccess extends Access[F, CS, E] {
 
     private def getId(elementId: ElementId[F]): F[Id] = Effect[F].delay {
+      unsafeGetId(elementId)
+    }
+
+    private def unsafeGetId(elementId: ElementId[F]): Id = {
       // miscLock synchronization required
       // because prop handler methods can be
       // invoked during render.
@@ -187,7 +194,8 @@ final class ComponentInstance
         frontend.resetForm(id)
       }
 
-    def evalJs(code: String): F[String] = frontend.evalJs(code)
+    def evalJs(code: JsCode): F[String] =
+      frontend.evalJs(code.mkString(unsafeGetId))
 
     def eventData: F[String] = frontend.extractEventData(getRenderNum())
   }
@@ -262,6 +270,7 @@ final class ComponentInstance
                 )
                 markedComponentInstances += id
                 nestedComponents.put(id, n)
+                n.unsafeInitialize()
                 n.setEventsSubscription((e: Any) => entry.eventHandler(browserAccess, e).runAsyncForget)
                 n.applyRenderContext(entry.parameters, proxy, snapshot)
             }
@@ -360,11 +369,14 @@ final class ComponentInstance
         .unit
     } yield ()
 
+  protected def unsafeInitialize(): Unit =
+    immediatePendingEffects.stream
+      .foreach(_.apply())
+      .runAsyncForget
+
   // Execute effects sequentially
-  immediatePendingEffects
-    .stream
-    .foreach(_.apply())
-    .runAsyncForget
+  def initialize()(implicit ec: ExecutionContext): F[Effect.Fiber[F, Unit]] =
+    Effect[F].start(immediatePendingEffects.stream.foreach(_.apply()))
 }
 
 private object ComponentInstance {

@@ -4,12 +4,12 @@ import { ConnectionLostWidget, getDeviceId } from './utils.js';
 
 window['Korolev'] = {
   'setProtocolDebugEnabled': setProtocolDebugEnabled,
-  'swapElementInRegistry': () => console.log("Korolev is not ready"),
-  'reconnect': () => console.log("Connection is not ready")
+  'swapElementInRegistry': () => console.log("Korolev is not ready")
 };
 
 window.document.addEventListener("DOMContentLoaded", () => {
 
+  let reconnect = true
   let config = window['kfg'];
   let clw = new ConnectionLostWidget(config['clw']);
   let connection = new Connection(
@@ -19,13 +19,18 @@ window.document.addEventListener("DOMContentLoaded", () => {
     window.location
   );
 
-  // Set reconnect handler
-  window['Korolev']['reconnect'] = () => connection.disconnect();
+  window['Korolev']['disconnect'] = () => {
+    reconnect = false;
+    connection.disconnect();
+  }
+
+  window['Korolev']['connect'] = () => connection.connect();
 
   connection.dispatcher.addEventListener('open', () => {
     clw.hide();
     let bridge = new Bridge(config, connection);
     window['Korolev']['swapElementInRegistry'] = (a, b) => bridge._korolev.swapElementInRegistry(a, b);
+    window['Korolev']['element'] = (id) => bridge._korolev.element(id);
     let closeHandler = (event) => {
       bridge.destroy();
       clw.show();
@@ -39,8 +44,9 @@ window.document.addEventListener("DOMContentLoaded", () => {
   });
 
   connection.dispatcher.addEventListener('close', () => {
-    // Reconnect
-    connection.connect();
+    if (reconnect) {
+      connection.connect();
+    }
   });
 
   connection.connect();

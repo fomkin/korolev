@@ -306,6 +306,13 @@ export class Korolev {
   }
 
    /**
+    * @param {string} id
+    */
+  element(id) {
+    return this.els[id];
+  }
+
+   /**
     * @param {string} path
     */
   changePageUrl(path) {

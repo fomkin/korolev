@@ -20,6 +20,7 @@ import korolev.effect.io.LazyBytes
 import korolev.effect.{Effect, Reporter}
 import korolev.internal.{ComponentInstance, EventRegistry, Frontend, Scheduler}
 import korolev.state.{StateDeserializer, StateManager, StateSerializer}
+import korolev.util.JsCode
 import levsha._
 import levsha.events.EventPhase
 
@@ -110,7 +111,13 @@ object Context {
 
         def sessionId: F[Qsid] = access.sessionId
 
-        def evalJs(code: String): F[String] = access.evalJs(code)
+        def evalJs(code: JsCode): F[String] = access.evalJs(code)
+      }
+    }
+
+    implicit class JsCodeHelper(sc: StringContext) {
+      def js(args: Any*): JsCode = {
+        JsCode(sc.parts.toList, args.toList)
       }
     }
 
@@ -305,11 +312,16 @@ object Context {
     /**
       * Execute arbitrary JavaScript code on client and get stringified JSON back.
       * {{{
-      * access.evalJs("new Date().getTimezoneOffset()").map(offset => ...)
+      * for {
+      *   _ <- access.evalJs("new Date().getTimezoneOffset()").map(offset => ...)
+      *   _ <- access.evalJs(js"$myForm.submit()").map(offset => ...)
+      * } yield ()
       * }}}
       */
-    def evalJs(code: String): F[String]
+    def evalJs(code: JsCode): F[String]
 
+    def evalJs(code: String): F[String] =
+      evalJs(JsCode(code))
   }
 
   trait EventAccess[F[_], S, M] {
@@ -329,7 +341,7 @@ object Context {
     */
   abstract class Access[F[_]: Effect, S, M] extends BaseAccess[F, S, M] with EventAccess[F, S, M]
 
-  sealed abstract class Binding[F[_]: Effect, +S, +M]
+  sealed trait Binding[F[_], +S, +M]
 
   abstract class PropertyHandler[F[_]: Effect] {
     @deprecated("""Use "propertyName" instead of 'propertyName""", "0.13.0")
@@ -376,12 +388,15 @@ object Context {
       duration: FiniteDuration,
       effect: Access[F, S, M] => F[Unit]) extends Binding[F, S, M]
 
-  final class ElementId[F[_]: Effect](val name: Option[String]) extends Binding[F, Nothing, Nothing] {
+  final class ElementId[F[_]](val name: Option[String]) extends Binding[F, Nothing, Nothing] {
     override def equals(obj: Any): Boolean = obj match {
       case other: ElementId[F] => if (name.isDefined) name == other.name else super.equals(other)
       case _ => false
     }
-
+    override def toString: String = name match {
+      case Some(x) => s"ElementId($x)"
+      case None => super.toString
+    }
     override def hashCode(): Int = if (name.isDefined) name.hashCode() else super.hashCode()
   }
 }

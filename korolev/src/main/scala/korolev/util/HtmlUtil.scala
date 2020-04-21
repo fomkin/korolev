@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package korolev.utils
+package korolev.util
 
 object HtmlUtil {
 

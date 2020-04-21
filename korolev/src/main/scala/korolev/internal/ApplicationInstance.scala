@@ -22,13 +22,15 @@ import korolev.Context._
 import korolev.Router.Path
 import korolev.effect.syntax._
 import korolev._
-import korolev.effect.{Effect, Stream, Queue, Reporter}
+import korolev.effect.{Effect, Queue, Reporter, Stream}
 import korolev.internal.Frontend.DomEventMessage
 import korolev.state.{StateDeserializer, StateManager, StateSerializer}
 import levsha.events.calculateEventPropagation
 import levsha.impl.DiffRenderContext
 import levsha.impl.DiffRenderContext.ChangesPerformer
 import levsha.{Document, Id, XmlNs}
+
+import scala.concurrent.ExecutionContext
 
 final class ApplicationInstance
   [
@@ -172,7 +174,7 @@ final class ApplicationInstance
     _ <- topLevelComponentInstance.destroy()
   } yield ()
 
-  def initialize(reload: Boolean): F[Unit] = {
+  def initialize(reload: Boolean)(implicit ec: ExecutionContext): F[Unit] = {
 
     // If dev mode is enabled and active
     // CSS should be reloaded
@@ -208,6 +210,7 @@ final class ApplicationInstance
         _ <- reloadCssIfNecessary()
         _ <- renderEmptyBody()
         _ <- onState()
+        _ <- topLevelComponentInstance.initialize()
       } yield ()
 
     } else if (devMode.saved) {
@@ -225,6 +228,7 @@ final class ApplicationInstance
         // consist changes in render, so we
         // should deliver them to the user.
         _ <- render(frontend.performDomChanges)
+        _ <- topLevelComponentInstance.initialize()
       } yield ()
 
     } else {
@@ -235,6 +239,7 @@ final class ApplicationInstance
         _ <- frontend.setRenderNum(0)
         _ <- reloadCssIfNecessary()
         _ <- render(f => Effect[F].delay(f(DiffRenderContext.DummyChangesPerformer)))
+        _ <- topLevelComponentInstance.initialize()
       } yield ()
     }
   }
