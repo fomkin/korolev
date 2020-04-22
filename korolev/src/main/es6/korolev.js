@@ -301,8 +301,10 @@ export class Korolev {
     * @param {string} id
     */
   focus(id) {
-    var element = this.els[id];
-    element.focus();
+    setTimeout(() => {
+      var element = this.els[id];
+      element.focus();
+    }, 0);
   }
 
    /**

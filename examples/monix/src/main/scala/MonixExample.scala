@@ -42,7 +42,7 @@ object MonixExample extends SimpleAkkaHttpKorolevApp {
       a <- access.valueOf(aInput)
       b <- access.valueOf(bInput)
       _ <-
-        if (a.isBlank || b.isBlank) Task.unit
+        if (a.trim.isEmpty || b.trim.isEmpty) Task.unit
         else access.transition(_ => Some((a.toInt + b.toInt).toString))
     } yield ()
 }

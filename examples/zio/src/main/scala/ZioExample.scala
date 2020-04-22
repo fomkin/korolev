@@ -45,7 +45,7 @@ object ZioExample extends SimpleAkkaHttpKorolevApp {
       a <- access.valueOf(aInput)
       b <- access.valueOf(bInput)
       _ <-
-        if (a.isBlank || b.isBlank) ZIO.unit
+        if (a.trim.isEmpty || b.trim.isEmpty) ZIO.unit
         else access.transition(_ => Some((a.toInt + b.toInt).toString))
     } yield ()
 }

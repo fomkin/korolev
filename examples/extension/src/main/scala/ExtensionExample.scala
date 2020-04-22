@@ -40,10 +40,10 @@ object ExtensionExample extends SimpleAkkaHttpKorolevApp {
       name <- access.valueOf(nameElement)
       text <- access.valueOf(textElement)
       userName =
-        if (name.isBlank) s"Anonymous #${sessionId.hashCode().toHexString}"
+        if (name.trim.isEmpty) s"Anonymous #${sessionId.hashCode().toHexString}"
         else name
       _ <-
-        if (text.isBlank) Future.unit
+        if (text.trim.isEmpty) Future.unit
         else access.publish(s"$userName: $text")
       _ <- access.property(textElement).set("value", "")
     } yield ()

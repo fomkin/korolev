@@ -4,6 +4,7 @@ import korolev.Context.ElementId
 import korolev.util.JsCode.{Element, Part}
 
 import scala.annotation.tailrec
+import scala.concurrent.Future
 
 sealed trait JsCode {
   def ::(s: String): Part = Part(s, this)
@@ -43,7 +44,7 @@ object JsCode {
     @tailrec
     def reverse(acc: JsCode, jsCode: JsCode): JsCode = jsCode match {
       case Part(x, xs) => reverse(x :: acc, xs)
-      case Element(x, xs) => reverse(x :: acc, xs)
+      case Element(x, xs) => reverse(x.asInstanceOf[ElementId[Future]] :: acc, xs)
       case End => acc
     }
     reverse(End, combine(End, parts, inclusions))
