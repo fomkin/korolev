@@ -116,9 +116,8 @@ object Context {
     }
 
     implicit class JsCodeHelper(sc: StringContext) {
-      def js(args: Any*): JsCode = {
+      def js(args: Any*): JsCode =
         JsCode(sc.parts.toList, args.toList)
-      }
     }
 
     def elementId(name: Option[String] = None): ElementId = new Context.ElementId[F](name)

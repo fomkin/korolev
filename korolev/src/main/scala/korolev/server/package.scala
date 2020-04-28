@@ -24,7 +24,7 @@ import korolev.state.{DeviceId, StateDeserializer, StateSerializer}
 
 package object server {
 
-  type StateLoader[F[_], S] = (DeviceId, Option[RequestHeader]) => F[S]
+  type StateLoader[F[_], S] = (DeviceId, RequestHeader) => F[S]
 
   def korolevService[F[_]: Effect, S: StateSerializer: StateDeserializer, M](
       config: KorolevServiceConfig[F, S, M]): KorolevService[F] = {

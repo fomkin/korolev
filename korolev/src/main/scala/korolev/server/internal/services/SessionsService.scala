@@ -50,7 +50,7 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
 
   def initAppState(qsid: Qsid, rh: RequestHeader): F[S] =
     for {
-      defaultState <- config.stateLoader(qsid.deviceId, Some(rh))
+      defaultState <- config.stateLoader(qsid.deviceId, rh)
       state <- config.router.toState
         .lift(rh.path)
         .fold(Effect[F].pure(defaultState))(f => f(defaultState))

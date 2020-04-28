@@ -32,10 +32,18 @@ object Request {
   type WebSocket[F[_]] = Request[Stream[F, String]]
 
   sealed trait RequestHeader {
+
     def path: Router.Path
     def param: String => Option[String]
     def cookie: String => Option[String]
     def headers: Seq[(String, String)]
+
+    def header(header: String): Option[String] = {
+      val htl = header.toLowerCase
+      headers.collectFirst {
+        case (k, v) if k.toLowerCase == htl => v
+      }
+    }
   }
 
   sealed trait Method

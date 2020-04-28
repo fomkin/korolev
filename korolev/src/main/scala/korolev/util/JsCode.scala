@@ -38,6 +38,7 @@ object JsCode {
       case px :: pxs =>
         is match {
           case (ix: ElementId[_]) :: ixs => combine(ix :: px :: acc, pxs, ixs)
+          case (ix: String) :: ixs => combine(ix :: px :: acc, pxs, ixs)
           case Nil => combine(px :: acc, pxs, Nil)
         }
     }

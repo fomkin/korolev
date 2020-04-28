@@ -56,5 +56,5 @@ object StateLoader {
    * could be None if case when user reconnected to
    * restarted application and state wasn't restored.
    */
-  def apply[F[_], S](f: (DeviceId, Option[RequestHeader]) => F[S]): StateLoader[F, S] = f
+  def apply[F[_], S](f: (DeviceId, RequestHeader) => F[S]): StateLoader[F, S] = f
 }
