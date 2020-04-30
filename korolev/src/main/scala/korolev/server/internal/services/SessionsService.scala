@@ -18,8 +18,8 @@ package korolev.server.internal.services
 
 import korolev.{Extension, Qsid}
 import korolev.effect.syntax._
-import korolev.effect.{Effect, Stream}
-import korolev.internal.{ApplicationInstance, Frontend, Scheduler}
+import korolev.effect.{Effect, Scheduler, Stream}
+import korolev.internal.{ApplicationInstance, Frontend}
 import korolev.server.KorolevServiceConfig
 import korolev.server.Request.RequestHeader
 import korolev.server.internal.{BadRequestException, Cookies}

@@ -22,7 +22,7 @@ import korolev.Context._
 import korolev.Router.Path
 import korolev.effect.syntax._
 import korolev._
-import korolev.effect.{Effect, Queue, Reporter, Stream}
+import korolev.effect.{Effect, Queue, Reporter, Scheduler, Stream}
 import korolev.internal.Frontend.DomEventMessage
 import korolev.state.{StateDeserializer, StateManager, StateSerializer}
 import levsha.events.calculateEventPropagation

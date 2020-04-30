@@ -1,7 +1,7 @@
 package korolev
 
-import korolev.effect.{Queue, Reporter}
-import korolev.internal.{ApplicationInstance, Frontend, Scheduler}
+import korolev.effect.{Queue, Reporter, Scheduler}
+import korolev.internal.{ApplicationInstance, Frontend}
 import korolev.state.StateStorage
 import korolev.state.javaSerialization._
 import korolev.testExecution._

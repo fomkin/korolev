@@ -17,7 +17,7 @@
 package korolev.internal
 
 import korolev._
-import korolev.effect.{Effect, Queue, Reporter}
+import korolev.effect.{Effect, Queue, Reporter, Scheduler}
 import korolev.effect.syntax._
 import korolev.state.{StateDeserializer, StateManager, StateSerializer}
 import levsha.Document.Node
@@ -394,12 +394,12 @@ private object ComponentInstance {
     def isFinished: Boolean = finished
 
     def cancel(): Unit = {
-      handler.foreach(_.cancelUnsafe())
+      handler.foreach(_.unsafeCancel())
     }
 
     def start(access: Access[F, S, M]): Unit = {
       handler = Some {
-        scheduler.scheduleOnce(delay.duration) {
+        scheduler.unsafeScheduleOnce(delay.duration) {
           finished = true
           delay.effect(access)
         }
