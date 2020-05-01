@@ -238,7 +238,7 @@ final class ComponentInstance
       def addTextNode(text: String): Unit = rc.addTextNode(text)
       def addMisc(misc: Binding[F, CS, E]): Unit = {
         misc match {
-          case event @ Event(eventType, phase, _) =>
+          case event @ Event(eventType, phase, _, _) =>
             val id = rc.currentContainerId
             events.put(EventId(id, eventType, phase), event)
             eventRegistry.registerEventType(event.`type`)
@@ -301,7 +301,7 @@ final class ComponentInstance
         // the user's code waits for something
         // for a long time.
         event.effect(browserAccess).runAsyncForget
-        false
+        !event.stopPropagation
       case None =>
         nestedComponents.values.forall { nested =>
           nested.applyEvent(eventId)
