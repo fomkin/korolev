@@ -72,6 +72,7 @@ private[korolev] final class ServerSideRenderingService[F[_]: Effect, S](session
         rc.mkString,
         Seq(
           Headers.ContentTypeHtmlUtf8,
+          Headers.CacheControlNoCache,
           Headers.setCookie(Cookies.DeviceId, qsid.deviceId, config.rootPath,
             maxAge = 60 * 60 * 24 * 365 * 10 /* 10 years */)
         )

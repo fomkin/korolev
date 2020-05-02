@@ -20,9 +20,10 @@ object Headers {
 
   final val ContentType = "content-type"
   final val SetCookie = "set-cookie"
+  final val CacheControl = "cache-control"
 
-  final val ContentTypeHtmlUtf8 =
-    ContentType -> "text/html; charset=utf-8"
+  final val CacheControlNoCache = CacheControl -> "no-store, no-cache, must-revalidate"
+  final val ContentTypeHtmlUtf8 = ContentType -> "text/html; charset=utf-8"
 
   def setCookie(cookie: String, value: String, path: String, maxAge: Int): (String, String) =
     SetCookie -> s"$cookie=$value; path=$path; max-age=$maxAge"
