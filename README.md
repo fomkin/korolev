@@ -20,12 +20,11 @@ Korolev runs a single-page application on the server side, keeping in the browse
 * Build extremely large app without increasing size of the page
 * No need to make CRUD REST service
 * Connect to infrastructure (DBMS, Message queue) directly from application
-* Data security
  
 ## Documentation
 
 * [User guide (open site)](https://fomkin.org/korolev/user-guide.html), [(download PDF)](https://fomkin.org/korolev/user-guide.pdf)
-* [API overview](https://www.javadoc.io/doc/com.github.fomkin/korolev_2.13/0.14.0) 
+* [API overview](https://www.javadoc.io/doc/com.github.fomkin/korolev_2.13/0.15.0) 
 
 ## Tools
 
