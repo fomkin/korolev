@@ -273,23 +273,22 @@ lazy val `integration-tests` = project.
   dependsOn(slf4j).
   dependsOn(akka)
 
-//lazy val `performance-benchmark` = project.
-//  disablePlugins(HeaderPlugin).
-//  settings(commonSettings).
-//  settings(dontPublishSettings:_*).
-//  settings(
-//    addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full),
-//    scalaVersion := "2.12.8",
-//    fork in run := true,
-//    libraryDependencies ++= Seq(
-//      "com.typesafe.akka" %% "akka-http" % "10.1.8",
-//      "com.typesafe.akka" %% "akka-stream" % "2.5.23",
-//      "com.typesafe.akka" %% "akka-actor"  % "2.5.23",
-//      "com.typesafe.akka" %% "akka-typed" % "2.5.8",
-//      "com.github.fomkin" %% "pushka-json" % "0.8.0"
-//    )
-//  ).
-//  dependsOn(korolev)
+lazy val `performance-benchmark` = project.
+  disablePlugins(HeaderPlugin).
+  settings(commonSettings).
+  settings(dontPublishSettings:_*).
+  settings(crossVersionSettings).
+  settings(
+    fork in run := true,
+    libraryDependencies ++= Seq(
+      "com.typesafe.akka" %% "akka-http" % "10.1.11",
+      "com.typesafe.akka" %% "akka-stream" % "2.6.3",
+      "com.typesafe.akka" %% "akka-actor"  % "2.6.3",
+      "com.typesafe.akka" %% "akka-actor-typed" % "2.6.3",
+      "com.lihaoyi" %% "ujson" % "0.9.5"
+    )
+  ).
+  dependsOn(korolev)
 
 lazy val root = project.in(file(".")).
   settings(crossVersionSettings).
@@ -302,6 +301,6 @@ lazy val root = project.in(file(".")).
     formDataExample, `file-streaming-example`, delayExample, focusExample,
     webComponentExample, componentExample, akkaHttpExample, contextScopeExample,
     eventDataExample, extensionExample, `integration-tests`,
-    zioExample, monixExample, catsEffectExample
+    zioExample, monixExample, catsEffectExample, `performance-benchmark`
   )
 
