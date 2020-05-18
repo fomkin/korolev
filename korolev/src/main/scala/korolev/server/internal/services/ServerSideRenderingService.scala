@@ -65,7 +65,7 @@ private[korolev] final class ServerSideRenderingService[F[_]: Effect, S](session
       state <- sessionsService.initAppState(qsid, request)
     } yield {
       val rc = new HtmlRenderContext[F, S]()
-      rc.builder.append("<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.1//EN\" \"http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd\">\n")
+      rc.builder.append("<!DOCTYPE html>\n")
       page(qsid, state).apply(rc)
       Response.Http(
         Status.Ok,
