@@ -279,7 +279,7 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
               .after(stringPromises.remove(descriptor))
           case EvalJsStatus.Failure.code =>
             stringPromises
-              .fail(descriptor, ClientSideException("JavaScript evaluation error"))
+              .fail(descriptor, ClientSideException(json))
               .after(stringPromises.remove(descriptor))
         }
       case (callbackType, args) =>

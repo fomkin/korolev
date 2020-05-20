@@ -241,6 +241,13 @@ lazy val eventDataExample = (project in examples / "event-data").
   settings(mainClass := Some("EventDataExample")).
   dependsOn(akka)
 
+lazy val evalJsExample = (project in examples / "evalJs").
+  disablePlugins(HeaderPlugin).
+  settings(crossVersionSettings).
+  settings(exampleSettings: _*).
+  settings(mainClass := Some("EvalJsExample")).
+  dependsOn(akka)
+
 lazy val contextScopeExample = (project in examples / "context-scope").
   disablePlugins(HeaderPlugin).
   settings(crossVersionSettings).
@@ -301,6 +308,6 @@ lazy val root = project.in(file(".")).
     formDataExample, `file-streaming-example`, delayExample, focusExample,
     webComponentExample, componentExample, akkaHttpExample, contextScopeExample,
     eventDataExample, extensionExample, `integration-tests`,
-    zioExample, monixExample, catsEffectExample, `performance-benchmark`
+    zioExample, monixExample, catsEffectExample, evalJsExample, `performance-benchmark`,
   )
 

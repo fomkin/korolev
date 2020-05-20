@@ -428,6 +428,7 @@ export class Korolev {
       result = eval(code);
     } catch (e) {
       console.error(`Error evaluating code ${code}`, e);
+      result = e;
       status = 1;
     }
 
@@ -436,13 +437,16 @@ export class Korolev {
         (res) => this.callback(CallbackType.EVALJS_RESPONSE,`${descriptor}:0:${JSON.stringify(res)}`),
         (err) => {
           console.error(`Error evaluating code ${code}`, err);
-          this.callback(CallbackType.EVALJS_RESPONSE,`${descriptor}:1:${JSON.stringify(err)}`)
+          this.callback(CallbackType.EVALJS_RESPONSE,`${descriptor}:1:err}`)
         }
       );
     } else {
+      var resultString;
+      if (status === 1) resultString = result.toString();
+      else resultString = JSON.stringify(result);
       this.callback(
         CallbackType.EVALJS_RESPONSE,
-        `${descriptor}:${status}:${JSON.stringify(result)}`
+        `${descriptor}:${status}:${resultString}`
       );
     }
   }
