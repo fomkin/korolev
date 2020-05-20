@@ -310,7 +310,7 @@ object Context {
   /**
     * Provides access to make side effects
     */
-  abstract class Access[F[_]: Effect, S, M] extends BaseAccess[F, S, M] with EventAccess[F, S, M]
+  trait Access[F[_], S, M] extends BaseAccess[F, S, M] with EventAccess[F, S, M]
 
   sealed trait Binding[F[_], +S, +M]
 
