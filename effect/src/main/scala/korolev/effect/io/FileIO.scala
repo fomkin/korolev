@@ -26,7 +26,7 @@ object FileIO {
 
   def readBytes[F[_]: Effect](path: Path): F[LazyBytes[F]] = {
     val inputStream = new FileInputStream(path.toFile)
-    LazyBytes(inputStream)
+    LazyBytes.fromInputStream(inputStream)
   }
 
   def readLines[F[_]: Effect](path: Path): F[Stream[F, String]] = {

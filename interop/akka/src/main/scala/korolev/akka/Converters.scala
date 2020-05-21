@@ -17,6 +17,7 @@
 package korolev.akka
 
 import akka.NotUsed
+import akka.stream.{Attributes, OverflowStrategy}
 import akka.stream.scaladsl.{Sink, Source}
 import korolev.akka.util.{KorolevStreamPublisher, KorolevStreamSubscriber}
 import korolev.effect.{Effect, Stream}
@@ -59,7 +60,9 @@ object Converters {
 
     def asAkkaSource: Source[T, NotUsed] = {
       val publisher = new KorolevStreamPublisher(stream, fanout = false)
-      Source.fromPublisher(publisher)
+      Source
+        .fromPublisher(publisher)
+        .buffer(10, OverflowStrategy.backpressure) // FIXME should work without this line. Looks like bug in akka-streams
     }
   }
 }

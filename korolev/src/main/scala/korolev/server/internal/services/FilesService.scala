@@ -41,7 +41,7 @@ private[korolev] final class FilesService[F[_]: Effect](commonService: CommonSer
         case Some(mimeType) => Seq(Headers.ContentType -> mimeType)
         case None           => Nil
       }
-      LazyBytes(javaSyncStream) map { lazyBytes =>
+      LazyBytes.fromInputStream(javaSyncStream) map { lazyBytes =>
         Response(Response.Status.Ok, lazyBytes, headers)
       }
     }

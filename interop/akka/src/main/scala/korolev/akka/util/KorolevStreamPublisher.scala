@@ -38,6 +38,8 @@ final class KorolevStreamPublisher[F[_] : Effect, T](stream: Stream[F, T],
     @volatile var pending: Effect.Promise[Unit] = _
     val res = Right(())
 
+    def value(): F[Long] = Effect[F].delay(n)
+
     def decOrLock(): F[Unit] = Effect[F].promise[Unit] { cb =>
       this.synchronized { // FIXME use CAS?
         if (n == 0) {
@@ -49,7 +51,7 @@ final class KorolevStreamPublisher[F[_] : Effect, T](stream: Stream[F, T],
       }
     }
 
-    def setUnsafe(x: Long): Unit =
+    def unsafeSet(x: Long): Unit =
       this.synchronized {
         n = x
         if (x > 0 && pending != null) {
@@ -79,10 +81,13 @@ final class KorolevStreamPublisher[F[_] : Effect, T](stream: Stream[F, T],
         }
       } yield ()
 
-    loop().runAsyncForget
+    loop().runAsync {
+      case Left(error) => subscriber.onError(error)
+      case Right(_) => ()
+    }
 
     def request(n: Long): Unit = {
-      counter.setUnsafe(n)
+      counter.unsafeSet(n)
     }
 
     def cancel(): Unit = {

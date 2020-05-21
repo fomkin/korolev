@@ -70,7 +70,7 @@ object LazyBytes {
     new LazyBytes(Stream.eval(bytes), Some(bytes.length.toLong))
   }
 
-  def apply[F[_] : Effect](inputStream: InputStream, chunkSize: Int = 8192): F[LazyBytes[F]] = {
+  def fromInputStream[F[_] : Effect](inputStream: InputStream, chunkSize: Int = 8192): F[LazyBytes[F]] = {
     @tailrec
     def readStream(chunk: Array[Byte], offset: Int, len: Int): (Unit, Option[Array[Byte]]) = {
       val read = inputStream.read(chunk, offset, len)
