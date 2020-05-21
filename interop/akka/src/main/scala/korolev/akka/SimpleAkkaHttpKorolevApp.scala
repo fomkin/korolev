@@ -18,12 +18,10 @@ package korolev.akka
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import akka.stream.{ActorMaterializer, Materializer}
 
 abstract class SimpleAkkaHttpKorolevApp(config: AkkaHttpServerConfig = null) {
 
   implicit val actorSystem: ActorSystem = ActorSystem()
-  implicit val materializer: Materializer = ActorMaterializer()
 
   def service: AkkaHttpService
 

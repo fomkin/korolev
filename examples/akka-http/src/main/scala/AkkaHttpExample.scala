@@ -1,18 +1,16 @@
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import akka.stream.{ActorMaterializer, Materializer}
 import korolev._
 import korolev.akka._
 import korolev.server._
 import korolev.state.javaSerialization._
 
-import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 
 object AkkaHttpExample extends App {
 
   private implicit val actorSystem: ActorSystem = ActorSystem()
-  private implicit val materializer: Materializer = ActorMaterializer()
 
   val applicationContext = Context[Future, Boolean, Any]
 

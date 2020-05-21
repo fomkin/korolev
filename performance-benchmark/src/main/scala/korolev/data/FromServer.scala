@@ -1,9 +1,7 @@
 package korolev.data
 
 import akka.actor.typed.ActorRef
-import korolev.data.ToServer.Callback
 import korolev.internal.Frontend
-import korolev.internal.Frontend.CallbackType
 import ujson._
 
 sealed trait FromServer

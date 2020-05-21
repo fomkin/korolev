@@ -17,7 +17,7 @@
 package korolev.akka
 
 import akka.NotUsed
-import akka.stream.{Attributes, OverflowStrategy}
+import akka.stream.OverflowStrategy
 import akka.stream.scaladsl.{Sink, Source}
 import korolev.akka.util.{KorolevStreamPublisher, KorolevStreamSubscriber}
 import korolev.effect.{Effect, Stream}

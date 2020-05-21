@@ -10,7 +10,7 @@ import org.slf4j.LoggerFactory
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
-import io.circe._, io.circe.generic.auto._, io.circe.parser._, io.circe.syntax._
+import io.circe.generic.auto._, io.circe.parser._
 
 object GuineaPigService {
 
@@ -129,11 +129,11 @@ object GuineaPigService {
             event("submit") { access =>
               logger.info("Submit clicked")
               val property = access.property(inputId)
-              property.get('value) flatMap { value =>
+              property.get("value") flatMap { value =>
                 logger.info("Value received")
-                property.set('value, "property value") flatMap { _ =>
+                property.set("value", "property value") flatMap { _ =>
                   val todo = State.Todo(value, done = false)
-                  access.transition { case s =>
+                  access.transition { s =>
                     s.copy(todos = s.todos + (s.selectedTab -> (s.todos(s.selectedTab) :+ todo)))
                   }
                 }

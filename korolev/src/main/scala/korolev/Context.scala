@@ -32,7 +32,7 @@ import scala.concurrent.duration.FiniteDuration
   */
 final class Context[F[_]: Effect, S: StateSerializer: StateDeserializer, M] extends Context.Scope[F, S, S, M] {
   type AccessType = S
-  protected val accessScope: Context.Access[F, S, M] => Context.Access[F, S, M] = identity _
+  protected val accessScope: Context.Access[F, S, M] => Context.Access[F, S, M] = identity
 }
 
 object Context {
@@ -48,8 +48,6 @@ object Context {
     new Context[F, S, M]()
 
   sealed abstract class Scope[F[_]: Effect, S: StateSerializer: StateDeserializer, AccessType, M] {
-
-    import EventPhase._
 
     type Binding = Context.Binding[F, S, M]
     type Event = Context.Event[F, S, M]

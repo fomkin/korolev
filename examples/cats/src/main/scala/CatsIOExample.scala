@@ -1,7 +1,5 @@
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import akka.stream.{ActorMaterializer, Materializer}
-import scala.concurrent.ExecutionContext.Implicits.global
 import cats.effect.IO
 import korolev.Context
 import korolev.akka.{AkkaHttpServerConfig, akkaHttpService}
@@ -9,10 +7,11 @@ import korolev.cats.IOEffect
 import korolev.server.{KorolevServiceConfig, StateLoader}
 import korolev.state.javaSerialization._
 
+import scala.concurrent.ExecutionContext.Implicits.global
+
 object CatsIOExample extends App {
 
   private implicit val actorSystem: ActorSystem = ActorSystem()
-  private implicit val materializer: Materializer = ActorMaterializer()
 
   val applicationContext: Context[IO, State, Any] = {
     Context[IO, State, Any]
