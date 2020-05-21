@@ -1,6 +1,6 @@
 import xerial.sbt.Sonatype._
 
-val levshaVersion = "0.9.1"
+val levshaVersion = "0.9.2"
 
 val unusedRepo = Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
 

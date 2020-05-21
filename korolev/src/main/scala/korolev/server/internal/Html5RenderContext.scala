@@ -20,10 +20,10 @@ import korolev.Context
 import korolev.Context._
 import korolev.effect.Effect
 import levsha.RenderContext
-import levsha.impl.{AbstractTextRenderContext, TextPrettyPrintingConfig}
+import levsha.impl.TextPrettyPrintingConfig
 
-private[korolev] final class HtmlRenderContext[F[_]: Effect, S]
-  extends AbstractTextRenderContext[Binding[F, S, _]] {
+private[korolev] final class Html5RenderContext[F[_]: Effect, S]
+  extends levsha.impl.Html5RenderContext[Binding[F, S, _]] {
 
   val prettyPrinting: TextPrettyPrintingConfig =
     TextPrettyPrintingConfig.noPrettyPrinting
@@ -35,4 +35,5 @@ private[korolev] final class HtmlRenderContext[F[_]: Effect, S]
       component.render(parameters, component.initialState).apply(rc)
     case _ => ()
   }
+
 }
