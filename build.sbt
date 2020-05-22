@@ -1,11 +1,11 @@
 import xerial.sbt.Sonatype._
 
-val levshaVersion = "0.9.2"
+val levshaVersion = "0.10.0"
 
 val unusedRepo = Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
 
 val crossVersionSettings = Seq(
-  crossScalaVersions := Seq("2.12.10", "2.13.2")
+  crossScalaVersions := Seq("2.12.11", "2.13.2")
 )
 
 val dontPublishSettings = Seq(
