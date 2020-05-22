@@ -51,7 +51,7 @@ private[korolev] final class ServerSideRenderingService[F[_]: Effect, S](session
       optimize {
         Html(
           head(
-            script(language := "javascript", kfg),
+            script(kfg),
             script(src := config.rootPath + "static/korolev-client.min.js", defer := ""),
             config.head(state)
           ),

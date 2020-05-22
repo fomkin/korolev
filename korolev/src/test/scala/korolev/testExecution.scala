@@ -1,9 +1,6 @@
 package korolev
 
-import korolev.effect.{Effect, Reporter, Scheduler}
-
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration.FiniteDuration
 
 object testExecution {
 

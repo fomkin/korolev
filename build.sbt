@@ -5,7 +5,7 @@ val levshaVersion = "0.9.1"
 val unusedRepo = Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
 
 val crossVersionSettings = Seq(
-  crossScalaVersions := Seq("2.12.10", "2.13.1")
+  crossScalaVersions := Seq("2.12.10", "2.13.2")
 )
 
 val dontPublishSettings = Seq(
