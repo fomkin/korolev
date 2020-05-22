@@ -21,7 +21,7 @@ import korolev.effect.Effect
 import korolev.effect.syntax._
 import korolev.server.{Headers, KorolevServiceConfig, Request, Response}
 import korolev.server.Response.Status
-import korolev.server.internal.{Cookies, HtmlRenderContext}
+import korolev.server.internal.{Cookies, Html5RenderContext}
 import levsha.Document.Node
 
 private[korolev] final class ServerSideRenderingService[F[_]: Effect, S](sessionsService: SessionsService[F, S, _],
@@ -33,7 +33,7 @@ private[korolev] final class ServerSideRenderingService[F[_]: Effect, S](session
   def serverSideRenderedPage(request: Request.Http[F]): F[Response.Http[F]] = {
 
     def connectionLostWidgetHtml() = {
-      val rc = new HtmlRenderContext[F, S]()
+      val rc = new Html5RenderContext[F, S]()
       config.connectionLostWidget(rc)
       rc.mkString
     }
@@ -64,7 +64,7 @@ private[korolev] final class ServerSideRenderingService[F[_]: Effect, S](session
       qsid <- sessionsService.initSession(request)
       state <- sessionsService.initAppState(qsid, request)
     } yield {
-      val rc = new HtmlRenderContext[F, S]()
+      val rc = new Html5RenderContext[F, S]()
       rc.builder.append("<!DOCTYPE html>\n")
       page(qsid, state).apply(rc)
       Response.Http(
