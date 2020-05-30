@@ -271,7 +271,8 @@ object Context {
     /**
       * Applies transition to current state.
       */
-    def maybeTransition(f: PartialFunction[S, S]): F[Unit] = transition(f)
+    final def maybeTransition(f: PartialFunction[S, S]): F[Unit] =
+      transition(s => f.applyOrElse(s, identity[S]))
 
     /**
       * Gives current session id.
