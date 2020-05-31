@@ -50,6 +50,7 @@ object Router {
       aux("", this)
     }
     def /(s: String): Path = Router./(this, s)
+    def /(p: Path): Path = Router./(this, p.mkString)
   }
   case class /(prev: Path, value: String) extends Path
   case object Root extends Path
