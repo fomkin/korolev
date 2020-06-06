@@ -38,26 +38,45 @@ object Router {
     def mkString: String = {
       @tailrec def aux(acc: List[String], path: Path): List[String] = path match {
         case Root => acc
-        case prev / s => aux(s :: acc, prev)
+        case Segment(s) =>
+          s :: acc
+        case prev / s => {
+          aux(s :: acc, prev)
+        }
       }
+
       "/" + aux(Nil, this).mkString("/")
     }
     def startsWith(s: String): Boolean = {
       @tailrec def aux(last: String, path: Path): Boolean = path match {
         case Root => last == s
+        case Segment(s) => {
+          aux(s, Root)
+        }
         case prev / x => aux(x, prev)
       }
       aux("", this)
     }
     def /(s: String): Path = Router./(this, s)
-    def /(p: Path): Path = Router./(this, p.mkString)
+    def /(p: Path): Path = {
+      @tailrec def aux(acc: List[String], path: Path): List[String] = path match {
+        case Root => acc
+        case Segment(s) =>
+          s :: acc
+        case prev / s => {
+          aux(s :: acc, prev)
+        }
+      }
+
+      Router./(this, aux(Nil, p).mkString("/"))
+    }
   }
   case class /(prev: Path, value: String) extends Path
+  case class Segment(value: String) extends Path
   case object Root extends Path
 
   object Path {
-    val fromString: String => Path = _.split("/")
-      .toList
+    val fromString: String => Path = _.split("/").toList
       .filter(_.nonEmpty)
       .foldLeft(Root: Path)((xs, x) => /(xs, x))
   }
