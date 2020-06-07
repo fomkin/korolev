@@ -57,9 +57,9 @@ lazy val akka = (project in file("interop") / "akka").
   settings(
     normalizedName := "korolev-akka",
     libraryDependencies ++= Seq(
-      "com.typesafe.akka" %% "akka-actor" % "2.6.3",
-      "com.typesafe.akka" %% "akka-stream" % "2.6.3",
-      "com.typesafe.akka" %% "akka-http" % "10.1.11"
+      "com.typesafe.akka" %% "akka-actor" % "2.6.4",
+      "com.typesafe.akka" %% "akka-stream" % "2.6.4",
+      "com.typesafe.akka" %% "akka-http" % "10.1.12"
     )
   ).
   dependsOn(korolev)
@@ -288,10 +288,10 @@ lazy val `performance-benchmark` = project.
   settings(
     fork in run := true,
     libraryDependencies ++= Seq(
-      "com.typesafe.akka" %% "akka-http" % "10.1.11",
-      "com.typesafe.akka" %% "akka-stream" % "2.6.3",
-      "com.typesafe.akka" %% "akka-actor"  % "2.6.3",
-      "com.typesafe.akka" %% "akka-actor-typed" % "2.6.3",
+      "com.typesafe.akka" %% "akka-http" % "10.1.12",
+      "com.typesafe.akka" %% "akka-stream" % "2.6.4",
+      "com.typesafe.akka" %% "akka-actor"  % "2.6.4",
+      "com.typesafe.akka" %% "akka-actor-typed" % "2.6.4",
       "com.lihaoyi" %% "ujson" % "0.9.5"
     )
   ).
