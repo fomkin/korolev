@@ -41,7 +41,7 @@ class ZioEffect[R, E](rts: Runtime[R],
   def unit: ZIO[R, E, Unit] =
     ZIO.unit
 
-  def fromTry[A](value: => Try[A]): ZIO[R, E, A] =
+  def fromTry[A](value: Try[A]): ZIO[R, E, A] =
     Task.fromTry(value).mapError(liftError)
 
   def promise[A](callback: (Either[Throwable, A] => Unit) => Unit): ZIO[R, E, A] =

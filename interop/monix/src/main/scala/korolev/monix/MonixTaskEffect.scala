@@ -39,7 +39,7 @@ class MonixTaskEffect(implicit scheduler: Scheduler) extends Effect[Task] {
   def unit: Task[Unit] =
     Task.unit
 
-  def fromTry[A](value: => Try[A]): Task[A] =
+  def fromTry[A](value: Try[A]): Task[A] =
     Task.fromTry(value)
 
   def start[A](m: => Task[A])(implicit ec: ExecutionContext): Task[Effect.Fiber[Task, A]] = m

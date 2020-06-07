@@ -33,7 +33,7 @@ package object cats {
     private val cs = TrieMap.empty[ExecutionContext, ContextShift[IO]]
 
     def pure[A](value: A): IO[A] =
-      IO.pure(value)
+      IO.pure(value).start
 
     def delay[A](value: => A): IO[A] =
       IO.delay(value)
@@ -46,7 +46,7 @@ package object cats {
     def unit: IO[Unit] =
       IO.unit
 
-    def fromTry[A](value: => Try[A]): IO[A] =
+    def fromTry[A](value: Try[A]): IO[A] =
       IO.fromTry(value)
 
     def start[A](m: => IO[A])(implicit ec: ExecutionContext): IO[KEffect.Fiber[IO, A]] = m

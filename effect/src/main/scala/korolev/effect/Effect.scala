@@ -21,7 +21,7 @@ import korolev.effect.Effect.Fiber
 import scala.annotation.implicitNotFound
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, ExecutionContext, Future}
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 /**
   * Korolev's internal presentation of effect (such as Future, cats.effect.IO, Monix or ZIO tasks).
@@ -33,7 +33,7 @@ trait Effect[F[_]] {
   def delay[A](value: => A): F[A]
   def fail[A](e: Throwable): F[A]
   def unit: F[Unit]
-  def fromTry[A](value: => Try[A]): F[A]
+  def fromTry[A](value: Try[A]): F[A]
   def promise[A](cb: (Either[Throwable, A] => Unit) => Unit): F[A]
   def promiseF[A](cb: (Either[Throwable, A] => Unit) => F[Unit]): F[A]
   def flatMap[A, B](m: F[A])(f: A => F[B]): F[B]
@@ -62,48 +62,41 @@ object Effect {
   def apply[F[_]: Effect]: Effect[F] = implicitly[Effect[F]]
 
   final class FutureEffect extends Effect[Future] {
-    private implicit val immediateEc: ExecutionContext = new ExecutionContext {
-      // Run on the same thread
-      def execute(runnable: Runnable): Unit = runnable.run()
-      def reportFailure(cause: Throwable): Unit = cause.printStackTrace()
-    }
-    val unit: Future[Unit] = Future.unit
+
+    val unit: Future[Unit] = BrightFuture.unit
     def toFuture[A](m: Future[A]): Future[A] = m
-    def fail[A](e: Throwable): Future[A] = Future.failed(e)
-    def pure[A](value: A): Future[A] = Future.successful(value)
-    def delay[A](value: => A): Future[A] =
-      try {
-        Future.successful(value)
-      } catch {
-        case error: Throwable =>
-          Future.failed(error)
-      }
+    def fail[A](e: Throwable): Future[A] = BrightFuture.Error(e)
+    def pure[A](value: A): Future[A] = BrightFuture.Pure(value)
+    def delay[A](value: => A): Future[A] = BrightFuture.Delay(() => value)
     def fork[A](m: => Future[A])(implicit ec: ExecutionContext): Future[A] =
-      Future(m)(ec).flatten
-    def fromTry[A](value: => Try[A]): Future[A] = Future.fromTry(value)
-    def flatMap[A, B](m: Future[A])(f: A => Future[B]): Future[B] = m.flatMap(f)
-    def map[A, B](m: Future[A])(f: A => B): Future[B] = m.map(f)
+      BrightFuture.Map[A, A](m, identity, ec)
+    def fromTry[A](value: Try[A]): Future[A] = value match {
+      case Success(value) => BrightFuture.Pure(value)
+      case Failure(exception) => BrightFuture.Error(exception)
+    }
+    def flatMap[A, B](m: Future[A])(f: A => Future[B]): Future[B] = m.flatMap(f)(RunNowExecutionContext)
+    def map[A, B](m: Future[A])(f: A => B): Future[B] = m.map(f)(RunNowExecutionContext)
     def runAsync[A](m: Future[A])(f: Either[Throwable, A] => Unit): Unit =
-      m.onComplete(x => f(x.toEither))
+      m.onComplete(x => f(x.toEither))(RunNowExecutionContext)
     def run[A](m: Future[A]): A =
       Await.result(m, Duration.Inf)
-    def recover[A](m: Future[A])(f: PartialFunction[Throwable, A]): Future[A] = m.recover(f)
-    def sequence[A](in: List[Future[A]]): Future[List[A]] =
+    def recover[A](m: Future[A])(f: PartialFunction[Throwable, A]): Future[A] = m.recover(f)(RunNowExecutionContext)
+    def sequence[A](in: List[Future[A]]): Future[List[A]] = {
+      implicit val executor: ExecutionContext = RunNowExecutionContext
       Future.sequence(in)
+    }
     def start[A](create: => Future[A])(implicit ec: ExecutionContext): Future[Fiber[Future, A]] = {
       val f = Future(create)(ec).flatten
-      Future.successful(() => f)
+      Future.successful(() => f) // TODO ???
     }
     def promise[A](cb: (Either[Throwable, A] => Unit) => Unit): Future[A] = {
-      val promise = scala.concurrent.Promise[A]()
-      cb(or => promise.complete(or.toTry))
-      promise.future
+      BrightFuture.Async(cb)
     }
     def promiseF[A](cb: (Either[Throwable, A] => Unit) => Future[Unit]): Future[A] = {
       val promise = scala.concurrent.Promise[A]()
       cb(or => promise.complete(or.toTry)).flatMap { _ =>
         promise.future
-      }
+      }(RunNowExecutionContext) // TODO ???
     }
   }
 
