@@ -69,6 +69,9 @@ lazy val effect = project.
   settings(crossVersionSettings).
   settings(commonSettings: _*).
   settings(normalizedName := "korolev-effect")
+  .settings(
+    libraryDependencies += "org.typelevel" %% "cats-effect-laws" % "2.1.3" % "test"
+  )
 
 lazy val korolev = project.
   enablePlugins(GitVersioning).

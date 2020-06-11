@@ -13,31 +13,30 @@ sealed trait BrightFuture[+T] extends Future[T] {
 
   def transformWith[S](f: Try[T] => Future[S])(implicit executor: ExecutionContext): Future[S] =
     Bind(this, f, executor)
+
+  def attempt: BrightFuture[Either[Throwable, T]] = Map(
+    this, {
+      case Success(value) => Success(Right(value))
+      case Failure(value) => Success(Left(value))
+    }, RunNowExecutionContext
+  )
+
+  /**
+    * Same as [[onComplete]] but doesn't state
+    * change state of computing BrightFutures
+    * during computation.
+    */
+  def run[U](executor: ExecutionContext)(f: Try[T] => U): Unit
 }
 
 object BrightFuture {
 
-  sealed trait LazyLike[T] extends BrightFuture[T] {
+  sealed trait OnComplete[T] extends BrightFuture[T] {
 
     @volatile private var computed: Try[T] = _
     @volatile private var listeners = List.empty[(Try[T] => _, ExecutionContext)]
 
     def value: Option[Try[T]] = Option(computed)
-
-    protected def compute()(implicit executor: ExecutionContext): Unit
-
-    protected def complete(value: Try[T]): Unit = {
-      val xs = this.synchronized {
-        val res = listeners
-        listeners = Nil
-        computed = value
-        res
-      }
-      xs.foreach {
-        case (f, ec) =>
-          ec(f(computed))
-      }
-    }
 
     def onComplete[U](f: Try[T] => U)(implicit executor: ExecutionContext): Unit = this.synchronized {
       if (computed == null && listeners.isEmpty) {
@@ -45,7 +44,20 @@ object BrightFuture {
         // process is not started. Lets add the listener
         // and start computation
         listeners = (f, executor) :: listeners
-        executor(compute())
+        run(executor) { `try` =>
+          // Update the state
+          val xs = this.synchronized {
+            val res = listeners
+            listeners = Nil
+            computed = `try`
+            res
+          }
+          // Notify computed
+          xs.foreach {
+            case (f, ec) =>
+              ec(f(computed))
+          }
+        }
       } else if (computed != null) {
         // Future already computed. Lets invoke
         // the listener.
@@ -73,87 +85,117 @@ object BrightFuture {
         .result(atMost)
   }
 
-  final case class Async[T](k: (Either[Throwable, T] => Unit) => Unit) extends LazyLike[T] {
-    protected def compute()(implicit executor: ExecutionContext): Unit =
-      executor(k(result => complete(result.toTry)))
+  sealed trait LazyLike[T] extends BrightFuture[T] {
+
+    def value: Option[Try[T]] = None
+
+    protected def compute[U](complete: Try[T] => U): Unit
+
+    def run[U](executor: ExecutionContext)(f: Try[T] => U): Unit = this.synchronized {
+      // Execute in stateless mode
+      executor(compute(f))
+    }
+
+    def isCompleted: Boolean =
+      false
+
+    def ready(atMost: Duration)(implicit permit: CanAwait): this.type =
+      throw new TimeoutException("Unable to await lazy future without state")
+
+    def result(atMost: Duration)(implicit permit: CanAwait): T =
+      throw new TimeoutException("Unable to await lazy future without state")
+  }
+
+  final case class Async[T](k: (Either[Throwable, T] => Unit) => Unit) extends LazyLike[T] with OnComplete[T] {
+    protected def compute[U](complete: Try[T] => U): Unit =
+      k(result => complete(result.toTry))
   }
 
   final case class Map[A, B](source: Future[A],
                              f: Try[A] => Try[B],
-                             shift: ExecutionContext) extends LazyLike[B] {
+                             shift: ExecutionContext) extends LazyLike[B] with OnComplete[B] {
 
-    protected def compute()(implicit executor: ExecutionContext): Unit =
-      source.onComplete { `try` =>
-        complete(f(`try`))
-      }(shift)
+    protected def compute[U](complete: Try[B] => U): Unit = {
+      def runCallback(`try`: Try[A]): Unit = shift(complete(f(`try`)))
+      source match {
+        case bright: BrightFuture[A] => bright.run(shift)(runCallback)
+        case standard: Future[A] => standard.onComplete(runCallback)(shift)
+      }
+    }
   }
 
   final case class Bind[A, B](source: Future[A],
                               f: Try[A] => Future[B],
-                              shift: ExecutionContext) extends LazyLike[B] {
+                              shift: ExecutionContext) extends LazyLike[B] with OnComplete[B] {
 
-    protected def compute()(implicit executor: ExecutionContext): Unit =
-      source.onComplete { `try` =>
+    protected def compute[U](complete: Try[B] => U): Unit = {
+      def runCallback(`try`: Try[A]): Unit = shift {
         try {
           f(`try`) match {
-            case Pure(pureValue) => complete(Success(pureValue))
-            case Delay(thunk) => complete(Try(thunk()))
-            case Error(error) => complete(Failure(error))
             case Never => () // Do nothing
-            case future => future.onComplete(complete)
+            case Pure(pureValue) => complete(Success(pureValue))
+            case Error(error) => complete(Failure(error))
+            case Delay(thunk) => complete(Try(thunk()))
+            case future => future.onComplete(complete)(shift)
           }
         } catch {
           case error: Throwable =>
             complete(Failure(error))
         }
-      }(shift)
+      }
+      source match {
+        case bright: BrightFuture[A] => bright.run(shift)(runCallback)
+        case standard: Future[A] => standard.onComplete(runCallback)(shift)
+      }
+    }
   }
 
   /**
     * This future computes value (effect) every time
-    * onComplete is invoked.
+    * run(stateless = true) is invoked.
     */
-  final case class Delay[+T](thunk: () => T) extends BrightFuture[T] {
-    def value: Option[Try[T]] = Some(Try(thunk()))
-    val isCompleted: Boolean = true
-    def onComplete[U](f: Try[T] => U)(implicit executor: ExecutionContext): Unit =
-      executor(f(Try(thunk())))
-    def ready(atMost: Duration)(implicit permit: CanAwait): this.type = this
-    def result(atMost: Duration)(implicit permit: CanAwait): T = thunk()
+  final case class Delay[T](thunk: () => T) extends LazyLike[T] with OnComplete[T] {
+    protected def compute[U](f: Try[T] => U): Unit =
+      f(Try(thunk()))
   }
 
   final case class Error(error: Throwable) extends BrightFuture[Nothing] {
     private lazy val tryPureValue = Failure(error)
     lazy val value: Option[Try[Nothing]] = Some(Failure(error))
     def isCompleted: Boolean = true
-    def onComplete[U](f: Try[Nothing] => U)(implicit executor: ExecutionContext): Unit =
+    def run[U](executor: ExecutionContext)(f: Try[Nothing] => U): Unit =
       executor(f(tryPureValue))
     override def transform[S](f: Try[Nothing] => Try[S])(implicit executor: ExecutionContext): Future[S] = this
     override def transformWith[S](f: Try[Nothing] => Future[S])(implicit executor: ExecutionContext): Future[S] = this
     def ready(atMost: Duration)(implicit permit: CanAwait): this.type = this
     def result(atMost: Duration)(implicit permit: CanAwait): Nothing = throw error
+    def onComplete[U](f: Try[Nothing] => U)(implicit executor: ExecutionContext): Unit =
+      run(executor)(f)
   }
 
   final case class Pure[+T](pureValue: T) extends BrightFuture[T] {
     private lazy val tryPureValue: Try[T] = Success(pureValue)
     lazy val value: Option[Try[T]] = Some(tryPureValue)
-    def onComplete[U](f: Try[T] => U)(implicit executor: ExecutionContext): Unit =
+    def run[U](executor: ExecutionContext)(f: Try[T] => U): Unit =
       executor(f(tryPureValue))
     def isCompleted: Boolean = true
-    override def ready(atMost: Duration)(implicit permit: CanAwait): this.type = this
-    override def result(atMost: Duration)(implicit permit: CanAwait): T = pureValue
+    def ready(atMost: Duration)(implicit permit: CanAwait): this.type = this
+    def result(atMost: Duration)(implicit permit: CanAwait): T = pureValue
+    def onComplete[U](f: Try[T] => U)(implicit executor: ExecutionContext): Unit =
+      run(executor)(f)
   }
 
   case object Never extends BrightFuture[Nothing] {
-    def onComplete[U](f: Try[Nothing] => U)(implicit executor: ExecutionContext): Unit = ()
     def isCompleted: Boolean = false
     val value: Option[Try[Nothing]] = None
     override def transform[S](f: Try[Nothing] => Try[S])(implicit executor: ExecutionContext): Future[S] = this
     override def transformWith[S](f: Try[Nothing] => Future[S])(implicit executor: ExecutionContext): Future[S] = this
-    override def ready(atMost: Duration)(implicit permit: CanAwait): Never.this.type =
+    def ready(atMost: Duration)(implicit permit: CanAwait): Never.this.type =
       throw new TimeoutException("The bright future will never come")
-    override def result(atMost: Duration)(implicit permit: CanAwait): Nothing =
+    def result(atMost: Duration)(implicit permit: CanAwait): Nothing =
       throw new TimeoutException("The bright future will never come")
+    def run[U](executor: ExecutionContext)(f: Try[Nothing] => U): Unit = ()
+    def onComplete[U](f: Try[Nothing] => U)(implicit executor: ExecutionContext): Unit = ()
   }
 
   final val unit = Pure(())

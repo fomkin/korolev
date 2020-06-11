@@ -77,7 +77,11 @@ object Effect {
     def flatMap[A, B](m: Future[A])(f: A => Future[B]): Future[B] = m.flatMap(f)(RunNowExecutionContext)
     def map[A, B](m: Future[A])(f: A => B): Future[B] = m.map(f)(RunNowExecutionContext)
     def runAsync[A](m: Future[A])(f: Either[Throwable, A] => Unit): Unit =
-      m.onComplete(x => f(x.toEither))(RunNowExecutionContext)
+      m match {
+        case bf: BrightFuture[A] => bf.run(RunNowExecutionContext, stateless = true)(x => f(x.toEither))
+        case _ => m.onComplete(x => f(x.toEither))(RunNowExecutionContext)
+      }
+
     def run[A](m: Future[A]): A =
       Await.result(m, Duration.Inf)
     def recover[A](m: Future[A])(f: PartialFunction[Throwable, A]): Future[A] = m.recover(f)(RunNowExecutionContext)
