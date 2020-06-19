@@ -142,32 +142,31 @@ Render is a map between state and view. In other words render is a function whic
 -----------------------------------
 val render: State => Node = {
   case Anonymous(_) =>
-    body(
-      form(
-        input(placeholder := "Login"),
-        input(placeholder := "Password"),
-        button("Submit")
+    Html(
+      body(
+        form(
+          input(placeholder := "Login"),
+          input(placeholder := "Password"),
+          button("Submit")
+        )
       )
     )
   case Authorized(_, User(name, friends)) =>
-    body(
-      div(s"Your name is $name. Your friends:"),
-      ul(
-        // Look at that. You just map data to view
-        friends map { friend =>
-          li(friend)
-        }
+    Html(
+      body(
+        div(s"Your name is $name. Your friends:"),
+        ul(
+          // Look at that. You just map data to view
+          friends map { friend =>
+            li(friend)
+          }
+        )
       )
     )
 }
 -----------------------------------
 
 Render is called for each new state. It's important to understand that render produces a full DOM for every call. It does not mean that client receives a new page every time. Korolev makes a diff between current and latest DOM. Only changes between the two are sent to the client.
-
-[NOTE]
-==========================
-Currently, top-level render method must wrap its content into `body` element. This limitation will be removed in a future version.
-==========================
 
 === Transitions
 
@@ -203,10 +202,12 @@ def onClick(access: Access) = {
 }
 
 def renderAnonymous(state: MyState) = optimize {
-  body(
-    state.i.toString,
-    button("Increment",
-      event("click")(onClick)
+  Html(
+    body(
+      state.i.toString,
+      button("Increment",
+        event("click")(onClick)
+      )
     )
   )
 }
@@ -232,12 +233,14 @@ def onSubmit(access: Access) = {
 }
 
 def renderAnonymous = optimize {
-  body(
-    form(
-      input(placeholder := "Login", loginField),
-      input(placeholder := "Password", passwordField),
-      button("Submit"),
-      event("submit")(onSubmit)
+  Html(
+    body(
+      form(
+        input(placeholder := "Login", loginField),
+        input(placeholder := "Password", passwordField),
+        button("Submit"),
+        event("submit")(onSubmit)
+      )
     )
   )
 }
@@ -302,16 +305,18 @@ Let's use our component in the application.
 
 [source,scala]
 -----------------------------------
-body(
-  "Hello world!",
-  MyComponent(parameters) { (access, _) =>
-    // make transition on component event
-    access.transition {
-      case n => n + 1
-    }
-  },
-  // If you don't want to handle event, use silent instance
-  MyComponent.silent(parameters)
+Html(
+  body(
+    "Hello world!",
+    MyComponent(parameters) { (access, _) =>
+      // make transition on component event
+      access.transition {
+        case n => n + 1
+      }
+    },
+    // If you don't want to handle event, use silent instance
+    MyComponent.silent(parameters)
+  )
 )
 -----------------------------------
 
@@ -386,19 +391,23 @@ type MyState = Boolean
 
 def render(state: Boolean) =
   if (state) {
-    body(
-      delay(3.seconds) { access =>
-        access.transition(_ => false)
-      },
-      "Wait 3 seconds!"
+    Html(
+      body(
+        delay(3.seconds) { access =>
+          access.transition(_ => false)
+        },
+        "Wait 3 seconds!"
+      )
     )
   } else {
-    body(
-      button(
-        event("click") { access =>
-          access.transition(_ => true)
-        },
-        "Push the button"
+    Html(
+      body(
+        button(
+          event("click") { access =>
+            access.transition(_ => true)
+          },
+          "Push the button"
+        )
       )
     )
   }
@@ -463,11 +472,14 @@ case class MyState(author: String, title: String, text: String)
 KorolevServiceConfig(
   ...
   // Render the article
-  render = {
-    case MyState(author, title, text) => body(
-      div(s"$author: $title"),
-      div(text)
-    )
+  document = {
+    case MyState(author, title, text) =>
+      Html(
+        body(
+          div(s"$author: $title"),
+          div(text)
+        )
+      )
   },
   router = Router(
     fromState = {
@@ -678,7 +690,7 @@ And create Korolev route:
 ------------------------------
 val config = KorolevServiceConfig[Future, String, Any](
   stateLoader = StateLoader.default("world"),
-  render = state => body(div(s"Hello $state"))
+  document = state => Html(body(div(s"Hello $state")))
 )
 
 val korolevRoute = akkaHttpService(config).apply(AkkaHttpServerConfig())
