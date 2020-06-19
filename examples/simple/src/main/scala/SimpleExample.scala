@@ -19,8 +19,8 @@ object SimpleExample extends SimpleAkkaHttpKorolevApp {
   val service = akkaHttpService {
     KorolevServiceConfig [Future, State, Any] (
       stateLoader = StateLoader.default(State()),
-      render = {
-        case state => optimize {
+      document = state => optimize {
+        Html(
           body(
             div("Super TODO tracker"),
             div(height @= "250px", overflow @= "scroll",
@@ -95,7 +95,7 @@ object SimpleExample extends SimpleAkkaHttpKorolevApp {
               )
             )
           )
-        }
+        )
       }
     )
   }

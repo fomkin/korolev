@@ -56,12 +56,13 @@ object GameOfLife extends SimpleAkkaHttpKorolevApp {
     }
   }
 
+  import html._
+
   val service = akkaHttpService {
     KorolevServiceConfig[Future, Universe, Any](
       stateLoader = StateLoader.default(Universe(universeSize)),
-      render = { universe: Universe =>
-        import html._
-        optimize {
+      document = universe => optimize {
+        Html(
           body(
             div(
               button(
@@ -75,7 +76,7 @@ object GameOfLife extends SimpleAkkaHttpKorolevApp {
             ),
             renderUniverse(universe)
           )
-        }
+        )
       }
     )
   }

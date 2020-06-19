@@ -68,8 +68,8 @@ object ComponentExample extends SimpleAkkaHttpKorolevApp {
   val service: AkkaHttpService = akkaHttpService {
     KorolevServiceConfig[Future, String, Any] (
       stateLoader = StateLoader.default("a"),
-      render = {
-        state =>
+      document = { state =>
+        Html(
           body(
             s"State is $state",
             ComponentAsObject("Click me, i'm function") { (access, _) =>
@@ -85,6 +85,7 @@ object ComponentExample extends SimpleAkkaHttpKorolevApp {
               }
             )
           )
+        )
       }
     )
   }

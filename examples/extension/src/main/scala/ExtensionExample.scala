@@ -55,34 +55,36 @@ object ExtensionExample extends SimpleAkkaHttpKorolevApp {
   private val config = KorolevServiceConfig[Future, List[String], String](
     stateLoader = StateLoader.default(Nil),
     extensions = List(topicListener),
-    render = { message =>
+    document = { message =>
 
       import levsha.dsl._
       import html._
 
       optimize {
-        body(
-          div(
-            backgroundColor @= "yellow",
-            padding @= "10px",
-            border @= "1px solid black",
-            "This is a chat. Open this app in few browser tabs or on few different computers"
-          ),
-          div(
-            marginTop @= "10px",
-            padding @= "10px",
-            height @= "250px",
-            backgroundColor @= "#eeeeee",
-            message map { x =>
-              div(x)
-            }
-          ),
-          form(
-            marginTop @= "10px",
-            input(`type` := "text", placeholder := "Name", nameElement),
-            input(`type` := "text", placeholder := "Message", textElement),
-            button("Sent"),
-            event("submit")(onSubmit)
+        Html(
+          body(
+            div(
+              backgroundColor @= "yellow",
+              padding @= "10px",
+              border @= "1px solid black",
+              "This is a chat. Open this app in few browser tabs or on few different computers"
+            ),
+            div(
+              marginTop @= "10px",
+              padding @= "10px",
+              height @= "250px",
+              backgroundColor @= "#eeeeee",
+              message map { x =>
+                div(x)
+              }
+            ),
+            form(
+              marginTop @= "10px",
+              input(`type` := "text", placeholder := "Name", nameElement),
+              input(`type` := "text", placeholder := "Message", textElement),
+              button("Sent"),
+              event("submit")(onSubmit)
+            )
           )
         )
       }

@@ -18,9 +18,9 @@ object DelayExample extends SimpleAkkaHttpKorolevApp {
   val service = akkaHttpService {
     KorolevServiceConfig[Future, Option[Int], Any](
       stateLoader = StateLoader.default(Option.empty[Int]),
-      render = {
-        case Some(n) =>
-          optimize {
+      document = {
+        case Some(n) => optimize {
+          Html(
             body(
               delay(3.seconds) { access =>
                 access.transition {
@@ -37,16 +37,17 @@ object DelayExample extends SimpleAkkaHttpKorolevApp {
               ),
               "Wait 3 seconds!"
             )
-          }
+          )
+        }
         case None => optimize {
-          body(
-            button(
-              event("click") { access =>
-                access.transition {
-                  case _ => Some(1)
-                }
-              },
-              "Push the button"
+          Html(
+            body(
+              button(
+                event("click") { access =>
+                  access.transition { _ => Some(1) }
+                },
+                "Push the button"
+              )
             )
           )
         }

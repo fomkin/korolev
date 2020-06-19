@@ -56,22 +56,24 @@ object FileStreamingExample extends SimpleAkkaHttpKorolevApp {
   val service = akkaHttpService {
     KorolevServiceConfig[Future, State, Any] (
       stateLoader = StateLoader.default(State(aliveIndicator = false, Map.empty, inProgress = false)),
-      render = {
+      document = {
         case State(aliveIndicator, progress, inProgress) => optimize {
-          body(
-            delay(1.second) { access => access.transition(_.copy(aliveIndicator = !aliveIndicator)) },
-            div(when(aliveIndicator)(backgroundColor @= "red"), "Online"),
-            input(`type` := "file", multiple, fileInput),
-            ul(
-              progress.map {
-                case (name, (loaded, total)) =>
-                  li(s"$name: $loaded / $total")
-              }
-            ),
-            button(
-              "Upload",
-              when(inProgress)(disabled),
-              event("click")(onUploadClick)
+          Html(
+            body(
+              delay(1.second) { access => access.transition(_.copy(aliveIndicator = !aliveIndicator)) },
+              div(when(aliveIndicator)(backgroundColor @= "red"), "Online"),
+              input(`type` := "file", multiple, fileInput),
+              ul(
+                progress.map {
+                  case (name, (loaded, total)) =>
+                    li(s"$name: $loaded / $total")
+                }
+              ),
+              button(
+                "Upload",
+                when(inProgress)(disabled),
+                event("click")(onUploadClick)
+              )
             )
           )
         }
