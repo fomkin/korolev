@@ -26,7 +26,7 @@ private[korolev] final class KorolevServiceImpl[F[_]: Effect](reporter: Reporter
                                                               filesService: FilesService[F],
                                                               messagingService: MessagingService[F],
                                                               postService: PostService[F],
-                                                              ssrService: ServerSideRenderingService[F, _])
+                                                              ssrService: ServerSideRenderingService[F, _, _])
     extends KorolevService[F] {
 
   def http(request: Request.Http[F]): F[Response.Http[F]] = {

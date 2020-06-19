@@ -30,7 +30,7 @@ export class Korolev {
     /** @type {Object} */
     this.config = config;
     /** @type {HTMLElement} */
-    this.root = document.body;
+    this.root = document.children[0];
     /** @type {Object<Element>} */
     this.els = {};
     /** @type {number} */

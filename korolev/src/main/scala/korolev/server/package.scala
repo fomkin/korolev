@@ -16,6 +16,7 @@
 
 package korolev
 
+import korolev.Context.Binding
 import korolev.effect.Effect
 import korolev.server.Request.RequestHeader
 import korolev.server.internal.services._
@@ -29,15 +30,33 @@ package object server {
   def korolevService[F[_]: Effect, S: StateSerializer: StateDeserializer, M](
       config: KorolevServiceConfig[F, S, M]): KorolevService[F] = {
 
+    // TODO remove this when render/node fields will be removed
+    val actualConfig =
+      if (config.document == null) {
+        config.copy(document = { (state: S) =>
+          import levsha.dsl._
+          import html._
+          optimize[Binding[F, S, M]] {
+            Html(
+              head(config.head(state)),
+              config.render(state)
+            )
+          }
+        })(implicitly[Effect[F]], config.executionContext)
+      } else {
+        config
+      }
+
     import config.executionContext
 
     val commonService = new CommonService[F]()
     val filesService = new FilesService[F](commonService)
-    val sessionsService = new SessionsService[F, S, M](config)
-    val messagingService = new MessagingService[F](config.reporter, commonService, sessionsService)
-    val formDataCodec = new FormDataCodec(config.maxFormDataEntrySize)
-    val postService = new PostService[F](config.reporter, sessionsService, commonService, formDataCodec)
-    val ssrService = new ServerSideRenderingService[F, S](sessionsService, config)
+    val pageService = new PageService[F, S, M](actualConfig)
+    val sessionsService = new SessionsService[F, S, M](actualConfig, pageService)
+    val messagingService = new MessagingService[F](actualConfig.reporter, commonService, sessionsService)
+    val formDataCodec = new FormDataCodec(actualConfig.maxFormDataEntrySize)
+    val postService = new PostService[F](actualConfig.reporter, sessionsService, commonService, formDataCodec)
+    val ssrService = new ServerSideRenderingService[F, S, M](sessionsService, pageService, actualConfig)
 
     new KorolevServiceImpl[F](
       config.reporter,
