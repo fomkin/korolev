@@ -18,7 +18,7 @@ sealed trait BrightFuture[+T] extends Future[T] {
     this, {
       case Success(value) => Success(Right(value))
       case Failure(value) => Success(Left(value))
-    }, RunNowExecutionContext
+    }: Try[T] => Try[Either[Throwable, T]], RunNowExecutionContext
   )
 
   /**
@@ -36,7 +36,13 @@ object BrightFuture {
     @volatile private var computed: Try[T] = _
     @volatile private var listeners = List.empty[(Try[T] => _, ExecutionContext)]
 
-    def value: Option[Try[T]] = Option(computed)
+    def value: Option[Try[T]] = this.synchronized {
+      if (computed == null && listeners.isEmpty) {
+        // Force computation
+        this.onComplete(_ => ())(RunNowExecutionContext)
+      }
+      Option(computed)
+    }
 
     def onComplete[U](f: Try[T] => U)(implicit executor: ExecutionContext): Unit = this.synchronized {
       if (computed == null && listeners.isEmpty) {
@@ -87,23 +93,12 @@ object BrightFuture {
 
   sealed trait LazyLike[T] extends BrightFuture[T] {
 
-    def value: Option[Try[T]] = None
-
     protected def compute[U](complete: Try[T] => U): Unit
 
-    def run[U](executor: ExecutionContext)(f: Try[T] => U): Unit = this.synchronized {
+    def run[U](executor: ExecutionContext)(f: Try[T] => U): Unit = {
       // Execute in stateless mode
       executor(compute(f))
     }
-
-    def isCompleted: Boolean =
-      false
-
-    def ready(atMost: Duration)(implicit permit: CanAwait): this.type =
-      throw new TimeoutException("Unable to await lazy future without state")
-
-    def result(atMost: Duration)(implicit permit: CanAwait): T =
-      throw new TimeoutException("Unable to await lazy future without state")
   }
 
   final case class Async[T](k: (Either[Throwable, T] => Unit) => Unit) extends LazyLike[T] with OnComplete[T] {

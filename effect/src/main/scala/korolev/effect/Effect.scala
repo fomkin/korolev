@@ -78,7 +78,7 @@ object Effect {
     def map[A, B](m: Future[A])(f: A => B): Future[B] = m.map(f)(RunNowExecutionContext)
     def runAsync[A](m: Future[A])(f: Either[Throwable, A] => Unit): Unit =
       m match {
-        case bf: BrightFuture[A] => bf.run(RunNowExecutionContext, stateless = true)(x => f(x.toEither))
+        case bf: BrightFuture[A] => bf.run(RunNowExecutionContext)(x => f(x.toEither))
         case _ => m.onComplete(x => f(x.toEither))(RunNowExecutionContext)
       }
 

@@ -32,7 +32,7 @@ val commonSettings = publishSettings ++ Seq(
   git.useGitDescribe := true,
   organization := "com.github.fomkin",
   libraryDependencies ++= Seq(
-    "org.scalatest" %% "scalatest" % "3.0.8" % Test
+    "org.scalatest" %% "scalatest" % "3.1.1" % Test
   ),
   scalacOptions ++= Seq(
     "-deprecation",
@@ -70,7 +70,12 @@ lazy val effect = project.
   settings(commonSettings: _*).
   settings(normalizedName := "korolev-effect")
   .settings(
-    libraryDependencies += "org.typelevel" %% "cats-effect-laws" % "2.1.3" % "test"
+    libraryDependencies ++= Seq(
+      "org.typelevel" %% "cats-laws" % "2.0.0" % Test,
+      "org.typelevel" %% "cats-effect-laws" % "2.1.3" % Test,
+      "org.typelevel" %% "discipline-scalatest" % "1.0.1" % Test,
+      "com.github.alexarchambault" %% "scalacheck-shapeless_1.14" % "1.2.3" % Test
+    )
   )
 
 lazy val korolev = project.

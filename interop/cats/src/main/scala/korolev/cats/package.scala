@@ -33,7 +33,7 @@ package object cats {
     private val cs = TrieMap.empty[ExecutionContext, ContextShift[IO]]
 
     def pure[A](value: A): IO[A] =
-      IO.pure(value).start
+      IO.pure(value)
 
     def delay[A](value: => A): IO[A] =
       IO.delay(value)
