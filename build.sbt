@@ -20,7 +20,7 @@ val publishSettings = Seq(
   publishArtifact in Test := false,
   pomIncludeRepository := { _ => false },
   publishTo := sonatypePublishTo.value,
-  sonatypeProfileName := "org.github.fomkin",
+  sonatypeProfileName := "org.fomkin",
   sonatypeProjectHosting := Some(GitHubHosting("fomkin", "korolev", "Aleksey Fomkin", "aleksey.fomkin@gmail.com")),
   headerLicense := Some(HeaderLicense.ALv2("2017-2020", "Aleksey Fomkin")),
   licenses := Seq("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.txt")),
@@ -30,7 +30,7 @@ val commonSettings = publishSettings ++ Seq(
   addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
   addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.0" cross CrossVersion.full),
   git.useGitDescribe := true,
-  organization := "com.github.fomkin",
+  organization := "org.fomkin",
   libraryDependencies ++= Seq(
     "org.scalatest" %% "scalatest" % "3.0.8" % Test
   ),
