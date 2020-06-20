@@ -40,8 +40,9 @@ object GuineaPigService {
   }
 
   import State.globalContext._
-  import State.globalContext.symbolDsl._
-
+  import levsha.dsl._
+  import html._
+  
   val logger = LoggerFactory.getLogger("GuineaPig")
 
   val uploadFormId = elementId()
@@ -50,8 +51,8 @@ object GuineaPigService {
   val TheComponent = Component[Future, Int, String, Unit](0) { (context, label, state) =>
     import context._
     import symbolDsl._
-    'span(
-      'id /= "the-component",
+    span(
+      id := "the-component",
       s"$label $state",
       event("click") { access =>
         val future =
@@ -69,45 +70,43 @@ object GuineaPigService {
   val service = KorolevServiceConfig[Future, State, Any](
     stateLoader = StateLoader.default[Future, State](State()),
     reporter = korolev.slf4j.Slf4jReporter,
-    head = _ => {
-      Seq(
-        'title("The Test App"),
-        'link('href /= "/static/main.css", 'rel /= "stylesheet", 'type /= "text/css"),
-        'meta('content/="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0", 'name /= "viewport"),
-        'script('src /= "/static/debug-console.js")
-      )
-    },
-    render = {
-      case state =>
-        'body(
-          'div("Super TODO tracker"),
-          'div(
+    document = { state =>
+      Html(
+        head(
+          title("The Test App"),
+          link(href := "/static/main.css", rel := "stylesheet", `type` := "text/css"),
+          meta(content:="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0", name := "viewport"),
+          script(src := "/static/debug-console.js")
+        ),
+        body(
+          div("Super TODO tracker"),
+          div(
             state.todos.keys map { name =>
-              'span(
-                'id /= name,
+              span(
+                id := name,
                 event("click") { access =>
                   access.transition { case s =>
                     s.copy(selectedTab = name)
                   }
                 },
-                'marginLeft @= 10,
-                if (name == state.selectedTab) 'strong(name)
+                marginLeft @= "10",
+                if (name == state.selectedTab) strong(name)
                 else name
               )
             }
           ),
-          'div(
-            'id /= "todo-list",
-            'class /= "todos",
+          div(
+            id := "todo-list",
+            clazz := "todos",
             (state.todos(state.selectedTab) zipWithIndex) map {
               case (todo, i) =>
-                'div(
-                  'class /= {
+                div(
+                  clazz := {
                     if (todo.done) "todo todo__finished"
                     else "todo"
                   },
-                  'div(
-                    'class /= {
+                  div(
+                    clazz := {
                       if (!todo.done) "todo_checkbox"
                       else "todo_checkbox todo_checkbox__checked"
                     },
@@ -124,8 +123,8 @@ object GuineaPigService {
                 )
             }
           ),
-          'form(
-            // Generate AddTodo action when 'Add' button clicked
+          form(
+            // Generate AddTodo action when Add' button clicked
             event("submit") { access =>
               logger.info("Submit clicked")
               val property = access.property(inputId)
@@ -139,11 +138,11 @@ object GuineaPigService {
                 }
               }
             },
-            'input(
+            input(
               inputId,
-              'id /= "todo-input",
-              'type /= "text",
-              'placeholder /= "What should be done?",
+              id := "todo-input",
+              `type` := "text",
+              placeholder := "What should be done?",
               event("keydown") { access =>
                 access.eventData.flatMap { jsonString =>
                   decode[EventData](jsonString) match {
@@ -156,21 +155,21 @@ object GuineaPigService {
                 }
               }
             ),
-            'button(
-              'id /= "todo-submit-button",
+            button(
+              id := "todo-submit-button",
               "Add todo"
             )
           ),
-          'div(
+          div(
             state.uploadedText match {
               case "" => void
-              case s => 'div('id /= "upload-text", s)
+              case s => div(id := "upload-text", s)
             },
-            'form(
+            form(
               uploadFormId,
-              'id /= "upload-form",
-              'input('type /= "file", 'name /= "upload-input"),
-              'button('id /= "upload-button", "Submit"),
+              id := "upload-form",
+              input(`type` := "file", name := "upload-input"),
+              button(id := "upload-button", "Submit"),
               event("submit") { access =>
                 access
                   .downloadFormData(uploadFormId)
@@ -183,7 +182,7 @@ object GuineaPigService {
               }
             )
           ),
-          'div('id /= "delay-text",
+          div(id := "delay-text",
             if (state.delayOn) "Wait a second" else "Click me",
             if (state.delayOn) {
               delay(2.second) { access =>
@@ -199,17 +198,18 @@ object GuineaPigService {
               }
             }
           ),
-          'span('id /= "theKey", state.key.fold("[no key]")(identity)),
-          'div(
+          span(id := "theKey", state.key.fold("[no key]")(identity)),
+          div(
             TheComponent("label") { (access, _) =>
               access.transition(_.copy(eventFromComponentReceived = true))
             },
-            'span('id /= "from-component",
+            span(id := "from-component",
               if (state.eventFromComponentReceived) "Cat"
               else "Dog"
             )
           )
         )
+      )
     },
     router = {
       Router(

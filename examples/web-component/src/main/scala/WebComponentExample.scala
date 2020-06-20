@@ -29,14 +29,12 @@ object WebComponentExample extends SimpleAkkaHttpKorolevApp {
   val service = akkaHttpService{
     KorolevServiceConfig [Future, State, Any] (
       stateLoader = StateLoader.default(State()),
-      head = _ => {
-        Seq(
-          script(src := "https://cdnjs.cloudflare.com/ajax/libs/webcomponentsjs/0.7.24/webcomponents-lite.min.js"),
-          link(rel := "import", href := "https://leaflet-extras.github.io/leaflet-map/bower_components/leaflet-map/leaflet-map.html")
-        )
-      },
-      render = {
-        case state =>
+      document = state => optimize {
+        Html(
+          head(
+            script(src := "https://cdnjs.cloudflare.com/ajax/libs/webcomponentsjs/0.7.24/webcomponents-lite.min.js"),
+            link(rel := "import", href := "https://leaflet-extras.github.io/leaflet-map/bower_components/leaflet-map/leaflet-map.html")
+          ),
           body(
             div(
               button("San Francisco", event("click")(setLatLon(37.7576793, -122.5076402))),
@@ -52,6 +50,7 @@ object WebComponentExample extends SimpleAkkaHttpKorolevApp {
               zoom := "10"
             )
           )
+        )
       }
     )
   }

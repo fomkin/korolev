@@ -29,7 +29,8 @@ import scala.collection.concurrent.TrieMap
 import scala.util.Random
 
 private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: StateDeserializer, M](
-    config: KorolevServiceConfig[F, S, M]) {
+    config: KorolevServiceConfig[F, S, M],
+    pageService: PageService[F, S, M]) {
 
   import config.executionContext
   import config.reporter.Implicit
@@ -130,8 +131,9 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
         frontend,
         stateManager,
         initialState,
-        config.render,
+        config.document,
         config.router,
+        createMiscProxy = (rc, k) => pageService.setupStatefulProxy(rc, qsid, k),
         scheduler,
         config.reporter
       )

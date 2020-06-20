@@ -16,8 +16,8 @@ object EventDataExample extends SimpleAkkaHttpKorolevApp {
   val service = akkaHttpService {
     KorolevServiceConfig [Future, String, Any] (
       stateLoader = StateLoader.default("nothing"),
-      render = {
-        json: String => optimize {
+      document = json => optimize {
+        Html(
           body(
             input(
               `type` := "text",
@@ -29,7 +29,7 @@ object EventDataExample extends SimpleAkkaHttpKorolevApp {
             ),
             pre(json)
           )
-        }
+        )
       }
     )
   }

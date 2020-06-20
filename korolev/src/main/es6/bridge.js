@@ -12,7 +12,7 @@ export class Bridge {
    */
   constructor(config, connection) {
     this._korolev = new Korolev(config, this._onCallback.bind(this));
-    this._korolev.registerRoot(document.body);
+    this._korolev.registerRoot(document.children[0]);
     this._connection = connection;
     this._messageHandler = this._onMessage.bind(this);
 

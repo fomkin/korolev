@@ -28,7 +28,7 @@ import korolev.state.{StateDeserializer, StateManager, StateSerializer}
 import levsha.events.calculateEventPropagation
 import levsha.impl.DiffRenderContext
 import levsha.impl.DiffRenderContext.ChangesPerformer
-import levsha.{Document, Id, XmlNs}
+import levsha.{Document, Id, StatefulRenderContext, XmlNs}
 
 import scala.concurrent.ExecutionContext
 
@@ -44,6 +44,7 @@ final class ApplicationInstance
      initialState: S,
      render: S => Document.Node[Binding[F, S, M]],
      router: Router[F, S],
+     createMiscProxy: (StatefulRenderContext[Binding[F, S, M]], (StatefulRenderContext[Binding[F, S, M]], Binding[F, S, M]) => Unit) => StatefulRenderContext[Binding[F, S, M]],
      scheduler: Scheduler[F],
      reporter: Reporter
   ) { application =>
@@ -81,7 +82,7 @@ final class ApplicationInstance
       Id.TopLevel, sessionId, frontend, eventRegistry,
       stateManager, () => currentRenderNum.get(), component,
       notifyStateChange = (id, state) => onState() >> stateQueue.offer((id, state)),
-      scheduler, reporter
+      createMiscProxy, scheduler, reporter
     )
     componentInstance.setEventsSubscription(messagesQueue.offerUnsafe)
     componentInstance

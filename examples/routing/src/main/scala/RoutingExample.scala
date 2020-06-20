@@ -18,18 +18,16 @@ object RoutingExample extends SimpleAkkaHttpKorolevApp {
   val service = akkaHttpService {
     KorolevServiceConfig [Future, State, Any](
       stateLoader = StateLoader.default(State()),
-      head = _ => {
-        Seq(
-          title("Main Routing Page"),
-          link(
-            href := "/static/main.css",
-            rel := "stylesheet",
-            `type` := "text/css"
-          )
-        )
-      },
-      render = state => {
-        optimize {
+      document = state => optimize {
+        Html(
+          head(
+            title(s"ToDo [${state.selectedTab}]"),
+            link(
+              href := "/static/main.css",
+              rel := "stylesheet",
+              `type` := "text/css"
+            )
+          ),
           body(
             div("Super TODO tracker"),
             div(
@@ -87,7 +85,7 @@ object RoutingExample extends SimpleAkkaHttpKorolevApp {
               button("Add todo")
             )
           )
-        }
+        )
       },
       router = Router(
         fromState = {

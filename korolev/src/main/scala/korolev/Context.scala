@@ -345,7 +345,21 @@ object Context {
                        notifyStateChange: (Id, Any) => F[Unit],
                        scheduler: Scheduler[F],
                        reporter: Reporter): ComponentInstance[F, AS, M, CS, P, E] = {
-      new ComponentInstance(node, sessionId, frontend, eventRegistry, stateManager, getRenderNum, component, notifyStateChange, scheduler, reporter)
+      new ComponentInstance(
+        node, sessionId, frontend, eventRegistry, stateManager, getRenderNum, component, notifyStateChange,
+        createMiscProxy = (rc, k) => new StatefulRenderContext[Binding[F, CS, E]] {
+          def currentContainerId: Id = rc.currentContainerId
+          def currentId: Id = rc.currentId
+          def subsequentId: Id = rc.subsequentId
+          def openNode(xmlns: XmlNs, name: String): Unit = rc.openNode(xmlns, name)
+          def closeNode(name: String): Unit = rc.closeNode(name)
+          def setAttr(xmlNs: XmlNs, name: String, value: String): Unit = rc.setAttr(xmlNs, name, value)
+          def setStyle(name: String, value: String): Unit = rc.setStyle(name, value) 
+          def addTextNode(text: String): Unit = rc.addTextNode(text)
+          def addMisc(misc: Binding[F, CS, E]): Unit = k(this, misc)
+        },
+        scheduler, reporter
+      )
     }
   }
 

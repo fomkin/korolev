@@ -12,6 +12,8 @@ object MonixExample extends SimpleAkkaHttpKorolevApp {
   val ctx = Context[Task, Option[String], Any]
 
   import ctx._
+  import levsha.dsl._
+  import html._
 
   private val aInput = elementId()
   private val bInput = elementId()
@@ -19,10 +21,8 @@ object MonixExample extends SimpleAkkaHttpKorolevApp {
   def service: AkkaHttpService = akkaHttpService {
     KorolevServiceConfig[Task, Option[String], Any](
       stateLoader = StateLoader.default(None),
-      render = { maybeResult =>
-        import levsha.dsl._
-        import html._
-        optimize {
+      document = maybeResult => optimize {
+        Html(
           body(
             form(
               input(aInput, `type` := "number", event("input")(onChange)),
@@ -32,7 +32,7 @@ object MonixExample extends SimpleAkkaHttpKorolevApp {
               maybeResult.map(result => span(result)),
             )
           )
-        }
+        )
       }
     )
   }

@@ -22,10 +22,10 @@ import korolev.effect.Effect
 import levsha.RenderContext
 import levsha.impl.TextPrettyPrintingConfig
 
-private[korolev] final class Html5RenderContext[F[_]: Effect, S]
-  extends levsha.impl.Html5RenderContext[Binding[F, S, _]](TextPrettyPrintingConfig.noPrettyPrinting) {
+private[korolev] final class Html5RenderContext[F[_]: Effect, S, M]
+  extends levsha.impl.Html5RenderContext[Binding[F, S, M]](TextPrettyPrintingConfig.noPrettyPrinting) {
 
-  override def addMisc(misc: Binding[F, S, _]): Unit = misc match {
+  override def addMisc(misc: Binding[F, S, M]): Unit = misc match {
     case ComponentEntry(component, parameters, _) =>
       val rc = this.asInstanceOf[RenderContext[Context.Binding[F, Any, Any]]]
       // Static pages always made from scratch

@@ -48,5 +48,5 @@ final class KorolevTemplateDsl[F[_]: Effect, S, M] extends SymbolDsl[Binding[F, 
     * Make 'a tag non-clickable
     */
   val disableHref: Document.Attr[Binding[F, S, M]] =
-    'onclick /= "return false"
+    Symbol("onclick") /= "return false"
 }

@@ -20,8 +20,8 @@ object FocusExample extends SimpleAkkaHttpKorolevApp {
   val service: AkkaHttpService = akkaHttpService {
     KorolevServiceConfig[Future, Boolean, Any](
       stateLoader = StateLoader.default(false),
-      render = {
-        _: Boolean => optimize {
+      document = _ => optimize {
+        Html(
           body(
             div("Focus example"),
             div(
@@ -40,7 +40,7 @@ object FocusExample extends SimpleAkkaHttpKorolevApp {
               )
             )
           )
-        }
+        )
       }
     )
   }

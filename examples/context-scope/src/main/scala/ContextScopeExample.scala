@@ -25,12 +25,12 @@ object ContextScopeExample extends SimpleAkkaHttpKorolevApp {
   val service: AkkaHttpService = akkaHttpService {
     KorolevServiceConfig[Future, ViewState, Any] (
       stateLoader = StateLoader.default(ViewState("My blog", Blog.default)),
-      render = {
-        state =>
-          val isBlog = state.tab.isInstanceOf[Blog]
-          val isAbout = state.tab.isInstanceOf[About]
+      document = { state =>
+        val isBlog = state.tab.isInstanceOf[Blog]
+        val isAbout = state.tab.isInstanceOf[About]
 
-          optimize {
+        optimize {
+          Html(
             body(
               h1(state.blogName),
               div(
@@ -59,7 +59,8 @@ object ContextScopeExample extends SimpleAkkaHttpKorolevApp {
                 }
               )
             )
-          }
+          )
+        }
       }
     )
   }

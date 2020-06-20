@@ -19,13 +19,14 @@ object ZioExample extends SimpleAkkaHttpKorolevApp {
   private val aInput = elementId()
   private val bInput = elementId()
 
+  import levsha.dsl._
+  import html._
+
   def service: AkkaHttpService = akkaHttpService {
     KorolevServiceConfig[Task, Option[String], Any](
       stateLoader = StateLoader.default(None),
-      render = { maybeResult =>
-        import levsha.dsl._
-        import html._
-        optimize {
+      document = maybeResult => optimize {
+        Html(
           body(
             form(
               input(aInput, `type` := "number", event("input")(onChange)),
@@ -35,7 +36,7 @@ object ZioExample extends SimpleAkkaHttpKorolevApp {
               maybeResult.map(result => span(result)),
             )
           )
-        }
+        )
       }
     )
   }

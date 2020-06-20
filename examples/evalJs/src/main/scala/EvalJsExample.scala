@@ -22,11 +22,13 @@ object EvalJsExample extends SimpleAkkaHttpKorolevApp {
   val service = akkaHttpService {
     KorolevServiceConfig [Future, String, Any] (
       stateLoader = StateLoader.default("nothing"),
-      render = { s =>
+      document = { s =>
         optimize {
-          body(
-            button("Click me", event("click")(onClick)),
-            div(s)
+          Html(
+            body(
+              button("Click me", event("click")(onClick)),
+              div(s)
+            )
           )
         }
       }

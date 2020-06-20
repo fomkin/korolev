@@ -58,6 +58,7 @@ final class ComponentInstance
      getRenderNum: () => Int,
      val component: Component[F, CS, P, E],
      notifyStateChange: (Id, Any) => F[Unit],
+     createMiscProxy: (StatefulRenderContext[Binding[F, AS, M]], (StatefulRenderContext[Binding[F, CS, E]], Binding[F, CS, E]) => Unit) => StatefulRenderContext[Binding[F, CS, E]],
      scheduler: Scheduler[F],
      reporter: Reporter
   ) { self =>
@@ -227,56 +228,46 @@ final class ComponentInstance
             rc.closeNode("span")
           }
       }
-    val proxy = new StatefulRenderContext[Binding[F, CS, E]] { proxy =>
-      def subsequentId: Id = rc.subsequentId
-      def currentId: Id = rc.currentId
-      def currentContainerId: Id = rc.currentContainerId
-      def openNode(xmlNs: XmlNs, name: String): Unit = rc.openNode(xmlNs, name)
-      def closeNode(name: String): Unit = rc.closeNode(name)
-      def setAttr(xmlNs: XmlNs, name: String, value: String): Unit = rc.setAttr(xmlNs, name, value)
-      def setStyle(name: String, value: String): Unit = rc.setStyle(name, value)
-      def addTextNode(text: String): Unit = rc.addTextNode(text)
-      def addMisc(misc: Binding[F, CS, E]): Unit = {
-        misc match {
-          case event @ Event(eventType, phase, _, _) =>
-            val id = rc.currentContainerId
-            events.put(EventId(id, eventType, phase), event)
-            eventRegistry.registerEventType(event.`type`)
-          case element: ElementId[F] =>
-            val id = rc.currentContainerId
-            elements.put(element, id)
-            ()
-          case delay: Delay[F, CS, E] =>
-            val id = rc.currentContainerId
-            markedDelays += id
-            if (!delays.contains(id)) {
-              val delayInstance = new DelayInstance(delay, scheduler, reporter)
-              delays.put(id, delayInstance)
-              delayInstance.start(browserAccess)
-            }
-          case entry @ ComponentEntry(_, _: Any, _: ((Access[F, CS, E], Any) => F[Unit])) =>
-            val id = rc.subsequentId
-            nestedComponents.get(id) match {
-              case Some(n: ComponentInstance[F, CS, E, Any, Any, Any]) if n.component.id == entry.component.id =>
-                // Use nested component instance
-                markedComponentInstances += id
-                n.setEventsSubscription((e: Any) => entry.eventHandler(browserAccess, e).runAsyncForget)
-                n.applyRenderContext(entry.parameters, proxy, snapshot)
-              case _ =>
-                val n = entry.createInstance(
-                  id, sessionId, frontend, eventRegistry,
-                  stateManager, getRenderNum, notifyStateChange,
-                  scheduler, reporter
-                )
-                markedComponentInstances += id
-                nestedComponents.put(id, n)
-                n.unsafeInitialize()
-                n.setEventsSubscription((e: Any) => entry.eventHandler(browserAccess, e).runAsyncForget)
-                n.applyRenderContext(entry.parameters, proxy, snapshot)
-            }
-        }
+    val proxy = createMiscProxy(rc, { (proxy, misc) =>
+      misc match {
+        case event @ Event(eventType, phase, _, _) =>
+          val id = rc.currentContainerId
+          events.put(EventId(id, eventType, phase), event)
+          eventRegistry.registerEventType(event.`type`)
+        case element: ElementId[F] =>
+          val id = rc.currentContainerId
+          elements.put(element, id)
+          ()
+        case delay: Delay[F, CS, E] =>
+          val id = rc.currentContainerId
+          markedDelays += id
+          if (!delays.contains(id)) {
+            val delayInstance = new DelayInstance(delay, scheduler, reporter)
+            delays.put(id, delayInstance)
+            delayInstance.start(browserAccess)
+          }
+        case entry @ ComponentEntry(_, _: Any, _: ((Access[F, CS, E], Any) => F[Unit])) =>
+          val id = rc.subsequentId
+          nestedComponents.get(id) match {
+            case Some(n: ComponentInstance[F, CS, E, Any, Any, Any]) if n.component.id == entry.component.id =>
+              // Use nested component instance
+              markedComponentInstances += id
+              n.setEventsSubscription((e: Any) => entry.eventHandler(browserAccess, e).runAsyncForget)
+              n.applyRenderContext(entry.parameters, proxy, snapshot)
+            case _ =>
+              val n = entry.createInstance(
+                id, sessionId, frontend, eventRegistry,
+                stateManager, getRenderNum, notifyStateChange,
+                scheduler, reporter
+              )
+              markedComponentInstances += id
+              nestedComponents.put(id, n)
+              n.unsafeInitialize()
+              n.setEventsSubscription((e: Any) => entry.eventHandler(browserAccess, e).runAsyncForget)
+              n.applyRenderContext(entry.parameters, proxy, snapshot)
+          }
       }
-    }
+    })
     node(proxy)
   }
 

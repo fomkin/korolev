@@ -16,19 +16,19 @@ object AkkaHttpExample extends App {
 
   import applicationContext._
   import levsha.dsl._
-  import html.{body, button}
+  import html.{body, button, Html}
 
   private val config = KorolevServiceConfig[Future, Boolean, Any](
     stateLoader = StateLoader.default(false),
-    render = { s: Boolean =>
-      optimize {
+    document = s => optimize {
+      Html(
         body(
           s"Hello akka-http: $s",
           button("Click me!",
             event("click")(_.transition(!_))
           )
         )
-      }
+      )
     }
   )
 
