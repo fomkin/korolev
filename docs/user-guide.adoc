@@ -616,6 +616,28 @@ div(myElement)
 access.evalJs(js"""$myElement.innerHTML = 'this is <a href="http://example.com">example</a>'""")
 -------------------------------------------------------------------------------
 
+https://github.com/fomkin/korolev/blob/v0.15.0/examples/evalJs/src/main/scala/EvalJs.scala[See full example]
+
+=== Call server from JavaScript
+
+You can invoke callbacks on a server side from a browser. Declare the callback using `access`.
+
+[source,scala]
+-------------------------------------------------------------------------------
+access.registerCallback("myCallback") { myArg =>
+  Future(println(myArg))
+}
+-------------------------------------------------------------------------------
+
+Now invoke it from the client side.
+
+[source,javascript]
+-------------------------------------------------------------------------------
+Korolev.invokeCallback('myCallback', 'myArgValue');
+-------------------------------------------------------------------------------
+
+https://github.com/fomkin/korolev/blob/v0.15.0/examples/evalJs/src/main/scala/EvalJs.scala[See full example]
+
 == Productivity
 
 === Developer mode and "hot reload"

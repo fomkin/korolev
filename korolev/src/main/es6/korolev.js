@@ -3,7 +3,7 @@ import { getDeviceId } from './utils.js';
 /** @enum {number} */
 export const CallbackType = {
   DOM_EVENT: 0, // `$renderNum:$elementId:$eventType`
-  //FORM_DATA_PROGRESS: 1, // `$descriptor:$loaded:$total`
+  CUSTOM_CALLBACK: 1, // `$name:$arg`
   EXTRACT_PROPERTY_RESPONSE: 2, // `$descriptor:$propertyType:$value`
   HISTORY: 3, // URL
   EVALJS_RESPONSE: 4, // `$descriptor:$status:$value`
@@ -320,6 +320,14 @@ export class Korolev {
   changePageUrl(path) {
     if (path !== window.location.pathname)
       window.history.pushState(path, '', path);
+  }
+
+   /**
+    * @param {string} name
+    * @param {string} arg
+    */
+  invokeCustomCallback(name, arg) {
+    this.callback(CallbackType.CUSTOM_CALLBACK, [name, arg].join(':'));
   }
 
    /**

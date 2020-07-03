@@ -199,6 +199,9 @@ final class ComponentInstance
       frontend.evalJs(code.mkString(unsafeGetId))
 
     def eventData: F[String] = frontend.extractEventData(getRenderNum())
+
+    def registerCallback(name: String)(f: String => F[Unit]): F[Unit] =
+      frontend.registerCustomCallback(name)(f)
   }
 
   /**

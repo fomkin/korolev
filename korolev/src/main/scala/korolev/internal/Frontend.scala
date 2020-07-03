@@ -17,6 +17,8 @@
 package korolev.internal
 
 import java.util.concurrent.atomic.AtomicInteger
+import scala.collection.mutable
+import scala.annotation.switch
 
 import korolev.Context.FileHandler
 import korolev.{FormData, Router}
@@ -26,8 +28,6 @@ import korolev.effect.syntax._
 import korolev.effect.{AsyncTable, Effect, Queue, Reporter, Stream}
 import levsha.Id
 import levsha.impl.DiffRenderContext.ChangesPerformer
-
-import scala.annotation.switch
 
 /**
   * Typed interface to client side
@@ -39,6 +39,7 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
   private val lastDescriptor = new AtomicInteger(0)
   private val remoteDomChangesPerformer = new RemoteDomChangesPerformer()
 
+  private val customCallbacks = mutable.Map.empty[String, String => F[Unit]]
   private val stringPromises = AsyncTable.empty[F, String, String]
   private val formDataPromises = AsyncTable.empty[F, String, FormData]
   private val filesPromises = AsyncTable.empty[F, String, LazyBytes[F]]
@@ -207,6 +208,9 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
       .putEither(descriptor, formData)
       .after(formDataPromises.remove(descriptor))
 
+  def registerCustomCallback(name: String)(f: String => F[Unit]): F[Unit] =
+    Effect[F].delay(customCallbacks.put(name, f))
+
   private def unescapeJsonString(s: String): String = {
     val sb = new StringBuilder()
     var i = 1
@@ -281,6 +285,12 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
             stringPromises
               .fail(descriptor, ClientSideException(json))
               .after(stringPromises.remove(descriptor))
+        }
+      case (CallbackType.CustomCallback.code, args) =>
+        val Array(name, arg) = args.split(":", 2)
+        customCallbacks.get(name) match {
+          case Some(f) => f(arg)
+          case None => Effect[F].unit
         }
       case (callbackType, args) =>
         Effect[F].fail(UnknownCallbackException(callbackType, args))
@@ -368,7 +378,7 @@ object Frontend {
 
   object CallbackType {
     case object DomEvent extends CallbackType(0) // `$renderNum:$elementId:$eventType`
-    case object FormDataProgress extends CallbackType(1) // `$descriptor:$loaded:$total`
+    case object CustomCallback extends CallbackType(1) // `$name:arg`
     case object ExtractPropertyResponse extends CallbackType(2) // `$descriptor:$value`
     case object History extends CallbackType(3) // URL
     case object EvalJsResponse extends CallbackType(4) // `$descriptor:$status:$value`
@@ -376,7 +386,7 @@ object Frontend {
     case object Heartbeat extends CallbackType(6) // `$descriptor:$anyvalue`
 
     final val All = Set(DomEvent,
-                        FormDataProgress,
+                        CustomCallback,
                         ExtractPropertyResponse,
                         History,
                         EvalJsResponse,

@@ -25,13 +25,29 @@ object EvalJsExample extends SimpleAkkaHttpKorolevApp {
       document = { s =>
         optimize {
           Html(
+            head(
+              script(
+                """var x = 0;
+                  |setInterval(() => {
+                  |  x++;
+                  |  Korolev.invokeCallback('myCallback', x.toString());
+                  |}, 1000);
+                  |""".stripMargin
+              )
+            ),
             body(
               button("Click me", event("click")(onClick)),
               div(s)
             )
           )
         }
-      }
+      },
+      extensions = List(
+        Extension { access =>
+          for (_ <- access.registerCallback("myCallback")(arg => Future(println(arg))))
+            yield Extension.Handlers()
+        }
+      )
     )
   }
 }

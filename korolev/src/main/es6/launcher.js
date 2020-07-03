@@ -4,6 +4,7 @@ import { ConnectionLostWidget, getDeviceId } from './utils.js';
 
 window['Korolev'] = {
   'setProtocolDebugEnabled': setProtocolDebugEnabled,
+  'invokeCallback': () => console.log("Korolev is not ready"),
   'swapElementInRegistry': () => console.log("Korolev is not ready")
 };
 
@@ -31,6 +32,7 @@ window.document.addEventListener("DOMContentLoaded", () => {
     let bridge = new Bridge(config, connection);
     window['Korolev']['swapElementInRegistry'] = (a, b) => bridge._korolev.swapElementInRegistry(a, b);
     window['Korolev']['element'] = (id) => bridge._korolev.element(id);
+    window['Korolev']['invokeCallback'] = (name, arg) => bridge._korolev.invokeCustomCallback(name, arg);
     let closeHandler = (event) => {
       bridge.destroy();
       clw.show();

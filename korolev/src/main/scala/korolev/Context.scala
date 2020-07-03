@@ -110,6 +110,9 @@ object Context {
         def sessionId: F[Qsid] = access.sessionId
 
         def evalJs(code: JsCode): F[String] = access.evalJs(code)
+
+        def registerCallback(name: String)(f: String => F[Unit]): F[Unit] =
+          access.registerCallback(name)(f)
       }
     }
 
@@ -292,6 +295,21 @@ object Context {
 
     def evalJs(code: String): F[String] =
       evalJs(JsCode(code))
+
+    /**
+     * Register callback that could be invoked from the client side.
+     *
+     * {{{
+     *   // Scala
+     *   access.registerCallback("myCallback") { myArg =>
+     *     Future(println(myArg))
+     *   }
+     *
+     *   // JavaScript
+     *   Korolev.invokeCallback('myCallback', 'myArgValue');
+     * }}}
+     */
+    def registerCallback(name: String)(f: String => F[Unit]): F[Unit]
   }
 
   trait EventAccess[F[_], S, M] {
