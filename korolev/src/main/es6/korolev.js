@@ -115,9 +115,8 @@ export class Korolev {
     aux("1", rootNode);
   }
 
-  cleanRoot() {
-    while (this.root.children.length > 0)
-      this.root.removeChild(this.root.children[0]);
+  reload() {
+    window.document.location.reload();
   }
 
    /**

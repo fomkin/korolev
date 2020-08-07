@@ -175,22 +175,13 @@ final class ApplicationInstance
     _ <- topLevelComponentInstance.destroy()
   } yield ()
 
-  def initialize(reload: Boolean)(implicit ec: ExecutionContext): F[Unit] = {
+  def initialize()(implicit ec: ExecutionContext): F[Unit] = {
 
     // If dev mode is enabled and active
     // CSS should be reloaded
     def reloadCssIfNecessary() =
       if (devMode.isActive) frontend.reloadCss()
       else Effect[F].unit
-
-    // After 'cleanRoot' DiffRenderContext should
-    // be noticed about actual DOM state.
-    def renderEmptyBody() =
-      Effect[F].delay {
-        renderContext.openNode(levsha.XmlNs.html, "body")
-        renderContext.closeNode("body")
-        renderContext.diff(DiffRenderContext.DummyChangesPerformer)
-      }
 
     // Render current state using 'performDiff'.
     def render(performDiff: (ChangesPerformer => Unit) => F[Unit]) =
@@ -201,20 +192,7 @@ final class ApplicationInstance
         _ <- saveRenderContextIfNecessary()
       } yield ()
 
-    if (reload) {
-
-      // Reload opened page after
-      // server restart
-      for {
-        _ <- frontend.setRenderNum(0)
-        _ <- frontend.cleanRoot()
-        _ <- reloadCssIfNecessary()
-        _ <- renderEmptyBody()
-        _ <- onState()
-        _ <- topLevelComponentInstance.initialize()
-      } yield ()
-
-    } else if (devMode.saved) {
+    if (devMode.saved) {
 
       // Initialize with
       // 1. Old page in users browser
@@ -235,7 +213,6 @@ final class ApplicationInstance
     } else {
 
       // Initialize with pre-rendered page
-      // THIS IS COMMON INITIALIZATION SCENARIO
       for {
         _ <- frontend.setRenderNum(0)
         _ <- reloadCssIfNecessary()

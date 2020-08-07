@@ -57,14 +57,18 @@ private[korolev] final class PostService[F[_]: Effect](reporter: Reporter,
       }
     }
 
-    for {
-      app <- sessionsService.findApp(qsid)
-      formBytes <- data.toStrict
-      boundary <- extractBoundary()
-      errorOrFormData <- parseFormData(formBytes, boundary)
-      _ <- app.frontend.resolveFormData(descriptor, errorOrFormData)
-    } yield {
-      commonService.simpleOkResponse
+    sessionsService.getApp(qsid) flatMap {
+      case Some(app) =>
+        for {
+          formBytes <- data.toStrict
+          boundary <- extractBoundary()
+          errorOrFormData <- parseFormData(formBytes, boundary)
+          _ <- app.frontend.resolveFormData(descriptor, errorOrFormData)
+        } yield {
+          commonService.simpleOkResponse
+        }
+      case None =>
+        Effect[F].pure(commonService.badRequest(ErrorSessionNotFound(qsid)))
     }
   }
 
@@ -77,30 +81,41 @@ private[korolev] final class PostService[F[_]: Effect](reporter: Reporter,
         (entry.substring(0, slash), entry.substring(slash + 1).toLong)
       }
 
-    for {
-      app <- sessionsService.findApp(qsid)
-      message <- body.toStrictUtf8 // file_name/size_in_bytes\n
-      sizes =
-        if (message.isEmpty) List.empty[(String, Long)]
-        else parseFilesInfo(message)
-      _ <- app.frontend.resolveFileNames(descriptor, sizes)
-    } yield commonService.simpleOkResponse
+    sessionsService.getApp(qsid) flatMap {
+      case Some(app) =>
+        for {
+          message <- body.toStrictUtf8 // file_name/size_in_bytes\n
+          sizes =
+          if (message.isEmpty) List.empty[(String, Long)]
+          else parseFilesInfo(message)
+          _ <- app.frontend.resolveFileNames(descriptor, sizes)
+        } yield commonService.simpleOkResponse
+      case None =>
+        Effect[F].pure(commonService.badRequest(ErrorSessionNotFound(qsid)))
+    }
   }
 
   def file(qsid: Qsid, descriptor: String, headers: Seq[(String, String)], body: LazyBytes[F]): F[Response.Http[F]] = {
     val (consumed, chunks) = body.chunks.handleConsumed
-    for {
-      app <- sessionsService.findApp(qsid)
-      _ <- Effect[F].delay {
-        headers.collectFirst { case ("x-name", v) => v } match {
-          case None => Effect[F].pure(Response.Http(Response.Status.BadRequest, "Header 'x-name' should be defined", Nil))
-          case Some(fileName) =>
-            app.frontend.resolveFile(descriptor, LazyBytes(chunks, body.bytesLength))
-        }
-      }
-      // Do not response until chunks are not
-      // consumed inside an application
-      _ <- consumed
-    } yield commonService.simpleOkResponse
+    sessionsService.getApp(qsid) flatMap {
+      case Some(app) =>
+        for {
+          _ <- Effect[F].delay {
+            headers.collectFirst { case ("x-name", v) => v } match {
+              case None => Effect[F].pure(Response.Http(Response.Status.BadRequest, "Header 'x-name' should be defined", Nil))
+              case Some(fileName) =>
+                app.frontend.resolveFile(descriptor, LazyBytes(chunks, body.bytesLength))
+            }
+          }
+          // Do not response until chunks are not
+          // consumed inside an application
+          _ <- consumed
+        } yield commonService.simpleOkResponse
+      case None =>
+        Effect[F].pure(commonService.badRequest(ErrorSessionNotFound(qsid)))
+    }
   }
+
+  private def ErrorSessionNotFound(qsid: Qsid) =
+    s"There is no app instance matched to $qsid"
 }

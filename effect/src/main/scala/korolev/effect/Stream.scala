@@ -188,28 +188,33 @@ abstract class Stream[F[_]: Effect, A] { lhs =>
           Effect[F].promiseF { cb =>
             val maybeItem = values(i)
             if (maybeItem != null && maybeItem.isEmpty) {
+              // End of parent stream
               Effect[F].delay(cb(Right(maybeItem)))
             } else if (maybeItem != null && maybeItem.nonEmpty) {
-              cb(Right(maybeItem))
-              Effect[F].delay(values(i) = null)
+              // Contains value
+              Effect[F].delay {
+                cb(Right(maybeItem))
+                values(i) = null
+              }
             } else {
               promises(i) = cb
               if (inProgress.compareAndSet(false, true)) {
                 Effect[F].map(lhs.pull()) {
                   case maybeItem @ Some(item) =>
-                    inProgress.compareAndSet(true, false)
                     val j = f(item)
                     val cb = promises(j)
                     if (cb != null) {
                       promises(j) = null
+                      inProgress.compareAndSet(true, false)
                       cb(Right(maybeItem))
                     } else {
                       values(j) = maybeItem
+                      inProgress.compareAndSet(true, false)
                     }
                   case None =>
-                    inProgress.compareAndSet(true, false)
                     for (j <- 0 until numRacks)
                       values(j) = None
+                    inProgress.compareAndSet(true, false)
                     promises.foreach(_(Right(None)))
                 }
               } else {

@@ -23,6 +23,8 @@ import korolev.server.Response
 import korolev.server.Response.Status
 import korolev.Qsid
 import korolev.effect.io.LazyBytes
+import korolev.internal.Frontend
+import korolev.internal.Frontend.ReloadMessage
 
 import scala.collection.mutable
 
@@ -30,13 +32,17 @@ private[korolev] final class MessagingService[F[_]: Effect](reporter: Reporter,
                                                             commonService: CommonService[F],
                                                             sessionsService: SessionsService[F, _, _]) {
 
+  import MessagingService._
+
   /**
     * Poll message from session's ongoing queue.
     */
   def longPollingSubscribe(qsid: Qsid, rh: RequestHeader): F[Response.Http[F]] = {
     for {
-      app <- sessionsService.findAppOrCreate(qsid, rh, createTopic(qsid))
-      maybeMessage <- app.frontend.outgoingMessages.pull()
+      _ <- sessionsService.createAppIfNeeded(qsid, rh, createTopic(qsid))
+      maybeApp <- sessionsService.getApp(qsid)
+      // See webSocketMessaging()
+      maybeMessage <- maybeApp.fold(SomeReloadMessageF)(_.frontend.outgoingMessages.pull())
     } yield {
       maybeMessage match {
         case None => commonGoneResponse
@@ -62,8 +68,16 @@ private[korolev] final class MessagingService[F[_]: Effect](reporter: Reporter,
   }
 
   def webSocketMessaging(qsid: Qsid, rh: RequestHeader, incomingMessages: Stream[F, String]): F[Response.WebSocket[F]] = {
-    sessionsService.findAppOrCreate(qsid, rh, incomingMessages) map { app =>
-      Response(Status.Ok, app.frontend.outgoingMessages, Nil)
+    sessionsService.createAppIfNeeded(qsid, rh, incomingMessages) flatMap { _ =>
+      sessionsService.getApp(qsid) map {
+        case Some(app) => Response(Status.Ok, app.frontend.outgoingMessages, Nil)
+        case None =>
+          // Respond with reload message because app was not found.
+          // In this case it means that server had ben restarted and
+          // do not have an information about the state which had been
+          // applied to render of the page on a client side.
+          Response(Status.Ok, Stream.eval(Frontend.ReloadMessage), Nil)
+      }
     }
   }
 
@@ -112,4 +126,10 @@ private[korolev] final class MessagingService[F[_]: Effect](reporter: Reporter,
       longPollingTopics.put(qsid, topic)
       topic.stream
     }
+}
+
+private[korolev] object MessagingService {
+
+  def SomeReloadMessageF[F[_]: Effect]: F[Option[String]] =
+    Effect[F].pure(Option(ReloadMessage))
 }

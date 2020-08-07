@@ -38,6 +38,8 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
   type App = ApplicationInstance[F, S, M]
   type ExtensionsHandlers = List[Extension.Handlers[F, S, M]]
 
+  private val apps = TrieMap.empty[Qsid, Either[InitInProgress, App]]
+
   def initSession(rh: RequestHeader): F[Qsid] =
     for {
       deviceId <- rh.cookie(Cookies.DeviceId) match {
@@ -58,34 +60,30 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
       _ <- stateStorage.create(qsid.deviceId, qsid.sessionId, state)
     } yield state
 
-  def findApp(qsid: Qsid): F[App] =
+  def getApp(qsid: Qsid): F[Option[App]] =
     Effect[F].delay {
       apps.get(qsid) match {
-        case Some(Right(app)) => app
         case Some(Left(_))    => throw BadRequestException(ErrorInitInProgress)
-        case _                => throw BadRequestException(ErrorSessionNotFound(qsid))
+        case Some(Right(app)) => Some(app)
+        case _                => None
       }
     }
 
-  def findAppOrCreate(qsid: Qsid, rh: RequestHeader, incomingMessages: => Stream[F, String]): F[App] =
+  def createAppIfNeeded(qsid: Qsid, rh: RequestHeader, incomingMessages: => Stream[F, String]): F[Unit] =
     for {
       requestId <- Effect[F].delay(Random.nextInt())
       inProgressOrApp <- Effect[F].delay(apps.getOrElseUpdate(qsid, Left(InitInProgress(requestId))))
-      app <- {
+      _ <- {
         inProgressOrApp match {
           case Left(InitInProgress(`requestId`)) =>
             appsFactory(qsid, rh, incomingMessages)
-          case Right(app) =>
-            Effect[F].pure(app)
-          case _ =>
+          case Right(_) =>
+            Effect[F].unit
+          case xxx =>
             Effect[F].fail[App](BadRequestException(ErrorInitInProgress))
         }
       }
-    } yield {
-      app
-    }
-
-  private val apps = TrieMap.empty[Qsid, Either[InitInProgress, App]]
+    } yield ()
 
   private def appsFactory(qsid: Qsid, rh: RequestHeader, incomingStream: Stream[F, String]) = {
 
@@ -116,36 +114,43 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
           ehs.map(_.onMessage(m)).sequence.unit
         }
 
-    for {
-      exists <- stateStorage.exists(qsid.deviceId, qsid.sessionId)
-      stateManager <-
-        if (exists) stateStorage.get(qsid.deviceId, qsid.sessionId)
-        else initAppState(qsid, rh).flatMap(stateStorage.create(qsid.deviceId, qsid.sessionId, _))
-      maybeInitialState <- stateManager.read[S](levsha.Id.TopLevel)
-      // Top level state should exists. See 'initAppState'.
-      initialState = maybeInitialState.get
-      reload = !exists
-      frontend = new Frontend[F](incoming)
-      app = new ApplicationInstance[F, S, M](
-        qsid,
-        frontend,
-        stateManager,
-        initialState,
-        config.document,
-        config.router,
-        createMiscProxy = (rc, k) => pageService.setupStatefulProxy(rc, qsid, k),
-        scheduler,
-        config.reporter
-      )
-      browserAccess = app.topLevelComponentInstance.browserAccess
-      ehs <- config.extensions.map(_.setup(browserAccess)).sequence
-      _ <- Effect[F].start(handleStateChange(app, ehs))
-      _ <- Effect[F].start(handleMessages(app, ehs))
-      _ <- Effect[F].start(handleAppClose(frontend, app, ehs))
-      _ <- app.initialize(reload)
-    } yield {
-      apps.put(qsid, Right(app))
-      app
+    stateStorage.exists(qsid.deviceId, qsid.sessionId) flatMap {
+      case true =>
+        // State exists because it was created on static page
+        // rendering phase (see ServerSideRenderingService)
+        for {
+          stateManager <- stateStorage.get(qsid.deviceId, qsid.sessionId)
+          maybeInitialState <- stateManager.read[S](levsha.Id.TopLevel)
+          // Top level state should exists. See 'initAppState'.
+          initialState = maybeInitialState.get
+          frontend = new Frontend[F](incoming)
+          app = new ApplicationInstance[F, S, M](
+            qsid,
+            frontend,
+            stateManager,
+            initialState,
+            config.document,
+            config.router,
+            createMiscProxy = (rc, k) => pageService.setupStatefulProxy(rc, qsid, k),
+            scheduler,
+            config.reporter
+          )
+          browserAccess = app.topLevelComponentInstance.browserAccess
+          ehs <- config.extensions.map(_.setup(browserAccess)).sequence
+          _ <- Effect[F].start(handleStateChange(app, ehs))
+          _ <- Effect[F].start(handleMessages(app, ehs))
+          _ <- Effect[F].start(handleAppClose(frontend, app, ehs))
+          _ <- app.initialize()
+        } yield {
+          apps.put(qsid, Right(app))
+          ()
+        }
+      case false =>
+        // State is not exists. Do nothing
+        Effect[F].delay {
+          apps.remove(qsid)
+          ()
+        }
     }
   }
 
@@ -156,9 +161,6 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
   private val scheduler = new Scheduler[F]()
 
   private case class InitInProgress(request: Int)
-
-  private def ErrorSessionNotFound(qsid: Qsid) =
-    s"There is no app instance matched to $qsid"
 
   private final val ErrorInitInProgress =
     "Session initialization in progress. Please try again later."

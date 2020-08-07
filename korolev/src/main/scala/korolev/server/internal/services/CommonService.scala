@@ -25,6 +25,9 @@ private[korolev] final class CommonService[F[_]: Effect] {
   val notFoundResponse: Response.Http[F] =
     Response.Http(Response.Status.NotFound, "Not found", Nil)
 
+  def badRequest(message: String): Response.Http[F] =
+    Response.Http(Response.Status.BadRequest, s"Bad request. $message", Nil)
+
   val notFoundResponseF: F[Response.Http[F]] =
     Effect[F].pure(notFoundResponse)
 

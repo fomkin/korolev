@@ -12,7 +12,7 @@ From server to the client
 ```
 
  * 0 - SetRenderNum(n)
- * 1 - CleanRoot()
+ * 1 - Reload()
  * 2 - ListenEvent(type, preventDefault)
  * 3 - ExtractProperty(descriptor, id, propertyName)
  * 4 - ModifyDOM(commands)

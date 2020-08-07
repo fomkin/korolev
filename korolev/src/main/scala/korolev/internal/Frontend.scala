@@ -169,8 +169,8 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
   def setRenderNum(i: Int): F[Unit] =
     send(Procedure.SetRenderNum.code, i)
 
-  def cleanRoot(): F[Unit] =
-    send(Procedure.CleanRoot.code)
+  def reload(): F[Unit] =
+    send(Procedure.Reload.code)
 
   def reloadCss(): F[Unit] =
     send(Procedure.ReloadCss.code)
@@ -308,7 +308,7 @@ object Frontend {
 
   object Procedure {
     case object SetRenderNum extends Procedure(0) // (n)
-    case object CleanRoot extends Procedure(1) // ()
+    case object Reload extends Procedure(1) // ()
     case object ListenEvent extends Procedure(2) // (type, preventDefault)
     case object ExtractProperty extends Procedure(3) // (id, propertyName, descriptor)
     case object ModifyDom extends Procedure(4) // (commands)
@@ -325,7 +325,7 @@ object Frontend {
 
     val All = Set(
       SetRenderNum,
-      CleanRoot,
+      Reload,
       ListenEvent,
       ExtractProperty,
       ModifyDom,
@@ -400,4 +400,6 @@ object Frontend {
   case class ClientSideException(message: String) extends Exception(message)
   case class UnknownCallbackException(callbackType: Int, args: String)
     extends Exception(s"Unknown callback $callbackType with args '$args' received")
+
+  val ReloadMessage: String = "[1]"
 }

@@ -30,9 +30,11 @@ window.document.addEventListener("DOMContentLoaded", () => {
   connection.dispatcher.addEventListener('open', () => {
     clw.hide();
     let bridge = new Bridge(config, connection);
+
     window['Korolev']['swapElementInRegistry'] = (a, b) => bridge._korolev.swapElementInRegistry(a, b);
     window['Korolev']['element'] = (id) => bridge._korolev.element(id);
     window['Korolev']['invokeCallback'] = (name, arg) => bridge._korolev.invokeCustomCallback(name, arg);
+
     let closeHandler = (event) => {
       bridge.destroy();
       clw.show();
