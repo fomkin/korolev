@@ -57,9 +57,9 @@ lazy val akka = (project in file("interop") / "akka").
   settings(
     normalizedName := "korolev-akka",
     libraryDependencies ++= Seq(
-      "com.typesafe.akka" %% "akka-actor" % "2.6.4",
-      "com.typesafe.akka" %% "akka-stream" % "2.6.4",
-      "com.typesafe.akka" %% "akka-http" % "10.1.12"
+      "com.typesafe.akka" %% "akka-actor" % "2.6.8",
+      "com.typesafe.akka" %% "akka-stream" % "2.6.8",
+      "com.typesafe.akka" %% "akka-http" % "10.2.0"
     )
   ).
   dependsOn(korolev)
@@ -111,7 +111,7 @@ lazy val cats = project.
   settings(commonSettings: _*).
   settings(
     normalizedName := "korolev-cats",
-    libraryDependencies += "org.typelevel" %% "cats-effect" % "2.1.2"
+    libraryDependencies += "org.typelevel" %% "cats-effect" % "2.1.4"
   ).
   dependsOn(effect)
 
@@ -136,7 +136,7 @@ lazy val zio = project
   .settings(commonSettings: _*)
   .settings(
     normalizedName := "korolev-zio",
-    libraryDependencies += "dev.zio" %% "zio" % "1.0.0-RC18-2"
+    libraryDependencies += "dev.zio" %% "zio" % "1.0.0"
   )
   .dependsOn(effect)
 
@@ -288,10 +288,10 @@ lazy val `performance-benchmark` = project.
   settings(
     fork in run := true,
     libraryDependencies ++= Seq(
-      "com.typesafe.akka" %% "akka-http" % "10.1.12",
-      "com.typesafe.akka" %% "akka-stream" % "2.6.4",
-      "com.typesafe.akka" %% "akka-actor"  % "2.6.4",
-      "com.typesafe.akka" %% "akka-actor-typed" % "2.6.4",
+      "com.typesafe.akka" %% "akka-http" % "10.2.0",
+      "com.typesafe.akka" %% "akka-stream" % "2.6.8",
+      "com.typesafe.akka" %% "akka-actor"  % "2.6.8",
+      "com.typesafe.akka" %% "akka-actor-typed" % "2.6.8",
       "com.lihaoyi" %% "ujson" % "0.9.5"
     )
   ).
