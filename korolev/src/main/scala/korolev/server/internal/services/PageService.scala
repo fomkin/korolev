@@ -82,14 +82,14 @@ object PageService {
         underlyingRenderContext.closeNode("head")
       } else if (xmlNs == XmlNs.html && name == "head") {
         headWasOpened = true
+        underlyingRenderContext.openNode(xmlNs, name)
+        upgradeHead()
+      } else {
+        underlyingRenderContext.openNode(xmlNs, name)
       }
-      underlyingRenderContext.openNode(xmlNs, name)
     }
 
     override def closeNode(name: String): Unit = {
-      if (headWasOpened && name == "head") {
-        upgradeHead()
-      }
       underlyingRenderContext.closeNode(name)
     }
   }
