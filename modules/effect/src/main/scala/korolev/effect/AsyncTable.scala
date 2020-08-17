@@ -38,6 +38,15 @@ final class AsyncTable[F[_]: Effect, K, V](elems: Seq[(K, V)]) {
       }
     }
 
+  def getImmediately(key: K): F[Option[V]] =
+    Effect[F].delay {
+      for {
+        lr <- table.get(key)
+        res <- lr.toOption
+        v <- res.toOption
+      } yield v
+    }
+
   def put(key: K, value: V): F[Unit] =
     putEither(key, Right(value))
 
