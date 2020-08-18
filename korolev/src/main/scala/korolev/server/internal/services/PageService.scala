@@ -80,6 +80,7 @@ object PageService {
         underlyingRenderContext.openNode(XmlNs.html, "head")
         upgradeHead()
         underlyingRenderContext.closeNode("head")
+        underlyingRenderContext.openNode(xmlNs, name)
       } else if (xmlNs == XmlNs.html && name == "head") {
         headWasOpened = true
         underlyingRenderContext.openNode(xmlNs, name)
