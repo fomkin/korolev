@@ -9,6 +9,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.Duration
+import scala.util.{Failure, Success}
 
 class Http11Spec extends FlatSpec with Matchers with ScalaCheckPropertyChecks {
 
@@ -115,6 +116,15 @@ class Http11Spec extends FlatSpec with Matchers with ScalaCheckPropertyChecks {
         bytesVector -> withCookiesAndParams
       }
 
+  private def sliceToChunks(bytes: ByteVector, n: Int) = {
+    val chunk = bytes.length / n
+    (0 until n) map { i =>
+      val pos = chunk * i
+      if (i < n - 1) bytes.slice(pos, pos + chunk).copy
+      else bytes.slice(pos).copy
+    }
+  }
+
   "renderResponse/parseResponse" should "comply with the law `parse(render(response)) == response`" in {
     forAll (genResponse) { generated =>
       val (responseNoBody, bodyBytes, (parsedBodyBytes, parsedResponse)) = await {
@@ -136,6 +146,33 @@ class Http11Spec extends FlatSpec with Matchers with ScalaCheckPropertyChecks {
     }
   }
 
+//  "renderResponse/decodeResponse" should "comply with rule `decode(render(request)) == request`" in {
+//    // FIXME fomkin: I do not understand why Gen.chooseNum gives values < 1
+//    forAll (genRequest, Gen.chooseNum(2, 20).filter(i => i > 1)) { (generated, numChunks) =>
+//      val (sampleRequest, decodedRequest, sampleBody, decodedBody) = await {
+//        for {
+//          (sampleBody, sampleRequest) <- generated
+//          renderedRequestAsStream <- Http11.renderRequest(sampleRequest)
+//          renderedRequestAsBytes <- renderedRequestAsStream.fold(ByteVector.empty)(_ ++ _)
+//          renderedRequestAsChunks <- Stream(sliceToChunks(renderedRequestAsBytes, 2):_*).mat()
+//          maybeDecodedRequest <- Http11.decodeRequest(Decoder(renderedRequestAsChunks)).pull()
+//          decodedRequest = maybeDecodedRequest.getOrElse(throw new Exception("No request found in rendered stream"))
+//          decodedBody <- decodedRequest.body.fold(ByteVector.empty)(_ ++ _)
+//        } yield (
+//          sampleRequest.copy(body = ()),
+//          decodedRequest.copy(body = ()),
+//          sampleBody,
+//          decodedBody
+//        )
+//      }
+//      assert(
+//        sampleRequest == decodedRequest &&
+//          sampleBody == decodedBody
+//      )
+//    }
+//  }
+
+
   "renderRequest/parseRequest" should "comply with the law `parse(render(request)) == request`" in {
     forAll (genRequest) { generated =>
       val (requestNoBody, bodyBytes, (parsedBodyBytes, parsedRequest)) = await {
@@ -152,6 +189,33 @@ class Http11Spec extends FlatSpec with Matchers with ScalaCheckPropertyChecks {
       assert(
         parsedBodyBytes == bodyBytes &&
           parsedRequest == requestNoBody
+      )
+    }
+  }
+
+  "renderRequest/decodeRequest" should "comply with rule `decode(render(request)) == request`" in {
+    // FIXME fomkin: I do not understand why Gen.chooseNum gives values < 1
+    forAll (genRequest, Gen.chooseNum(2, 20).filter(i => i > 1)) { (generated, numChunks) =>
+      val (sampleRequest, decodedRequest, sampleBody, decodedBody) = await {
+        for {
+          (sampleBody, sampleRequest) <- generated
+          renderedRequestAsStream <- Http11.renderRequest(sampleRequest)
+          renderedRequestAsBytes <- renderedRequestAsStream.fold(ByteVector.empty)(_ ++ _)
+          renderedRequestAsChunks <- Stream(sliceToChunks(renderedRequestAsBytes, numChunks):_*).mat()
+          _ = println(sliceToChunks(renderedRequestAsBytes, numChunks).reduce(_ ++ _) == renderedRequestAsBytes)
+          maybeDecodedRequest <- Http11.decodeRequest(Decoder(renderedRequestAsChunks)).pull()
+          decodedRequest = maybeDecodedRequest.getOrElse(throw new Exception("No request found in rendered stream"))
+          decodedBody <- decodedRequest.body.fold(ByteVector.empty)(_ ++ _)
+        } yield (
+          sampleRequest.copy(body = ()),
+          decodedRequest.copy(body = ()),
+          sampleBody,
+          decodedBody
+        )
+      }
+      assert(
+        sampleRequest == decodedRequest &&
+          sampleBody == decodedBody
       )
     }
   }

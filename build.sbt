@@ -35,6 +35,7 @@ val commonSettings = publishSettings ++ Seq(
     "org.scalatest" %% "scalatest" % "3.0.8" % Test,
     "org.scalacheck" %% "scalacheck" % "1.14.1" % Test
   ),
+  //javaOptions in Test += "-XX:-OmitStackTraceInFastThrow",
   scalacOptions ++= Seq(
     "-deprecation",
     "-feature",

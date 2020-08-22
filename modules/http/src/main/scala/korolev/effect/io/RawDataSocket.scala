@@ -8,7 +8,8 @@ import korolev.data.ByteVector
 import korolev.effect.{Effect, Stream}
 
 sealed class RawDataSocket[F[_]: Effect](channel: AsynchronousSocketChannel,
-                                         buffer: ByteBuffer) extends DataSocket[F] {
+                                         buffer: ByteBuffer,
+                                         label: String) extends DataSocket[F] {
 
   private var inProgress = false
   private var canceled = false
@@ -20,7 +21,7 @@ sealed class RawDataSocket[F[_]: Effect](channel: AsynchronousSocketChannel,
       } else {
         buffer.clear()
         if (inProgress) {
-          println(s"${Console.RED}Concurrent pull() detected in RawDataSocket(${channel.getRemoteAddress}).stream. ${Console.RESET}")
+          println(s"${Console.RED}Concurrent pull() detected in RawDataSocket($label, ${channel.getRemoteAddress}) ${Console.RESET}")
           Thread
             .currentThread()
             .getStackTrace
@@ -80,7 +81,7 @@ object RawDataSocket {
                             group: AsynchronousChannelGroup = null): F[RawDataSocket[F]] =
     Effect[F].promise { cb =>
       val channel = AsynchronousSocketChannel.open(group)
-      lazy val ds = new RawDataSocket[F](channel, buffer)
+      lazy val ds = new RawDataSocket[F](channel, buffer, "outgoing connection")
       channel.connect(address, (), completionHandler[Void](cb.compose(_.map(_ => ds))))
     }
 }

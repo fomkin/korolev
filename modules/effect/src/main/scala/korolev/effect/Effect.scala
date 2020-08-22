@@ -40,6 +40,7 @@ trait Effect[F[_]] {
   def flatMap[A, B](m: F[A])(f: A => F[B]): F[B]
   def map[A, B](m: F[A])(f: A => B): F[B]
   def recover[A, AA >: A](m: F[A])(f: PartialFunction[Throwable, AA]): F[AA]
+  def recoverF[A, AA >: A](m: F[A])(f: PartialFunction[Throwable, F[AA]]): F[AA]
   /** Keep in mind that when [[F]] has strict semantic, effect should
     * created inside 'start()' brackets. */
   def start[A](create: => F[A])(implicit ec: ExecutionContext): F[Fiber[F, A]]
@@ -89,6 +90,7 @@ object Effect {
     def run[A](m: Future[A]): Either[Throwable, A] =
       Try(Await.result(m, Duration.Inf)).toEither
     def recover[A, AA >: A](m: Future[A])(f: PartialFunction[Throwable, AA]): Future[AA] = m.recover(f)
+    def recoverF[A, AA >: A](m: Future[A])(f: PartialFunction[Throwable, Future[AA]]): Future[AA] = m.recoverWith(f)
     def sequence[A](in: List[Future[A]]): Future[List[A]] =
       Future.sequence(in)
     def start[A](create: => Future[A])(implicit ec: ExecutionContext): Future[Fiber[Future, A]] = {
