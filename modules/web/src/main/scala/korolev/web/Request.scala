@@ -19,6 +19,9 @@ package korolev.web
 import java.net.{URLDecoder, URLEncoder}
 import java.nio.charset.StandardCharsets
 
+/**
+ * @param body Should be handled before response be given
+ */
 final case class Request[Body](method: Request.Method,
                                path: Path,
                                headers: Seq[(String, String)],

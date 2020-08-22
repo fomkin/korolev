@@ -49,6 +49,8 @@ object syntax {
 
     def recover[AA >: A](f: PartialFunction[Throwable, AA]): F[AA] = Effect[F].recover[A, AA](effect)(f)
 
+    def recoverF[AA >: A](f: PartialFunction[Throwable, F[AA]]): F[AA] = Effect[F].recoverF[A, AA](effect)(f)
+
     def start(implicit ec: ExecutionContext): F[Effect.Fiber[F, A]] = Effect[F].start(effect)
 
     def runAsync(f: Either[Throwable, A] => Unit): Unit = Effect[F].runAsync(effect)(f)

@@ -1,7 +1,7 @@
 package korolev
 
-import korolev.util.JsCode
 import korolev.Context.ElementId
+import korolev.util.JsCode
 import org.scalatest.{FlatSpec, Matchers}
 
 import scala.concurrent.Future

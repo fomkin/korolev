@@ -1,6 +1,7 @@
 package korolev.http
 
 import java.net.{InetSocketAddress, SocketAddress}
+import java.nio.ByteBuffer
 
 import korolev.data.ByteVector
 import korolev.effect.io.RawDataSocket
@@ -15,22 +16,23 @@ object HttpClient {
 
   def apply[F[_]: Effect](host: String,
                           port: Int,
-                          request: Request[Stream[F, ByteVector]])
+                          request: Request[Stream[F, ByteVector]],
+                          bufferSize: Int = 8096)
                          (implicit executor: ExecutionContext): F[Response[Stream[F, ByteVector]]] = {
     for {
-      socket <- RawDataSocket.connect(new InetSocketAddress(host, port))
+      socket <- RawDataSocket.connect(new InetSocketAddress(host, port), buffer = ByteBuffer.allocate(bufferSize))
       requestStream <- Http11.renderRequest(request.withHeader(Headers.Host, host))
       writeBytesFiber <- requestStream.foreach(socket.write).start // Write response asynchronously
       maybeResponse <- Http11.decodeResponse(Decoder(socket.stream)).pull()
       response <-
         maybeResponse match {
           case Some(response) =>
-            val (consumed, consumableBody) = response.body.handleConsumed
-            consumed
-              .after(writeBytesFiber.join())
+            //val (consumed, consumableBody) = response.body.handleConsumed
+            writeBytesFiber
+              .join()
               .after(socket.stream.cancel())
               .start
-              .as(response.copy(body = consumableBody))
+              .as(response)
           case None =>
             Effect[F].fail[Response[Stream[F, ByteVector]]](
               new IllegalStateException("Peer has closed connection before sending response."))

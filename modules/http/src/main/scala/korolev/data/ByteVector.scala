@@ -75,13 +75,6 @@ sealed trait ByteVector {
       else -1
     }
 
-//  def indexOfSlice(that: GenSeq[Byte]): Long =
-//    searchIndex(0) { (i, x) =>
-//      val j = x.indexOfSlice(that)
-//      if (j > -1) i + j
-//      else -1
-//    }
-
   def indexOfThat(that: ByteVector): Long = {
     val l = that.length - 1
     var i = 0
@@ -178,6 +171,9 @@ sealed trait ByteVector {
     mkBuffer(buffer)
     buffer
   }
+
+  def copy: ByteVector =
+    new Arr(mkArray)
 
   def slice(from: Long, until: Long): ByteVector =
     if (from < 0) throw new IndexOutOfBoundsException("Start of slice can't be less than zero")

@@ -44,6 +44,7 @@ object Response {
     val BadRequest: Status = new Status(400, "Bad Request")
     val Gone: Status = new Status(410, "Gone")
     val SwitchingProtocols: Status = new Status(101, "Switching Protocols")
+    val InternalServerError: Status = new Status(500, "Internal Server Error")
 
     def apply(code: Int, phrase: String): Status = {
       (code: @switch) match {

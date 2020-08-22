@@ -16,10 +16,10 @@
 
 package korolev
 
-import korolev.util.HtmlUtil
 import levsha.Document
 import Context.Binding
 import korolev.effect.Effect
+import korolev.util.HtmlUtil
 import levsha.dsl.SymbolDsl
 
 /**

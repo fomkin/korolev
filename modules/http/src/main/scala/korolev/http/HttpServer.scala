@@ -11,6 +11,7 @@ import korolev.http.protocol.Http11
 import korolev.web.{Request, Response}
 
 import scala.concurrent.ExecutionContext
+import scala.util.control.NonFatal
 
 object HttpServer {
 
@@ -28,12 +29,22 @@ object HttpServer {
         .decodeRequest(Decoder(client.stream))
         .foreach { request =>
           for {
-            response <- f(request)
+            response <- f(request).recoverF {
+              case NonFatal(error) =>
+                ec.reportFailure(error)
+                Stream(InternalServerErrorMessage).mat() map { body =>
+                  Response(Response.Status.InternalServerError, body, Nil, Some(InternalServerErrorMessage.length))
+                }
+            }
             byteStream <- Http11.renderResponse(response)
             _ <- byteStream.foreach(client.write)
           } yield ()
         }
     }
   }
+
+  private val InternalServerErrorMessage =
+    ByteVector.ascii("Internal server error")
 }
+
 

@@ -89,11 +89,15 @@ class ByteVectorSpec extends FlatSpec with Matchers {
     assert(concatSample1 != concatSample2)
   }
 
-  "indexOfSlice" should "find slice in sliced vector" in {
-    val sample = ByteVector
-      .ascii("xxx hello\r\nworld")
-      .slice(4)
+  "indexOfThat" should "find slice in sliced vector" in {
+    val sample = (ByteVector.ascii("xx") ++ ByteVector.ascii("x ") ++ ByteVector.ascii("hello\r\nworld")).slice(4)
     val result = sample.indexOfThat(ByteVector.ascii("\r\n"))
     assert(result == 5)
+  }
+
+  it should "return -1 if subslice is not found" in {
+    val sample = (ByteVector.ascii("xx") ++ ByteVector.ascii("x ") ++ ByteVector.ascii("hello world")).slice(4)
+    val result = sample.indexOfThat(ByteVector.ascii("\r\n"))
+    assert(result == -1)
   }
 }
