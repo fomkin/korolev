@@ -9,13 +9,13 @@ import korolev.web.{Headers, Path, Request, Response}
 
 import scala.collection.mutable
 
-class Http11[ByteVector: BytesLike] {
+class Http11[B: BytesLike] {
 
   import Http11._
 
-  private final val LastChunk = Stream(BytesLike[ByteVector].ascii("0\r\n\r\n"))
-  private final val HeaderDelimiter = BytesLike[ByteVector].ascii("\r\n\r\n")
-  private final val CRLF = BytesLike[ByteVector].ascii("\r\n")
+  private final val LastChunk = Stream(BytesLike[B].ascii("0\r\n\r\n"))
+  private final val HeaderDelimiter = BytesLike[B].ascii("\r\n\r\n")
+  private final val CRLF = BytesLike[B].ascii("\r\n")
 
 //  private def printDebug(bytes: ByteVector, prefix: String): Unit = println(
 //    prefix + bytes
@@ -24,8 +24,8 @@ class Http11[ByteVector: BytesLike] {
 //      .replaceAll("\n", s"${Console.RESET}${Console.YELLOW_B}\\\\n${Console.RESET}${Console.YELLOW}\n$prefix")
 //  )
 
-  def decodeRequest[F[_]: Effect](decoder: Decoder[F, ByteVector]): Stream[F, Request[Stream[F, ByteVector]]] = decoder
-      .decode(BytesLike[ByteVector].empty)(decodeRequest)
+  def decodeRequest[F[_]: Effect](decoder: Decoder[F, B]): Stream[F, Request[Stream[F, B]]] = decoder
+      .decode(BytesLike[B].empty)(decodeRequest)
       .map { request =>
         request.copy(
           body = request.contentLength match {
@@ -34,54 +34,54 @@ class Http11[ByteVector: BytesLike] {
             case Some(contentLength) =>
               decoder.decode(0L)(decodeLimitedBody(_, _, contentLength))
             case None if request.header(Headers.TransferEncoding).contains("chunked") =>
-              decoder.decode((Option.empty[Long], BytesLike[ByteVector].empty))(decodeChunkedBody)
+              decoder.decode((Option.empty[Long], BytesLike[B].empty))(decodeChunkedBody)
             case None =>
               decoder
           }
         )
       }
 
-  def decodeRequest(buffer: ByteVector,
-                    incoming: ByteVector): (ByteVector, Decoder.Action[ByteVector, Request[Unit]]) = {
+  def decodeRequest(buffer: B,
+                    incoming: B): (B, Decoder.Action[B, Request[Unit]]) = {
     val allBytes = buffer ++ incoming
     findLastHeaderEnd(allBytes) match {
       case -1 => (allBytes, Decoder.Action.TakeNext)
       case lastByteOfHeader =>
         val (bodyBytes, request) = parseRequest(allBytes, lastByteOfHeader)
-        (BytesLike[ByteVector].empty, Decoder.Action.Fork(request, bodyBytes))
+        (BytesLike[B].empty, Decoder.Action.Fork(request, bodyBytes))
     }
   }
 
-  def decodeResponse[F[_]: Effect](decoder: Decoder[F, ByteVector]): Stream[F, Response[Stream[F, ByteVector]]] = decoder
-    .decode(BytesLike[ByteVector].empty)(decodeResponse)
+  def decodeResponse[F[_]: Effect](decoder: Decoder[F, B]): Stream[F, Response[Stream[F, B]]] = decoder
+    .decode(BytesLike[B].empty)(decodeResponse)
     .map { response =>
       response.copy(
         body = response.contentLength match {
           case Some(contentLength) =>
             decoder.decode(0L)(decodeLimitedBody(_, _, contentLength))
           case None if response.header(Headers.TransferEncoding).contains("chunked") =>
-            decoder.decode((Option.empty[Long], BytesLike[ByteVector].empty))(decodeChunkedBody)
+            decoder.decode((Option.empty[Long], BytesLike[B].empty))(decodeChunkedBody)
           case None =>
             decoder
         }
       )
     }
 
-  def decodeResponse(buffer: ByteVector,
-                     incoming: ByteVector): (ByteVector, Decoder.Action[ByteVector, Response[Unit]]) = {
+  def decodeResponse(buffer: B,
+                     incoming: B): (B, Decoder.Action[B, Response[Unit]]) = {
     val allBytes = buffer ++ incoming
     findLastHeaderEnd(allBytes) match {
       case -1 =>
         (allBytes, Decoder.Action.TakeNext)
       case lastByteOfHeader =>
         val (bodyBytes, response) = parseResponse(allBytes, lastByteOfHeader)
-        (BytesLike[ByteVector].empty, Decoder.Action.Fork(response, bodyBytes))
+        (BytesLike[B].empty, Decoder.Action.Fork(response, bodyBytes))
     }
   }
 
   def decodeLimitedBody[F[_] : Effect](prevBytesTotal: Long,
-                                       incoming: ByteVector,
-                                       contentLength: Long): (Long, Decoder.Action[ByteVector, ByteVector]) =
+                                       incoming: B,
+                                       contentLength: Long): (Long, Decoder.Action[B, B]) =
     prevBytesTotal + incoming.length match {
       case `contentLength` =>
         (contentLength, Decoder.Action.PushFinish(incoming))
@@ -96,8 +96,8 @@ class Http11[ByteVector: BytesLike] {
         (total, Decoder.Action.Push(incoming))
     }
 
-  def decodeChunkedBody(state: (Option[Long], ByteVector),
-                        incoming: ByteVector): ((Option[Long], ByteVector), Decoder.Action[ByteVector, ByteVector]) =
+  def decodeChunkedBody(state: (Option[Long], B),
+                        incoming: B): ((Option[Long], B), Decoder.Action[B, B]) =
     state match {
       case (maybeChunkSize @ Some(chunkSize), buffer) =>
         val allBytes = buffer ++ incoming
@@ -106,10 +106,10 @@ class Http11[ByteVector: BytesLike] {
           if (chunkSize > 0) {
             val chunk = allBytes.slice(0, chunkSize)
             val rest = allBytes.slice(expectedLength)
-            ((None, BytesLike[ByteVector].empty), Decoder.Action.Fork(chunk, rest))
+            ((None, BytesLike[B].empty), Decoder.Action.Fork(chunk, rest))
           } else {
             val rest = allBytes.slice(expectedLength)
-            ((None, BytesLike[ByteVector].empty), Decoder.Action.TakeBackFinish(rest))
+            ((None, BytesLike[B].empty), Decoder.Action.TakeBackFinish(rest))
           }
         } else {
           ((maybeChunkSize, allBytes), Decoder.Action.TakeNext)
@@ -123,12 +123,12 @@ class Http11[ByteVector: BytesLike] {
           val chunkSizeHex = allBytes.slice(0, index).asAsciiString
           val chunkSize = java.lang.Long.parseLong(chunkSizeHex, 16)
           val restBytes = allBytes.slice(index + CRLF.length)
-          ((Some(chunkSize), BytesLike[ByteVector].empty), Decoder.Action.TakeBack(restBytes))
+          ((Some(chunkSize), BytesLike[B].empty), Decoder.Action.TakeBack(restBytes))
         }
     }
 
-  def parseRequest(allBytes: ByteVector,
-                   lastByteOfHeader: Long): (ByteVector, Request[Unit]) = {
+  def parseRequest(allBytes: B,
+                   lastByteOfHeader: Long): (B, Request[Unit]) = {
     // Buffer contains header.
     // Lets parse it.
     val methodEnd = allBytes.indexOf(' ')
@@ -176,10 +176,10 @@ class Http11[ByteVector: BytesLike] {
     (bodyBytes, request)
   }
 
-  def findLastHeaderEnd(bytes: ByteVector): Long =
+  def findLastHeaderEnd(bytes: B): Long =
     bytes.indexOfSlice(HeaderDelimiter)
 
-  def parseResponse(bytes: ByteVector, lastHeaderEnd: Long): (ByteVector, Response[Unit]) = {
+  def parseResponse(bytes: B, lastHeaderEnd: Long): (B, Response[Unit]) = {
     // First line
     val protocolVersionEnd = bytes.indexOf(' ')
     val statusCodeStart = protocolVersionEnd + 1
@@ -281,17 +281,17 @@ class Http11[ByteVector: BytesLike] {
       .newLine()
       .mkString
   }
-  def renderRequest[F[_]: Effect](request: Request[Stream[F, ByteVector]]): F[Stream[F, ByteVector]] = {
+  def renderRequest[F[_]: Effect](request: Request[Stream[F, B]]): F[Stream[F, B]] = {
     val head = renderRequestHead(request)
-    Stream(BytesLike[ByteVector].ascii(head))
+    Stream(BytesLike[B].ascii(head))
       .mat()
       .map(_ ++ request.body) // TODO add chunked encoding
   }
 
-  def renderResponse[F[_]: Effect](response: Response[Stream[F, ByteVector]]): F[Stream[F, ByteVector]] = {
-    def go(readers: Seq[(String, String)], body: Stream[F, ByteVector]) = {
+  def renderResponse[F[_]: Effect](response: Response[Stream[F, B]]): F[Stream[F, B]] = {
+    def go(readers: Seq[(String, String)], body: Stream[F, B]) = {
       val fullHeaderString =  renderResponseHeader(response.status, readers)
-      val fullHeaderBytes = BytesLike[ByteVector].ascii(fullHeaderString)
+      val fullHeaderBytes = BytesLike[B].ascii(fullHeaderString)
       Stream(fullHeaderBytes).mat().map(_ ++ body)
     }
     response.contentLength match {
@@ -299,7 +299,7 @@ class Http11[ByteVector: BytesLike] {
       case None if response.status == Status.SwitchingProtocols => go(response.headers, response.body)
       case None if response.header(Headers.TransferEncoding).contains("chunked") =>
         val chunkedBody = response.body.map { chunk =>
-          BytesLike[ByteVector].ascii(chunk.length.toHexString) ++
+          BytesLike[B].ascii(chunk.length.toHexString) ++
             CRLF ++
             chunk ++
             CRLF

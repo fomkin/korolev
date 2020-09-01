@@ -1,28 +1,29 @@
 package korolev.http.protocol
 
-import korolev.data.ByteVector
+import korolev.data.Bytes
 import korolev.effect.{Decoder, Stream}
 import korolev.web.{Path, Request, Response}
 import org.scalacheck._
 import org.scalatest.{FlatSpec, Matchers}
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.Duration
-import scala.util.{Failure, Success}
+import scala.concurrent.{ExecutionContext, Future}
 
 class Http11Spec extends FlatSpec with Matchers with ScalaCheckPropertyChecks {
 
-  import korolev.http.protocol.Http11._
+  val http11 = new Http11[Bytes]
+
+  import http11._
 
   // TODO use from effect
-  implicit val ec = new  ExecutionContext {
+  implicit val ec: ExecutionContext = new  ExecutionContext {
     def execute(runnable: Runnable): Unit = runnable.run()
     def reportFailure(cause: Throwable): Unit = cause.printStackTrace()
   }
 
   "decodeLimitedBody" should "pass bytes if content length not reached and byteTotal is zero" in {
-    val bytes = ByteVector.fill(5)(i => i.toByte)
+    val bytes = Bytes(1, 2, 3, 4, 5)
     val contentLength = 10L
     val (bytesTotal, frame) = decodeLimitedBody(0, bytes, contentLength)
     bytesTotal shouldEqual 5
@@ -30,17 +31,17 @@ class Http11Spec extends FlatSpec with Matchers with ScalaCheckPropertyChecks {
   }
 
   it should "pass part of bytes and take back rest of bytes if content length reached" in {
-    val bytes = ByteVector.fill(5)(i => i.toByte)
+    val bytes = Bytes(1, 2, 3, 4, 5)
     val contentLength = 10L
     val (_, frame) = decodeLimitedBody(7, bytes, contentLength)
     frame shouldEqual Decoder.Action.ForkFinish(
       bytes.slice(0, 3),
-      bytes.slice(3)
+      bytes.slice(3, bytes.length)
     )
   }
 
   it should "finish the stream if count of bytes in chunk is equals to content length" in {
-    val bytes = ByteVector.fill(3)(i => i.toByte)
+    val bytes = Bytes(1, 2, 3)
     val contentLength = 10L
     val (_, frame) = decodeLimitedBody(7, bytes, contentLength)
     frame shouldEqual Decoder.Action.PushFinish(bytes)
@@ -73,7 +74,7 @@ class Http11Spec extends FlatSpec with Matchers with ScalaCheckPropertyChecks {
       //path = Path.fromString(pathStrings.mkString("/"))
       headers <- Gen.listOf(genHeader)
       bytes <- Gen.listOf(Gen.choose(Byte.MinValue, Byte.MaxValue))
-      bytesVector = ByteVector(bytes.toArray)
+      bytesVector = Bytes.wrap(bytes.toArray)
     } yield Stream(bytesVector)
       .mat()
       .map { bodyStream =>
@@ -94,7 +95,7 @@ class Http11Spec extends FlatSpec with Matchers with ScalaCheckPropertyChecks {
       cookies <- Gen.listOf(genCookieOrParam)
       params <- Gen.listOf(genCookieOrParam)
       bytes <- Gen.listOf(Gen.choose(Byte.MinValue, Byte.MaxValue))
-      bytesVector = ByteVector(bytes.toArray)
+      bytesVector = Bytes.wrap(bytes.toArray)
     } yield Stream(bytesVector)
       .mat()
       .map { bodyStream =>
@@ -116,12 +117,12 @@ class Http11Spec extends FlatSpec with Matchers with ScalaCheckPropertyChecks {
         bytesVector -> withCookiesAndParams
       }
 
-  private def sliceToChunks(bytes: ByteVector, n: Int) = {
+  private def sliceToChunks(bytes: Bytes, n: Int) = {
     val chunk = bytes.length / n
     (0 until n) map { i =>
       val pos = chunk * i
-      if (i < n - 1) bytes.slice(pos, pos + chunk).copy
-      else bytes.slice(pos).copy
+      if (i < n - 1) bytes.slice(pos, pos + chunk)
+      else bytes.slice(pos, bytes.length)
     }
   }
 
@@ -130,64 +131,63 @@ class Http11Spec extends FlatSpec with Matchers with ScalaCheckPropertyChecks {
       val (responseNoBody, bodyBytes, (parsedBodyBytes, parsedResponse)) = await {
         for {
           (bodyBytes, response) <- generated
-          bytesStream <- Http11.renderResponse(response)
-          bytes <- bytesStream.fold(ByteVector.empty)(_ ++ _)
+          bytesStream <- renderResponse(response)
+          bytes <- bytesStream.fold(Bytes.empty)(_ ++ _)
           //_ = println(bytes.asciiString.replaceAll("\r", "\\\\r"))
           lhe = findLastHeaderEnd(bytes)
         } yield {
           val responseNoBody = response.copy(body = ())
-          (responseNoBody, bodyBytes, Http11.parseResponse(bytes, lhe))
+          (responseNoBody, bodyBytes, parseResponse(bytes, lhe))
         }
       }
       assert(
-        parsedBodyBytes == bodyBytes &&
+        (parsedBodyBytes == bodyBytes) &&
         parsedResponse == responseNoBody
       )
     }
   }
 
-//  "renderResponse/decodeResponse" should "comply with rule `decode(render(request)) == request`" in {
-//    // FIXME fomkin: I do not understand why Gen.chooseNum gives values < 1
-//    forAll (genRequest, Gen.chooseNum(2, 20).filter(i => i > 1)) { (generated, numChunks) =>
-//      val (sampleRequest, decodedRequest, sampleBody, decodedBody) = await {
-//        for {
-//          (sampleBody, sampleRequest) <- generated
-//          renderedRequestAsStream <- Http11.renderRequest(sampleRequest)
-//          renderedRequestAsBytes <- renderedRequestAsStream.fold(ByteVector.empty)(_ ++ _)
-//          renderedRequestAsChunks <- Stream(sliceToChunks(renderedRequestAsBytes, 2):_*).mat()
-//          maybeDecodedRequest <- Http11.decodeRequest(Decoder(renderedRequestAsChunks)).pull()
-//          decodedRequest = maybeDecodedRequest.getOrElse(throw new Exception("No request found in rendered stream"))
-//          decodedBody <- decodedRequest.body.fold(ByteVector.empty)(_ ++ _)
-//        } yield (
-//          sampleRequest.copy(body = ()),
-//          decodedRequest.copy(body = ()),
-//          sampleBody,
-//          decodedBody
-//        )
-//      }
-//      assert(
-//        sampleRequest == decodedRequest &&
-//          sampleBody == decodedBody
-//      )
-//    }
-//  }
-
+  "renderResponse/decodeResponse" should "comply with rule `decode(render(response)) == response`" in {
+    // FIXME fomkin: I do not understand why Gen.chooseNum gives values < 1
+    forAll (genResponse, Gen.chooseNum(2, 20).filter(i => i > 1)) { (generated, numChunks) =>
+      val (sampleResponse, decodedResponse, sampleBody, decodedBody) = await {
+        for {
+          (sampleBody, sampleResponse) <- generated
+          renderedResponseAsStream <- renderResponse(sampleResponse)
+          renderedResponseAsBytes <- renderedResponseAsStream.fold(Bytes.empty)(_ ++ _)
+          renderedResponseAsChunks <- Stream(sliceToChunks(renderedResponseAsBytes, numChunks):_*).mat()
+          maybeDecodedResponse <- decodeResponse(Decoder(renderedResponseAsChunks)).pull()
+          decodedResponse = maybeDecodedResponse.getOrElse(throw new Exception("No response found in rendered stream"))
+          decodedBody <- decodedResponse.body.fold(Bytes.empty)(_ ++ _)
+        } yield (
+          sampleResponse.copy(body = ()),
+          decodedResponse.copy(body = ()),
+          sampleBody,
+          decodedBody
+        )
+      }
+      assert(
+        sampleResponse == decodedResponse &&
+          (sampleBody == decodedBody)
+      )
+    }
+  }
 
   "renderRequest/parseRequest" should "comply with the law `parse(render(request)) == request`" in {
     forAll (genRequest) { generated =>
       val (requestNoBody, bodyBytes, (parsedBodyBytes, parsedRequest)) = await {
         for {
           (bodyBytes, request) <- generated
-          bytesStream <- Http11.renderRequest(request)
-          bytes <- bytesStream.fold(ByteVector.empty)(_ ++ _)
+          bytesStream <- renderRequest(request)
+          bytes <- bytesStream.fold(Bytes.empty)(_ ++ _)
           lhe = findLastHeaderEnd(bytes)
         } yield {
           val responseNoBody = request.copy(body = ())
-          (responseNoBody, bodyBytes, Http11.parseRequest(bytes, lhe))
+          (responseNoBody, bodyBytes, parseRequest(bytes, lhe))
         }
       }
       assert(
-        parsedBodyBytes == bodyBytes &&
+        (parsedBodyBytes == bodyBytes) &&
           parsedRequest == requestNoBody
       )
     }
@@ -199,13 +199,12 @@ class Http11Spec extends FlatSpec with Matchers with ScalaCheckPropertyChecks {
       val (sampleRequest, decodedRequest, sampleBody, decodedBody) = await {
         for {
           (sampleBody, sampleRequest) <- generated
-          renderedRequestAsStream <- Http11.renderRequest(sampleRequest)
-          renderedRequestAsBytes <- renderedRequestAsStream.fold(ByteVector.empty)(_ ++ _)
+          renderedRequestAsStream <- renderRequest(sampleRequest)
+          renderedRequestAsBytes <- renderedRequestAsStream.fold(Bytes.empty)(_ ++ _)
           renderedRequestAsChunks <- Stream(sliceToChunks(renderedRequestAsBytes, numChunks):_*).mat()
-          _ = println(sliceToChunks(renderedRequestAsBytes, numChunks).reduce(_ ++ _) == renderedRequestAsBytes)
-          maybeDecodedRequest <- Http11.decodeRequest(Decoder(renderedRequestAsChunks)).pull()
+          maybeDecodedRequest <- decodeRequest(Decoder(renderedRequestAsChunks)).pull()
           decodedRequest = maybeDecodedRequest.getOrElse(throw new Exception("No request found in rendered stream"))
-          decodedBody <- decodedRequest.body.fold(ByteVector.empty)(_ ++ _)
+          decodedBody <- decodedRequest.body.fold(Bytes.empty)(_ ++ _)
         } yield (
           sampleRequest.copy(body = ()),
           decodedRequest.copy(body = ()),
@@ -215,7 +214,7 @@ class Http11Spec extends FlatSpec with Matchers with ScalaCheckPropertyChecks {
       }
       assert(
         sampleRequest == decodedRequest &&
-          sampleBody == decodedBody
+          (sampleBody == decodedBody)
       )
     }
   }

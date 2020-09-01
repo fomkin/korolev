@@ -3,7 +3,7 @@ package korolev.server
 import korolev.state.javaSerialization._
 import scala.concurrent.Future
 
-object TestApp extends KorolevApp[Future, String, Any](gracefulShutdown = true) {
+object TestApp extends KorolevApp[Future, Array[Byte], String, Any](gracefulShutdown = true) {
 
   import context._
   import levsha.dsl._

@@ -21,106 +21,22 @@ import scala.annotation.{switch, tailrec}
   */
 final class WebSocketProtocol[B: BytesLike] {
 
-  final val GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
-
-  // https://tools.ietf.org/html/rfc6455#section-11.8
-  final val OpContinuation = 0
-  final val OpText = 1
-  final val OpBinary = 2
-  final val OpConnectionClose = 8
-  final val OpPing = 9
-  final val OpPong = 10
-
-  final case class Intention(key: String)
-
-  object Intention {
-    def random[F[_]: Effect]: F[Intention] =
-      Effect[F].delay {
-        val random = new SecureRandom()
-        val bytes = new Array[Byte](16)
-        random.nextBytes(bytes)
-        Intention(Base64.getEncoder.encodeToString(bytes))
-      }
-  }
-
-  sealed trait Frame {
-    def opcode: Int
-    def fin: Boolean
-  }
-
-  object Frame {
-    sealed trait Control extends Frame with Merged
-    sealed trait Merged extends Frame {
-      def append(data: B, fin: Boolean): Merged
-    }
-
-    final case class Unspecified(fin: Boolean, opcode: Int, payload: B) extends Merged {
-      def append(data: B, fin: Boolean): Unspecified =
-        copy(fin = fin, payload = payload ++ data)
-    }
-    final case class Continuation(payload: B, fin: Boolean) extends Frame {
-      final val opcode = OpContinuation
-    }
-    final case class Binary(payload: B, fin: Boolean = true) extends Merged {
-      final val opcode = OpBinary
-      def append(data: B, fin: Boolean): Binary =
-        copy(fin = fin, payload = payload ++ data)
-    }
-    final case class Text(payload: B, fin: Boolean = true) extends Merged {
-      lazy val utf8: String = payload.asUtf8String
-      final val opcode = OpText
-      def append(data: B, fin: Boolean): Text =
-        copy(fin = fin, payload = payload ++ data)
-    }
-    case object ConnectionClose extends Frame with Merged with Control {
-      final val opcode = OpConnectionClose
-      final val fin = true
-      def append(data: B, fin: Boolean): ConnectionClose.type = this
-    }
-    case object Ping extends Frame with Merged with Control {
-      final val opcode = OpPing
-      final val fin = true
-      def append(data: B, fin: Boolean): Ping.type = this
-    }
-    case object Pong extends  Frame with Merged with Control {
-      final val opcode = OpPong
-      final val fin = true
-      def append(data: B, fin: Boolean): Pong.type = this
-    }
-  }
-
-  sealed trait DecodingState
-
-  object DecodingState {
-    val begin: DecodingState = Begin
-    case object Begin extends DecodingState
-    case class ShortLength(fin: Boolean, mask: Boolean, opcode: Int) extends DecodingState
-    case class LongLength(fin: Boolean, mask: Boolean, opcode: Int) extends DecodingState
-    case class Payload(fin: Boolean, containMask: Boolean, opcode: Int, length: Long) extends DecodingState {
-      lazy val offset: Long =
-        if (containMask) 4
-        else 0
-      lazy val fullLength: Long =
-        if (containMask) length + 4
-        else length
-    }
-  }
-
+  import WebSocketProtocol._
   import DecodingState._
 
-  def decodeFrames[F[_]: Effect](decoder: Decoder[F, B]): Decoder[F, Frame] =
+  def decodeFrames[F[_]: Effect](decoder: Decoder[F, B]): Decoder[F, Frame[B]] =
     decoder.decode((BytesLike[B].empty, DecodingState.begin)) {
       case ((buffer, state), incoming) =>
         decodeFrames(buffer, state, incoming)
     }
 
-  def decodeFrame(data: B): ((B, DecodingState), Decoder.Action[B, Frame]) =
+  def decodeFrame(data: B): ((B, DecodingState), Decoder.Action[B, Frame[B]]) =
     decodeFrames(BytesLike[B].empty, Begin, data)
 
   @tailrec
   def decodeFrames(buffer: B,
                    state: DecodingState,
-                   incoming: B): ((B, DecodingState), Decoder.Action[B, Frame]) = {
+                   incoming: B): ((B, DecodingState), Decoder.Action[B, Frame[B]]) = {
 
     def decodePayload(bytes: B, state: Payload): B =
       if (!state.containMask) {
@@ -184,30 +100,30 @@ final class WebSocketProtocol[B: BytesLike] {
     }
   }
 
-  def mergeFrames[F[_]: Effect](decoder: Decoder[F, Frame]): Decoder[F, Frame.Merged] =
-    decoder.decode(Option.empty[Frame.Merged])(mergeFrames)
+  def mergeFrames[F[_]: Effect](decoder: Decoder[F, Frame[B]]): Decoder[F, Frame.Merged[B]] =
+    decoder.decode(Option.empty[Frame.Merged[B]])(mergeFrames)
 
   /**
     * https://tools.ietf.org/html/rfc6455#section-5.4
     */
-  def mergeFrames(buffer: Option[Frame.Merged], incoming: Frame): (Option[Frame.Merged], Decoder.Action[Frame, Frame.Merged]) =
+  def mergeFrames(buffer: Option[Frame.Merged[B]], incoming: Frame[B]): (Option[Frame.Merged[B]], Decoder.Action[Frame[B], Frame.Merged[B]]) =
     (buffer, incoming) match {
-      case (_, controlFrame: Frame.Control) =>
+      case (_, controlFrame: Frame.Control[B]) =>
         // Control frames MAY be injected in
         // the middle of a fragmented message.
         (buffer, Decoder.Action.Push(controlFrame))
-      case (None, i: Frame.Merged) if i.fin => (None, Decoder.Action.Push(i))
-      case (None, i: Frame.Text) if !i.fin => (Some(i), Decoder.Action.TakeNext)
-      case (None, i: Frame.Binary) if !i.fin => (Some(i), Decoder.Action.TakeNext)
-      case (None, i: Frame.Unspecified) if !i.fin => (Some(i), Decoder.Action.TakeNext)
-      case (Some(buffer), i: Frame.Continuation) if !i.fin =>
+      case (None, i: Frame.Merged[B]) if i.fin => (None, Decoder.Action.Push(i))
+      case (None, i: Frame.Text[B]) if !i.fin => (Some(i), Decoder.Action.TakeNext)
+      case (None, i: Frame.Binary[B]) if !i.fin => (Some(i), Decoder.Action.TakeNext)
+      case (None, i: Frame.Unspecified[B]) if !i.fin => (Some(i), Decoder.Action.TakeNext)
+      case (Some(buffer), i: Frame.Continuation[B]) if !i.fin =>
         (Some(buffer.append(i.payload, fin = false)), Decoder.Action.TakeNext)
-      case (Some(buffer), i: Frame.Continuation) if i.fin =>
+      case (Some(buffer), i: Frame.Continuation[B]) if i.fin =>
         (None, Decoder.Action.Push(buffer.append(i.payload, fin = true)))
       case _ => throw new IllegalStateException(s"Fragmentation in WebSocket is invalid. Received $incoming after $buffer")
     }
 
-  def encodeFrame(frame: Frame, maybeMask: Option[Int]): B = frame match {
+  def encodeFrame(frame: Frame[B], maybeMask: Option[Int]): B = frame match {
     case Frame.Pong | Frame.Ping | Frame.ConnectionClose => encodeFrame(fin = true, maybeMask, frame.opcode, BytesLike[B].empty)
     case Frame.Continuation(payload, fin) => encodeFrame(fin, maybeMask, frame.opcode, payload)
     case Frame.Binary(payload, fin) => encodeFrame(fin, maybeMask, frame.opcode, payload)
@@ -237,7 +153,7 @@ final class WebSocketProtocol[B: BytesLike] {
         val o = array.length - 4
         buffer.putInt(mask)
         BytesLike[B].wrapArray(array) ++ payload.mapI { (x, i) =>
-          (x ^ array(o + (i % 4))).toByte
+          (x ^ array(o + (i.toInt % 4))).toByte
         }
     }
   }
@@ -273,14 +189,14 @@ final class WebSocketProtocol[B: BytesLike] {
     * insert handshake headers. Fragments will be merged to single frames.
     */
   def upgrade[F[_]: Effect](intention: Intention)
-                           (f: Request[Stream[F, Frame.Merged]] => F[Response[Stream[F, Frame.Merged]]]): Request[LazyBytes[F]] => F[Response[LazyBytes[F]]] = f
+                           (f: Request[Stream[F, Frame.Merged[B]]] => F[Response[Stream[F, Frame.Merged[B]]]]): Request[LazyBytes[F]] => F[Response[LazyBytes[F]]] = f
       .compose[Request[LazyBytes[F]]] { request =>
         val messages = Decoder(request.body.chunks.map(BytesLike[B].wrapArray))
           .decode((BytesLike[B].empty, DecodingState.begin)) {
             case ((buffer, state), incoming) =>
               decodeFrames(buffer, state, incoming)
           }
-          .decode(Option.empty[Frame.Merged])(mergeFrames)
+          .decode(Option.empty[Frame.Merged[B]])(mergeFrames)
         request.copy(body = messages)
       }
       .andThen[F[Response[LazyBytes[F]]]] { responseF =>
@@ -289,4 +205,91 @@ final class WebSocketProtocol[B: BytesLike] {
           handshake(response, intention).copy(body = LazyBytes(upgradedBody, None))
         }
       }
+}
+
+object WebSocketProtocol {
+  final val GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+
+  // https://tools.ietf.org/html/rfc6455#section-11.8
+  final val OpContinuation = 0
+  final val OpText = 1
+  final val OpBinary = 2
+  final val OpConnectionClose = 8
+  final val OpPing = 9
+  final val OpPong = 10
+
+  final case class Intention(key: String)
+
+  object Intention {
+    def random[F[_]: Effect]: F[Intention] =
+      Effect[F].delay {
+        val random = new SecureRandom()
+        val bytes = new Array[Byte](16)
+        random.nextBytes(bytes)
+        Intention(Base64.getEncoder.encodeToString(bytes))
+      }
+  }
+
+  sealed trait Frame[+B] {
+    def opcode: Int
+    def fin: Boolean
+  }
+
+  object Frame {
+    sealed trait Control[B] extends Frame[B] with Merged[B]
+    sealed trait Merged[B] extends Frame[B] {
+      def append(data: B, fin: Boolean): Merged[B]
+    }
+
+    final case class Unspecified[B: BytesLike](fin: Boolean, opcode: Int, payload: B) extends Merged[B] {
+      def append(data: B, fin: Boolean): Unspecified[B] =
+        copy(fin = fin, payload = payload ++ data)
+    }
+    final case class Continuation[B](payload: B, fin: Boolean) extends Frame[B] {
+      final val opcode = OpContinuation
+    }
+    final case class Binary[B: BytesLike](payload: B, fin: Boolean = true) extends Merged[B] {
+      final val opcode = OpBinary
+      def append(data: B, fin: Boolean): Binary[B] =
+        copy(fin = fin, payload = payload ++ data)
+    }
+    final case class Text[B: BytesLike](payload: B, fin: Boolean = true) extends Merged[B] {
+      lazy val utf8: String = payload.asUtf8String
+      final val opcode = OpText
+      def append(data: B, fin: Boolean): Text[B] =
+        copy(fin = fin, payload = payload ++ data)
+    }
+    case object ConnectionClose extends Frame[Nothing] with Merged[Nothing] with Control[Nothing] {
+      final val opcode = OpConnectionClose
+      final val fin = true
+      def append(data: Nothing, fin: Boolean): ConnectionClose.type = this
+    }
+    case object Ping extends Frame[Nothing] with Merged[Nothing] with Control[Nothing] {
+      final val opcode = OpPing
+      final val fin = true
+      def append(data: Nothing, fin: Boolean): Ping.type = this
+    }
+    case object Pong extends Frame[Nothing] with Merged[Nothing] with Control[Nothing] {
+      final val opcode = OpPong
+      final val fin = true
+      def append(data: Nothing, fin: Boolean): Pong.type = this
+    }
+  }
+
+  sealed trait DecodingState
+
+  object DecodingState {
+    val begin: DecodingState = Begin
+    case object Begin extends DecodingState
+    case class ShortLength(fin: Boolean, mask: Boolean, opcode: Int) extends DecodingState
+    case class LongLength(fin: Boolean, mask: Boolean, opcode: Int) extends DecodingState
+    case class Payload(fin: Boolean, containMask: Boolean, opcode: Int, length: Long) extends DecodingState {
+      lazy val offset: Long =
+        if (containMask) 4
+        else 0
+      lazy val fullLength: Long =
+        if (containMask) length + 4
+        else length
+    }
+  }
 }
