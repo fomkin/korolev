@@ -5,6 +5,7 @@ import java.nio.channels.AsynchronousChannelGroup
 import java.util.concurrent.Executors
 
 import korolev.Context
+import korolev.data.BytesLike
 import korolev.effect.Effect
 import korolev.effect.io.ServerSocket.ServerSocketHandler
 import korolev.effect.syntax._
@@ -14,6 +15,7 @@ import scala.concurrent.{ExecutionContext, ExecutionContextExecutorService}
 
 abstract class KorolevApp[
   F[_] : Effect,
+  B: BytesLike,
   S: StateSerializer : StateDeserializer,
   M](address: SocketAddress = new InetSocketAddress("localhost", 8080),
      gracefulShutdown: Boolean = false) {
@@ -51,7 +53,7 @@ abstract class KorolevApp[
     val server =
       for {
         cfg <- config
-        handler <- standalone.buildServer[F](korolevService(cfg), address, channelGroup)
+        handler <- standalone.buildServer[F, B](korolevService(cfg), address, channelGroup)
       } yield {
         (cfg, handler)
       }

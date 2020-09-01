@@ -184,6 +184,18 @@ lazy val zio = project
   )
   .dependsOn(effect)
 
+lazy val scodec = project
+  .in(interop / "scodec")
+  .enablePlugins(GitVersioning)
+  .settings(crossVersionSettings)
+  .settings(commonSettings: _*)
+  .settings(
+    normalizedName := "korolev-scodec",
+    libraryDependencies += "org.scodec" %% "scodec-bits" % "1.1.18"
+  )
+  .dependsOn(effect)
+
+
 // Examples
 
 lazy val simpleExample = (project in examples / "simple")
@@ -370,6 +382,7 @@ lazy val root = project
     korolev, effect, web, http, standalone,
     // Interop
     akka, cats, monix, zio, slf4j,
+    scodec,
     // Examples
     simpleExample, routingExample, gameOfLifeExample,
     formDataExample, `file-streaming-example`, delayExample,

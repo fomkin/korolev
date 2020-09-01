@@ -1,5 +1,7 @@
 package korolev.data
 
+import java.nio.ByteBuffer
+
 object syntax {
 
   implicit final class BytesLikeOps[T](bytes: T)(implicit instance: BytesLike[T]) {
@@ -11,7 +13,7 @@ object syntax {
     def ++(right: T): T = BytesLike[T].concat(bytes, right)
     def slice(from: Long, until: Long): T = BytesLike[T].slice(bytes, from, until)
     def slice(from: Long): T = BytesLike[T].slice(bytes, from, length)
-    def mapI(f: (Long, Byte) => Byte): T = BytesLike[T].mapI(bytes, f)
+    def mapI(f: (Byte, Long) => Byte): T = BytesLike[T].mapI(bytes, f)
     def indexOf(elem: Byte): Long = BytesLike[T].indexOf(bytes, elem)
     def indexOf(elem: Byte, from: Long): Long = BytesLike[T].indexOf(bytes, elem, from)
     def lastIndexOf(elem: Byte): Long = BytesLike[T].lastIndexOf(bytes, elem)
@@ -20,6 +22,7 @@ object syntax {
     def asUtf8String: String = instance.asUtf8String(bytes)
     def asAsciiString: String = instance.asAsciiString(bytes)
     def asArray: Array[Byte] = instance.asArray(bytes)
+    def asBuffer: ByteBuffer = instance.asBuffer(bytes)
     def as[T2: BytesLike]: T2 = instance.as[T2](bytes)
   }
 }

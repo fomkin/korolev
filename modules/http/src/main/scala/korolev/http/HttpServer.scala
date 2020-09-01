@@ -3,7 +3,8 @@ package korolev.http
 import java.net.SocketAddress
 import java.nio.channels.AsynchronousChannelGroup
 
-import korolev.data.ByteVector
+import korolev.data.BytesLike
+import korolev.data.syntax._
 import korolev.effect.io.ServerSocket
 import korolev.effect.syntax._
 import korolev.effect.{Decoder, Effect, Stream}
@@ -18,14 +19,18 @@ object HttpServer {
   /**
     * @see [[ServerSocket.bind]]
     */
-  def apply[F[_]: Effect](address: SocketAddress,
-                          backlog: Int = 0,
-                          readBufferSize: Int = 8096,
-                          group: AsynchronousChannelGroup = null)
-                         (f: Request[Stream[F, ByteVector]] => F[Response[Stream[F, ByteVector]]])
-                         (implicit ec: ExecutionContext): F[ServerSocket.ServerSocketHandler[F]] = {
-    ServerSocket.accept(address, backlog, readBufferSize, group) { client =>
-      Http11
+  def apply[F[_]: Effect, B: BytesLike](address: SocketAddress,
+                                        backlog: Int = 0,
+                                        readBufferSize: Int = 8096,
+                                        group: AsynchronousChannelGroup = null)
+                                       (f: Request[Stream[F, B]] => F[Response[Stream[F, B]]])
+                                       (implicit ec: ExecutionContext): F[ServerSocket.ServerSocketHandler[F]] = {
+
+    val InternalServerErrorMessage = BytesLike[B].ascii("Internal server error")
+    val http11 = new Http11[B]
+
+    ServerSocket.accept[F, B](address, backlog, readBufferSize, group) { client =>
+      http11
         .decodeRequest(Decoder(client.stream))
         .foreach { request =>
           for {
@@ -36,15 +41,12 @@ object HttpServer {
                   Response(Response.Status.InternalServerError, body, Nil, Some(InternalServerErrorMessage.length))
                 }
             }
-            byteStream <- Http11.renderResponse(response)
+            byteStream <- http11.renderResponse(response)
             _ <- byteStream.foreach(client.write)
           } yield ()
         }
     }
   }
-
-  private val InternalServerErrorMessage =
-    ByteVector.ascii("Internal server error")
 }
 
 
