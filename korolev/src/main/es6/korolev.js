@@ -1,4 +1,4 @@
-import { getDeviceId } from './utils.js';
+import { getDeviceId, encodeRFC5987ValueChars } from './utils.js';
 
 /** @enum {number} */
 export const CallbackType = {
@@ -403,7 +403,7 @@ export class Korolev {
     if(file) {
       let request = new XMLHttpRequest();
       request.open('POST', uri, true);
-      request.setRequestHeader('x-name', file.name)
+      request.setRequestHeader('x-name', encodeRFC5987ValueChars(file.name))
       request.send(file);
     } else {
       console.error(`Can't find file with name ${fileName}`);
