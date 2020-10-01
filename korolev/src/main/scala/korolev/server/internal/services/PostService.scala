@@ -16,7 +16,9 @@
 
 package korolev.server.internal.services
 
+import java.net.URLDecoder
 import java.nio.ByteBuffer
+import java.nio.charset.StandardCharsets
 
 import korolev.effect.io.LazyBytes
 import korolev.Qsid
@@ -101,7 +103,7 @@ private[korolev] final class PostService[F[_]: Effect](reporter: Reporter,
       case Some(app) =>
         for {
           _ <- Effect[F].delay {
-            headers.collectFirst { case ("x-name", v) => v } match {
+            headers.collectFirst { case ("x-name", v) => URLDecoder.decode(v, StandardCharsets.UTF_8) } match {
               case None => Effect[F].pure(Response.Http(Response.Status.BadRequest, "Header 'x-name' should be defined", Nil))
               case Some(fileName) =>
                 app.frontend.resolveFile(descriptor, LazyBytes(chunks, body.bytesLength))
