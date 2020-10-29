@@ -30,8 +30,10 @@ You need SBT and JDK 9+ installed. Once installed, run g8 template.
 $ sbt new fomkin/korolev.g8
 $ cd mykorolevproject
 $ sbt
-> re-start
+> ~reStart
 -----------------------------------
+
+The sbt command `~reStart` will make sure that your Korolev application gets restarted and the browser window reloaded on source code changes. 
 
 Ok, now you are ready to start hacking with Korolev.
 
