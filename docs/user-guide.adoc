@@ -33,7 +33,7 @@ $ sbt
 > ~reStart
 -----------------------------------
 
-The sbt command `~reStart` will make sure that your Korolev application gets restarted and the browser window reloaded on source code changes. 
+The sbt command `~reStart` will make sure that your Korolev application gets restarted and the browser window reloaded on source code changes.
 
 Ok, now you are ready to start hacking with Korolev.
 
@@ -463,7 +463,7 @@ https://github.com/fomkin/korolev/blob/v0.16.0/examples/extension/src/main/scala
 
 === Routing
 
-Router allows to integrate browser navigation into you app. In the router you define bidirectional mapping between the state and the URL.
+Router allows to integrate browser navigation into you app. In the router you define bidirectional mapping between the state and the Uri (about migration from Path routing read below).
 
 Let's pretends that your application is a blogging platform.
 
@@ -488,7 +488,7 @@ KorolevServiceConfig(
       case MyState(author, article, _) =>
         Root / author / article
     },
-    toState = {
+    toState = Uri {
       case Root / author / article => defaultState =>
         articleService.load(author, article).map { text =>
           MyState(author, article, text)
@@ -498,7 +498,50 @@ KorolevServiceConfig(
 )
 -------------------------------------------------------------------------------
 
-https://github.com/fomkin/korolev/blob/v0.16.0/examples/routing/src/main/scala/RoutingExample.scala#L93[See full example]
+https://github.com/fomkin/korolev/blob/v0.17.0/examples/routing/src/main/scala/RoutingExample.scala#L93[See full example]
+
+==== Using Uri routing
+
+Large applications some times require ability to share URL from one user to other with exact some state of sorting and filtering parameters.
+For that you have possibility to use URL search parameters for state initialisation.
+For example initialize search form from URI:
+
+[source,scala]
+-------------------------------------------------------------------------------
+object BeginOptionQueryParam extends OptionQueryParam("begin")
+object EndOptionQueryParam extends OptionQueryParam("end")
+
+case class State(begin: Option[String] = None, end: Option[String] = None)
+
+router = Router(
+    fromState = {
+      case State(begin, end) =>
+        Uri(Root / "search").withParam("begin", begin).withParam("end", end)
+    },
+    toState = {
+// match / without any parameters
+      case Root :? _ =>
+        initialState =>
+          Future.successful(initialState)
+// match /search with two optional parameter `begin` and `end`
+      case Root  / "search" :? BeginOptionQueryParam(begin) +& EndOptionQueryParam(end) =>
+        initialState =>
+          val result = State(begin, end)
+          Future.successful(result)
+    }
+)
+-------------------------------------------------------------------------------
+
+https://github.com/fomkin/korolev/blob/v0.17.0/examples/routing/src/main/scala/UriRoutingExample[See full example]
+
+For easy parameter matching Korolev provide simple DSL functions and parameter extractor:
+
+* `:?` - begin parameters matching block
+* `+&` - add one more parameter to match
+* `QueryParam` - abstract class for matching required parameter
+* `OptionQueryParam` - abstract class for matching optional parameter
+
+Also you can simple do `case Root / .. / .. :? params =>` code `:? params` return all parameters as `Map[String, String`
 
 ==== Running at a nested path
 
@@ -510,6 +553,27 @@ router = Router(
   static = ...,
   dynamic = ...,
   rootPath = "/ui/"
+)
+-------------------------------------------------------------------------------
+
+==== Migration existing Router to Uri routing
+
+For migration your routing's from previous version of Korolev you need to do two things:
+
+* Add import of new class Uri with implicit conversion from Path to Uri, for correct work of `fromState`.
+[source,scala]
+
+-------------------------------------------------------------------------------
+import korolev.web.Uri
+-------------------------------------------------------------------------------
+
+* Cover existing `toState` code with `Uri {}` for correct convert `PartialFunction[Path, S => F[S]]` to `PartialFunction[Uri, S => F[S]]`.
+[source,scala]
+
+-------------------------------------------------------------------------------
+router = Router(
+    fromState = ...,
+    toState = Uri {...}
 )
 -------------------------------------------------------------------------------
 
@@ -827,11 +891,11 @@ First number is always an procedure or callback code. You can protocol descripti
 
 === Reconnections under Kubernetes Ingress
 
-When using Korolev under Ingress you may face a problem with frequent recconections of websocket channel between browser and server. 
+When using Korolev under Ingress you may face a problem with frequent recconections of websocket channel between browser and server.
 
 For Google Cloud hosting you can try the following:
 
 1. There is https://cloud.google.com/kubernetes-engine/docs/concepts/ingress#support_for_websocket[section] in the Ingress documentaion concerning websockets. It suggests to create a https://cloud.google.com/kubernetes-engine/docs/how-to/configure-backend-service[`BackendConfig`].
 2. You should set https://cloud.google.com/kubernetes-engine/docs/how-to/configure-backend-service#creating_a_backendconfig[`connectionDraining.drainingTimeoutSec`] to sufficiently large value (e.g. `"3600"`), `timeoutSec` doesn't solve the problem.
 
-This solution was tested only for Google Cloud, but it might work for other systems. Don't hesitate to open a PR and describe if this instruction works for other cases. 
+This solution was tested only for Google Cloud, but it might work for other systems. Don't hesitate to open a PR and describe if this instruction works for other cases.

@@ -24,7 +24,7 @@ import korolev._
 import korolev.effect.{Effect, Queue, Reporter, Scheduler, Stream}
 import korolev.internal.Frontend.DomEventMessage
 import korolev.state.{StateDeserializer, StateManager, StateSerializer}
-import korolev.web.Path
+import korolev.web.Uri
 import levsha.events.calculateEventPropagation
 import levsha.impl.DiffRenderContext
 import levsha.impl.DiffRenderContext.ChangesPerformer
@@ -104,7 +104,7 @@ final class ApplicationInstance
       // Set page url if router exists
       _ <-  router.fromState
           .lift(snapshot(Id.TopLevel).getOrElse(initialState))
-          .fold(Effect[F].unit)(path => frontend.changePageUrl(path))
+          .fold(Effect[F].unit)(uri => frontend.changePageUrl(uri))
       _ <- Effect[F].delay {
         // Prepare render context
         renderContext.swap()
@@ -125,13 +125,13 @@ final class ApplicationInstance
     } yield ()
 
 
-  private def onHistory(path: Path): F[Unit] =
+  private def onHistory(uri: Uri): F[Unit] =
     stateManager
       .read[S](Id.TopLevel)
       .flatMap { maybeTopLevelState =>
         router
           .toState
-          .lift(path)
+          .lift(uri)
           .fold(Effect[F].delay(Option.empty[S]))(_(maybeTopLevelState.getOrElse(initialState)).map(Some(_)))
       }
       .flatMap {

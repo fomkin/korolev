@@ -21,14 +21,14 @@ import korolev.effect.syntax._
 import korolev.server.internal.{Cookies, Html5RenderContext, HttpResponse}
 import korolev.server.{HttpRequest, HttpResponse, KorolevServiceConfig}
 import korolev.web.Response.Status
-import korolev.web.{Headers, Path}
+import korolev.web.{Headers, Uri}
 
 private[korolev] final class ServerSideRenderingService[F[_]: Effect, S, M](sessionsService: SessionsService[F, S, _],
                                                                          pageService: PageService[F, S, M],
                                                                          config: KorolevServiceConfig[F, S, M]) {
 
-  def canBeRendered(path: Path): Boolean =
-    config.router.toState.isDefinedAt(path)
+  def canBeRendered(uri: Uri): Boolean =
+    config.router.toState.isDefinedAt(uri)
 
   def serverSideRenderedPage(request: HttpRequest[F]): F[HttpResponse[F]] = {
 

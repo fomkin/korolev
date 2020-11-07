@@ -31,7 +31,7 @@ private[korolev] final class KorolevServiceImpl[F[_]: Effect](http: PartialFunct
     extends KorolevService[F] {
 
   def http(request: HttpRequest[F]): F[HttpResponse[F]] = {
-    request.path match {
+    request.uri.path match {
 
       // Static files
       case Root / "static" =>
@@ -54,7 +54,7 @@ private[korolev] final class KorolevServiceImpl[F[_]: Effect](http: PartialFunct
         postService.file(Qsid(deviceId, sessionId), descriptor, request.headers, request.body)
 
       // Server side rendering
-      case path if path == Root || ssrService.canBeRendered(request.path) =>
+      case path if path == Root || ssrService.canBeRendered(request.uri) =>
         ssrService.serverSideRenderedPage(request)
 
       // Not found
@@ -64,7 +64,7 @@ private[korolev] final class KorolevServiceImpl[F[_]: Effect](http: PartialFunct
   }
 
   def ws(request: WebSocketRequest[F]): F[WebSocketResponse[F]] = {
-    request.path match {
+    request.uri.path match {
       case Root / "bridge" / "web-socket" / deviceId / sessionId =>
         messagingService.webSocketMessaging(Qsid(deviceId, sessionId), request, request.body)
       case _ =>

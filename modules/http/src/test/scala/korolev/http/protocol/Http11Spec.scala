@@ -2,7 +2,7 @@ package korolev.http.protocol
 
 import korolev.data.Bytes
 import korolev.effect.{Decoder, Stream}
-import korolev.web.{Path, Request, Response}
+import korolev.web.{Path, Request, Response, Uri}
 import org.scalacheck._
 import org.scalatest.{FlatSpec, Matchers}
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -90,7 +90,7 @@ class Http11Spec extends FlatSpec with Matchers with ScalaCheckPropertyChecks {
     for {
       method <- Gen.oneOf(Request.Method.All)
       pathStrings <- Gen.listOf(Gen.alphaNumStr)
-      path = Path.fromString(pathStrings.mkString("/"))
+      uri = Uri(Path.fromString(pathStrings.mkString("/")), None)
       headers <- Gen.listOf(genHeader)
       cookies <- Gen.listOf(genCookieOrParam)
       params <- Gen.listOf(genCookieOrParam)
@@ -101,7 +101,7 @@ class Http11Spec extends FlatSpec with Matchers with ScalaCheckPropertyChecks {
       .map { bodyStream =>
         val originalRequest = Request(
           method = method,
-          path = path,
+          uri = uri,
           headers = headers,
           contentLength = Some(bytes.length.toLong),
           body = bodyStream

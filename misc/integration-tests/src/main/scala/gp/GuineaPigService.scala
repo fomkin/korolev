@@ -4,13 +4,13 @@ import korolev._
 import korolev.server._
 import scala.concurrent.ExecutionContext.Implicits.global
 import korolev.state.javaSerialization._
-
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
-
-import io.circe.generic.auto._, io.circe.parser._
+import io.circe.generic.auto._
+import io.circe.parser._
+import korolev.web.Uri
 
 object GuineaPigService {
 
@@ -42,6 +42,7 @@ object GuineaPigService {
   import State.globalContext._
   import levsha.dsl._
   import html._
+  import korolev.web.Path._
   
   val logger = LoggerFactory.getLogger("GuineaPig")
 
@@ -217,7 +218,7 @@ object GuineaPigService {
           case State(tab, _, _, _, _, _) =>
             Root / tab.toLowerCase
         },
-        toState = {
+        toState = Uri {
           case Root => s =>
             val u = s.copy(selectedTab = s.todos.keys.head)
             Future.successful(u)

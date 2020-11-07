@@ -3,6 +3,7 @@ import korolev.akka._
 import scala.concurrent.ExecutionContext.Implicits.global
 import korolev.server._
 import korolev.state.javaSerialization._
+import korolev.web.Uri
 
 import scala.concurrent.Future
 
@@ -12,11 +13,12 @@ object RoutingExample extends SimpleAkkaHttpKorolevApp {
 
   import levsha.dsl._
   import html._
+  import korolev.web.Path._
 
   val inputId = elementId()
 
   val service = akkaHttpService {
-    KorolevServiceConfig [Future, State, Any](
+    KorolevServiceConfig[Future, State, Any](
       stateLoader = StateLoader.default(State()),
       document = state => optimize {
         Html(
@@ -92,12 +94,14 @@ object RoutingExample extends SimpleAkkaHttpKorolevApp {
           case State(tab, _) =>
             Root / tab.toLowerCase
         },
-        toState = {
-          case Root => initialState =>
-            Future.successful(initialState)
-          case Root / name if State.Tabs.exists(_.toLowerCase == name.toLowerCase) => initialState =>
-            val key = initialState.todos.keys.find(_.toLowerCase == name)
-            Future.successful(key.fold(initialState)(k => initialState.copy(selectedTab = k)))
+        toState = Uri {
+          case Root =>
+            initialState =>
+              Future.successful(initialState)
+          case Root / name if State.Tabs.exists(_.toLowerCase == name.toLowerCase) =>
+            initialState =>
+              val key = initialState.todos.keys.find(_.toLowerCase == name)
+              Future.successful(key.fold(initialState)(k => initialState.copy(selectedTab = k)))
         }
       )
     )

@@ -9,7 +9,7 @@ import korolev.effect.{Queue, Stream}
 import korolev.http.protocol.WebSocketProtocol.Frame
 import korolev.web.Request.Method
 import korolev.web.Response.Status
-import korolev.web.{Headers, Path, Request}
+import korolev.web.{Headers, Path, Request, Uri}
 import org.scalatest.{AsyncFlatSpec, Matchers}
 
 import scala.concurrent.Future
@@ -21,7 +21,7 @@ class HttpClientSpec extends AsyncFlatSpec with Matchers {
       response <- HttpClient[Future, Array[Byte]](
         host = "example.com",
         port = 80,
-        request = Request(Method.Get, Path.Root, Nil, Some(0), Stream.empty[Future, Array[Byte]])
+        request = Request(Method.Get, Uri(Path.Root), Nil, Some(0), Stream.empty[Future, Array[Byte]])
       )
       strictResponseBody <- response.body.fold(Array.empty[Byte])(_ ++ _)
       utf8Body = strictResponseBody.asUtf8String
@@ -42,7 +42,7 @@ class HttpClientSpec extends AsyncFlatSpec with Matchers {
         port = 80,
         request = Request(
           Method.Get,
-          Path.Root / "examples" / "react" / "node_modules" / "todomvc-common" / "base.css",
+          Uri(Path.Root / "examples" / "react" / "node_modules" / "todomvc-common" / "base.css"),
           Vector(Headers.AcceptEncoding -> "gzip"),
           Some(0),
           Stream.empty[Future, Array[Byte]]
