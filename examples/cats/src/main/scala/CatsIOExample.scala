@@ -86,6 +86,12 @@ object CatsIOExample extends App {
               val prop = access.property(inputId)
               prop.get("value") flatMap { value =>
                 prop.set("value", "") flatMap { _ =>
+//                  IO.trace flatMap { trace =>
+//                    println(trace)
+//                    val todo = State.Todo(value, done = false)
+//                    access.transition(s => s.copy(todos = s.todos :+ todo))
+//                  }
+
                   val todo = State.Todo(value, done = false)
                   access.transition(s => s.copy(todos = s.todos :+ todo))
                 }
