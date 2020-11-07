@@ -16,8 +16,6 @@
 
 package korolev.server.internal.services
 
-import java.io.FileWriter
-
 import korolev.effect.Effect
 import korolev.effect.syntax._
 import korolev.server.internal.{Cookies, Html5RenderContext, HttpResponse}
@@ -41,12 +39,6 @@ private[korolev] final class ServerSideRenderingService[F[_]: Effect, S, M](sess
       proxy = pageService.setupStatelessProxy(rc, qsid)
       _ = rc.builder.append("<!DOCTYPE html>\n")
       _ = config.document(state)(proxy)
-      _ = {
-        val w = new FileWriter("html_dump.txt")
-        w.write(rc.mkString)
-        w.flush()
-        w.close()
-      }
       response <- HttpResponse(
         Status.Ok,
         rc.mkString,
