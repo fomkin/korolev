@@ -703,7 +703,7 @@ div(myElement)
 access.evalJs(js"""$myElement.innerHTML = 'this is <a href="http://example.com">example</a>'""")
 -------------------------------------------------------------------------------
 
-https://github.com/fomkin/korolev/blob/v0.16.0/examples/evalJs/src/main/scala/EvalJs.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.16.0/examples/evalJs/src/main/scala/EvalJsExample.scala[See full example]
 
 === Call server from JavaScript
 
@@ -723,7 +723,7 @@ Now invoke it from the client side.
 Korolev.invokeCallback('myCallback', 'myArgValue');
 -------------------------------------------------------------------------------
 
-https://github.com/fomkin/korolev/blob/v0.16.0/examples/evalJs/src/main/scala/EvalJs.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.16.0/examples/evalJs/src/main/scala/EvalJsExample.scala[See full example]
 
 == Productivity
 
