@@ -235,7 +235,7 @@ lazy val `file-streaming-example` = project
   .settings(crossVersionSettings)
   .settings(exampleSettings: _*)
   .settings(mainClass := Some("FileStreamingExample"))
-  .dependsOn(akka)
+  .dependsOn(akka, monix)
 
 lazy val delayExample = project
   .in(examples / "delay")
