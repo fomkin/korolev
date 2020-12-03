@@ -100,7 +100,7 @@ private[korolev] final class PostService[F[_]: Effect](reporter: Reporter,
     sessionsService.getApp(qsid) flatMap {
       case Some(app) =>
         for {
-          _ <- Effect[F].delay {
+          _ <- {
             headers.collectFirst { case ("x-name", v) => v } match {
               case None => Effect[F].pure(Response.Http(Response.Status.BadRequest, "Header 'x-name' should be defined", Nil))
               case Some(fileName) =>

@@ -1,20 +1,21 @@
 import java.nio.file.Paths
 
-import korolev._
+import korolev.Context
 import korolev.akka._
 import korolev.effect.io.FileIO
-import scala.concurrent.ExecutionContext.Implicits.global
-import korolev.server._
+import korolev.server.{KorolevServiceConfig, StateLoader}
 import korolev.state.javaSerialization._
+import korolev.monix._
+import monix.eval.Task
+import monix.execution.Scheduler.Implicits.global
 
-import scala.concurrent.Future
-import scala.concurrent.duration._
+import scala.concurrent.duration.DurationInt
 
 object FileStreamingExample extends SimpleAkkaHttpKorolevApp {
 
   case class State(aliveIndicator: Boolean, progress: Map[String, (Long, Long)], inProgress: Boolean)
 
-  val globalContext = Context[Future, State, Any]
+  val globalContext = Context[Task, State, Any]
 
   import globalContext._
   import levsha.dsl._
@@ -33,12 +34,12 @@ object FileStreamingExample extends SimpleAkkaHttpKorolevApp {
     for {
       files <- access.downloadFilesAsStream(fileInput)
       _ <- access.transition(_.copy(progress = files.map(x => (x._1.fileName, (0L, x._1.size))).toMap, inProgress = true))
-      _ <- Future.sequence {
+      _ <- Task.sequence {
         files.map { case (handler, data) =>
           val size = data.bytesLength.getOrElse(0L)
           // File will be saved in 'downloads' directory
           // in the root of the example project
-          val path = Paths.get("downloads", handler.fileName)
+          val path = Paths.get(handler.fileName)
           data.chunks
             .over(0L) {
               case (acc, chunk) =>
@@ -54,7 +55,7 @@ object FileStreamingExample extends SimpleAkkaHttpKorolevApp {
   }
 
   val service = akkaHttpService {
-    KorolevServiceConfig[Future, State, Any] (
+    KorolevServiceConfig[Task, State, Any] (
       stateLoader = StateLoader.default(State(aliveIndicator = false, Map.empty, inProgress = false)),
       document = {
         case State(aliveIndicator, progress, inProgress) => optimize {
