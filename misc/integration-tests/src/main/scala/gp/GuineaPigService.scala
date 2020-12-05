@@ -10,7 +10,6 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 import io.circe.generic.auto._
 import io.circe.parser._
-import korolev.web.Uri
 
 object GuineaPigService {
 
@@ -42,7 +41,6 @@ object GuineaPigService {
   import State.globalContext._
   import levsha.dsl._
   import html._
-  import korolev.web.Path._
   
   val logger = LoggerFactory.getLogger("GuineaPig")
 
@@ -218,7 +216,7 @@ object GuineaPigService {
           case State(tab, _, _, _, _, _) =>
             Root / tab.toLowerCase
         },
-        toState = Uri {
+        toState = {
           case Root => s =>
             val u = s.copy(selectedTab = s.todos.keys.head)
             Future.successful(u)

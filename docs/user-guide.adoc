@@ -488,7 +488,7 @@ KorolevServiceConfig(
       case MyState(author, article, _) =>
         Root / author / article
     },
-    toState = Uri {
+    toState = {
       case Root / author / article => defaultState =>
         articleService.load(author, article).map { text =>
           MyState(author, article, text)
@@ -532,16 +532,60 @@ router = Router(
 )
 -------------------------------------------------------------------------------
 
-https://github.com/fomkin/korolev/blob/v0.17.0/examples/routing/src/main/scala/UriRoutingExample[See full example]
+https://github.com/fomkin/korolev/blob/v0.17.0/examples/routing/src/main/scala/PathAndQueryRoutingExample.scala[See full example]
 
-For easy parameter matching Korolev provide simple DSL functions and parameter extractor:
+For easy parameter matching Korolev provide tree way for parameters matching:
 
-* `:?` - begin parameters matching block
-* `+&` - add one more parameter to match
-* `QueryParam` - abstract class for matching required parameter
-* `OptionQueryParam` - abstract class for matching optional parameter
+Exact parameter matching, be careful your parameter patterns order and count must have exact same order and count with request:
 
-Also you can simple do `case Root / .. / .. :? params =>` code `:? params` return all parameters as `Map[String, String`
+* `:?` - begin exact parameters matching block
+* `:&` - add one more exact parameter to match
+
+[source,scala]
+-------------------------------------------------------------------------------
+val path = Root / "test" :? =?=("k1", "v1") :& =?=("k2", "v2") :& =?=("k3", "v3")
+path match {
+    case Root / "test" :? =?=("k1", v1) :& =?=("k2", v2) :& =?=("k3", v3) =>
+        ???
+}
+-------------------------------------------------------------------------------
+
+Parse parameter manually from Map[String, String]
+
+* `:?*` - extract parameters as Map[String, String]
+
+[source,scala]
+-------------------------------------------------------------------------------
+val path = Root / "test" :? =?=("k1", "v1") :& =?=("k2", "v2") :& =?=("k3", "v3")
+path match {
+    case Root / "test" :?* params =>
+        ???
+}
+-------------------------------------------------------------------------------
+
+Use parameter extractor syntaxis, combain it with `:?*` for greater results
+
+* `*&` - add one more parameter extractor to match expression
+
+Available parameter extractor:
+
+* `QueryParam` or `QP` - abstract class for matching required request parameter
+* `OptionQueryParam` or `OQP`- abstract class for matching optional request parameter
+
+[source,scala]
+-------------------------------------------------------------------------------
+object K1 extends OQP("k1")
+object K2 extends QP("k2")
+object K3 extends QP("k3")
+
+val path = Root / "test" :? =?=("k1", "v1") :& =?=("k2", "v2") :& =?=("k3", "v3")
+path match {
+    case Root / "test" :?* K1(v1) *& K2(v2) *& K3(v3) =>
+        ???
+}
+-------------------------------------------------------------------------------
+
+For more information about Path and Querry matching, please read https://github.com/fomkin/korolev/blob/v0.17.0/modules/web/src/test/scala/korolev/web/PathAndQuerySpec.scala[PathAndQuerySpec]
 
 ==== Running at a nested path
 
@@ -553,27 +597,6 @@ router = Router(
   static = ...,
   dynamic = ...,
   rootPath = "/ui/"
-)
--------------------------------------------------------------------------------
-
-==== Migration existing Router to Uri routing
-
-For migration your routing's from previous version of Korolev you need to do two things:
-
-* Add import of new class Uri with implicit conversion from Path to Uri, for correct work of `fromState`.
-[source,scala]
-
--------------------------------------------------------------------------------
-import korolev.web.Uri
--------------------------------------------------------------------------------
-
-* Cover existing `toState` code with `Uri {}` for correct convert `PartialFunction[Path, S => F[S]]` to `PartialFunction[Uri, S => F[S]]`.
-[source,scala]
-
--------------------------------------------------------------------------------
-router = Router(
-    fromState = ...,
-    toState = Uri {...}
 )
 -------------------------------------------------------------------------------
 

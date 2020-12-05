@@ -115,7 +115,7 @@ object CatsIOExample extends App {
 
   private val route = akkaHttpService(config).apply(AkkaHttpServerConfig())
 
-  Http().bindAndHandle(route, "0.0.0.0", 8080)
+  Http().newServerAt("0.0.0.0", 8080).bindFlow(route)
 }
 
 case class State(

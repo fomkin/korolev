@@ -1,4 +1,4 @@
-import korolev.web.Path
+import korolev.web.PathAndQuery
 
 /*
  * Copyright 2017-2020 Aleksey Fomkin
@@ -19,8 +19,12 @@ import korolev.web.Path
 package object korolev {
 
   // Routing API
-  @inline val Root = Path.Root
-  @inline val / = Path./
+  @inline val Root: PathAndQuery.Root.type = PathAndQuery.Root
+  @inline val RelativeRoot: PathAndQuery.RelativeRoot.type = PathAndQuery.RelativeRoot
+  @inline val / : PathAndQuery./.type = PathAndQuery./
+  @inline val :? : PathAndQuery.:?.type = PathAndQuery.:?
+  @inline val :?* : PathAndQuery.:?*.type = PathAndQuery.:?*
+  @inline val *& : PathAndQuery.*&.type = PathAndQuery.*&
 
   type Transition[State] = State => State
 }

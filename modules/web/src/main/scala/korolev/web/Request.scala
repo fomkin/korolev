@@ -23,7 +23,7 @@ import java.nio.charset.StandardCharsets
   * @param body Should be handled before response be given
   */
 final case class Request[Body](method: Request.Method,
-                               uri: Uri,
+                               pq: PathAndQuery,
                                headers: Seq[(String, String)],
                                contentLength: Option[Long],
                                body: Body,
@@ -41,7 +41,7 @@ final case class Request[Body](method: Request.Method,
       .toMap
 
   def param(name: String): Option[String] =
-    uri.param(name)
+    pq.param(name)
 
   def cookie(name: String): Option[String] =
     parsedCookie.get(name)
@@ -52,7 +52,7 @@ final case class Request[Body](method: Request.Method,
     }
 
   def withParam(name: String, value: String): Request[Body] = {
-    copy(uri = uri.withParam(name, value))
+    copy(pq = pq.withParam(name, value))
   }
 
   def withCookie(name: String, value: String): Request[Body] = {
@@ -81,7 +81,7 @@ object Request {
 
     def method: Method
 
-    def uri: Uri
+    def pq: PathAndQuery
 
     def param(name: String): Option[String]
 

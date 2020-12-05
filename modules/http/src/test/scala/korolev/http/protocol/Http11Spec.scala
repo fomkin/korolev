@@ -2,7 +2,7 @@ package korolev.http.protocol
 
 import korolev.data.Bytes
 import korolev.effect.{Decoder, Stream}
-import korolev.web.{Path, Request, Response, Uri}
+import korolev.web.{PathAndQuery, Request, Response}
 import org.scalacheck._
 import org.scalatest.{FlatSpec, Matchers}
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -51,20 +51,20 @@ class Http11Spec extends FlatSpec with Matchers with ScalaCheckPropertyChecks {
 
   private val genCookieOrParam =
     for {
-      k <- Gen.asciiPrintableStr.filter(_.length > 0)
+      k <- Gen.asciiPrintableStr.filter(_.nonEmpty)
       v <- Gen.asciiPrintableStr
     } yield (k, v)
 
   private val genHeader =
     for {
-      k <- Gen.alphaNumStr.filter(_.length > 0)
+      k <- Gen.alphaNumStr.filter(_.nonEmpty)
       v <- Gen.asciiPrintableStr
     } yield (k, v)
 
   private val genStatus =
     for {
       k <- Gen.choose(0, 1000)
-      v <- Gen.alphaNumStr.filter(_.length > 0)
+      v <- Gen.alphaNumStr.filter(_.nonEmpty)
     } yield Response.Status(k, v.toUpperCase)
 
   private val genResponse =
@@ -90,7 +90,7 @@ class Http11Spec extends FlatSpec with Matchers with ScalaCheckPropertyChecks {
     for {
       method <- Gen.oneOf(Request.Method.All)
       pathStrings <- Gen.listOf(Gen.alphaNumStr)
-      uri = Uri(Path.fromString(pathStrings.mkString("/")), None)
+      pq = PathAndQuery.fromString(pathStrings.mkString("/"))
       headers <- Gen.listOf(genHeader)
       cookies <- Gen.listOf(genCookieOrParam)
       params <- Gen.listOf(genCookieOrParam)
@@ -101,7 +101,7 @@ class Http11Spec extends FlatSpec with Matchers with ScalaCheckPropertyChecks {
       .map { bodyStream =>
         val originalRequest = Request(
           method = method,
-          uri = uri,
+          pq = pq,
           headers = headers,
           contentLength = Some(bytes.length.toLong),
           body = bodyStream

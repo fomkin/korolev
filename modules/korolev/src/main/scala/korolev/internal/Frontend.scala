@@ -21,7 +21,7 @@ import scala.collection.mutable
 import scala.annotation.switch
 
 import korolev.Context.FileHandler
-import korolev.web.{FormData, Uri}
+import korolev.web.{FormData, PathAndQuery}
 import korolev.effect.io.LazyBytes
 import korolev.effect.syntax._
 import korolev.effect.{AsyncTable, Effect, Queue, Reporter, Stream}
@@ -65,9 +65,9 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
         DomEventMessage(renderNum.toInt, Id(target), tpe)
     }
 
-  val browserHistoryMessages: Stream[F, Uri] =
+  val browserHistoryMessages: Stream[F, PathAndQuery] =
     rawBrowserHistoryChanges.map {
-      case (_, args) => Uri.fromString(args)
+      case (_, args) => PathAndQuery.fromString(args)
     }
 
   private def send(args: Any*): F[Unit] = {
@@ -163,8 +163,8 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
   def resetForm(id: Id): F[Unit] =
     send(Procedure.RestForm.code, id.mkString)
 
-  def changePageUrl(uri: Uri): F[Unit] =
-    send(Procedure.ChangePageUrl.code, uri.mkString)
+  def changePageUrl(pq: PathAndQuery): F[Unit] =
+    send(Procedure.ChangePageUrl.code, pq.mkString)
 
   def setRenderNum(i: Int): F[Unit] =
     send(Procedure.SetRenderNum.code, i)

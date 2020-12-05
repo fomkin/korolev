@@ -16,7 +16,7 @@
 
 package korolev
 
-import korolev.web.Uri
+import korolev.web.PathAndQuery
 
 /**
   * URL routing definition
@@ -28,8 +28,8 @@ import korolev.web.Uri
   * @tparam S Type of State
   */
 final case class Router[F[_], S](
-    fromState: PartialFunction[S, Uri] = PartialFunction.empty,
-    toState: PartialFunction[Uri, S => F[S]] = PartialFunction.empty
+    fromState: PartialFunction[S, PathAndQuery] = PartialFunction.empty,
+    toState: PartialFunction[PathAndQuery, S => F[S]] = PartialFunction.empty
 )
 
 object Router {

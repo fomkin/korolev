@@ -19,7 +19,6 @@ package korolev
 import _root_.cats.Traverse
 import _root_.cats.effect._
 import _root_.cats.instances.list._
-import _root_.cats.syntax.all._
 import korolev.effect.{Effect => KEffect}
 
 import scala.collection.concurrent.TrieMap

@@ -28,9 +28,9 @@ import _root_.akka.util.ByteString
 import korolev.akka.util.LoggingReporter
 import korolev.effect.io.LazyBytes
 import korolev.effect.{Effect, Reporter}
-import korolev.server.{KorolevService, KorolevServiceConfig, HttpRequest => KorolevHttpRequest, HttpResponse => KorolevHttpResponse}
-import korolev.web.{Path, Request => KorolevRequest, Response => KorolevResponse, Uri => KorolevUri}
+import korolev.server.{KorolevService, KorolevServiceConfig, HttpRequest => KorolevHttpRequest}
 import korolev.state.{StateDeserializer, StateSerializer}
+import korolev.web.{PathAndQuery, Request => KorolevRequest, Response => KorolevResponse}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -115,7 +115,7 @@ package object akka {
                                      path: String,
                                      body: Body): KorolevRequest[Body] =
     KorolevRequest(
-      uri = KorolevUri(Path.fromString(path), request.uri.rawQueryString),
+      pq = PathAndQuery.fromString(path).withParams(request.uri.rawQueryString),
       method = KorolevRequest.Method.fromString(request.method.value),
       contentLength = request.headers.find(_.is("content-length")).map(_.value().toLong),
       renderedCookie = request.headers.find(_.is("cookie")).map(_.value()).getOrElse(""),

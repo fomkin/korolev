@@ -4,12 +4,12 @@ import korolev.akka._
 import scala.concurrent.ExecutionContext.Implicits.global
 import korolev.server._
 import korolev.state.javaSerialization._
-import korolev.web.Uri.OptionQueryParam
-import korolev.web.Uri
+import korolev.web.PathAndQuery.OptionQueryParam
+import korolev.web.PathAndQuery.*&
 
 import scala.concurrent.Future
 
-object UriRoutingExample extends SimpleAkkaHttpKorolevApp {
+object PathAndQueryRoutingExample extends SimpleAkkaHttpKorolevApp {
   object BeginOptionQueryParam extends OptionQueryParam("begin")
   object EndOptionQueryParam extends OptionQueryParam("end")
 
@@ -23,8 +23,6 @@ object UriRoutingExample extends SimpleAkkaHttpKorolevApp {
 
   import levsha.dsl._
   import html._
-  import korolev.web.Path._
-  import korolev.web.Uri._
 
   val beginElementId = elementId()
   val endElementId = elementId()
@@ -75,13 +73,13 @@ object UriRoutingExample extends SimpleAkkaHttpKorolevApp {
       router = Router(
         fromState = {
           case State(begin, end) =>
-            Uri(Root / "search").withParam("begin", begin).withParam("end", end)
+            (Root / "search").withParam("begin", begin).withParam("end", end)
         },
         toState = {
-          case Root :? _ =>
+          case Root =>
             initialState =>
               Future.successful(initialState)
-          case Root  / "search" :? BeginOptionQueryParam(begin) +& EndOptionQueryParam(end) => _ =>
+          case Root  / "search" :?* BeginOptionQueryParam(begin) *& EndOptionQueryParam(end) => _ =>
               val result = State(begin, end)
               Future.successful(result)
         }

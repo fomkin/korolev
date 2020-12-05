@@ -3,8 +3,6 @@ import korolev.akka._
 import scala.concurrent.ExecutionContext.Implicits.global
 import korolev.server._
 import korolev.state.javaSerialization._
-import korolev.web.Uri
-
 import scala.concurrent.Future
 
 object RoutingExample extends SimpleAkkaHttpKorolevApp {
@@ -13,7 +11,7 @@ object RoutingExample extends SimpleAkkaHttpKorolevApp {
 
   import levsha.dsl._
   import html._
-  import korolev.web.Path._
+  import korolev.web.PathAndQuery._
 
   val inputId = elementId()
 
@@ -94,7 +92,7 @@ object RoutingExample extends SimpleAkkaHttpKorolevApp {
           case State(tab, _) =>
             Root / tab.toLowerCase
         },
-        toState = Uri {
+        toState = {
           case Root =>
             initialState =>
               Future.successful(initialState)

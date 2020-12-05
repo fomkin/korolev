@@ -1,15 +1,14 @@
 package korolev.http
 
-import java.net.InetSocketAddress
-import java.nio.ByteBuffer
-
 import korolev.data.BytesLike
 import korolev.effect.io.RawDataSocket
 import korolev.effect.syntax._
 import korolev.effect.{Decoder, Effect, Stream}
 import korolev.http.protocol.{Http11, WebSocketProtocol}
-import korolev.web.{Headers, Path, Request, Response, Uri}
+import korolev.web.{Headers, Path, Request, Response}
 
+import java.net.InetSocketAddress
+import java.nio.ByteBuffer
 import scala.concurrent.ExecutionContext
 
 object HttpClient {
@@ -56,7 +55,7 @@ object HttpClient {
     for {
       intention <- WebSocketProtocol.Intention.random
       encodedOutgoingFrames = outgoingFrames.map(frame => webSocketProtocol.encodeFrame(frame, Some(123)))
-      requestRaw = Request(Request.Method.Get, Uri(path), headers.toSeq, None, encodedOutgoingFrames)
+      requestRaw = Request(Request.Method.Get, path, headers.toSeq, None, encodedOutgoingFrames)
       requestWithParams = params.foldLeft(requestRaw) { case (acc, (k, v)) => acc.withParam(k, v) }
       requestWithCookie = cookie.foldLeft(requestWithParams) { case (acc, (k, v)) => acc.withCookie(k, v) }
       requestWithIntention = webSocketProtocol.addIntention(requestWithCookie, intention)

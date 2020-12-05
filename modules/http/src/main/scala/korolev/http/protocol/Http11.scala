@@ -5,7 +5,7 @@ import korolev.data.syntax._
 import korolev.effect.syntax._
 import korolev.effect.{Decoder, Effect, Stream}
 import korolev.web.Response.Status
-import korolev.web.{Headers, Path, Request, Response, Uri}
+import korolev.web.{Headers, PathAndQuery, Request, Response}
 
 import scala.collection.mutable
 
@@ -163,7 +163,7 @@ class Http11[B: BytesLike] {
     }
     val request = Request(
       method = Request.Method.fromString(method),
-      uri = Uri(Path.fromString(path), Option(params)),
+      pq = PathAndQuery.fromString(path).withParams(Option(params)),
       renderedCookie = cookie,
       headers = headers.toVector,
       body = (),
@@ -248,7 +248,7 @@ class Http11[B: BytesLike] {
     val sb = new StringBuilder()
       .append(request.method.value)
       .append(' ')
-      .append(request.uri.mkString)
+      .append(request.pq.mkString)
 
     sb
       .append(' ')

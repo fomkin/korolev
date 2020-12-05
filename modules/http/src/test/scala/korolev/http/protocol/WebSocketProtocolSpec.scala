@@ -2,7 +2,7 @@ package korolev.http.protocol
 
 import korolev.data.Bytes
 import korolev.effect.Decoder
-import korolev.web.Uri.UriRoot
+import korolev.web.PathAndQuery.Root
 import korolev.web.{Request, Response}
 import org.scalatest.{Assertion, FlatSpec, Matchers}
 
@@ -19,7 +19,7 @@ class WebSocketProtocolSpec extends FlatSpec with Matchers {
   final val HandshakeAccept = "s3pPLMBiTxaQ9kYGzzhZRbK+xOo="
   final val HandshakeRequest = Request(
     method = Request.Method.Get,
-    uri = UriRoot,
+    pq = Root,
     headers = Seq(
       "connection" -> "upgrade",
       "sec-websocket-key" -> HandshakeKey,
@@ -30,7 +30,7 @@ class WebSocketProtocolSpec extends FlatSpec with Matchers {
   )
   final val BasicHttpRequest = Request(
     method = Request.Method.Get,
-    uri = UriRoot,
+    pq = Root,
     headers = Seq.empty,
     contentLength = None,
     body = ()
