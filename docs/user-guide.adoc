@@ -463,7 +463,7 @@ https://github.com/fomkin/korolev/blob/v0.16.0/examples/extension/src/main/scala
 
 === Routing
 
-Router allows to integrate browser navigation into you app. In the router you define bidirectional mapping between the state and the Uri (about migration from Path routing read below).
+Router allows to integrate browser navigation into you app. In the router you define bidirectional mapping between the state and the PathAndQuery.
 
 Let's pretends that your application is a blogging platform.
 
