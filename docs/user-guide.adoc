@@ -500,7 +500,7 @@ KorolevServiceConfig(
 
 https://github.com/fomkin/korolev/blob/v0.17.0/examples/routing/src/main/scala/RoutingExample.scala#L93[See full example]
 
-==== Using Uri routing
+==== Using Query parameter extractors
 
 Large applications some times require ability to share URL from one user to other with exact some state of sorting and filtering parameters.
 For that you have possibility to use URL search parameters for state initialisation.
@@ -516,16 +516,13 @@ case class State(begin: Option[String] = None, end: Option[String] = None)
 router = Router(
     fromState = {
       case State(begin, end) =>
-        Uri(Root / "search").withParam("begin", begin).withParam("end", end)
+        (Root / "search").withParam("begin", begin).withParam("end", end)
     },
     toState = {
-// match / without any parameters
-      case Root :? _ =>
+      case Root =>
         initialState =>
           Future.successful(initialState)
-// match /search with two optional parameter `begin` and `end`
-      case Root  / "search" :? BeginOptionQueryParam(begin) +& EndOptionQueryParam(end) =>
-        initialState =>
+      case Root  / "search" :?* BeginOptionQueryParam(begin) *& EndOptionQueryParam(end) => _ =>
           val result = State(begin, end)
           Future.successful(result)
     }
