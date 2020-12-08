@@ -535,15 +535,16 @@ For easy parameter matching Korolev provide tree way for parameters matching:
 
 Exact parameter matching, be careful your parameter patterns order and count must have exact same order and count with request:
 
-* `:?` - begin exact parameters matching block
-* `:&` - add one more exact parameter to match
+* `:?`  - start query paraters
+* `:&`  - add one more parameter to query
+* `:??` - start exact parameter matchig block
 
 [source,scala]
 -------------------------------------------------------------------------------
-val path = Root / "test" :? =?=("k1", "v1") :& =?=("k2", "v2") :& =?=("k3", "v3")
+val path = Root / "test" :? "k1" -> "v1" :& "k2" -> "v2" :& "k3" -> "v3"
 path match {
-    case Root / "test" :? =?=("k1", v1) :& =?=("k2", v2) :& =?=("k3", v3) =>
-        ???
+    case Root / "test" :?? (("k1", v1), ("k2", v2), ("k3", v3)) =>
+        (v1, v2, v3)
 }
 -------------------------------------------------------------------------------
 
@@ -553,7 +554,7 @@ Parse parameter manually from Map[String, String]
 
 [source,scala]
 -------------------------------------------------------------------------------
-val path = Root / "test" :? =?=("k1", "v1") :& =?=("k2", "v2") :& =?=("k3", "v3")
+val path = Root / "test" :? "k1" -> "v1" :& "k2" -> "v2" :& "k3" -> "v3"
 path match {
     case Root / "test" :?* params =>
         ???
@@ -575,7 +576,7 @@ object K1 extends OQP("k1")
 object K2 extends QP("k2")
 object K3 extends QP("k3")
 
-val path = Root / "test" :? =?=("k1", "v1") :& =?=("k2", "v2") :& =?=("k3", "v3")
+val path = Root / "test" :? "k1" -> "v1" :& "k2" -> "v2" :& "k3" -> "v3"
 path match {
     case Root / "test" :?* K1(v1) *& K2(v2) *& K3(v3) =>
         ???

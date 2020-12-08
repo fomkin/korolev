@@ -20,9 +20,9 @@ package object korolev {
 
   // Routing API
   @inline val Root: PathAndQuery.Root.type = PathAndQuery.Root
-  @inline val RelativeRoot: PathAndQuery.RelativeRoot.type = PathAndQuery.RelativeRoot
   @inline val / : PathAndQuery./.type = PathAndQuery./
   @inline val :? : PathAndQuery.:?.type = PathAndQuery.:?
+  @inline val :?? : PathAndQuery.:??.type = PathAndQuery.:??
   @inline val :?* : PathAndQuery.:?*.type = PathAndQuery.:?*
   @inline val *& : PathAndQuery.*&.type = PathAndQuery.*&
 

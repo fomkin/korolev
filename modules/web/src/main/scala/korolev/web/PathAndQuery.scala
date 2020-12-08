@@ -1,5 +1,7 @@
 package korolev.web
 
+import korolev.web.PathAndQuery./
+
 import java.net.{URLDecoder, URLEncoder}
 import java.nio.charset.StandardCharsets
 import scala.annotation.tailrec
@@ -15,11 +17,11 @@ sealed trait PathAndQuery {
   def startsWith(value: String): Boolean = {
     @tailrec
     def aux(pq: PathAndQuery): Boolean = pq match {
-      case :&(prev, _)                  => aux(prev)
-      case prev :? _                    => aux(prev)
-      case /(Root | RelativeRoot, path) => path == value
-      case /(prev, _)                   => aux(prev)
-      case _                            => false
+      case :&(prev, _)   => aux(prev)
+      case prev :? _     => aux(prev)
+      case /(Root, path) => path == value
+      case /(prev, _)    => aux(prev)
+      case _             => false
     }
 
     aux(this)
@@ -41,12 +43,10 @@ sealed trait PathAndQuery {
     @tailrec
     def aux(pq: PathAndQuery, path: Seq[String], query: String): String = {
       pq match {
-        case Root                => "/" + path.mkString("/") + query
-        case RelativeRoot        => path.mkString("/") + query
-        case :&(prev, =?=(k, v)) => aux(prev, path, s"&${encode(k)}=${encode(v)}" + query)
-        case head :? (k =?= v)   => aux(head, path, s"?${encode(k)}=${encode(v)}" + query)
-        case /(head, segment)    => aux(head, segment +: path, query)
-        case =?=(_, _)           => "/" + path.mkString("/") + query
+        case Root                 => "/" + path.mkString("/") + query
+        case :&(prev, (k, v))     => aux(prev, path, s"&${encode(k)}=${encode(v)}" + query)
+        case head :? Tuple2(k, v) => aux(head, path, s"?${encode(k)}=${encode(v)}" + query)
+        case /(head, segment)     => aux(head, segment +: path, query)
       }
     }
 
@@ -57,11 +57,10 @@ sealed trait PathAndQuery {
     @tailrec
     def aux(pq: PathAndQuery): Option[String] = {
       pq match {
-        case _: Path                       => None
-        case :&(_, =?=(k, v)) if k == name => Some(v)
-        case :&(prev, _)                   => aux(prev)
-        case _ :? (k =?= v) if k == name   => Some(v)
-        case _ :? _                        => None
+        case _: Path                        => None
+        case :&(_, (k, v)) if k == name     => Some(v)
+        case :&(prev, _)                    => aux(prev)
+        case _ :? Tuple2(k, v) if k == name => Some(v)
       }
     }
 
@@ -71,9 +70,9 @@ sealed trait PathAndQuery {
   def withParam(key: String, value: String): PathAndQuery = {
     this match {
       case path: Path =>
-        path :? =?=(key, value)
+        path :? key -> value
       case query: Query =>
-        query :& =?=(key, value)
+        query :& key -> value
     }
   }
 
@@ -92,7 +91,7 @@ sealed trait PathAndQuery {
 sealed trait Query extends PathAndQuery {
   import korolev.web.PathAndQuery._
 
-  def :&(next: =?=): Query = {
+  def :&(next: (String, String)): Query = {
     new :&(this, next)
   }
 }
@@ -103,26 +102,24 @@ sealed trait Path extends PathAndQuery {
 
   def /(s: String): Path = PathAndQuery./(this, s)
 
-  def :?(next: =?=): Query = {
+  def :?(next: (String, String)): Query = {
     new :?(this, next)
   }
 
   @tailrec
   private[this] def pathRoot(path: Path): Path = path match {
-    case /(Root, _)         => Root
-    case /(RelativeRoot, _) => RelativeRoot
-    case /(prev, _)         => pathRoot(prev)
-    case _                  => throw new Exception("?== should not be reachable")
+    case /(Root, _) => Root
+    case /(prev, _) => pathRoot(prev)
+    case _          => throw new Exception("?== should not be reachable")
   }
 
   def reverse: Path = {
     @tailrec
     def reverse(path: Path, result: Path): Path = {
       path match {
-        case /(Root | RelativeRoot, path) => result / path
-        case /(p, path)                   => reverse(p, result / path)
-        case Root                         => Root
-        case RelativeRoot                 => RelativeRoot
+        case /(Root, path) => result / path
+        case /(p, path)    => reverse(p, result / path)
+        case Root          => Root
       }
     }
 
@@ -133,10 +130,9 @@ sealed trait Path extends PathAndQuery {
     @tailrec
     def aux(result: Path, other: Path): Path = {
       other match {
-        case /(RelativeRoot | Root, path) => result / path
-        case /(p, path)                   => aux(result / path, p)
-        case RelativeRoot                 => tail
-        case Root                         => tail
+        case /(Root, path) => result / path
+        case /(p, path)    => aux(result / path, p)
+        case Root          => tail
       }
     }
 
@@ -146,7 +142,6 @@ sealed trait Path extends PathAndQuery {
 
 object PathAndQuery {
   case object Root extends Path
-  case object RelativeRoot extends Path
 
   final case class /(prev: Path, value: String) extends Path
 
@@ -163,9 +158,8 @@ object PathAndQuery {
     }
   }
 
-  final case class =?=(k: String, v: String) extends Query
-  final case class :&(prev: Query, next: (=?=)) extends Query
-  final case class :?(path: Path, next: (=?=)) extends Query
+  final case class :&(prev: Query, next: (String, String)) extends Query
+  final case class :?(path: Path, next: (String, String)) extends Query
 
   object *& {
     def unapply(params: Map[String, String]): Some[(Map[String, String], Map[String, String])] =
@@ -176,15 +170,27 @@ object PathAndQuery {
     def unapply(pq: PathAndQuery): Some[(Path, Map[String, String])] = {
       @tailrec
       def aux(pq: PathAndQuery, query: Map[String, String]): (Path, Map[String, String]) = pq match {
-        case :&(prev, =?=(k, v)) => aux(prev, query + (k -> v))
-        case path :? (k =?= v)   => (path, query + (k -> v))
-        case path: /             => (path, query)
-        case Root                => (Root, query)
-        case RelativeRoot        => (RelativeRoot, query)
-        case _: =?=              => throw new Exception("?== should not be reachable")
+        case :&(prev, (k, v))     => aux(prev, query + (k -> v))
+        case path :? Tuple2(k, v) => (path, query + (k -> v))
+        case path: /              => (path, query)
+        case Root                 => (Root, query)
       }
 
       Some(aux(pq, Map.empty))
+    }
+  }
+
+  object :?? {
+    def unapplySeq(pq: PathAndQuery): Some[(Path, Seq[(String, String)])] = {
+      @tailrec
+      def aux(pq: PathAndQuery, query: Seq[(String, String)]): (Path, Seq[(String, String)]) = pq match {
+        case :&(prev, (k, v))     => aux(prev, (k, v) +: query)
+        case path :? Tuple2(k, v) => (path, (k, v) +: query)
+        case path: /              => (path, query)
+        case Root                 => (Root, query)
+      }
+
+      Some(aux(pq, Seq.empty))
     }
   }
 
@@ -217,17 +223,15 @@ object PathAndQuery {
     val pathAndQuery = raw.split('?')
     val params: Seq[(String, String)] = parseParams(pathAndQuery.lift(1))
 
-    val first: Path = if (raw.startsWith("/")) Root else RelativeRoot
-
     pathAndQuery.headOption match {
       case None =>
-        first
+        Root
       case Some(rawPath) =>
         val path = rawPath
           .split("/")
           .toList
           .filter(_.nonEmpty)
-          .foldLeft(first)((xs, x) => PathAndQuery./(xs, x))
+          .foldLeft[Path](Root)((xs, x) => PathAndQuery./(xs, x))
 
         params.foldLeft[PathAndQuery](path) {
           case (result, (key, value)) =>
