@@ -25,6 +25,7 @@ package object korolev {
   @inline val :?? : PathAndQuery.:??.type = PathAndQuery.:??
   @inline val :?* : PathAndQuery.:?*.type = PathAndQuery.:?*
   @inline val *& : PathAndQuery.*&.type = PathAndQuery.*&
+  @inline val :& : PathAndQuery.:&.type = PathAndQuery.:&
 
   type Transition[State] = State => State
 }
