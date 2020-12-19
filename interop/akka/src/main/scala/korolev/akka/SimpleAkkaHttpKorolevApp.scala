@@ -30,7 +30,7 @@ abstract class SimpleAkkaHttpKorolevApp(config: AkkaHttpServerConfig = null) {
       if (config == null) AkkaHttpServerConfig()
       else config
     val route = service(escapedConfig)
-    Http().bindAndHandle(route, "0.0.0.0", 8080)
+    Http().newServerAt("0.0.0.0", 8080).bindFlow(route)
     ()
   }
 }

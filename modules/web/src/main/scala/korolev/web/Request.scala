@@ -20,26 +20,15 @@ import java.net.{URLDecoder, URLEncoder}
 import java.nio.charset.StandardCharsets
 
 /**
- * @param body Should be handled before response be given
- */
+  * @param body Should be handled before response be given
+  */
 final case class Request[Body](method: Request.Method,
-                               path: Path,
+                               pq: PathAndQuery,
                                headers: Seq[(String, String)],
                                contentLength: Option[Long],
                                body: Body,
-                               renderedParams: String = null,
                                renderedCookie: String = null)
     extends Request.Head {
-
-  private lazy val parsedParams =
-    if (renderedParams == null || renderedParams.isEmpty) Map.empty[String, String]
-    else renderedParams
-      .split('&')
-      .map { xs =>
-        val Array(k, v) = xs.split('=')
-        (URLDecoder.decode(k, StandardCharsets.UTF_8), URLDecoder.decode(v, StandardCharsets.UTF_8))
-      }
-      .toMap
 
   private lazy val parsedCookie =
     if (renderedCookie == null || renderedCookie.isEmpty) Map.empty[String, String]
@@ -52,7 +41,7 @@ final case class Request[Body](method: Request.Method,
       .toMap
 
   def param(name: String): Option[String] =
-    parsedParams.get(name)
+    pq.param(name)
 
   def cookie(name: String): Option[String] =
     parsedCookie.get(name)
@@ -63,18 +52,7 @@ final case class Request[Body](method: Request.Method,
     }
 
   def withParam(name: String, value: String): Request[Body] = {
-    val ek = URLEncoder.encode(name, StandardCharsets.UTF_8)
-    if (renderedParams == null || renderedParams.isEmpty) {
-      if (value.isEmpty) copy(renderedParams = ek) else {
-        val ev = URLEncoder.encode(value, StandardCharsets.UTF_8)
-        copy(renderedParams = s"$ek=$ev")
-      }
-    } else {
-      if (value.isEmpty) copy(renderedParams = s"$renderedParams&$ek") else {
-        val ev = URLEncoder.encode(value, StandardCharsets.UTF_8)
-        copy(renderedParams = s"${renderedParams}&$ek=$ev")
-      }
-    }
+    copy(pq = pq.withParam(name, value))
   }
 
   def withCookie(name: String, value: String): Request[Body] = {
@@ -103,7 +81,7 @@ object Request {
 
     def method: Method
 
-    def path: Path
+    def pq: PathAndQuery
 
     def param(name: String): Option[String]
 
@@ -120,15 +98,15 @@ object Request {
 
     def fromString(method: String): Method =
       method match {
-        case "POST" => Post
-        case "GET" => Get
-        case "PUT" => Put
-        case "DELETE" => Delete
+        case "POST"    => Post
+        case "GET"     => Get
+        case "PUT"     => Put
+        case "DELETE"  => Delete
         case "OPTIONS" => Options
-        case "HEAD" => Head
-        case "TRACE" => Trace
+        case "HEAD"    => Head
+        case "TRACE"   => Trace
         case "CONNECT" => Connect
-        case _ => Unknown(method)
+        case _         => Unknown(method)
       }
 
     case object Post extends Method("POST")

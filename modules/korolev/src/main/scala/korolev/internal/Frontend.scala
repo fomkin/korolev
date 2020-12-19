@@ -21,11 +21,10 @@ import scala.collection.mutable
 import scala.annotation.switch
 
 import korolev.Context.FileHandler
-import korolev.web.Path
+import korolev.web.{FormData, PathAndQuery}
 import korolev.effect.io.LazyBytes
 import korolev.effect.syntax._
 import korolev.effect.{AsyncTable, Effect, Queue, Reporter, Stream}
-import korolev.web.FormData
 import levsha.Id
 import levsha.impl.DiffRenderContext.ChangesPerformer
 
@@ -43,7 +42,7 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
   private val stringPromises = AsyncTable.unsafeCreateEmpty[F, String, String]
   private val formDataPromises = AsyncTable.unsafeCreateEmpty[F, String, FormData]
   private val filesPromises = AsyncTable.unsafeCreateEmpty[F, String, LazyBytes[F]]
-  
+
   // Store file name and it`s length as data
   private val fileNamePromises = AsyncTable.unsafeCreateEmpty[F, String, List[(String, Long)]]
 
@@ -53,8 +52,8 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
     .map(parseMessage)
     .sort(3) {
       case (CallbackType.DomEvent.code, _) => 0
-      case (CallbackType.History.code, _) => 1
-      case _ => 2
+      case (CallbackType.History.code, _)  => 1
+      case _                               => 2
     }
 
   val outgoingMessages: Stream[F, String] = outgoingQueue.stream
@@ -66,9 +65,9 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
         DomEventMessage(renderNum.toInt, Id(target), tpe)
     }
 
-  val browserHistoryMessages: Stream[F, Path] =
+  val browserHistoryMessages: Stream[F, PathAndQuery] =
     rawBrowserHistoryChanges.map {
-      case (_, args) => Path.fromString(args)
+      case (_, args) => PathAndQuery.fromString(args)
     }
 
   private def send(args: Any*): F[Unit] = {
@@ -164,8 +163,8 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
   def resetForm(id: Id): F[Unit] =
     send(Procedure.RestForm.code, id.mkString)
 
-  def changePageUrl(path: Path): F[Unit] =
-    send(Procedure.ChangePageUrl.code, path.mkString)
+  def changePageUrl(pq: PathAndQuery): F[Unit] =
+    send(Procedure.ChangePageUrl.code, pq.mkString)
 
   def setRenderNum(i: Int): F[Unit] =
     send(Procedure.SetRenderNum.code, i)

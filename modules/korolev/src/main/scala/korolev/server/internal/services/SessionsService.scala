@@ -55,7 +55,7 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
     for {
       defaultState <- config.stateLoader(qsid.deviceId, rh)
       state <- config.router.toState
-        .lift(rh.path)
+        .lift(rh.pq)
         .fold(Effect[F].pure(defaultState))(f => f(defaultState))
       _ <- stateStorage.create(qsid.deviceId, qsid.sessionId, state)
     } yield state

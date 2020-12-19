@@ -21,14 +21,14 @@ import korolev.effect.io.LazyBytes
 import korolev.effect.syntax._
 import korolev.server.HttpResponse
 import korolev.server.internal.MimeTypes
-import korolev.web.Path._
-import korolev.web.{Headers, Path, Response}
+import korolev.web.PathAndQuery._
+import korolev.web.{Headers, PathAndQuery, Response}
 
 private[korolev] final class FilesService[F[_]: Effect](commonService: CommonService[F]) {
 
   import commonService._
 
-  def resourceFromClasspath(path: Path): F[HttpResponse[F]] = {
+  def resourceFromClasspath(path: PathAndQuery): F[HttpResponse[F]] = {
     val fsPath = path.mkString
     val maybeResourceStream = Option(this.getClass.getResourceAsStream(fsPath))
     maybeResourceStream.fold(notFoundResponseF) { javaSyncStream =>

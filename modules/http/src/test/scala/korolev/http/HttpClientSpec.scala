@@ -1,17 +1,17 @@
 package korolev.http
 
-import java.io.ByteArrayInputStream
-import java.util.zip.GZIPInputStream
-
 import korolev.data.Bytes
 import korolev.data.syntax._
 import korolev.effect.{Queue, Stream}
 import korolev.http.protocol.WebSocketProtocol.Frame
+import korolev.web.PathAndQuery._
 import korolev.web.Request.Method
 import korolev.web.Response.Status
-import korolev.web.{Headers, Path, Request}
+import korolev.web.{Headers, Request}
 import org.scalatest.{AsyncFlatSpec, Matchers}
 
+import java.io.ByteArrayInputStream
+import java.util.zip.GZIPInputStream
 import scala.concurrent.Future
 
 class HttpClientSpec extends AsyncFlatSpec with Matchers {
@@ -21,7 +21,7 @@ class HttpClientSpec extends AsyncFlatSpec with Matchers {
       response <- HttpClient[Future, Array[Byte]](
         host = "example.com",
         port = 80,
-        request = Request(Method.Get, Path.Root, Nil, Some(0), Stream.empty[Future, Array[Byte]])
+        request = Request(Method.Get, Root, Nil, Some(0), Stream.empty[Future, Array[Byte]])
       )
       strictResponseBody <- response.body.fold(Array.empty[Byte])(_ ++ _)
       utf8Body = strictResponseBody.asUtf8String
@@ -42,7 +42,7 @@ class HttpClientSpec extends AsyncFlatSpec with Matchers {
         port = 80,
         request = Request(
           Method.Get,
-          Path.Root / "examples" / "react" / "node_modules" / "todomvc-common" / "base.css",
+          Root / "examples" / "react" / "node_modules" / "todomvc-common" / "base.css",
           Vector(Headers.AcceptEncoding -> "gzip"),
           Some(0),
           Stream.empty[Future, Array[Byte]]
@@ -66,7 +66,7 @@ class HttpClientSpec extends AsyncFlatSpec with Matchers {
       response <- HttpClient.webSocket(
         host = "echo.websocket.org",
         port = 80,
-        path = Path.Root,
+        path = Root,
         outgoingFrames = queue.stream
       )
       _ <- queue.offer(wsSample1)

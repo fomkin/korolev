@@ -33,7 +33,7 @@ $ sbt
 > ~reStart
 -----------------------------------
 
-The sbt command `~reStart` will make sure that your Korolev application gets restarted and the browser window reloaded on source code changes. 
+The sbt command `~reStart` will make sure that your Korolev application gets restarted and the browser window reloaded on source code changes.
 
 Ok, now you are ready to start hacking with Korolev.
 
@@ -463,7 +463,7 @@ https://github.com/fomkin/korolev/blob/v0.16.0/examples/extension/src/main/scala
 
 === Routing
 
-Router allows to integrate browser navigation into you app. In the router you define bidirectional mapping between the state and the URL.
+Router allows to integrate browser navigation into you app. In the router you define bidirectional mapping between the state and the PathAndQuery.
 
 Let's pretends that your application is a blogging platform.
 
@@ -498,7 +498,92 @@ KorolevServiceConfig(
 )
 -------------------------------------------------------------------------------
 
-https://github.com/fomkin/korolev/blob/v0.16.0/examples/routing/src/main/scala/RoutingExample.scala#L93[See full example]
+https://github.com/fomkin/korolev/blob/v0.17.0/examples/routing/src/main/scala/RoutingExample.scala#L93[See full example]
+
+==== Using Query parameter extractors
+
+Large applications some times require ability to share URL from one user to other with exact some state of sorting and filtering parameters.
+For that you have possibility to use URL search parameters for state initialisation.
+For example initialize search form from URI:
+
+[source,scala]
+-------------------------------------------------------------------------------
+object BeginOptionQueryParam extends OptionQueryParam("begin")
+object EndOptionQueryParam extends OptionQueryParam("end")
+
+case class State(begin: Option[String] = None, end: Option[String] = None)
+
+router = Router(
+    fromState = {
+      case State(begin, end) =>
+        (Root / "search").withParam("begin", begin).withParam("end", end)
+    },
+    toState = {
+      case Root =>
+        initialState =>
+          Future.successful(initialState)
+      case Root  / "search" :?* BeginOptionQueryParam(begin) *& EndOptionQueryParam(end) => _ =>
+          val result = State(begin, end)
+          Future.successful(result)
+    }
+)
+-------------------------------------------------------------------------------
+
+https://github.com/fomkin/korolev/blob/v0.17.0/examples/routing/src/main/scala/PathAndQueryRoutingExample.scala[See full example]
+
+For easy parameter matching Korolev provide tree way for parameters matching:
+
+Exact parameter matching, be careful your parameter patterns order and count must have exact same order and count with request:
+
+* `:?`  - start query paraters
+* `:&`  - add one more parameter to query
+* `:??` - start exact parameter matchig block
+
+[source,scala]
+-------------------------------------------------------------------------------
+val path = Root / "test" :? "k1" -> "v1" :& "k2" -> "v2" :& "k3" -> "v3"
+path match {
+    case Root / "test" :?? (("k1", v1), ("k2", v2), ("k3", v3)) =>
+        (v1, v2, v3)
+}
+-------------------------------------------------------------------------------
+
+Parse parameter manually from Map[String, String]
+
+* `:?*` - extract parameters as Map[String, String]
+
+[source,scala]
+-------------------------------------------------------------------------------
+val path = Root / "test" :? "k1" -> "v1" :& "k2" -> "v2" :& "k3" -> "v3"
+path match {
+    case Root / "test" :?* params =>
+        ???
+}
+-------------------------------------------------------------------------------
+
+Use parameter extractor syntaxis, combain it with `:?*` for greater results
+
+* `*&` - add one more parameter extractor to match expression
+
+Available parameter extractor:
+
+* `QueryParam` or `QP` - abstract class for matching required request parameter
+* `OptionQueryParam` or `OQP`- abstract class for matching optional request parameter
+
+[source,scala]
+-------------------------------------------------------------------------------
+object K1 extends OQP("k1")
+object K2 extends QP("k2")
+object K3 extends QP("k3")
+
+val path = Root / "test" :? "k1" -> "v1" :& "k2" -> "v2" :& "k3" -> "v3"
+path match {
+    case Root / "test" :?* K1(v1) *& K2(v2) *& K3(v3) =>
+        ???
+}
+-------------------------------------------------------------------------------
+
+For more information about Path and Querry matching, please read https://github.com/fomkin/korolev/blob/v0.17.0/modules/web/src/test/scala/korolev/web/PathAndQuerySpec.scala[PathAndQuerySpec]
 
 ==== Running at a nested path
 
@@ -827,11 +912,11 @@ First number is always an procedure or callback code. You can protocol descripti
 
 === Reconnections under Kubernetes Ingress
 
-When using Korolev under Ingress you may face a problem with frequent recconections of websocket channel between browser and server. 
+When using Korolev under Ingress you may face a problem with frequent recconections of websocket channel between browser and server.
 
 For Google Cloud hosting you can try the following:
 
 1. There is https://cloud.google.com/kubernetes-engine/docs/concepts/ingress#support_for_websocket[section] in the Ingress documentaion concerning websockets. It suggests to create a https://cloud.google.com/kubernetes-engine/docs/how-to/configure-backend-service[`BackendConfig`].
 2. You should set https://cloud.google.com/kubernetes-engine/docs/how-to/configure-backend-service#creating_a_backendconfig[`connectionDraining.drainingTimeoutSec`] to sufficiently large value (e.g. `"3600"`), `timeoutSec` doesn't solve the problem.
 
-This solution was tested only for Google Cloud, but it might work for other systems. Don't hesitate to open a PR and describe if this instruction works for other cases. 
+This solution was tested only for Google Cloud, but it might work for other systems. Don't hesitate to open a PR and describe if this instruction works for other cases.

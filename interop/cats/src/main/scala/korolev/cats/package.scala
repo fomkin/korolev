@@ -19,7 +19,6 @@ package korolev
 import _root_.cats.Traverse
 import _root_.cats.effect._
 import _root_.cats.instances.list._
-import _root_.cats.syntax.all._
 import korolev.effect.{Effect => KEffect}
 
 import scala.collection.concurrent.TrieMap
@@ -67,6 +66,9 @@ package object cats {
 
     def recover[A, AA >: A](m: IO[A])(f: PartialFunction[Throwable, AA]): IO[AA] =
       m.handleErrorWith(e => f.andThen(IO.pure[AA] _).applyOrElse(e, IO.raiseError[AA] _))
+
+    def recoverF[A, AA >: A](m: IO[A])(f: PartialFunction[Throwable, IO[AA]]): IO[AA] =
+      m.handleErrorWith(e => f.applyOrElse(e, IO.raiseError[AA] _))
 
     def sequence[A](in: List[IO[A]]): IO[List[A]] =
       Traverse[List].sequence(in)

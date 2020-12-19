@@ -317,7 +317,7 @@ export class Korolev {
     * @param {string} path
     */
   changePageUrl(path) {
-    if (path !== window.location.pathname)
+    if (path !== window.location.pathname + window.location.search)
       window.history.pushState(path, '', path);
   }
 

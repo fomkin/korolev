@@ -16,20 +16,20 @@
 
 package korolev
 
-import korolev.web.Path
+import korolev.web.PathAndQuery
 
 /**
   * URL routing definition
   *
-  * @param fromState From current state to path
-  * @param toState From path to state
+  * @param fromState From current state to Uri
+  * @param toState From Uri to state
   *
   * @tparam F A async control
   * @tparam S Type of State
   */
 final case class Router[F[_], S](
-    fromState: PartialFunction[S, Path] = PartialFunction.empty,
-    toState: PartialFunction[Path, S => F[S]] = PartialFunction.empty
+    fromState: PartialFunction[S, PathAndQuery] = PartialFunction.empty,
+    toState: PartialFunction[PathAndQuery, S => F[S]] = PartialFunction.empty
 )
 
 object Router {

@@ -4,13 +4,12 @@ import korolev._
 import korolev.server._
 import scala.concurrent.ExecutionContext.Implicits.global
 import korolev.state.javaSerialization._
-
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
-
-import io.circe.generic.auto._, io.circe.parser._
+import io.circe.generic.auto._
+import io.circe.parser._
 
 object GuineaPigService {
 
