@@ -45,7 +45,7 @@ sealed trait PathAndQuery {
       pq match {
         case Root                 => "/" + path.mkString("/") + query
         case :&(prev, (k, v))     => aux(prev, path, s"&${encode(k)}=${encode(v)}" + query)
-        case head :? Tuple2(k, v) => aux(head, path, s"?${encode(k)}=${encode(v)}" + query)
+        case head :? tpl => aux(head, path, s"?${encode(tpl._1)}=${encode(tpl._2)}" + query)
         case /(head, segment)     => aux(head, segment +: path, query)
       }
     }
@@ -60,7 +60,7 @@ sealed trait PathAndQuery {
         case _: Path                        => None
         case :&(_, (k, v)) if k == name     => Some(v)
         case :&(prev, _)                    => aux(prev)
-        case _ :? Tuple2(k, v) if k == name => Some(v)
+        case _ :? tpl if tpl._1 == name => Some(tpl._2)
       }
     }
 
@@ -171,7 +171,7 @@ object PathAndQuery {
       @tailrec
       def aux(pq: PathAndQuery, query: Map[String, String]): (Path, Map[String, String]) = pq match {
         case :&(prev, (k, v))     => aux(prev, query + (k -> v))
-        case path :? Tuple2(k, v) => (path, query + (k -> v))
+        case path :? tpl => (path, query + tpl)
         case path: /              => (path, query)
         case Root                 => (Root, query)
       }
@@ -185,7 +185,7 @@ object PathAndQuery {
       @tailrec
       def aux(pq: PathAndQuery, query: Seq[(String, String)]): (Path, Seq[(String, String)]) = pq match {
         case :&(prev, (k, v))     => aux(prev, (k, v) +: query)
-        case path :? Tuple2(k, v) => (path, (k, v) +: query)
+        case path :? tpl => (path, tpl +: query)
         case path: /              => (path, query)
         case Root                 => (Root, query)
       }
