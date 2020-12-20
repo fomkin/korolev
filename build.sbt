@@ -130,9 +130,9 @@ lazy val akka = project
   .settings(
     normalizedName := "korolev-akka",
     libraryDependencies ++= Seq(
-      "com.typesafe.akka" %% "akka-actor" % "2.6.8",
-      "com.typesafe.akka" %% "akka-stream" % "2.6.8",
-      "com.typesafe.akka" %% "akka-http" % "10.2.0"
+      "com.typesafe.akka" %% "akka-actor" % "2.6.10",
+      "com.typesafe.akka" %% "akka-stream" % "2.6.10",
+      "com.typesafe.akka" %% "akka-http" % "10.2.1"
     )
   )
   .dependsOn(korolev)
