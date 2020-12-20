@@ -100,13 +100,7 @@ private[korolev] final class PostService[F[_]: Effect](reporter: Reporter,
     sessionsService.getApp(qsid) flatMap {
       case Some(app) =>
         for {
-          _ <- {
-            headers.collectFirst { case ("x-name", v) => v } match {
-              case None => Effect[F].pure(Response.Http(Response.Status.BadRequest, "Header 'x-name' should be defined", Nil))
-              case Some(fileName) =>
-                app.frontend.resolveFile(descriptor, LazyBytes(chunks, body.bytesLength))
-            }
-          }
+          _ <- app.frontend.resolveFile(descriptor, LazyBytes(chunks, body.bytesLength))
           // Do not response until chunks are not
           // consumed inside an application
           _ <- consumed

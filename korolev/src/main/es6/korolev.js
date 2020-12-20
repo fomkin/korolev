@@ -403,7 +403,6 @@ export class Korolev {
     if(file) {
       let request = new XMLHttpRequest();
       request.open('POST', uri, true);
-      request.setRequestHeader('x-name', file.name)
       request.send(file);
     } else {
       console.error(`Can't find file with name ${fileName}`);
