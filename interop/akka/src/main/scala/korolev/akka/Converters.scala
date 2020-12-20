@@ -23,6 +23,8 @@ import korolev.akka.util.{KorolevStreamPublisher, KorolevStreamSubscriber}
 import korolev.effect.{Effect, Stream}
 import org.reactivestreams.Publisher
 
+import scala.concurrent.ExecutionContext
+
 object Converters {
 
   implicit final class SinkCompanionOps(value: Sink.type) {
@@ -55,14 +57,12 @@ object Converters {
       * If `fanout` is `false` then the `Publisher` will only support a single `Subscriber` and
       * reject any additional `Subscriber`s with [[korolev.akka.util.KorolevStreamPublisher.MultipleSubscribersProhibitedException]].
       */
-    def asPublisher(fanout: Boolean = false): Publisher[T] =
+    def asPublisher(fanout: Boolean = false)(implicit ec: ExecutionContext): Publisher[T] =
       new KorolevStreamPublisher(stream, fanout)
 
-    def asAkkaSource: Source[T, NotUsed] = {
+    def asAkkaSource(implicit ec: ExecutionContext): Source[T, NotUsed] = {
       val publisher = new KorolevStreamPublisher(stream, fanout = false)
-      Source
-        .fromPublisher(publisher)
-        .buffer(10, OverflowStrategy.backpressure) // FIXME should work without this line. Looks like bug in akka-streams
+      Source.fromPublisher(publisher)
     }
   }
 }

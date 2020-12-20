@@ -17,12 +17,15 @@
 package korolev.akka.util
 
 import korolev.akka.util.KorolevStreamPublisher.MultipleSubscribersProhibitedException
-import korolev.effect.{Effect, Hub, Reporter, Stream}
 import korolev.effect.syntax._
+import korolev.effect.{Effect, Hub, Reporter, Stream}
 import org.reactivestreams.{Publisher, Subscriber, Subscription}
 
+import scala.concurrent.ExecutionContext
+
 final class KorolevStreamPublisher[F[_] : Effect, T](stream: Stream[F, T],
-                                                     fanout: Boolean) extends Publisher[T] {
+                                                     fanout: Boolean)
+                                                    (implicit ec: ExecutionContext) extends Publisher[T] {
 
   private implicit val reporter: Reporter = Reporter.PrintReporter
 
@@ -51,15 +54,17 @@ final class KorolevStreamPublisher[F[_] : Effect, T](stream: Stream[F, T],
       }
     }
 
-    def unsafeSet(x: Long): Unit =
+    def unsafeAdd(x: Long): Unit =
       this.synchronized {
-        n = x
-        if (x > 0 && pending != null) {
+        n = n + x
+        if (n > 0 && pending != null) {
           val cb = pending
           pending = null
           cb(res)
         }
       }
+
+    def unsafeValue: Long = n
   }
 
   private final class StreamSubscription(stream: Stream[F, T],
@@ -74,7 +79,7 @@ final class KorolevStreamPublisher[F[_] : Effect, T](stream: Stream[F, T],
         _ <- maybeItem match {
           case Some(item) =>
             subscriber.onNext(item)
-            loop()
+            Effect[F].fork(loop())
           case None =>
             subscriber.onComplete()
             Effect[F].unit
@@ -87,7 +92,7 @@ final class KorolevStreamPublisher[F[_] : Effect, T](stream: Stream[F, T],
     }
 
     def request(n: Long): Unit = {
-      counter.unsafeSet(n)
+      counter.unsafeAdd(n)
     }
 
     def cancel(): Unit = {
