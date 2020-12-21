@@ -32,7 +32,15 @@ class HttpClientSpec extends AsyncFlatSpec with Matchers {
 
   def uncompressByteArray(from: Array[Byte]): Array[Byte] = {
     val stream = new GZIPInputStream(new ByteArrayInputStream(from.asArray), from.length)
-    stream.readAllBytes()
+    val buffer = new Array[Byte](50)
+    var result = new Array[Byte](0)
+    var n = 0
+    do {
+      n = stream.read(buffer)
+      if (n > 0)
+        result = result ++ buffer.slice(0, n)
+    } while (n > 0)
+    result
   }
 
   it should "receive chunked bodies well" in {
@@ -51,7 +59,6 @@ class HttpClientSpec extends AsyncFlatSpec with Matchers {
       strictResponseBody <- response.body.fold(Array.empty[Byte])(_ ++ _)
       utf8Body = uncompressByteArray(strictResponseBody).asUtf8String
     } yield {
-      println(response)
       assert(utf8Body.contains("@media") && response.status == Status.Ok)
     }
   }

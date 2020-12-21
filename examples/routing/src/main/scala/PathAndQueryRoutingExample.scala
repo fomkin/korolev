@@ -88,7 +88,7 @@ object PathAndQueryRoutingExample extends SimpleAkkaHttpKorolevApp {
   }
 
   private def trimToEmpty(value: String): Option[String] = {
-    if (value.isBlank) {
+    if (value.trim.isEmpty) {
       None
     } else {
       Some(value)

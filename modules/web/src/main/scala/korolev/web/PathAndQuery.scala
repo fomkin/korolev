@@ -1,7 +1,5 @@
 package korolev.web
 
-import korolev.web.PathAndQuery./
-
 import java.net.{URLDecoder, URLEncoder}
 import java.nio.charset.StandardCharsets
 import scala.annotation.tailrec
@@ -11,7 +9,7 @@ sealed trait PathAndQuery {
   import PathAndQuery._
 
   private[this] def encode(value: String): String = {
-    URLEncoder.encode(value, StandardCharsets.UTF_8)
+    URLEncoder.encode(value, "UTF-8")
   }
 
   def startsWith(value: String): Boolean = {
@@ -255,6 +253,6 @@ object PathAndQuery {
   }
 
   private[this] def decode(value: String): String = {
-    URLDecoder.decode(value, StandardCharsets.UTF_8)
+    URLDecoder.decode(value, "UTF-8")
   }
 }

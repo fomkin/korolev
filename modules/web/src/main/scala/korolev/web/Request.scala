@@ -36,7 +36,7 @@ final case class Request[Body](method: Request.Method,
       .split(';')
       .map { xs =>
         val Array(k, v) = xs.split('=')
-        (URLDecoder.decode(k.trim, StandardCharsets.UTF_8), URLDecoder.decode(v, StandardCharsets.UTF_8))
+        (URLDecoder.decode(k.trim, "UTF-8"), URLDecoder.decode(v, "UTF-8"))
       }
       .toMap
 
@@ -56,8 +56,8 @@ final case class Request[Body](method: Request.Method,
   }
 
   def withCookie(name: String, value: String): Request[Body] = {
-    val ek = URLEncoder.encode(name, StandardCharsets.UTF_8)
-    val ev = URLEncoder.encode(value, StandardCharsets.UTF_8)
+    val ek = URLEncoder.encode(name, "UTF-8")
+    val ev = URLEncoder.encode(value, "UTF-8")
     if (renderedCookie == null || renderedCookie.isEmpty) {
       copy(renderedCookie = s"$ek=$ev")
     } else {
