@@ -21,13 +21,11 @@ import org.reactivestreams.{Subscriber, Subscription}
 
 final class KorolevStreamSubscriber[F[_]: Effect,T] extends Stream[F, T] with Subscriber[T] {
 
-  private var subscription: Subscription = _
+  @volatile private var subscription: Subscription = _
 
-  private var pullCallback: Either[Throwable, Option[T]] => Unit = _
+  @volatile private var pullCallback: Either[Throwable, Option[T]] => Unit = _
 
-  private var consumedCallback: Either[Throwable, Unit] => Unit = _
-
-  private var completeValue: Either[Throwable, Unit] = _
+  @volatile private var completeValue: Either[Throwable, None.type] = _
 
   def onSubscribe(subscription: Subscription): Unit = {
     this.subscription = subscription
@@ -43,23 +41,17 @@ final class KorolevStreamSubscriber[F[_]: Effect,T] extends Stream[F, T] with Su
 
   def onError(error: Throwable): Unit = {
     completeWith(Left(error))
-    val cb = pullCallback
-    pullCallback = null
-    cb(Left(error))
   }
 
   def onComplete(): Unit = {
-    completeWith(Right(()))
-    val cb = pullCallback
-    pullCallback = null
-    cb(Right(None))
+    completeWith(Right(None))
   }
 
-  private def completeWith(that: Either[Throwable, Unit]): Unit = {
+  private def completeWith(that: Either[Throwable, None.type]): Unit = {
     completeValue = that
-    if (consumedCallback != null) {
-      val cb = consumedCallback
-      consumedCallback = null
+    if (pullCallback != null) {
+      val cb = pullCallback
+      pullCallback = null
       cb(that)
     }
   }
@@ -71,16 +63,10 @@ final class KorolevStreamSubscriber[F[_]: Effect,T] extends Stream[F, T] with Su
         subscription.request(1)
       }
     } else {
-      cb(completeValue.map(_ => None))
+      cb(completeValue)
     }
   }
 
-  def cancel(): F[Unit] = Effect[F].delay(subscription.cancel())
-
-  val consumed: F[Unit] = Effect[F].promise { cb =>
-    if (completeValue != null) cb(completeValue)
-    else consumedCallback = cb
-  }
-
-  val size: Option[Long] = None
+  def cancel(): F[Unit] =
+    Effect[F].delay(subscription.cancel())
 }
