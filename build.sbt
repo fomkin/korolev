@@ -120,6 +120,16 @@ lazy val standalone = project
   )
   .dependsOn(korolev, http)
 
+lazy val testHarness = project
+  .in(modules / "test-harness")
+  .enablePlugins(GitVersioning)
+  .settings(crossVersionSettings)
+  .settings(commonSettings: _*)
+  .settings(
+    normalizedName := "korolev-test-harness"
+  )
+  .dependsOn(korolev)
+
 // Interop
 
 lazy val akka = project
