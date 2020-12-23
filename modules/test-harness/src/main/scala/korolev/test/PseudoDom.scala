@@ -1,5 +1,7 @@
 package korolev.test
 
+import levsha.Id
+
 import scala.annotation.tailrec
 
 sealed trait PseudoDom {
@@ -24,8 +26,11 @@ sealed trait PseudoDom {
   def byClass(clazz: String): List[PseudoDom] =
     byAttribute("class", _.indexOf(clazz) > -1)
 
-  def byName(name: String): List[PseudoDom] = find {
-    case e: Element => e.name == name
+  def byName(name: String): List[PseudoDom] =
+    byAttribute("name", _ == name)
+
+  def byTag(tagName: String): List[PseudoDom] = find {
+    case e: Element => e.tagName == tagName
     case _: Text => false
   }
 
@@ -34,15 +39,16 @@ sealed trait PseudoDom {
 
 object PseudoDom {
 
-  case class Element(name: String,
+  case class Element(id: Id,
+                     tagName: String,
                      attributes: Map[String, String],
                      children: List[PseudoDom]) extends PseudoDom {
 
     lazy val text: String =
-      children.reduce(_.text + _.text)
+      children.foldLeft("")(_ + _.text)
   }
 
-  case class Text(value: String) extends PseudoDom {
+  case class Text(id: Id, value: String) extends PseudoDom {
     val text: String = value
   }
 }
