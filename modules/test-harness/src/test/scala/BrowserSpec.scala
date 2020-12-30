@@ -1,54 +1,76 @@
-import org.scalatest.{FlatSpec, Matchers}
-import korolev.testkit._
-import levsha.{Id, XmlNs}
+import korolev.Context.ElementId
+import korolev.testkit.{Action, Browser}
+import org.scalatest.{AsyncFlatSpec, Matchers}
 
-class BrowserSpec extends FlatSpec with Matchers  {
+import scala.concurrent.Future
 
-  "Browser.render" should "map levsha.Node to PseudoDom.Element" in {
-    import levsha.dsl._
-    import html._
+class BrowserSpec extends AsyncFlatSpec with Matchers {
 
-    val node = div()
-    val rr = Browser.render(node)
-
-    rr.pseudoDom shouldEqual PseudoDom.Element(Id("1"), XmlNs.html, "div", Map.empty, Map.empty, List.empty)
+  "Browser().access" should "emulate transitions" in {
+    Browser()
+      .access[Future, String, Any]("hello", _.transition(_ + " world"))
+      .map { actions =>
+        actions shouldEqual List(Action.Transition("hello world"))
+      }
   }
 
-  it should "map nested levsha.Node to correspondent pseudo DOM elements" in {
-    import levsha.dsl._
-    import html._
-    import PseudoDom._
-
-    val node = body(ul(li("1"), li("2"), li("3")))
-    val rr = Browser.render(node)
-
-    rr.pseudoDom shouldEqual Element(Id("1"), XmlNs.html, "body", Map.empty, Map.empty, List(
-      Element(Id("1_1"), XmlNs.html, "ul", Map.empty, Map.empty, List(
-        Element(Id("1_1_1"), XmlNs.html, "li", Map.empty, Map.empty, List(Text(Id("1_1_1_1"), "1"))),
-        Element(Id("1_1_2"), XmlNs.html, "li", Map.empty, Map.empty, List(Text(Id("1_1_2_1"), "2"))),
-        Element(Id("1_1_3"), XmlNs.html, "li", Map.empty, Map.empty, List(Text(Id("1_1_3_1"), "3"))),
-      ))
-    ))
+  it  should "emulate property set" in {
+    val e1 = new ElementId(Some("e1"))
+    Browser()
+      .property(e1, "value", "hello")
+      .access[Future, String, Any]("", access =>
+        access.valueOf(e1).flatMap { v =>
+          access.property(e1).set("value", s"$v world")
+        }
+      )
+      .map { actions =>
+        actions shouldEqual List(Action.PropertySet(e1, "value", "hello world"))
+      }
   }
 
-  it should "map attributes well" in {
-    import levsha.dsl._
-    import html._
-
-    val node = div(clazz := "foo bar", id := "baz")
-    val rr = Browser.render(node)
-
-    rr.pseudoDom shouldEqual PseudoDom.Element(Id("1"), XmlNs.html, "div", Map("class" -> "foo bar", "id" -> "baz"), Map.empty, List.empty)
+  it should "emulate focus" in {
+    val e1 = new ElementId(Some("e1"))
+    Browser()
+      .access[Future, String, Any]("", _.focus(e1))
+      .map { actions =>
+        actions shouldEqual List(Action.Focus(e1))
+      }
   }
 
-  it should "map styles well" in {
-    import levsha.dsl._
-    import html._
-
-    val node = div(backgroundColor @= "red", border @= "1px")
-    val rr = Browser.render(node)
-
-    rr.pseudoDom shouldEqual PseudoDom.Element(Id("1"), XmlNs.html, "div", Map.empty, Map("background-color" -> "red", "border" -> "1px"), List.empty)
+  it should "emulate reset form" in {
+    val e1 = new ElementId(Some("e1"))
+    Browser()
+      .access[Future, String, Any]("", _.resetForm(e1))
+      .map { actions =>
+        actions shouldEqual List(Action.ResetForm(e1))
+      }
   }
 
+  it should "emulate message publishing" in {
+    Browser()
+      .access[Future, String, Any]("", _.publish("hello world"))
+      .map { actions =>
+        actions shouldEqual List(Action.Publish("hello world"))
+      }
+  }
+
+  it should "emulate evalJs" in {
+    Browser()
+      .mockJs("function foo() { return 1 }")
+      .mockJs("function bar() { return Promise.resolve(2) }")
+      .access[Future, String, Any]("", access =>
+        for {
+          foo <- access.evalJs("foo()")
+          bar <- access.evalJs("bar()")
+          _ <- access.publish(s"$foo $bar")
+        } yield ()
+      )
+      .map { actions =>
+        actions shouldEqual List(
+          Action.EvalJs(Right("1")),
+          Action.EvalJs(Right("2")),
+          Action.Publish("1 2")
+        )
+      }
+  }
 }

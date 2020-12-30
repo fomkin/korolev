@@ -1,17 +1,14 @@
 package korolev.testkit
 
-import korolev.{Context, Qsid, Transition}
-import korolev.Context.{Access, Binding, ComponentEntry, ElementId}
+import korolev.Context.{Access, Binding, ElementId}
 import korolev.effect.Effect
-import korolev.effect.syntax._
 import korolev.effect.io.LazyBytes
+import korolev.effect.syntax._
 import korolev.internal.Frontend.ClientSideException
 import korolev.util.JsCode
 import korolev.web.FormData
-import levsha.Document.Node
-import levsha.events.EventId
-import levsha.{IdBuilder, RenderContext, XmlNs}
-import org.graalvm.polyglot.{HostAccess, Value}
+import korolev.{Context, Qsid, Transition}
+import org.graalvm.polyglot.HostAccess
 
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
@@ -89,7 +86,7 @@ case class Browser(properties: Map[(ElementId, String), String] = Map.empty,
                                 target: PseudoDom => Option[levsha.Id],
                                 eventData: String = ""): F[Seq[Action[F, S, M]]] = {
 
-    val rr = Browser.render(dom)
+    val rr = PseudoDom.render(dom)
     target(rr.pseudoDom).fold(Effect[F].pure(Seq.empty[Action[F, S, M]])) { target =>
       val propagation = levsha.events.calculateEventPropagation(target, event)
 
@@ -132,7 +129,7 @@ case class Browser(properties: Map[(ElementId, String), String] = Map.empty,
           def set(propName: String, value: Any): F[Unit] =
             Effect[F].delay {
               browser = browser.property(id, propName, value.toString)
-              actions += Action.Property(id, propName, value.toString)
+              actions += Action.PropertySet(id, propName, value.toString)
             }
         }
 
@@ -214,8 +211,7 @@ case class Browser(properties: Map[(ElementId, String), String] = Map.empty,
           val finalCode = code.mkString(elements.map(_.swap))
           val bindings = context.getBindings("js")
 
-          bindings.putMember("code", finalCode)
-          bindings.putMember("handler", new Object {
+          class Handler {
             @HostAccess.Export
             def result(value: String): Unit = {
               val result = Right(value)
@@ -228,7 +224,10 @@ case class Browser(properties: Map[(ElementId, String), String] = Map.empty,
               actions += Action.EvalJs(result)
               cb(result)
             }
-          })
+          }
+
+          bindings.putMember("code", finalCode)
+          bindings.putMember("handler", new Handler())
 
           context.eval("js",
             jsMocks.mkString("\n") + """
@@ -244,7 +243,7 @@ case class Browser(properties: Map[(ElementId, String), String] = Map.empty,
 
               if (result instanceof Promise) {
                 result.then(
-                  (res) => handler.result(JSON.stringify(res))
+                  (res) => handler.result(JSON.stringify(res)),
                   (err) => {
                     console.error(`Error evaluating code ${code}`, err);
                     handler.error(err.toString())
@@ -273,83 +272,4 @@ case class Browser(properties: Map[(ElementId, String), String] = Map.empty,
     f(stub).as(actions)
   }
 
-}
-
-object Browser {
-
-  private class PseudoDomRenderContext[F[_], S, M] extends RenderContext[Binding[F, S, M]] {
-
-    val idBuilder = new IdBuilder(256)
-    var currentChildren: List[List[PseudoDom]] = List(Nil)
-    var currentNode = List.empty[(XmlNs, String)]
-    var currentAttrs = List.empty[(XmlNs, String, String)]
-    var currentStyles = List.empty[(String, String)]
-
-    var elements = List.empty[(levsha.Id, ElementId)]
-    var events = List.empty[(EventId, Context.Event[F, S, M])]
-
-    def openNode(xmlns: XmlNs, name: String): Unit = {
-      currentNode = (xmlns, name) :: currentNode
-      currentChildren = Nil :: currentChildren
-      currentAttrs = Nil
-      currentStyles = Nil
-      idBuilder.incId()
-      idBuilder.incLevel()
-    }
-
-    def closeNode(name: String): Unit = {
-      idBuilder.decLevel()
-      val (xmlns, _) :: currentNodeTail = currentNode
-      val children :: currentChildrenTail = currentChildren
-      val c2 :: cct2 = currentChildrenTail
-      val node = PseudoDom.Element(
-        id = idBuilder.mkId,
-        ns = xmlns,
-        tagName = name,
-        attributes = currentAttrs.map(x => (x._2, x._3)).toMap,
-        styles = currentStyles.toMap,
-        children = children.reverse
-      )
-      currentNode = currentNodeTail
-      currentChildren = (node :: c2) :: cct2
-    }
-
-    def setAttr(xmlNs: XmlNs, name: String, value: String): Unit = {
-      currentAttrs = (xmlNs, name, value) :: currentAttrs
-    }
-
-    def setStyle(name: String, value: String): Unit = {
-      currentStyles = (name, value) :: currentStyles
-    }
-
-    def addTextNode(text: String): Unit = {
-      idBuilder.incId()
-      val children :: xs = currentChildren
-      val updatedChildren = PseudoDom.Text(idBuilder.mkId, text) :: children
-      currentChildren = updatedChildren :: xs
-    }
-
-    def addMisc(misc: Binding[F, S, M]): Unit = misc match {
-      case ComponentEntry(c, p, _) =>
-        val rc = this.asInstanceOf[RenderContext[Context.Binding[F, Any, Any]]]
-        c.render(p, c.initialState).apply(rc)
-      case elementId: ElementId =>
-        elements = (idBuilder.mkId, elementId) :: elements
-      case event: Context.Event[F, S, M] =>
-        val eventId = EventId(idBuilder.mkId, event.`type`, event.phase)
-        events = (eventId, event) :: events
-    }
-  }
-
-  case class RenderingResult[F[_], S, M](pseudoDom: PseudoDom,
-                                         elements: Map[levsha.Id, ElementId],
-                                         events: Map[EventId, Context.Event[F, S, M]])
-
-  def render[F[_], S, M](node: Node[Binding[F, S, M]]): RenderingResult[F, S, M] = {
-
-    val rc = new PseudoDomRenderContext[F, S, M]()
-    node(rc)
-    val (top :: _) :: _ = rc.currentChildren
-    RenderingResult(top, rc.elements.toMap, rc.events.toMap)
-  }
 }

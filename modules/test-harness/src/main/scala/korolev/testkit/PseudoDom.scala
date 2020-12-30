@@ -1,6 +1,10 @@
 package korolev.testkit
 
-import levsha.{Id, XmlNs}
+import korolev.Context
+import korolev.Context.{Binding, ComponentEntry, ElementId}
+import levsha.Document.Node
+import levsha.events.EventId
+import levsha.{Id, IdBuilder, RenderContext, XmlNs}
 
 import scala.annotation.tailrec
 
@@ -74,5 +78,82 @@ object PseudoDom {
   case class Text(id: Id, value: String) extends PseudoDom {
     val text: String = value
   }
+
+  private class PseudoDomRenderContext[F[_], S, M] extends RenderContext[Binding[F, S, M]] {
+
+    val idBuilder = new IdBuilder(256)
+    var currentChildren: List[List[PseudoDom]] = List(Nil)
+    var currentNode = List.empty[(XmlNs, String)]
+    var currentAttrs = List.empty[(XmlNs, String, String)]
+    var currentStyles = List.empty[(String, String)]
+
+    var elements = List.empty[(levsha.Id, ElementId)]
+    var events = List.empty[(EventId, Context.Event[F, S, M])]
+
+    def openNode(xmlns: XmlNs, name: String): Unit = {
+      currentNode = (xmlns, name) :: currentNode
+      currentChildren = Nil :: currentChildren
+      currentAttrs = Nil
+      currentStyles = Nil
+      idBuilder.incId()
+      idBuilder.incLevel()
+    }
+
+    def closeNode(name: String): Unit = {
+      idBuilder.decLevel()
+      val (xmlns, _) :: currentNodeTail = currentNode
+      val children :: currentChildrenTail = currentChildren
+      val c2 :: cct2 = currentChildrenTail
+      val node = PseudoDom.Element(
+        id = idBuilder.mkId,
+        ns = xmlns,
+        tagName = name,
+        attributes = currentAttrs.map(x => (x._2, x._3)).toMap,
+        styles = currentStyles.toMap,
+        children = children.reverse
+      )
+      currentNode = currentNodeTail
+      currentChildren = (node :: c2) :: cct2
+    }
+
+    def setAttr(xmlNs: XmlNs, name: String, value: String): Unit = {
+      currentAttrs = (xmlNs, name, value) :: currentAttrs
+    }
+
+    def setStyle(name: String, value: String): Unit = {
+      currentStyles = (name, value) :: currentStyles
+    }
+
+    def addTextNode(text: String): Unit = {
+      idBuilder.incId()
+      val children :: xs = currentChildren
+      val updatedChildren = PseudoDom.Text(idBuilder.mkId, text) :: children
+      currentChildren = updatedChildren :: xs
+    }
+
+    def addMisc(misc: Binding[F, S, M]): Unit = misc match {
+      case ComponentEntry(c, p, _) =>
+        val rc = this.asInstanceOf[RenderContext[Context.Binding[F, Any, Any]]]
+        c.render(p, c.initialState).apply(rc)
+      case elementId: ElementId =>
+        elements = (idBuilder.mkId, elementId) :: elements
+      case event: Context.Event[F, S, M] =>
+        val eventId = EventId(idBuilder.mkId, event.`type`, event.phase)
+        events = (eventId, event) :: events
+    }
+  }
+
+  case class RenderingResult[F[_], S, M](pseudoDom: PseudoDom,
+                                         elements: Map[levsha.Id, ElementId],
+                                         events: Map[EventId, Context.Event[F, S, M]])
+
+  def render[F[_], S, M](node: Node[Binding[F, S, M]]): RenderingResult[F, S, M] = {
+
+    val rc = new PseudoDomRenderContext[F, S, M]()
+    node(rc)
+    val (top :: _) :: _ = rc.currentChildren
+    RenderingResult(top, rc.elements.toMap, rc.events.toMap)
+  }
+
 }
 
