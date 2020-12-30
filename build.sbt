@@ -126,7 +126,8 @@ lazy val testHarness = project
   .settings(crossVersionSettings)
   .settings(commonSettings: _*)
   .settings(
-    normalizedName := "korolev-test-harness"
+    normalizedName := "korolev-test-harness",
+    libraryDependencies += "org.graalvm.js" % "js" % "20.3.0"
   )
   .dependsOn(korolev)
 

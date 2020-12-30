@@ -5,11 +5,13 @@ import korolev.Context.{Access, Binding, ComponentEntry, ElementId}
 import korolev.effect.Effect
 import korolev.effect.syntax._
 import korolev.effect.io.LazyBytes
+import korolev.internal.Frontend.ClientSideException
 import korolev.util.JsCode
 import korolev.web.FormData
 import levsha.Document.Node
 import levsha.events.EventId
 import levsha.{IdBuilder, RenderContext, XmlNs}
+import org.graalvm.polyglot.{HostAccess, Value}
 
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
@@ -18,7 +20,8 @@ import scala.collection.mutable
 
 case class Browser(properties: Map[(ElementId, String), String] = Map.empty,
                    forms: Map[ElementId, FormData] = Map.empty,
-                   filesMap: Map[ElementId, Map[String, Array[Byte]]] = Map.empty) {
+                   filesMap: Map[ElementId, Map[String, Array[Byte]]] = Map.empty,
+                   jsMocks: List[String] = Nil) {
 
   def property(id: ElementId, name: String, value: String): Browser =
     copy(properties = properties + ((id -> name, value)))
@@ -28,6 +31,9 @@ case class Browser(properties: Map[(ElementId, String), String] = Map.empty,
 
   def form(id: ElementId, data: FormData): Browser =
     copy(forms = forms + (id -> data))
+
+  def mockJs(script: String): Browser =
+    copy(jsMocks = script :: jsMocks)
 
   def form(id: ElementId, fields: (String, String)*): Browser = {
     val entries = fields map {
@@ -94,7 +100,7 @@ case class Browser(properties: Map[(ElementId, String), String] = Map.empty,
           rr.events.get(eventId) match {
             case None => continue
             case Some(event) =>
-              val actionsF = access(state, event.effect, eventData)
+              val actionsF = access(state, event.effect, eventData, rr.elements)
               (!event.stopPropagation, actionsF :: acc)
           }
       }
@@ -196,12 +202,67 @@ case class Browser(properties: Map[(ElementId, String), String] = Map.empty,
           }
         }
 
-      def evalJs(code: JsCode): F[String] = ???
-//      def evalJs(code: JsCode): F[String] =
-//        Effect[F].delay {
-//          val finalCode = code.mkString(elements.map(_.swap))
-//          actions += Action.EvalJs(finalCode)
-//        }
+      def evalJs(code: JsCode): F[String] = Effect[F]
+        .promise[String] { cb =>
+
+          import org.graalvm.polyglot.{Context => GraalContext}
+
+          // TODO prevent reparsing
+          // TODO handle system errors
+
+          val context = GraalContext.create()
+          val finalCode = code.mkString(elements.map(_.swap))
+          val bindings = context.getBindings("js")
+
+          bindings.putMember("code", finalCode)
+          bindings.putMember("handler", new Object {
+            @HostAccess.Export
+            def result(value: String): Unit = {
+              val result = Right(value)
+              actions += Action.EvalJs(result)
+              cb(result)
+            }
+            @HostAccess.Export
+            def error(value: String): Unit = {
+              val result = Left(ClientSideException(value))
+              actions += Action.EvalJs(result)
+              cb(result)
+            }
+          })
+
+          context.eval("js",
+            jsMocks.mkString("\n") + """
+              var result;
+              var status = 0;
+              try {
+                result = eval(code);
+              } catch (e) {
+                console.error(`Error evaluating code ${code}`, e);
+                result = e;
+                status = 1;
+              }
+
+              if (result instanceof Promise) {
+                result.then(
+                  (res) => handler.result(JSON.stringify(res))
+                  (err) => {
+                    console.error(`Error evaluating code ${code}`, err);
+                    handler.error(err.toString())
+                  }
+                );
+              } else {
+                var resultString;
+                if (status === 1) {
+                  resultString = result.toString();
+                  handler.error(resultString);
+                } else {
+                  resultString = JSON.stringify(result);
+                  handler.result(resultString);
+                }
+              }
+            """
+          )
+        }
 
       def registerCallback(name: String)(f: String => F[Unit]): F[Unit] =
         Effect[F].delay {
