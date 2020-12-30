@@ -382,7 +382,7 @@ object Context {
     }
   }
 
-  final case class Event[F[_]: Effect, S, M](
+  final case class Event[F[_], S, M](
       `type`: String,
       phase: EventPhase,
       stopPropagation: Boolean,

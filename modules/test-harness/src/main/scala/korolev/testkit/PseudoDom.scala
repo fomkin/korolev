@@ -1,6 +1,6 @@
-package korolev.test
+package korolev.testkit
 
-import levsha.Id
+import levsha.{Id, XmlNs}
 
 import scala.annotation.tailrec
 
@@ -34,14 +34,37 @@ sealed trait PseudoDom {
     case _: Text => false
   }
 
+  def mkString: String = {
+    def aux(node: PseudoDom, ident: String): String = node match {
+      case Text(id, value) => s"$ident$value <!-- ${id.mkString} -->"
+      case Element(id, _, tagName, attributes, styles, children) =>
+        val renderedAttributes = attributes
+          .map { case (k, v) => s"""$k="$v"""" }
+          .mkString(" ")
+        val renderedStyles = if (styles.nonEmpty) {
+          val s = styles
+            .map { case (k, v) => s"""$k: $v""" }
+            .mkString("; ")
+          s""" style="$s""""
+        } else {
+          " "
+        }
+        val renderedChildren = children.map(aux(_, ident + "  "))
+        s"$ident<$tagName$renderedStyles$renderedAttributes> <!-- ${id.mkString} -->\n$renderedChildren\n$ident</$tagName>"
+    }
+    aux(this, "")
+  }
+
   def text: String
 }
 
 object PseudoDom {
 
   case class Element(id: Id,
+                     ns: XmlNs,
                      tagName: String,
                      attributes: Map[String, String],
+                     styles: Map[String, String],
                      children: List[PseudoDom]) extends PseudoDom {
 
     lazy val text: String =

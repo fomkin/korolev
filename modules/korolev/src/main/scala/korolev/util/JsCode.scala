@@ -23,9 +23,9 @@ import scala.annotation.tailrec
 
 sealed trait JsCode {
   def ::(s: String): Part = Part(s, this)
-  def ::[F[_]](s: ElementId): Element[F] = Element(s, this)
+  def ::(s: ElementId): Element = Element(s, this)
 
-  def mkString[F[_]](elementToId: ElementId => levsha.Id): String = {
+  def mkString(elementToId: ElementId => levsha.Id): String = {
     @tailrec
     def aux(acc: String, jsCode: JsCode): String = jsCode match {
       case JsCode.End => acc
@@ -41,7 +41,7 @@ sealed trait JsCode {
 object JsCode {
 
   case class Part(value: String, tail: JsCode) extends JsCode
-  case class Element[F[_]](elementId: ElementId, tail: JsCode) extends JsCode
+  case class Element(elementId: ElementId, tail: JsCode) extends JsCode
   case object End extends JsCode
 
   def apply(s: String): JsCode = s :: End
