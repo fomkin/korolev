@@ -84,10 +84,10 @@ case class Browser(properties: Map[(ElementId, String), String] = Map.empty,
   def event[F[_]: Effect, S, M](state: S,
                                 dom: levsha.Document.Node[Binding[F, S, M]],
                                 event: String,
-                                target: PseudoDom => Option[levsha.Id],
+                                target: PseudoHtml => Option[levsha.Id],
                                 eventData: String = ""): F[Seq[Action[F, S, M]]] = {
 
-    val rr = PseudoDom.render(dom)
+    val rr = PseudoHtml.render(dom)
     target(rr.pseudoDom).fold(Effect[F].pure(Seq.empty[Action[F, S, M]])) { target =>
       val propagation = levsha.events.calculateEventPropagation(target, event)
 
@@ -263,6 +263,7 @@ case class Browser(properties: Map[(ElementId, String), String] = Map.empty,
               }
             """
           )
+          ()
         }
 
       def registerCallback(name: String)(f: String => F[Unit]): F[Unit] =
@@ -271,7 +272,7 @@ case class Browser(properties: Map[(ElementId, String), String] = Map.empty,
         }
     }
 
-    f(stub).as(actions)
+    f(stub).map(_ => actions.toSeq)
   }
 
 }

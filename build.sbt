@@ -5,7 +5,7 @@ val levshaVersion = "0.10.0"
 val unusedRepo = Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
 
 val crossVersionSettings = Seq(
-  crossScalaVersions := Seq("2.12.11", "2.13.2")
+  crossScalaVersions := Seq("2.12.12", "2.13.4")
 )
 
 val dontPublishSettings = Seq(
@@ -28,7 +28,7 @@ val publishSettings = Seq(
 
 val commonSettings = publishSettings ++ Seq(
   addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
-  addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.0" cross CrossVersion.full),
+  addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.2" cross CrossVersion.full),
   git.useGitDescribe := true,
   organization := "org.fomkin",
   libraryDependencies ++= Seq(
@@ -64,7 +64,6 @@ lazy val effect = project
   .settings(crossVersionSettings)
   .settings(commonSettings: _*)
   .settings(
-    addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.0" cross CrossVersion.full),
     normalizedName := "korolev-effect"
   )
 
@@ -120,13 +119,13 @@ lazy val standalone = project
   )
   .dependsOn(korolev, http)
 
-lazy val testHarness = project
-  .in(modules / "test-harness")
+lazy val testkit = project
+  .in(modules / "testkit")
   .enablePlugins(GitVersioning)
   .settings(crossVersionSettings)
   .settings(commonSettings: _*)
   .settings(
-    normalizedName := "korolev-test-harness",
+    normalizedName := "korolev-testkit",
     libraryDependencies += "org.graalvm.js" % "js" % "20.3.0"
   )
   .dependsOn(korolev)
@@ -390,7 +389,7 @@ lazy val root = project
   .settings(dontPublishSettings:_*)
   .settings(name := "Korolev Project")
   .aggregate(
-    korolev, effect, web, http, standalone,
+    korolev, effect, web, http, standalone, testkit,
     // Interop
     akka, cats, monix, zio, slf4j,
     scodec,

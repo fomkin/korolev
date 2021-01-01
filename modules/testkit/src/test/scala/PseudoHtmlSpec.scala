@@ -2,25 +2,25 @@ import org.scalatest.{FlatSpec, Matchers}
 import korolev.testkit._
 import levsha.{Id, XmlNs}
 
-class PseudoDomSpec extends FlatSpec with Matchers {
+class PseudoHtmlSpec extends FlatSpec with Matchers {
 
   "PseudoDom.render" should "map levsha.Node to PseudoDom.Element" in {
     import levsha.dsl._
     import html._
 
     val node = div()
-    val rr = PseudoDom.render(node)
+    val rr = PseudoHtml.render(node)
 
-    rr.pseudoDom shouldEqual PseudoDom.Element(Id("1"), XmlNs.html, "div", Map.empty, Map.empty, List.empty)
+    rr.pseudoDom shouldEqual PseudoHtml.Element(Id("1"), XmlNs.html, "div", Map.empty, Map.empty, List.empty)
   }
 
   it should "map nested levsha.Node to correspondent pseudo DOM elements" in {
     import levsha.dsl._
     import html._
-    import PseudoDom._
+    import PseudoHtml._
 
     val node = body(ul(li("1"), li("2"), li("3")))
-    val rr = PseudoDom.render(node)
+    val rr = PseudoHtml.render(node)
 
     rr.pseudoDom shouldEqual Element(Id("1"), XmlNs.html, "body", Map.empty, Map.empty, List(
       Element(Id("1_1"), XmlNs.html, "ul", Map.empty, Map.empty, List(
@@ -36,9 +36,9 @@ class PseudoDomSpec extends FlatSpec with Matchers {
     import html._
 
     val node = div(clazz := "foo bar", id := "baz")
-    val rr = PseudoDom.render(node)
+    val rr = PseudoHtml.render(node)
 
-    rr.pseudoDom shouldEqual PseudoDom.Element(Id("1"), XmlNs.html, "div", Map("class" -> "foo bar", "id" -> "baz"), Map.empty, List.empty)
+    rr.pseudoDom shouldEqual PseudoHtml.Element(Id("1"), XmlNs.html, "div", Map("class" -> "foo bar", "id" -> "baz"), Map.empty, List.empty)
   }
 
   it should "map styles well" in {
@@ -46,9 +46,9 @@ class PseudoDomSpec extends FlatSpec with Matchers {
     import html._
 
     val node = div(backgroundColor @= "red", border @= "1px")
-    val rr = PseudoDom.render(node)
+    val rr = PseudoHtml.render(node)
 
-    rr.pseudoDom shouldEqual PseudoDom.Element(Id("1"), XmlNs.html, "div", Map.empty, Map("background-color" -> "red", "border" -> "1px"), List.empty)
+    rr.pseudoDom shouldEqual PseudoHtml.Element(Id("1"), XmlNs.html, "div", Map.empty, Map("background-color" -> "red", "border" -> "1px"), List.empty)
   }
 
   "byName" should "find list of Element by value of name attribute" in {
@@ -64,7 +64,7 @@ class PseudoDomSpec extends FlatSpec with Matchers {
       )
     )
 
-    val pd = PseudoDom.render(dom).pseudoDom
+    val pd = PseudoHtml.render(dom).pseudoDom
     pd.byName("my-button").headOption.map(_.id) shouldEqual Some(Id("1_2"))
   }
 }

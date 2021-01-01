@@ -1,7 +1,6 @@
 package korolev.web
 
 import java.net.{URLDecoder, URLEncoder}
-import java.nio.charset.StandardCharsets
 import scala.annotation.tailrec
 
 sealed trait PathAndQuery {

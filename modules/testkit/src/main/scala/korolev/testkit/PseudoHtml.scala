@@ -8,14 +8,14 @@ import levsha.{Id, IdBuilder, RenderContext, XmlNs}
 
 import scala.annotation.tailrec
 
-sealed trait PseudoDom {
+sealed trait PseudoHtml {
 
-  import PseudoDom._
+  import PseudoHtml._
 
   def id: Id
 
-  def find(f: PseudoDom => Boolean): List[PseudoDom] = {
-    @tailrec def aux(acc: List[Element], rest: List[PseudoDom]): List[Element] = rest match {
+  def find(f: PseudoHtml => Boolean): List[PseudoHtml] = {
+    @tailrec def aux(acc: List[Element], rest: List[PseudoHtml]): List[Element] = rest match {
       case Nil => acc
       case (_: Text) :: xs => aux(acc, xs)
       case (e: Element) :: xs if f(e) => aux(e :: acc, xs ::: e.children)
@@ -25,7 +25,7 @@ sealed trait PseudoDom {
   }
 
   def findElement(f: Element => Boolean): List[Element] = {
-    @tailrec def aux(acc: List[Element], rest: List[PseudoDom]): List[Element] = rest match {
+    @tailrec def aux(acc: List[Element], rest: List[PseudoHtml]): List[Element] = rest match {
       case Nil => acc
       case (_: Text) :: xs => aux(acc, xs)
       case (e: Element) :: xs if f(e) => aux(e :: acc, xs ::: e.children)
@@ -43,11 +43,11 @@ sealed trait PseudoDom {
   def byName(name: String): List[Element] =
     byAttribute("name", _ == name)
 
-  def byTag(tagName: String): List[PseudoDom] =
+  def byTag(tagName: String): List[PseudoHtml] =
     findElement(_.tagName == tagName)
 
   def mkString: String = {
-    def aux(node: PseudoDom, ident: String): String = node match {
+    def aux(node: PseudoHtml, ident: String): String = node match {
       case Text(id, value) => s"$ident$value <!-- ${id.mkString} -->"
       case Element(id, _, tagName, attributes, styles, children) =>
         val renderedAttributes = attributes
@@ -70,27 +70,27 @@ sealed trait PseudoDom {
   def text: String
 }
 
-object PseudoDom {
+object PseudoHtml {
 
   case class Element(id: Id,
                      ns: XmlNs,
                      tagName: String,
                      attributes: Map[String, String],
                      styles: Map[String, String],
-                     children: List[PseudoDom]) extends PseudoDom {
+                     children: List[PseudoHtml]) extends PseudoHtml {
 
     lazy val text: String =
       children.foldLeft("")(_ + _.text)
   }
 
-  case class Text(id: Id, value: String) extends PseudoDom {
+  case class Text(id: Id, value: String) extends PseudoHtml {
     val text: String = value
   }
 
   private class PseudoDomRenderContext[F[_], S, M] extends RenderContext[Binding[F, S, M]] {
 
     val idBuilder = new IdBuilder(256)
-    var currentChildren: List[List[PseudoDom]] = List(Nil)
+    var currentChildren: List[List[PseudoHtml]] = List(Nil)
     var currentNode = List.empty[(XmlNs, String)]
     var currentAttrs = List.empty[(XmlNs, String, String)]
     var currentStyles = List.empty[(String, String)]
@@ -112,7 +112,7 @@ object PseudoDom {
       val (xmlns, _) :: currentNodeTail = currentNode
       val children :: currentChildrenTail = currentChildren
       val c2 :: cct2 = currentChildrenTail
-      val node = PseudoDom.Element(
+      val node = PseudoHtml.Element(
         id = idBuilder.mkId,
         ns = xmlns,
         tagName = name,
@@ -135,7 +135,7 @@ object PseudoDom {
     def addTextNode(text: String): Unit = {
       idBuilder.incId()
       val children :: xs = currentChildren
-      val updatedChildren = PseudoDom.Text(idBuilder.mkId, text) :: children
+      val updatedChildren = PseudoHtml.Text(idBuilder.mkId, text) :: children
       currentChildren = updatedChildren :: xs
     }
 
@@ -155,7 +155,7 @@ object PseudoDom {
     }
   }
 
-  case class RenderingResult[F[_], S, M](pseudoDom: PseudoDom,
+  case class RenderingResult[F[_], S, M](pseudoDom: PseudoHtml,
                                          elements: Map[levsha.Id, ElementId],
                                          events: Map[EventId, Context.Event[F, S, M]])
 
