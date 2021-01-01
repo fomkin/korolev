@@ -12,9 +12,11 @@ sealed trait PseudoDom {
 
   import PseudoDom._
 
+  def id: Id
+
   def find(f: PseudoDom => Boolean): List[PseudoDom] = {
-    @tailrec def aux(acc: List[PseudoDom], rest: List[PseudoDom]): List[PseudoDom] = rest match {
-      case (e: Text) :: xs if f(e) => aux(e :: acc, xs)
+    @tailrec def aux(acc: List[Element], rest: List[PseudoDom]): List[Element] = rest match {
+      case Nil => acc
       case (_: Text) :: xs => aux(acc, xs)
       case (e: Element) :: xs if f(e) => aux(e :: acc, xs ::: e.children)
       case (e: Element) :: xs => aux(acc, xs ::: e.children)
@@ -22,21 +24,27 @@ sealed trait PseudoDom {
     aux(Nil, List(this))
   }
 
-  def byAttribute(name: String, f: String => Boolean): List[PseudoDom] = find {
-    case e: Element => e.attributes.get(name).exists(f)
-    case _: Text => false
+  def findElement(f: Element => Boolean): List[Element] = {
+    @tailrec def aux(acc: List[Element], rest: List[PseudoDom]): List[Element] = rest match {
+      case Nil => acc
+      case (_: Text) :: xs => aux(acc, xs)
+      case (e: Element) :: xs if f(e) => aux(e :: acc, xs ::: e.children)
+      case (e: Element) :: xs => aux(acc, xs ::: e.children)
+    }
+    aux(Nil, List(this))
   }
 
-  def byClass(clazz: String): List[PseudoDom] =
+  def byAttribute(name: String, f: String => Boolean): List[Element] =
+    findElement(_.attributes.get(name).exists(f))
+
+  def byClass(clazz: String): List[Element] =
     byAttribute("class", _.indexOf(clazz) > -1)
 
-  def byName(name: String): List[PseudoDom] =
+  def byName(name: String): List[Element] =
     byAttribute("name", _ == name)
 
-  def byTag(tagName: String): List[PseudoDom] = find {
-    case e: Element => e.tagName == tagName
-    case _: Text => false
-  }
+  def byTag(tagName: String): List[PseudoDom] =
+    findElement(_.tagName == tagName)
 
   def mkString: String = {
     def aux(node: PseudoDom, ident: String): String = node match {
@@ -53,7 +61,7 @@ sealed trait PseudoDom {
         } else {
           " "
         }
-        val renderedChildren = children.map(aux(_, ident + "  "))
+        val renderedChildren = children.map(aux(_, ident + "  ")).mkString("\n")
         s"$ident<$tagName$renderedStyles$renderedAttributes> <!-- ${id.mkString} -->\n$renderedChildren\n$ident</$tagName>"
     }
     aux(this, "")
@@ -131,15 +139,19 @@ object PseudoDom {
       currentChildren = updatedChildren :: xs
     }
 
-    def addMisc(misc: Binding[F, S, M]): Unit = misc match {
-      case ComponentEntry(c, p, _) =>
-        val rc = this.asInstanceOf[RenderContext[Context.Binding[F, Any, Any]]]
-        c.render(p, c.initialState).apply(rc)
-      case elementId: ElementId =>
-        elements = (idBuilder.mkId, elementId) :: elements
-      case event: Context.Event[F, S, M] =>
-        val eventId = EventId(idBuilder.mkId, event.`type`, event.phase)
-        events = (eventId, event) :: events
+    def addMisc(misc: Binding[F, S, M]): Unit = {
+      idBuilder.decLevel()
+      misc match {
+        case ComponentEntry(c, p, _) =>
+          val rc = this.asInstanceOf[RenderContext[Context.Binding[F, Any, Any]]]
+          c.render(p, c.initialState).apply(rc)
+        case elementId: ElementId =>
+          elements = (idBuilder.mkId, elementId) :: elements
+        case event: Context.Event[F, S, M] =>
+          val eventId = EventId(idBuilder.mkId, event.`type`, event.phase)
+          events = (eventId, event) :: events
+      }
+      idBuilder.incLevel()
     }
   }
 

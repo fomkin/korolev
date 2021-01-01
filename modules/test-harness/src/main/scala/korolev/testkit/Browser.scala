@@ -59,7 +59,7 @@ case class Browser(properties: Map[(ElementId, String), String] = Map.empty,
   /**
    * Simulate event propagation on the given DOM.
    *
-   * {{{
+   * @example {{{
    *
    * def onClick(access: Access) = ???
    *
@@ -79,6 +79,7 @@ case class Browser(properties: Map[(ElementId, String), String] = Map.empty,
    *   target = _.byName("by-button").headOption,
    *  )
    * }}}
+   * @see [[access]]
    */
   def event[F[_]: Effect, S, M](state: S,
                                 dom: levsha.Document.Node[Binding[F, S, M]],
@@ -110,6 +111,7 @@ case class Browser(properties: Map[(ElementId, String), String] = Map.empty,
 
   /**
    * Applies `f` to the Browser using [[Context.Access]].
+   * @param elements evalJs uses this mapping to search elements on the client side.
    */
   def access[F[_]: Effect, S, M](initialState: S,
                                  f: Access[F, S, M] => F[Unit],

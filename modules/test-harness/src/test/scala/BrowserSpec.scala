@@ -1,7 +1,9 @@
+import korolev.Context
 import korolev.Context.ElementId
 import korolev.testkit.{Action, Browser}
-import org.scalatest.{AsyncFlatSpec, Matchers}
+import korolev.state.javaSerialization._
 
+import org.scalatest.{AsyncFlatSpec, Matchers}
 import scala.concurrent.Future
 
 class BrowserSpec extends AsyncFlatSpec with Matchers {
@@ -14,7 +16,7 @@ class BrowserSpec extends AsyncFlatSpec with Matchers {
       }
   }
 
-  it  should "emulate property set" in {
+  it should "emulate property set" in {
     val e1 = new ElementId(Some("e1"))
     Browser()
       .property(e1, "value", "hello")
@@ -71,6 +73,38 @@ class BrowserSpec extends AsyncFlatSpec with Matchers {
           Action.EvalJs(Right("2")),
           Action.Publish("1 2")
         )
+      }
+  }
+
+  "Browser.event" should "emulate event propagation" in {
+
+    val context = Context[Future, String, Any]
+
+    import context._
+    import levsha.dsl._
+    import html._
+
+    def onClick(access: Access) =
+      access.publish("hello world")
+
+    val dom = body(
+      div("Hello world"),
+      button(
+        event("click")(onClick),
+        name := "my-button",
+        "Click me"
+      )
+    )
+
+    Browser()
+      .event(
+        state = "",
+        dom = dom,
+        event = "click",
+        target = _.byName("my-button").headOption.map(_.id),
+      )
+      .map { actions =>
+        actions shouldEqual List(Action.Publish("hello world"))
       }
   }
 }

@@ -51,4 +51,20 @@ class PseudoDomSpec extends FlatSpec with Matchers {
     rr.pseudoDom shouldEqual PseudoDom.Element(Id("1"), XmlNs.html, "div", Map.empty, Map("background-color" -> "red", "border" -> "1px"), List.empty)
   }
 
+  "byName" should "find list of Element by value of name attribute" in {
+
+    import levsha.dsl._
+    import html._
+
+    val dom = body(
+      div("Hello world"),
+      button(
+        name := "my-button",
+        "Click me"
+      )
+    )
+
+    val pd = PseudoDom.render(dom).pseudoDom
+    pd.byName("my-button").headOption.map(_.id) shouldEqual Some(Id("1_2"))
+  }
 }
