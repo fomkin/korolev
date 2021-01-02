@@ -301,7 +301,7 @@ lazy val zioExample = project
   .settings(crossVersionSettings)
   .settings(exampleSettings: _*)
   .settings(mainClass := Some("ZioExample"))
-  .dependsOn(zio, akka)
+  .dependsOn(zio, akka, testkit % Test)
 
 lazy val monixExample = project
   .in(examples / "monix")

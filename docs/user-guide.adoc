@@ -642,6 +642,98 @@ Sometimes, being in context scope, you need to apply a transition to all state. 
 
 https://github.com/fomkin/korolev/blob/v0.16.0/examples/context-scope/src/main/scala/ContextScopeExample.scala[See full example]
 
+== Testing Korolev applications
+
+=== Testkit
+
+Use Korolev Test Kit to simulate environment for event listeners and extensions.
+
+Add Test Kit dependency to your project. You can use use Test Kit with any suitable testing library which supports asynchronous testing.
+
+[source,scala]
+------------------------------
+libraryDependencies += "org.fomkin" %% "korolev-testkit" % "0.16.0" % Test
+------------------------------
+
+Let's imagine that you are creating application which can to add two integer numbers and to show the result. The app has two text fields and a `span` tag to show the result. The view state of the app is `Option[Int]`. When one of the fields changes, the app reads values of inputs, adds them, and shows calculated result.
+
+[source,scala]
+------------------------------
+val aInput = elementId()
+val bInput = elementId()
+
+def onChange(access: Access) =
+  for {
+    a <- access.valueOf(aInput)
+    b <- access.valueOf(bInput)
+    _ <-
+      if (a.isBlank || b.isBlank) Future.unit
+      else access.transition(_ => Some(a.toInt + b.toInt))
+  } yield ()
+
+def renderForm(maybeResult: Option[Int]) =
+  form(
+    input(
+      aInput,
+      name := "a-input",
+      `type` := "number",
+      event("input")(onChange)
+    ),
+    span("+"),
+    input(
+      bInput,
+      name := "b-input",
+      `type` := "number",
+      event("input")(onChange)
+    ),
+    span(s"= ${maybeResult.fold("?")(_.toString)}")
+  )
+------------------------------
+
+Now we can to write test for it. Lets define the environment.
+
+[source,scala]
+------------------------------
+val browser = Browser()
+  .value(aInput, "2")
+  .value(bInput, "3")
+------------------------------
+
+Check that `onChange` behaves right.
+
+[source,scala]
+------------------------------
+"onChange" should "read inputs and put calculation result to the view state" in {
+  browser.access(Option.empty[Int], onChange) map { actions =>
+    actions shouldEqual List(
+      Action.Transition(Some(5))
+    )
+  }
+}
+------------------------------
+
+Check that event will be handled correctly.
+
+[source,scala]
+------------------------------
+it should "be handled" in {
+  browser.event(Option.empty[Int],
+                renderForm(None),
+                "input",
+                _.byName("a-input").headOption.map(_.id)) map { actions =>
+    actions shouldEqual List(
+      Action.Transition(Some(5))
+    )
+  }
+}
+------------------------------
+
+https://github.com/fomkin/korolev/blob/v0.16.0/examples/zio/src/test/scala/ZioExampleSpec.scala[See full example]
+
+=== Selenium
+
+Korolev applications like any other web application could be tested using https://www.selenium.dev[Selenium].
+
 == JavaScript interoperability
 
 === WebComponents
