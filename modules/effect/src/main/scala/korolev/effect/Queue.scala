@@ -18,6 +18,9 @@ package korolev.effect
 
 import scala.collection.mutable
 
+/**
+ * Queue with drop last overflow strategy.
+ */
 class Queue[F[_]: Effect, T](maxSize: Int) {
 
   protected var stopped = false
