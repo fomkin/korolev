@@ -55,7 +55,7 @@ object Context {
     type EventFactory[T] = T => Event
     type Transition = korolev.Transition[S]
     type Render = PartialFunction[S, Document.Node[Binding]]
-    type ElementId = Context.ElementId[F]
+    type ElementId = Context.ElementId
     type Access = Context.Access[F, AccessType, M]
     type UnscopedAccess = Context.Access[F, S, M]
     type EventResult = F[Unit]
@@ -73,31 +73,31 @@ object Context {
 
         def eventData: F[String] = access.eventData
 
-        def property(id: Context.ElementId[F]): PropertyHandler[F] =
+        def property(id: Context.ElementId): PropertyHandler[F] =
           access.property(id)
 
-        def focus(id: Context.ElementId[F]): F[Unit] =
+        def focus(id: Context.ElementId): F[Unit] =
           access.focus(id)
 
         def publish(message: M): F[Unit] =
           access.publish(message)
 
-        def downloadFormData(id: Context.ElementId[F]): F[FormData] =
+        def downloadFormData(id: Context.ElementId): F[FormData] =
           access.downloadFormData(id)
 
-        def downloadFiles(id: Context.ElementId[F]): F[List[(FileHandler[F], Array[Byte])]] =
+        def downloadFiles(id: Context.ElementId): F[List[(FileHandler, Array[Byte])]] =
           access.downloadFiles(id)
 
-        def downloadFilesAsStream(id: Context.ElementId[F]): F[List[(FileHandler[F], LazyBytes[F])]] =
+        def downloadFilesAsStream(id: Context.ElementId): F[List[(FileHandler, LazyBytes[F])]] =
           access.downloadFilesAsStream(id)
 
-        def downloadFileAsStream(handler: FileHandler[F]): F[LazyBytes[F]] =
+        def downloadFileAsStream(handler: FileHandler): F[LazyBytes[F]] =
           access.downloadFileAsStream(handler)
 
-        def listFiles(id: Context.ElementId[F]): F[List[FileHandler[F]]] =
+        def listFiles(id: Context.ElementId): F[List[FileHandler]] =
           access.listFiles(id)
 
-        def resetForm(id: Context.ElementId[F]): F[Unit] =
+        def resetForm(id: Context.ElementId): F[Unit] =
           access.resetForm(id)
 
         def state: F[S2] = Effect[F].map(access.state)(read)
@@ -122,7 +122,7 @@ object Context {
         JsCode(sc.parts.toList, args.toList)
     }
 
-    def elementId(name: Option[String] = None): ElementId = new Context.ElementId[F](name)
+    def elementId(name: Option[String] = None): ElementId = new Context.ElementId(name)
 
     /**
       * Schedules the transition with delay. For example it can be useful
@@ -172,31 +172,31 @@ object Context {
       * }
       * }}}
       */
-    def property(id: ElementId[F]): PropertyHandler[F]
+    def property(id: ElementId): PropertyHandler[F]
 
     /**
       * Shortcut for `property(id).get(propName)`.
       * @since 0.6.0
       */
     @deprecated("""Use "propertyName" instead of 'propertyName""", "0.13.0")
-    final def property(id: ElementId[F], propName: Symbol): F[String] = property(id).get(propName)
+    final def property(id: ElementId, propName: Symbol): F[String] = property(id).get(propName)
 
     /**
       * Shortcut for `property(id).get(propName)`.
       * @since 0.13.0
       */
-    final def property(id: ElementId[F], propName: String): F[String] = property(id).get(propName)
+    final def property(id: ElementId, propName: String): F[String] = property(id).get(propName)
 
     /**
       * Shortcut for `property(id).get('value)`.
       * @since 0.6.0
       */
-    final def valueOf(id: ElementId[F]): F[String] = property(id, "value")
+    final def valueOf(id: ElementId): F[String] = property(id, "value")
 
     /**
       * Makes focus on the element
       */
-    def focus(id: ElementId[F]): F[Unit]
+    def focus(id: ElementId): F[Unit]
 
     /**
       * Publish message to environment.
@@ -224,37 +224,37 @@ object Context {
       * @param id form elementId
       * @return
       */
-    def downloadFormData(id: ElementId[F]): F[FormData]
+    def downloadFormData(id: ElementId): F[FormData]
 
     /**
       * Download the selected file list from input appropriate
       * to given element id. Use this method carefully because
       * all files are saving to RAM.
       */
-    def downloadFiles(id: ElementId[F]): F[List[(FileHandler[F], Array[Byte])]]
+    def downloadFiles(id: ElementId): F[List[(FileHandler, Array[Byte])]]
 
     /**
       * Same as [[downloadFiles]] but for stream mode. The method is useful
       * when user want to upload very large files list which is problematic
       * to keep in memory (especially when count of users is more than one).
       */
-    def downloadFilesAsStream(id: ElementId[F]): F[List[(FileHandler[F], LazyBytes[F])]]
+    def downloadFilesAsStream(id: ElementId): F[List[(FileHandler, LazyBytes[F])]]
 
     /**
       * Get selected file as a stream from input
       */
-    def downloadFileAsStream(handler: FileHandler[F]): F[LazyBytes[F]]
+    def downloadFileAsStream(handler: FileHandler): F[LazyBytes[F]]
 
     /**
       * Get only file list for input
       */
-    def listFiles(id: ElementId[F]): F[List[FileHandler[F]]]
+    def listFiles(id: ElementId): F[List[FileHandler]]
 
     /**
       * Purge inputs in given form.
       * @param id form element id binding
       */
-    def resetForm(id: ElementId[F]): F[Unit]
+    def resetForm(id: ElementId): F[Unit]
 
     /**
       * Gives current state.
@@ -330,18 +330,18 @@ object Context {
     */
   trait Access[F[_], S, M] extends BaseAccess[F, S, M] with EventAccess[F, S, M]
 
-  sealed trait Binding[F[_], +S, +M]
+  sealed trait Binding[+F[_], +S, +M]
 
   abstract class PropertyHandler[F[_]: Effect] {
     @deprecated("""Use "propertyName" instead of 'propertyName""", "0.13.0")
-    def get(propName: Symbol): F[String]
+    def get(propName: Symbol): F[String] = get(propName.name)
     @deprecated("""Use "propertyName" instead of 'propertyName""", "0.13.0")
-    def set(propName: Symbol, value: Any): F[Unit]
+    def set(propName: Symbol, value: Any): F[Unit] = set(propName.name, value)
     def get(propName: String): F[String]
     def set(propName: String, value: Any): F[Unit]
   }
 
-  final case class FileHandler[F[_]](fileName: String, size: Long)(private[korolev] val elementId: ElementId[F])
+  final case class FileHandler(fileName: String, size: Long)(private[korolev] val elementId: ElementId)
 
   final case class ComponentEntry
     [
@@ -382,7 +382,7 @@ object Context {
     }
   }
 
-  final case class Event[F[_]: Effect, S, M](
+  final case class Event[F[_], S, M](
       `type`: String,
       phase: EventPhase,
       stopPropagation: Boolean,
@@ -392,9 +392,9 @@ object Context {
       duration: FiniteDuration,
       effect: Access[F, S, M] => F[Unit]) extends Binding[F, S, M]
 
-  final class ElementId[F[_]](val name: Option[String]) extends Binding[F, Nothing, Nothing] {
+  final class ElementId (val name: Option[String]) extends Binding[Nothing, Nothing, Nothing] {
     override def equals(obj: Any): Boolean = obj match {
-      case other: ElementId[F] => if (name.isDefined) name == other.name else super.equals(other)
+      case other: ElementId => if (name.isDefined) name == other.name else super.equals(other)
       case _ => false
     }
     override def toString: String = name match {

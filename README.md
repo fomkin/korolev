@@ -23,6 +23,7 @@ Korolev runs a single-page application on the server side, keeping in the browse
 
 ## Examples
 
+* [Features](https://github.com/fomkin/korolev/tree/master/examples)
 * [Multiplayer match-three game build on Korolev](https://match3.fomkin.org/)
 * Goldbricker - Encrypted ToDo List (coming at summer 2020)
  
@@ -40,7 +41,7 @@ Korolev runs a single-page application on the server side, keeping in the browse
 
 * [HTML to Levsha DSL converter](https://fomkin.org/korolev/html-to-levsha)
 
-[![Browser support results](https://fomkin.org/korolev/browser-support.svg)](https://saucelabs.com/u/yelbota)
+[comment]: <> ([![Browser support results]&#40;https://fomkin.org/korolev/browser-support.svg&#41;]&#40;https://saucelabs.com/u/yelbota&#41;)
 
 ## License
 

@@ -128,7 +128,7 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
       files <- fileNamePromises.get(descriptor)
     } yield files
 
-  def uploadFile(id: Id, handler: FileHandler[F]): F[LazyBytes[F]] =
+  def uploadFile(id: Id, handler: FileHandler): F[LazyBytes[F]] =
     for {
       descriptor <- nextDescriptor()
       _ <- send(Procedure.UploadFile.code, id.mkString, descriptor, handler.fileName)
