@@ -17,25 +17,40 @@ object fs2 {
 
     private val queue = mutable.Queue.empty[O]
 
+    @volatile private var running = true
     @volatile private var pullCallbacks = List.empty[Promise[Option[O]]]
     @volatile private var joinCallbacks = List.empty[Promise[Unit]]
     @volatile private var cancelCallbacks = List.empty[Promise[Unit]]
 
     def join: F[Unit] = KorolevEffect[F].delayAsync {
       this.synchronized {
-        if (queue.size >= maxSize) {
+        if (queue.size < maxSize || !running) {
+          KorolevEffect[F].unit
+        } else {
           KorolevEffect[F].promise { cb =>
             joinCallbacks = cb :: joinCallbacks
           }
-        } else {
-          KorolevEffect[F].unit
         }
+      }
+    }
+
+    def stop(): F[Unit] = KorolevEffect[F].delay {
+      this.synchronized {
+        running = false
+        val pullXs = pullCallbacks
+        val joinXs = joinCallbacks
+        pullCallbacks = List.empty
+        joinCallbacks = List.empty
+        pullXs.foreach(_ (noneToken))
+        joinXs.foreach(_ (unitToken))
       }
     }
 
     def offer(value: O): F[Unit] = KorolevEffect[F].delay {
       this.synchronized {
         pullCallbacks match {
+          case _ if !running =>
+            () // Do nothing
           case Nil if queue.size >= maxSize =>
             queue.dequeue()
             queue.enqueue(value)
@@ -51,11 +66,13 @@ object fs2 {
 
     def pull(): F[Option[O]] = KorolevEffect[F].promise { cb =>
       this.synchronized {
-        if (queue.nonEmpty) {
+        if (!running) {
+          cb(noneToken)
+        } else if (queue.nonEmpty) {
           val xs = joinCallbacks
           joinCallbacks = Nil
           cb(Right(Option(queue.dequeue())))
-          xs.foreach(_ (token))
+          xs.foreach(_ (unitToken))
         } else {
           pullCallbacks = cb :: pullCallbacks
         }
@@ -72,13 +89,14 @@ object fs2 {
       this.synchronized {
         val xs = cancelCallbacks
         cancelCallbacks = Nil
-        xs.foreach(_ (token))
+        xs.foreach(_ (unitToken))
       }
     }
   }
 
   private object AsyncBlockingQueue {
-    private final val token = Right(())
+    private final val unitToken = Right(())
+    private final val noneToken = Right(None)
   }
 
   implicit class Fs2StreamOps[F[_] : KorolevEffect : CatsConcurrentEffect, O](stream: Fs2Stream[F, O]) {
@@ -88,12 +106,13 @@ object fs2 {
       val cancelToken: Either[Throwable, Unit] = Right(())
 
       KorolevEffect[F]
-        .fork(
+        .start(
           stream
             .interruptWhen(queue.cancelSignal.as(cancelToken))
             .evalMap(o => queue.join.flatMap(_ => queue.offer(o)))
             .compile
             .drain
+            .flatMap(_ => queue.stop())
         )
         .as(queue)
     }

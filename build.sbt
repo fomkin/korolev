@@ -403,7 +403,7 @@ lazy val root = project
     korolev, effect, web, http, standalone, testkit,
     // Interop
     akka, cats, monix, zio, slf4j,
-    scodec,
+    scodec, fs2,
     // Examples
     simpleExample, routingExample, gameOfLifeExample,
     formDataExample, `file-streaming-example`, delayExample,
