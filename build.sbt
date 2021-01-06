@@ -165,7 +165,7 @@ lazy val cats = project.
   settings(commonSettings: _*).
   settings(
     normalizedName := "korolev-cats",
-    libraryDependencies += "org.typelevel" %% "cats-effect" % "2.1.4"
+    libraryDependencies += "org.typelevel" %% "cats-effect" % "2.3.0"
   ).
   dependsOn(effect)
 
@@ -193,6 +193,17 @@ lazy val zio = project
     libraryDependencies += "dev.zio" %% "zio" % "1.0.0"
   )
   .dependsOn(effect)
+
+lazy val fs2 = project
+  .in(interop / "fs2")
+  .enablePlugins(GitVersioning)
+  .settings(crossVersionSettings)
+  .settings(commonSettings: _*)
+  .settings(
+    normalizedName := "korolev-fs2",
+    libraryDependencies += "co.fs2" %% "fs2-core" % "2.5.0"
+  )
+  .dependsOn(effect, cats)
 
 lazy val scodec = project
   .in(interop / "scodec")
@@ -392,7 +403,7 @@ lazy val root = project
     korolev, effect, web, http, standalone, testkit,
     // Interop
     akka, cats, monix, zio, slf4j,
-    scodec,
+    scodec, fs2,
     // Examples
     simpleExample, routingExample, gameOfLifeExample,
     formDataExample, `file-streaming-example`, delayExample,
