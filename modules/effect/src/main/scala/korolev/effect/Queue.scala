@@ -16,17 +16,29 @@
 
 package korolev.effect
 
+import korolev.effect.Effect.Promise
+
 import scala.collection.mutable
 
 class Queue[F[_]: Effect, T](maxSize: Int) {
 
-  protected var stopped = false
+  import Queue._
 
   def offer(item: T): F[Unit] =
     Effect[F].delay(offerUnsafe(item))
 
-  def offerUnsafe(item: T): Unit = if (!stopped) {
-    underlyingQueue.synchronized {
+  def join: F[Unit] = Effect[F].promise { cb =>
+    this.synchronized {
+      if (closed || underlyingQueue.size < maxSize) {
+        cb(unitToken)
+      } else {
+        joinCallbacks = cb :: joinCallbacks
+      }
+    }
+  }
+
+  def offerUnsafe(item: T): Unit = underlyingQueue.synchronized {
+    if (!stopped) {
       if (underlyingQueue.size == maxSize) {
         // Remove head from queue if max size reached
         underlyingQueue.dequeue()
@@ -58,10 +70,13 @@ class Queue[F[_]: Effect, T](maxSize: Int) {
 
   def unsafeClose(): Unit =
     underlyingQueue.synchronized {
+      val joinXs = joinCallbacks
+      joinCallbacks = List.empty
+      joinXs.foreach(_ (unitToken))
       if (pending != null) {
         val cb = pending
         pending = null
-        cb(Right(None))
+        cb(noneToken)
       }
       closed = true
     }
@@ -70,25 +85,36 @@ class Queue[F[_]: Effect, T](maxSize: Int) {
     Effect[F].delay {
       underlyingQueue.synchronized {
         error = e
+        val xs = joinCallbacks
+        joinCallbacks = Nil
         if (pending != null) {
           val cb = pending
           pending = null
           cb(Left(e))
         }
+        xs.foreach(_ (unitToken))
       }
     }
+
+  def cancelSignal: F[Unit] = Effect[F].promise { cb =>
+    this.synchronized {
+      cancelCallbacks = cb :: cancelCallbacks
+    }
+  }
 
   private final class QueueStream extends Stream[F, T] {
 
     def pull(): F[Option[T]] = Effect[F].promise { cb =>
       underlyingQueue.synchronized {
         if (error != null) cb(Left(error))
-        else if (closed) cb(Right(None)) else {
+        else if (closed) cb(noneToken) else {
           if (underlyingQueue.nonEmpty) {
-            val elem = underlyingQueue.dequeue()
-            cb(Right(Some(elem)))
+            val xs = joinCallbacks
+            joinCallbacks = Nil
+            cb(Right(Option(underlyingQueue.dequeue())))
+            xs.foreach(_ (unitToken))
           } else if (stopped) {
-            cb(Right(None))
+            cb(noneToken)
           } else {
             pending = cb
           }
@@ -96,18 +122,31 @@ class Queue[F[_]: Effect, T](maxSize: Int) {
       }
     }
 
-    def cancel(): F[Unit] = close()
+    def cancel(): F[Unit] = Effect[F].delay {
+      close()
+      val xs = cancelCallbacks
+      cancelCallbacks = Nil
+      xs.foreach(_ (unitToken))
+      unsafeClose()
+    }
   }
 
   val stream: Stream[F, T] = new QueueStream()
 
+  @volatile protected var stopped = false
   @volatile private var closed = false
   @volatile private var error: Throwable = _
-  @volatile private var pending: Effect.Promise[Option[T]] = _
+  @volatile private var pending: Promise[Option[T]] = _
+  @volatile private var joinCallbacks = List.empty[Promise[Unit]]
+  @volatile private var cancelCallbacks = List.empty[Promise[Unit]]
+
   private val underlyingQueue: mutable.Queue[T] = mutable.Queue.empty[T]
 }
 
 object Queue {
+
+  private final val unitToken = Right(())
+  private final val noneToken = Right(None)
 
   def apply[F[_]: Effect, T](maxSize: Int = Int.MaxValue): Queue[F, T] =
     new Queue[F, T](maxSize)
