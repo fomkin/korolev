@@ -61,7 +61,7 @@ class Issue14Spec extends FlatSpec with Matchers {
     def fireEvent(data: String) =
       incomingMessages.offerUnsafe(s"""[0,"$data"]""")
 
-    app.initialize(true)
+    app.initialize()
     fireEvent("1:1_2_1:mousedown")
     fireEvent("1:1_2_1:mouseup")
     fireEvent("1:1_2_1:click")

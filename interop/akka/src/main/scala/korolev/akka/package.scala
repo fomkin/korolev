@@ -61,28 +61,33 @@ package object akka {
       (implicit materializer: Materializer, ec: ExecutionContext): Route =
     extractRequest { request =>
       extractUnmatchedPath { path =>
-        extractUpgradeToWebSocket { upgrade =>
+        extractWebSocketUpgrade { upgrade =>
           // inSink - consume messages from the client
           // outSource - push messages to the client
           val (inStream, inSink) = Sink.korolevStream[F, String].preMaterialize()
           val korolevRequest = mkKorolevRequest(request, path.toString, Map.empty, inStream)
-          onSuccess(Effect[F].toFuture(korolevServer.ws(korolevRequest))) {
-            case KorolevResponse(_, outStream, _) =>
-              val outSource = outStream.asAkkaSource
-              val response = upgrade.handleMessagesWithSinkSource(
-                inSink = Flow[Message]
-                  .mapConcat {
-                    case tm: TextMessage.Strict => tm.text :: Nil
-                    case tm: TextMessage.Streamed => tm.textStream.runWith(Sink.ignore); Nil
-                    case bm: BinaryMessage => bm.dataStream.runWith(Sink.ignore); Nil
-                  }
-                  .to(inSink),
-                outSource = outSource
-                  .map(text => TextMessage.Strict(text))
-              )
-              complete(response)
-            case _ =>
-              throw new RuntimeException // cannot happen
+          
+          complete {
+            Effect[F].toFuture(korolevServer.ws(korolevRequest)).map {
+              case KorolevResponse(_, outStream, _) =>
+                val source = outStream
+                    .asAkkaSource
+                    .map(text => TextMessage.Strict(text))
+
+                val sink = Flow[Message]
+                    .mapConcat {
+                      case tm: TextMessage.Strict => tm.text :: Nil
+                      case tm: TextMessage.Streamed => tm.textStream.runWith(Sink.ignore); Nil
+                      case bm: BinaryMessage => bm.dataStream.runWith(Sink.ignore); Nil
+                    }
+                    .to(inSink)
+
+                upgrade.handleMessages(
+                  Flow.fromSinkAndSourceCoupled(sink, source)
+                )
+              case _ =>
+                throw new RuntimeException // cannot happen
+            }
           }
         }
       }
