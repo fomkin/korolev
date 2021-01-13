@@ -83,6 +83,13 @@ sealed trait PathAndQuery {
         pq.withParam(key, value)
     }
   }
+
+  def withParams(params: Map[String, String]): PathAndQuery = {
+    params.foldLeft(this) {
+      case (pq, (key, value)) =>
+        pq.withParam(key, value)
+    }
+  }
 }
 
 sealed trait Query extends PathAndQuery {
