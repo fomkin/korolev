@@ -13,6 +13,7 @@ import org.http4s.headers.Cookie
 import org.http4s.server.{Router => WSRouter}
 import org.http4s.server.websocket.WebSocketBuilder
 import org.http4s.websocket.WebSocketFrame.{Close, Text}
+
 import scala.concurrent.ExecutionContext
 import _root_.cats.effect.ConcurrentEffect
 import _root_.cats.syntax.all._
@@ -97,11 +98,11 @@ package object http4s {
         val korolevRequest = mkKorolevRequest(req, path.toString, body)
         handleHttpResponse(korolevServer, korolevRequest)
 
-      case req @ POST -> path =>
+      case req =>
         for {
           stream <- req.body.chunks.map(ch => ch.toArray).toKorolev()
           body = LazyBytes(stream, req.contentLength)
-          korolevRequest = mkKorolevRequest(req, path.toString, body)
+          korolevRequest = mkKorolevRequest(req, req.uri.toString(), body)
           response <- handleHttpResponse(korolevServer, korolevRequest)
         } yield {
           response
