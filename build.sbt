@@ -147,6 +147,20 @@ lazy val akka = project
   )
   .dependsOn(korolev)
 
+lazy val http4s = project
+  .in(interop / "http4s")
+  .enablePlugins(GitVersioning)
+  .settings(crossVersionSettings)
+  .settings(commonSettings: _*)
+  .settings(
+    normalizedName := "korolev-http4s",
+    libraryDependencies ++= Seq(
+      "org.http4s"     %% "http4s-server" % "0.21.14",
+      "org.http4s"     %% "http4s-dsl"          % "0.21.14"
+    )
+  )
+  .dependsOn(korolev, web, fs2)
+
 lazy val slf4j = project.
   in(interop / "slf4j").
   enablePlugins(GitVersioning).
@@ -165,7 +179,7 @@ lazy val cats = project.
   settings(commonSettings: _*).
   settings(
     normalizedName := "korolev-cats",
-    libraryDependencies += "org.typelevel" %% "cats-effect" % "2.3.0"
+    libraryDependencies += "org.typelevel" %% "cats-effect" % "2.3.1"
   ).
   dependsOn(effect)
 
@@ -298,6 +312,16 @@ lazy val akkaHttpExample = project
   .settings(mainClass := Some("AkkaHttpExample"))
   .dependsOn(akka)
 
+lazy val http4sZioExample = project
+  .in(examples / "http4s-zio")
+  .disablePlugins(HeaderPlugin)
+  .settings(crossVersionSettings)
+  .settings(exampleSettings: _*)
+  .settings(mainClass := Some("Http4sZioExample"))
+  .settings(libraryDependencies += "dev.zio" %% "zio-interop-cats" % "2.1.4.1")
+  .settings(libraryDependencies +=  "org.http4s" %% "http4s-blaze-server" % "0.21.14")
+  .dependsOn(zio, http4s)
+
 lazy val catsEffectExample = project
   .in(examples / "cats")
   .disablePlugins(HeaderPlugin)
@@ -403,14 +427,14 @@ lazy val root = project
     korolev, effect, web, http, standalone, testkit,
     // Interop
     akka, cats, monix, zio, slf4j,
-    scodec, fs2,
+    scodec, fs2, http4s,
     // Examples
     simpleExample, routingExample, gameOfLifeExample,
     formDataExample, `file-streaming-example`, delayExample,
     focusExample, webComponentExample, componentExample,
     akkaHttpExample, contextScopeExample, eventDataExample,
     extensionExample, zioExample, monixExample,
-    catsEffectExample, evalJsExample,
+    catsEffectExample, evalJsExample, http4sZioExample,
     // Misc
     `performance-benchmark`, `integration-tests`
   )
