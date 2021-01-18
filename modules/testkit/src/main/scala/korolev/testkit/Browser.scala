@@ -1,8 +1,8 @@
 package korolev.testkit
 
 import korolev.Context.{Access, Binding, ElementId}
-import korolev.effect.Effect
-import korolev.effect.io.LazyBytes
+import korolev.data.{Bytes, BytesLike}
+import korolev.effect.{Effect, StreamAdapter}
 import korolev.effect.syntax._
 import korolev.internal.Frontend.ClientSideException
 import korolev.util.JsCode
@@ -14,6 +14,7 @@ import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 import java.util.NoSuchElementException
 import scala.collection.mutable
+import korolev.effect.Stream
 
 case class Browser(properties: Map[(ElementId, String), String] = Map.empty,
                    forms: Map[ElementId, FormData] = Map.empty,
@@ -162,24 +163,26 @@ case class Browser(properties: Map[(ElementId, String), String] = Map.empty,
       def downloadFormData(id: ElementId): F[FormData] =
         Effect[F].delay(browser.forms(id))
 
-      def downloadFiles(id: ElementId): F[List[(Context.FileHandler, Array[Byte])]] =
+      def downloadFiles(id: ElementId): F[List[(Context.FileHandler, Bytes)]] =
         Effect[F].delay {
           browser.filesMap(id).toList map {
-            case (name, bytes) => Context.FileHandler(name, bytes.length)(id) -> bytes
+            case (name, bytes) => Context.FileHandler(name, bytes.length)(id) -> Bytes.wrap(bytes)
           }
         }
 
-      def downloadFilesAsStream(id: ElementId): F[List[(Context.FileHandler, LazyBytes[F])]] =
+      def downloadFilesAsStream(id: ElementId): F[List[(Context.FileHandler, Stream[F, Bytes])]] =
         Effect[F].sequence {
           browser.filesMap(id).toList map {
-            case (name, bytes) =>
-              LazyBytes(bytes) map { lb =>
-                Context.FileHandler(name, bytes.length)(id) -> lb
+            case (name, ba) =>
+              val bytes = Bytes.wrap(ba)
+              val h = Context.FileHandler(name, ba.length)(id)
+              Stream(bytes).mat().map { s =>
+                (h, s)
               }
           }
         }
 
-      def downloadFileAsStream(handler: Context.FileHandler): F[LazyBytes[F]] = {
+      def downloadFileAsStream(handler: Context.FileHandler): F[Stream[F, Bytes]] = {
         Effect[F].delayAsync {
           val bytesOpt = browser.filesMap.collectFirst {
             Function.unlift {
@@ -189,7 +192,9 @@ case class Browser(properties: Map[(ElementId, String), String] = Map.empty,
           }
           bytesOpt match {
             case None => Effect[F].fail(new NoSuchElementException(handler.fileName))
-            case Some(bytes) => LazyBytes(bytes)
+            case Some(ba) =>
+              val bytes = Bytes.wrap(ba)
+              Stream(bytes).mat()
           }
         }
       }

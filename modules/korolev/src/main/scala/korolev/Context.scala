@@ -16,8 +16,8 @@
 
 package korolev
 
-import korolev.effect.io.LazyBytes
-import korolev.effect.{Effect, Reporter, Scheduler}
+import korolev.data.{Bytes, BytesLike}
+import korolev.effect.{Effect, Reporter, Scheduler, Stream}
 import korolev.internal.{ComponentInstance, EventRegistry, Frontend}
 import korolev.state.{StateDeserializer, StateManager, StateSerializer}
 import korolev.util.JsCode
@@ -85,13 +85,13 @@ object Context {
         def downloadFormData(id: Context.ElementId): F[FormData] =
           access.downloadFormData(id)
 
-        def downloadFiles(id: Context.ElementId): F[List[(FileHandler, Array[Byte])]] =
+        def downloadFiles(id: Context.ElementId): F[List[(FileHandler, Bytes)]] =
           access.downloadFiles(id)
 
-        def downloadFilesAsStream(id: Context.ElementId): F[List[(FileHandler, LazyBytes[F])]] =
+        def downloadFilesAsStream(id: Context.ElementId): F[List[(FileHandler, Stream[F, Bytes])]] =
           access.downloadFilesAsStream(id)
 
-        def downloadFileAsStream(handler: FileHandler): F[LazyBytes[F]] =
+        def downloadFileAsStream(handler: FileHandler): F[Stream[F, Bytes]] =
           access.downloadFileAsStream(handler)
 
         def listFiles(id: Context.ElementId): F[List[FileHandler]] =
@@ -231,19 +231,19 @@ object Context {
       * to given element id. Use this method carefully because
       * all files are saving to RAM.
       */
-    def downloadFiles(id: ElementId): F[List[(FileHandler, Array[Byte])]]
+    def downloadFiles(id: ElementId): F[List[(FileHandler, Bytes)]]
 
     /**
       * Same as [[downloadFiles]] but for stream mode. The method is useful
       * when user want to upload very large files list which is problematic
       * to keep in memory (especially when count of users is more than one).
       */
-    def downloadFilesAsStream(id: ElementId): F[List[(FileHandler, LazyBytes[F])]]
+    def downloadFilesAsStream(id: ElementId): F[List[(FileHandler, Stream[F, Bytes])]]
 
     /**
       * Get selected file as a stream from input
       */
-    def downloadFileAsStream(handler: FileHandler): F[LazyBytes[F]]
+    def downloadFileAsStream(handler: FileHandler): F[Stream[F, Bytes]]
 
     /**
       * Get only file list for input

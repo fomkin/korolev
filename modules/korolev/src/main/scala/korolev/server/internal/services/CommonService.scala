@@ -16,8 +16,7 @@
 
 package korolev.server.internal.services
 
-import korolev.effect.Effect
-import korolev.effect.io.LazyBytes
+import korolev.effect.{Stream, Effect}
 import korolev.server.HttpResponse
 import korolev.server.internal.HttpResponse
 import korolev.web.Response
@@ -32,7 +31,7 @@ private[korolev] final class CommonService[F[_]: Effect] {
 
   val simpleOkResponse: HttpResponse[F] = Response(
     status = Response.Status.Ok,
-    body = LazyBytes.empty[F],
+    body = Stream.empty,
     headers = Nil,
     contentLength = Some(0L)
   )

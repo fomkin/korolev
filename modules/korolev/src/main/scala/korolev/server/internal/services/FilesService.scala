@@ -16,8 +16,9 @@
 
 package korolev.server.internal.services
 
+import korolev.data.Bytes
 import korolev.effect.Effect
-import korolev.effect.io.LazyBytes
+import korolev.effect.io.JavaIO
 import korolev.effect.syntax._
 import korolev.server.HttpResponse
 import korolev.server.internal.MimeTypes
@@ -41,8 +42,8 @@ private[korolev] final class FilesService[F[_]: Effect](commonService: CommonSer
         case Some(mimeType) => Seq(Headers.ContentType -> mimeType)
         case None           => Nil
       }
-      LazyBytes.fromInputStream(javaSyncStream) map { lazyBytes =>
-        Response(Response.Status.Ok, lazyBytes, headers, lazyBytes.bytesLength)
+      JavaIO.fromInputStream[F, Bytes](javaSyncStream) map { stream =>
+        Response(Response.Status.Ok, stream, headers, Some(javaSyncStream.available().toLong))
       }
     }
   }

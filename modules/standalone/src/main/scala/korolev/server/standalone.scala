@@ -2,10 +2,9 @@ package korolev.server
 
 import java.net.SocketAddress
 import java.nio.channels.AsynchronousChannelGroup
-
-import korolev.data.BytesLike
+import korolev.data.{Bytes, BytesLike}
 import korolev.data.syntax._
-import korolev.effect.io.{LazyBytes, ServerSocket}
+import korolev.effect.io.ServerSocket
 import korolev.effect.syntax._
 import korolev.effect.{Effect, Stream}
 import korolev.http.HttpServer
@@ -31,15 +30,15 @@ object standalone {
             }
             // TODO service.ws should work with websocket frame
             service.ws(request.copy(body = b2)).map { x =>
-              x.copy(body = x.body.map(m => WebSocketProtocol.Frame.Text(BytesLike[B].utf8(m), fin = true)))
+              x.copy(body = x.body.map(m => WebSocketProtocol.Frame.Text(BytesLike[B].utf8(m))))
             }
           }
-          f(request.copy(body = LazyBytes(request.body.map(bv => bv.asArray), request.contentLength)))
-            .map(response => response.copy(body = response.body.chunks.map(BytesLike[B].wrapArray(_))))
+          f(request)
         case _ =>
           // This is just HTTP query
-          service.http(request.copy(body = LazyBytes(request.body.map(bv => bv.asArray), request.contentLength)))
-            .map(response => response.copy(body = response.body.chunks.map(BytesLike[B].wrapArray(_))))
+          service
+            .http(request.copy(body = request.body.map(Bytes.wrap(_))))
+            .map(response => response.copy(body = response.body.map(_.as[B])))
       }
     }
   }

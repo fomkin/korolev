@@ -48,9 +48,6 @@ object scodec {
     def asBuffer(bytes: ByteVector): ByteBuffer =
       bytes.toByteBuffer
 
-    def asHexString(bytes: ByteVector): String =
-      bytes.toHex
-
     def eq(l: ByteVector, r: ByteVector): Boolean =
       l.equals(r)
 
@@ -66,7 +63,7 @@ object scodec {
     def slice(bytes: ByteVector, start: Long, end: Long): ByteVector =
       bytes.slice(start, end)
 
-    def mapI(bytes: ByteVector, f: (Byte, Long) => Byte): ByteVector = {
+    def mapWithIndex(bytes: ByteVector, f: (Byte, Long) => Byte): ByteVector = {
       var i = 0
       bytes.map { x =>
         val res = f(x, i)
@@ -74,6 +71,9 @@ object scodec {
         res
       }
     }
+
+    def foreach(bytes: ByteVector, f: Byte => Unit): Unit =
+      bytes.foreach(f)
 
     def indexOf(where: ByteVector, that: Byte): Long =
       where.indexOfSlice(ByteVector(that))

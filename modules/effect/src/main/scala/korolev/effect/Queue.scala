@@ -28,7 +28,7 @@ class Queue[F[_]: Effect, T](maxSize: Int) {
     Effect[F].delay(offerUnsafe(item))
 
   def join: F[Unit] = Effect[F].promise { cb =>
-    this.synchronized {
+    underlyingQueue.synchronized {
       if (closed || underlyingQueue.size < maxSize) {
         cb(unitToken)
       } else {
