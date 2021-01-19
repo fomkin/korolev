@@ -1,12 +1,13 @@
 package korolev
 
+import korolev.server.internal.FormDataCodec
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
+
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 
-import korolev.server.internal.FormDataCodec
-import org.scalatest.{FlatSpec, Matchers}
-
-class FormDataCodecSpec extends FlatSpec with Matchers {
+class FormDataCodecSpec extends AnyFlatSpec with Matchers {
   "decode" should "parse valid multipart/form-data body" in {
     val body = """--Asrf456BGe4h
       |Content-Disposition: form-data; name="DestAddress"

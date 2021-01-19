@@ -3,7 +3,8 @@ import _root_.cats.effect.{IO, _}
 import korolev.cats._
 import korolev.effect.{Queue, Effect => KorolevEffect, Stream => KorolevStream}
 import korolev.fs2._
-import org.scalatest.{AsyncFlatSpec, Matchers}
+import org.scalatest.flatspec.AsyncFlatSpec
+import org.scalatest.matchers.should.Matchers
 
 class Fs2InteropSpec extends AsyncFlatSpec with Matchers {
 

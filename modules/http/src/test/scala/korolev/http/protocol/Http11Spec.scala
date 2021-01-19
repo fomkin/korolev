@@ -4,13 +4,14 @@ import korolev.data.Bytes
 import korolev.effect.{Decoder, Stream}
 import korolev.web.{PathAndQuery, Request, Response}
 import org.scalacheck._
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.concurrent.duration.Duration
 import scala.concurrent.{ExecutionContext, Future}
 
-class Http11Spec extends FlatSpec with Matchers with ScalaCheckPropertyChecks {
+class Http11Spec extends AnyFlatSpec with Matchers with ScalaCheckPropertyChecks {
 
   val http11 = new Http11[Bytes]
 

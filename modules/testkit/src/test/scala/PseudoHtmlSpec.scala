@@ -1,8 +1,9 @@
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 import korolev.testkit._
 import levsha.{Id, XmlNs}
 
-class PseudoHtmlSpec extends FlatSpec with Matchers {
+class PseudoHtmlSpec extends AnyFlatSpec with Matchers {
 
   "PseudoDom.render" should "map levsha.Node to PseudoDom.Element" in {
     import levsha.dsl._

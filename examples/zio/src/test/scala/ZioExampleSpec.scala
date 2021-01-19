@@ -1,4 +1,5 @@
-import org.scalatest.{AsyncFlatSpec, Matchers}
+import org.scalatest.flatspec.AsyncFlatSpec
+import org.scalatest.matchers.should.Matchers
 import korolev.testkit._
 import zio.Task
 

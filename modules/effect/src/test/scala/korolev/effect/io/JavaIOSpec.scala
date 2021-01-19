@@ -2,7 +2,8 @@ package korolev.effect.io
 
 import java.io.ByteArrayInputStream
 
-import org.scalatest.{AsyncFlatSpec, Matchers}
+import org.scalatest.flatspec.AsyncFlatSpec
+import org.scalatest.matchers.should.Matchers
 
 class JavaIOSpec extends AsyncFlatSpec with Matchers {
 
