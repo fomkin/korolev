@@ -19,13 +19,15 @@ package korolev.akka
 import akka.NotUsed
 import akka.stream.OverflowStrategy
 import akka.stream.scaladsl.{Sink, Source}
-import korolev.akka.util.{KorolevStreamPublisher, KorolevStreamSubscriber}
+import akka.util.ByteString
+import korolev.akka.util.{AkkaByteStringBytesLike, KorolevStreamPublisher, KorolevStreamSubscriber}
+import korolev.data.BytesLike
 import korolev.effect.{Effect, Stream}
 import org.reactivestreams.Publisher
 
 import scala.concurrent.ExecutionContext
 
-object Converters {
+object instances {
 
   implicit final class SinkCompanionOps(value: Sink.type) {
     def korolevStream[F[_]: Effect, T]: Sink[T, Stream[F, T]] = {
@@ -65,4 +67,7 @@ object Converters {
       Source.fromPublisher(publisher)
     }
   }
+
+  implicit final val akkaByteStringBytesLike: BytesLike[ByteString] =
+    new AkkaByteStringBytesLike()
 }

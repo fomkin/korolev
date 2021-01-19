@@ -26,8 +26,8 @@ import _root_.akka.stream.Materializer
 import _root_.akka.stream.scaladsl.{Flow, Keep, Sink}
 import _root_.akka.util.ByteString
 import korolev.akka.util.LoggingReporter
-import korolev.effect.io.LazyBytes
-import korolev.effect.{Effect, Reporter}
+import korolev.data.Bytes
+import korolev.effect.{Effect, Reporter, Stream}
 import korolev.server.{KorolevService, KorolevServiceConfig, HttpRequest => KorolevHttpRequest}
 import korolev.state.{StateDeserializer, StateSerializer}
 import korolev.web.{PathAndQuery, Request => KorolevRequest, Response => KorolevResponse}
@@ -38,7 +38,7 @@ package object akka {
 
   type AkkaHttpService = AkkaHttpServerConfig => Route
 
-  import Converters._
+  import instances._
 
   def akkaHttpService[F[_]: Effect, S: StateSerializer: StateDeserializer, M]
       (config: KorolevServiceConfig[F, S, M])
@@ -97,18 +97,17 @@ package object akka {
   private def configureHttpRoute[F[_]](korolevServer: KorolevService[F])(implicit mat: Materializer, async: Effect[F], ec: ExecutionContext): Route =
     extractUnmatchedPath { path =>
       extractRequest { request =>
-        val sink = Sink.korolevStream[F, Array[Byte]]
+        val sink = Sink.korolevStream[F, Bytes]
         val body =
           if (request.method == HttpMethods.GET) {
-            LazyBytes.empty[F]
+            Stream.empty[F, Bytes]
           } else {
-            val stream = request
+            request
               .entity
               .dataBytes
-              .map(_.toArray)
+              .map(Bytes.wrap(_))
               .toMat(sink)(Keep.right)
               .run()
-            LazyBytes(stream, request.entity.contentLengthOption)
           }
         val korolevRequest = mkKorolevRequest(request, path.toString, body)
         val responseF = handleHttpResponse(korolevServer, korolevRequest)
@@ -136,13 +135,13 @@ package object akka {
   private def handleHttpResponse[F[_]: Effect](korolevServer: KorolevService[F],
                                                korolevRequest: KorolevHttpRequest[F])(implicit ec: ExecutionContext): Future[HttpResponse] =
     Effect[F].toFuture(korolevServer.http(korolevRequest)).map {
-      case KorolevResponse(status, lazyBytes, responseHeaders, _) =>
+      case response @ KorolevResponse(status, body, responseHeaders, _) =>
         val (contentTypeOpt, otherHeaders) = getContentTypeAndResponseHeaders(responseHeaders)
-        val bytesSource = lazyBytes.chunks.asAkkaSource.map(ByteString.apply)
+        val bytesSource = body.asAkkaSource.map(_.as[ByteString])
         HttpResponse(
           StatusCode.int2StatusCode(status.code),
           otherHeaders,
-          lazyBytes.bytesLength match {
+          response.contentLength match {
             case Some(bytesLength) => HttpEntity(contentTypeOpt.getOrElse(ContentTypes.NoContentType), bytesLength, bytesSource)
             case None => HttpEntity(contentTypeOpt.getOrElse(ContentTypes.NoContentType), bytesSource)
           }

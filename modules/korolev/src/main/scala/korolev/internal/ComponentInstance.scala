@@ -17,7 +17,7 @@
 package korolev.internal
 
 import korolev._
-import korolev.effect.{Effect, Queue, Reporter, Scheduler}
+import korolev.effect.{Effect, Queue, Reporter, Scheduler, Stream}
 import korolev.effect.syntax._
 import korolev.state.{StateDeserializer, StateManager, StateSerializer}
 import levsha.Document.Node
@@ -26,7 +26,7 @@ import levsha.events.EventId
 
 import scala.collection.mutable
 import Context._
-import korolev.effect.io.LazyBytes
+import korolev.data.{Bytes, BytesLike}
 import korolev.util.JsCode
 import korolev.web.FormData
 
@@ -145,17 +145,19 @@ final class ComponentInstance
         formData <- frontend.uploadForm(id)
       } yield formData
 
-    def downloadFiles(id: ElementId): F[List[(FileHandler, Array[Byte])]] = {
+    def downloadFiles(id: ElementId): F[List[(FileHandler, Bytes)]] = {
       downloadFilesAsStream(id).flatMap { streams =>
         Effect[F].sequence {
           streams.map { case (handler, data) =>
-            data.toStrict.map(b => (handler, b))
+            data
+              .fold(Bytes.empty)(_ ++ _)
+              .map(b => (handler, b))
           }
         }
       }
     }
 
-    def downloadFilesAsStream(id: ElementId): F[List[(FileHandler, LazyBytes[F])]] = {
+    def downloadFilesAsStream(id: ElementId): F[List[(FileHandler, Stream[F, Bytes])]] = {
       listFiles(id).flatMap { handlers =>
         Effect[F].sequence {
           handlers.map { handler =>
@@ -168,7 +170,7 @@ final class ComponentInstance
     /**
       * Get selected file as a stream from input
       */
-    def downloadFileAsStream(handler: FileHandler): F[LazyBytes[F]] = {
+    def downloadFileAsStream(handler: FileHandler): F[Stream[F, Bytes]] = {
       for {
         id <- getId(handler.elementId)
         streams <- frontend.uploadFile(id, handler)

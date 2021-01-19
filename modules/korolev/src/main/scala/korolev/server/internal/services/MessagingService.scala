@@ -16,7 +16,6 @@
 
 package korolev.server.internal.services
 
-import korolev.effect.io.LazyBytes
 import korolev.effect.syntax._
 import korolev.effect.{Effect, Queue, Reporter, Stream}
 import korolev.internal.Frontend
@@ -26,6 +25,7 @@ import korolev.web.Request.Head
 import korolev.web.Response
 import korolev.web.Response.Status
 import korolev.Qsid
+import korolev.data.Bytes
 
 import scala.collection.mutable
 
@@ -61,10 +61,10 @@ private[korolev] final class MessagingService[F[_]: Effect](reporter: Reporter,
   /**
     * Push message to session's incoming queue.
     */
-  def longPollingPublish(qsid: Qsid, data: LazyBytes[F]): F[HttpResponse[F]] = {
+  def longPollingPublish(qsid: Qsid, data: Stream[F, Bytes]): F[HttpResponse[F]] = {
     for {
       topic <- takeTopic(qsid)
-      message <- data.toStrictUtf8
+      message <- data.fold(Bytes.empty)(_ ++ _).map(_.asUtf8String)
       _ <- topic.offer(message)
     } yield commonOkResponse
   }
@@ -105,7 +105,7 @@ private[korolev] final class MessagingService[F[_]: Effect](reporter: Reporter,
     */
   private val commonOkResponse = Response(
     status = Response.Status.Ok,
-    body = LazyBytes.empty[F],
+    body = Stream.empty[F, Bytes],
     headers = commonResponseHeaders,
     contentLength = Some(0L)
   )
@@ -116,7 +116,7 @@ private[korolev] final class MessagingService[F[_]: Effect](reporter: Reporter,
     */
   private val commonGoneResponse = Response(
     status = Response.Status.Gone,
-    body = LazyBytes.empty[F],
+    body = Stream.empty[F, Bytes],
     headers = commonResponseHeaders,
     contentLength = Some(0L)
   )

@@ -1,25 +1,26 @@
 package korolev
 
-
-import korolev.effect.io.LazyBytes
 import korolev.effect.{Effect, Queue, Stream => KStream}
 import korolev.server.{KorolevService, KorolevServiceConfig, HttpRequest => KorolevHttpRequest}
 import korolev.web.{PathAndQuery => PQ, Request => KorolevRequest, Response => KorolevResponse}
 import korolev.state.{StateDeserializer, StateSerializer}
 import korolev.fs2._
+import korolev.scodec._
+import korolev.data.Bytes
 import org.http4s.{Header, Headers, HttpRoutes, Request, Response, Status}
 import org.http4s.dsl.Http4sDsl
 import org.http4s.headers.Cookie
 import org.http4s.server.{Router => WSRouter}
 import org.http4s.server.websocket.WebSocketBuilder
 import org.http4s.websocket.WebSocketFrame.{Close, Text}
+import org.http4s.websocket.WebSocketFrame
 
 import scala.concurrent.ExecutionContext
 import _root_.cats.effect.ConcurrentEffect
 import _root_.cats.syntax.all._
 import _root_.fs2.{Pipe, Stream => FS2Stream}
-import org.http4s.websocket.WebSocketFrame
-
+import _root_.fs2.Chunk
+import _root_.scodec.bits.ByteVector
 
 package object http4s {
 
@@ -78,9 +79,7 @@ package object http4s {
           implicitly[ConcurrentEffect[F]].pure(())
         case f =>
           throw new Exception(s"Invalid frame type ${f.getClass.getName}")
-      }.onFinalizeCase {
-        case _ => queue.close()
-      }
+      }.onFinalizeCase(_ => queue.close())
     }
     (sink, queue.stream)
   }
@@ -94,15 +93,14 @@ package object http4s {
     HttpRoutes.of[F] {
 
       case req @ GET -> path =>
-        val body = LazyBytes.empty[F]
+        val body = KStream.empty[F, Bytes]
         val korolevRequest = mkKorolevRequest(req, path.toString, body)
         handleHttpResponse(korolevServer, korolevRequest)
 
       case req =>
         for {
-          stream <- req.body.chunks.map(ch => ch.toArray).toKorolev()
-          body = LazyBytes(stream, req.contentLength)
-          korolevRequest = mkKorolevRequest(req, req.uri.toString(), body)
+          stream <- req.body.chunks.map(ch => Bytes.wrap(ch.toByteVector)).toKorolev()
+          korolevRequest = mkKorolevRequest(req, req.uri.toString(), stream)
           response <- handleHttpResponse(korolevServer, korolevRequest)
         } yield {
           response
@@ -114,9 +112,13 @@ package object http4s {
                                                                   korolevRequest: KorolevHttpRequest[F])
                                                                 (implicit ec: ExecutionContext)= {
     korolevServer.http(korolevRequest).map {
-      case KorolevResponse(status, lazyBytes, responseHeaders, _) =>
+      case KorolevResponse(status, stream, responseHeaders, _) =>
         val headers = getContentTypeAndResponseHeaders(responseHeaders)
-        val body = lazyBytes.chunks.toFs2.flatMap { chunk => FS2Stream.emits(chunk) }
+        val body = stream.toFs2.flatMap { bytes =>
+          val bv = bytes.as[ByteVector]
+          val chunk = Chunk.byteVector(bv)
+          FS2Stream.chunk(chunk)
+        }
         Response[F](
           status = Status(status.code),
           headers = Headers.of(headers: _*),

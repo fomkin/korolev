@@ -1,6 +1,8 @@
 import xerial.sbt.Sonatype._
 
 val levshaVersion = "0.10.0"
+val akkaVersion = "2.6.10"
+val akkaHttpVersion = "10.2.1"
 
 val unusedRepo = Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
 
@@ -32,8 +34,8 @@ val commonSettings = publishSettings ++ Seq(
   git.useGitDescribe := true,
   organization := "org.fomkin",
   libraryDependencies ++= Seq(
-    "org.scalatest" %% "scalatest" % "3.0.8" % Test,
-    "org.scalacheck" %% "scalacheck" % "1.14.1" % Test
+    "org.scalatest" %% "scalatest" % "3.2.3" % Test,
+    "org.scalatestplus" %% "scalacheck-1-15" % "3.2.3.0" % Test
   ),
   //javaOptions in Test += "-XX:-OmitStackTraceInFastThrow",
   scalacOptions ++= Seq(
@@ -56,7 +58,6 @@ val modules = file("modules")
 val interop = file("interop")
 val examples = file("examples")
 val misc = file("misc")
-
 
 lazy val effect = project
   .in(modules / "effect")
@@ -83,7 +84,12 @@ lazy val http = project
   .settings(crossVersionSettings)
   .settings(commonSettings: _*)
   .settings(
-    normalizedName := "korolev-http"
+    normalizedName := "korolev-http",
+    libraryDependencies ++= Seq(
+      "com.typesafe.akka" %% "akka-actor-typed" % akkaVersion,
+      "com.typesafe.akka" %% "akka-stream" % akkaVersion,
+      "com.typesafe.akka" %% "akka-http" % akkaHttpVersion % Test
+    )
   )
   .dependsOn(effect, web)
 
@@ -140,9 +146,9 @@ lazy val akka = project
   .settings(
     normalizedName := "korolev-akka",
     libraryDependencies ++= Seq(
-      "com.typesafe.akka" %% "akka-actor" % "2.6.10",
-      "com.typesafe.akka" %% "akka-stream" % "2.6.10",
-      "com.typesafe.akka" %% "akka-http" % "10.2.1"
+      "com.typesafe.akka" %% "akka-actor" % akkaVersion,
+      "com.typesafe.akka" %% "akka-stream" % akkaVersion,
+      "com.typesafe.akka" %% "akka-http" % akkaHttpVersion
     )
   )
   .dependsOn(korolev)
@@ -156,10 +162,10 @@ lazy val http4s = project
     normalizedName := "korolev-http4s",
     libraryDependencies ++= Seq(
       "org.http4s"     %% "http4s-server" % "0.21.14",
-      "org.http4s"     %% "http4s-dsl"          % "0.21.14"
+      "org.http4s"     %% "http4s-dsl"    % "0.21.14"
     )
   )
-  .dependsOn(korolev, web, fs2)
+  .dependsOn(korolev, web, fs2, scodec)
 
 lazy val slf4j = project.
   in(interop / "slf4j").

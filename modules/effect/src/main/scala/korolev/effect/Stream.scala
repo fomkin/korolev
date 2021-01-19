@@ -188,8 +188,7 @@ abstract class Stream[F[_]: Effect, A] { self =>
     * Useful when you want to track progress of downloading.
     *
     * {{{
-    *   file // :LazyBytes
-    *     .chunks
+    *   file
     *     .over(0L) {
     *       case (acc, chunk) =>
     *         val loaded = chunk.fold(acc)(_.length.toLong + acc)

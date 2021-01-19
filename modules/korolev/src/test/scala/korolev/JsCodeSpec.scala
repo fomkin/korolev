@@ -2,9 +2,10 @@ package korolev
 
 import korolev.Context.ElementId
 import korolev.util.JsCode
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class JsCodeSpec extends FlatSpec with Matchers {
+class JsCodeSpec extends AnyFlatSpec with Matchers {
 
   import JsCode._
 

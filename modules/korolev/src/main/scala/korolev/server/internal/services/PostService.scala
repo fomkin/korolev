@@ -16,17 +16,12 @@
 
 package korolev.server.internal.services
 
-import java.net.URLDecoder
-import java.nio.ByteBuffer
-import java.nio.charset.StandardCharsets
-
 import korolev.Qsid
-import korolev.effect.io.LazyBytes
+import korolev.data.Bytes
 import korolev.effect.syntax._
-import korolev.effect.{Effect, Reporter}
+import korolev.effect.{Effect, Reporter, Stream}
 import korolev.server.HttpResponse
-import korolev.server.internal.{FormDataCodec, HttpResponse}
-import korolev.web.Response
+import korolev.server.internal.FormDataCodec
 
 import scala.concurrent.ExecutionContext
 
@@ -36,7 +31,7 @@ private[korolev] final class PostService[F[_]: Effect](reporter: Reporter,
                                                        formDataCodec: FormDataCodec)
                                                       (implicit ec: ExecutionContext) {
 
-  def formData(qsid: Qsid, descriptor: String, headers: Seq[(String, String)], data: LazyBytes[F]): F[HttpResponse[F]] = {
+  def formData(qsid: Qsid, descriptor: String, headers: Seq[(String, String)], data: Stream[F, Bytes]): F[HttpResponse[F]] = {
 
     def extractBoundary() = headers
       .collectFirst { case (k, v) if k.toLowerCase == "content-type" && v.contains("multipart/form-data") => v }
@@ -49,10 +44,10 @@ private[korolev] final class PostService[F[_]: Effect](reporter: Reporter,
       }
       .fold(Effect[F].fail[String](new Exception("Content-Type should be `multipart/form-data`")))(Effect[F].pure)
 
-    def parseFormData(formBytes: Array[Byte], boundary: String) = Effect[F].fork {
+    def parseFormData(formBytes: Bytes, boundary: String) = Effect[F].fork {
       Effect[F].delay {
         try {
-          Right(formDataCodec.decode(ByteBuffer.wrap(formBytes), boundary))
+          Right(formDataCodec.decode(formBytes.asBuffer, boundary))
         } catch {
           case error: Throwable =>
             Left(error)
@@ -63,7 +58,7 @@ private[korolev] final class PostService[F[_]: Effect](reporter: Reporter,
     sessionsService.getApp(qsid) flatMap {
       case Some(app) =>
         for {
-          formBytes <- data.toStrict
+          formBytes <- data.fold(Bytes.empty)(_ ++ _)
           boundary <- extractBoundary()
           errorOrFormData <- parseFormData(formBytes, boundary)
           _ <- app.frontend.resolveFormData(descriptor, errorOrFormData)
@@ -75,7 +70,7 @@ private[korolev] final class PostService[F[_]: Effect](reporter: Reporter,
     }
   }
 
-  def filesInfo(qsid: Qsid, descriptor: String, body: LazyBytes[F]): F[HttpResponse[F]] = {
+  def filesInfo(qsid: Qsid, descriptor: String, body: Stream[F, Bytes]): F[HttpResponse[F]] = {
     def parseFilesInfo(message: String) = message
       .split("\n")
       .toList
@@ -87,10 +82,11 @@ private[korolev] final class PostService[F[_]: Effect](reporter: Reporter,
     sessionsService.getApp(qsid) flatMap {
       case Some(app) =>
         for {
-          message <- body.toStrictUtf8 // file_name/size_in_bytes\n
-          sizes =
-          if (message.isEmpty) List.empty[(String, Long)]
-          else parseFilesInfo(message)
+          message <- body.fold(Bytes.empty)(_ ++ _).map(_.asUtf8String) // file_name/size_in_bytes\n
+          sizes = {
+            if (message.isEmpty) List.empty[(String, Long)]
+            else parseFilesInfo(message)
+          }
           _ <- app.frontend.resolveFileNames(descriptor, sizes)
         } yield commonService.simpleOkResponse
       case None =>
@@ -98,12 +94,12 @@ private[korolev] final class PostService[F[_]: Effect](reporter: Reporter,
     }
   }
 
-  def file(qsid: Qsid, descriptor: String, headers: Seq[(String, String)], body: LazyBytes[F]): F[HttpResponse[F]] = {
-    val (consumed, chunks) = body.chunks.handleConsumed
+  def file(qsid: Qsid, descriptor: String, headers: Seq[(String, String)], body: Stream[F, Bytes]): F[HttpResponse[F]] = {
+    val (consumed, chunks) = body.handleConsumed
     sessionsService.getApp(qsid) flatMap {
       case Some(app) =>
         for {
-          _ <- app.frontend.resolveFile(descriptor, LazyBytes(chunks, body.bytesLength))
+          _ <- app.frontend.resolveFile(descriptor, chunks)
           // Do not response until chunks are not
           // consumed inside an application
           _ <- consumed

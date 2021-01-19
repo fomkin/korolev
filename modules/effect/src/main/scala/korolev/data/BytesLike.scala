@@ -19,7 +19,26 @@ trait BytesLike[T] {
   def asString(bytes: T, charset: Charset): String
   def asArray(bytes: T): Array[Byte]
   def asBuffer(bytes: T): ByteBuffer
-  def asHexString(bytes: T): String
+  def asHexString(bytes: T): String = {
+    val builder = new StringBuilder()
+    foreach(bytes, { x =>
+      val s = (x & 0xFF).toHexString
+      val _ = if (s.length == 2) {
+        builder
+          .append(s)
+          .append(' ')
+      } else {
+        builder
+          .append('0')
+          .append(s)
+          .append(' ')
+      }
+    })
+    builder
+      .deleteCharAt(builder.length - 1)
+      .mkString
+  }
+
   def as[T2: BytesLike](that: T): T2 =
     if (BytesLike[T2] == this) that.asInstanceOf[T2]
     else BytesLike[T2].wrapArray(asArray(that))
@@ -29,7 +48,9 @@ trait BytesLike[T] {
   def length(bytes: T): Long
   def concat(left: T, right: T): T
   def slice(bytes: T, start: Long, end: Long): T
-  def mapI(bytes: T, f: (Byte, Long) => Byte): T
+  // Scan
+  def mapWithIndex(bytes: T, f: (Byte, Long) => Byte): T
+  def foreach(bytes: T, f: Byte => Unit): Unit
   // Search
   def indexOf(where: T, that: Byte): Long
   def indexOf(where: T, that: Byte, from: Long): Long
@@ -59,14 +80,17 @@ object BytesLike {
     def asString(bytes: Array[Byte], charset: Charset): String =
       new String(bytes, StandardCharsets.UTF_8)
 
-    def mapI(bytes: Array[Byte], f: (Byte, Long) => Byte): Array[Byte] =
+    def mapWithIndex(bytes: Array[Byte], f: (Byte, Long) => Byte): Array[Byte] =
       // TODO optimize me
       bytes.zipWithIndex.map {
         case (x, i) => 
           f(x, i.toLong)
-      } 
+      }
 
-    def indexOf(where: Array[Byte], that: Byte, from: Long): Long = 
+    def foreach(bytes: Array[Byte], f: Byte => Unit): Unit =
+      bytes.foreach(f)
+
+    def indexOf(where: Array[Byte], that: Byte, from: Long): Long =
       where.indexOf(that, from.toInt)
 
     val empty: Array[Byte] =
@@ -88,26 +112,6 @@ object BytesLike {
       val array = new Array[Byte](buffer.remaining())
       buffer.get(array)
       array
-    }
-
-    def asHexString(bytes: Array[Byte]): String = {
-      val builder = new StringBuilder()
-      bytes.foreach { x =>
-        val s = (x & 0xFF).toHexString
-        val _ = if (s.length == 2) {
-          builder
-            .append(s)
-            .append(' ')
-        } else {
-          builder
-            .append('0')
-            .append(s)
-            .append(' ')
-        }
-      }
-      builder
-        .deleteCharAt(builder.length - 1)
-        .mkString
     }
 
     def asArray(bytes: Array[Byte]): Array[Byte] =

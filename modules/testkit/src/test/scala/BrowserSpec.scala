@@ -2,8 +2,9 @@ import korolev.Context
 import korolev.Context.ElementId
 import korolev.testkit.{Action, Browser}
 import korolev.state.javaSerialization._
+import org.scalatest.flatspec.AsyncFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-import org.scalatest.{AsyncFlatSpec, Matchers}
 import scala.concurrent.Future
 
 class BrowserSpec extends AsyncFlatSpec with Matchers {

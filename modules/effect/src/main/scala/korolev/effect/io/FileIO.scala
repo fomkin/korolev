@@ -16,17 +16,18 @@
 
 package korolev.effect.io
 
+import korolev.data.BytesLike
+
 import java.io.{BufferedReader, FileInputStream, FileOutputStream, FileReader}
 import java.nio.file.Path
-
 import korolev.effect.syntax._
 import korolev.effect.{Effect, Stream}
 
 object FileIO {
 
-  def readBytes[F[_]: Effect](path: Path): F[LazyBytes[F]] = {
+  def readBytes[F[_]: Effect, B: BytesLike](path: Path): F[Stream[F, B]] = {
     val inputStream = new FileInputStream(path.toFile)
-    LazyBytes.fromInputStream(inputStream)
+    JavaIO.fromInputStream(inputStream)
   }
 
   def readLines[F[_]: Effect](path: Path): F[Stream[F, String]] = {
@@ -41,15 +42,15 @@ object FileIO {
 
   /**
     * {{{
-    *   lazyBytes.chunks.to(File.write(path, append = true))
+    *   chunks.to(File.write(path, append = true))
     * }}}
     */
-  def write[F[_]: Effect](path: Path, append: Boolean = false): Stream[F, Array[Byte]] => F[Unit] = { stream =>
+  def write[F[_]: Effect, B: BytesLike](path: Path, append: Boolean = false): Stream[F, B] => F[Unit] = { stream =>
     val outputStream = new FileOutputStream(path.toFile, append)
     def aux(): F[Unit] = {
       stream.pull().flatMap {
         case Some(chunk) => Effect[F]
-          .delay(outputStream.write(chunk))
+          .delay(outputStream.write(BytesLike[B].asArray(chunk)))
           .after(aux())
           .recover {
             case error =>
