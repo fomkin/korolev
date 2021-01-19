@@ -18,132 +18,195 @@ package korolev.effect
 
 import korolev.effect.Effect.Promise
 
-import scala.collection.mutable
+import java.util.concurrent.atomic.AtomicReference
+import scala.annotation.tailrec
+import scala.collection.immutable.{Queue => IQueue}
 
+/**
+ * Nonblocking, concurrent, asynchronous queue.
+ * @param maxSize
+ */
 class Queue[F[_]: Effect, T](maxSize: Int) {
 
   import Queue._
 
+  private val state = new AtomicReference(Queue.State[T]())
+
+  private final class QueueStream extends Stream[F, T] {
+
+    def pull(): F[Option[T]] = Effect[F].promise { cb =>
+      @tailrec
+      def aux(): Unit = {
+        val ref = state.get()
+        ref.error match {
+          case Some(error) => cb(Left(error))
+          case None if ref.closed => cb(noneToken)
+          case None if ref.queue.nonEmpty =>
+            val (value, updatedQueue) = ref.queue.dequeue
+            val newValue = ref.copy(queue = updatedQueue, canOfferCallbacks = Nil)
+            if (state.compareAndSet(ref, newValue)) {
+              cb(Right(Option(value)))
+              ref.canOfferCallbacks.foreach(_(unitToken))
+            } else {
+              aux()
+            }
+          case None if ref.stopped => cb(noneToken)
+          case None =>
+            val updatedPc = cb :: ref.pullCallbacks
+            val newValue = ref.copy(pullCallbacks = updatedPc)
+            if (!state.compareAndSet(ref, newValue)) {
+              aux()
+            }
+        }
+      }
+      aux()
+    }
+
+    def cancel(): F[Unit] = Effect[F].delay {
+      unsafeClose()
+      @tailrec def aux(): Unit = {
+        val ref = state.get
+        val newValue = ref.copy(cancelCallbacks = Nil)
+        if (state.compareAndSet(ref, newValue)) {
+          ref.cancelCallbacks.foreach(cb => cb(unitToken))
+        } else {
+          aux()
+        }
+      }
+      aux()
+    }
+  }
+
+  def offerUnsafe(item: T): Unit = {
+    @tailrec
+    def aux(): Unit = {
+      val ref = state.get()
+      if (!ref.stopped) {
+        // Pull callbacks can be nonempty
+        // if queue was empty when pull was ran.
+        if (ref.pullCallbacks.nonEmpty) {
+          val newValue = ref.copy(pullCallbacks = Nil)
+          if (state.compareAndSet(ref, newValue)) {
+            val token = Right(Some(item))
+            ref.pullCallbacks.foreach(cb => cb(token))
+          } else {
+            aux()
+          }
+        } else {
+          val updatedQueue =
+            if (ref.queue.size >= maxSize) ref.queue.drop(1).enqueue(item)
+            else ref.queue.enqueue(item)
+          val newValue = ref.copy(queue = updatedQueue)
+          if (!state.compareAndSet(ref, newValue)) {
+            aux()
+          }
+        }
+      }
+    }
+    aux()
+  }
+
+  def unsafeStop(): Unit = {
+    @tailrec def aux(): Unit = {
+      val ref = state.get
+      if (!state.compareAndSet(ref, ref.copy(stopped = true))) {
+        aux()
+      }
+    }
+    aux()
+  }
+
+  def unsafeClose(): Unit = {
+    @tailrec
+    def aux(): Unit = {
+      val ref = state.get
+      if (!ref.closed) {
+        val newValue = ref.copy(canOfferCallbacks = Nil, pullCallbacks = Nil, closed = true)
+        if (state.compareAndSet(ref, newValue)) {
+          ref.canOfferCallbacks.foreach(cb => cb(unitToken))
+          ref.pullCallbacks.foreach(cb => cb(noneToken))
+        } else {
+          aux()
+        }
+      }
+    }
+    aux()
+  }
+
+  def canOffer: F[Unit] = Effect[F].promise { cb =>
+    @tailrec
+    def aux(): Unit = {
+      val ref = state.get
+      if (ref.closed || ref.queue.size < maxSize) {
+        cb(unitToken)
+      } else {
+        val newValue = ref.copy(canOfferCallbacks = cb :: ref.canOfferCallbacks)
+        if (!state.compareAndSet(ref, newValue)) {
+          aux()
+        }
+      }
+    }
+    aux()
+  }
+
+  def failUnsafe(e: Throwable): Unit = {
+    @tailrec
+    def aux(): Unit = {
+      val ref = state.get
+      val newValue = ref.copy(canOfferCallbacks = Nil, pullCallbacks = Nil, error = Some(e))
+      if (state.compareAndSet(ref, newValue)) {
+        ref.canOfferCallbacks.foreach(cb => cb(unitToken))
+        ref.pullCallbacks.foreach(cb => cb(Left(e)))
+      } else {
+        aux()
+      }
+    }
+    aux()
+  }
+
   def offer(item: T): F[Unit] =
     Effect[F].delay(offerUnsafe(item))
 
-  def join: F[Unit] = Effect[F].promise { cb =>
-    underlyingQueue.synchronized {
-      if (closed || underlyingQueue.size < maxSize) {
-        cb(unitToken)
-      } else {
-        joinCallbacks = cb :: joinCallbacks
-      }
-    }
-  }
-
-  def offerUnsafe(item: T): Unit = underlyingQueue.synchronized {
-    if (!stopped) {
-      if (underlyingQueue.size == maxSize) {
-        // Remove head from queue if max size reached
-        underlyingQueue.dequeue()
-        ()
-      }
-      if (pending != null) {
-        val cb = pending
-        pending = null
-        cb(Right(Some(item)))
-      } else {
-        underlyingQueue.enqueue(item)
-        ()
-      }
-    }
-  }
-
   /**
-    * Disallow to offer new items.
-    * Stream ends with last item.
-    */
+   * Disallow to offer new items.
+   * Stream ends with last item.
+   */
   def stop(): F[Unit] =
     Effect[F].delay(unsafeStop())
 
   def close(): F[Unit] =
     Effect[F].delay(unsafeClose())
 
-  def unsafeStop(): Unit =
-    stopped = true
-
-  def unsafeClose(): Unit =
-    underlyingQueue.synchronized {
-      val joinXs = joinCallbacks
-      joinCallbacks = List.empty
-      joinXs.foreach(_ (unitToken))
-      if (pending != null) {
-        val cb = pending
-        pending = null
-        cb(noneToken)
-      }
-      closed = true
-    }
-
   def fail(e: Throwable): F[Unit] =
-    Effect[F].delay {
-      underlyingQueue.synchronized {
-        error = e
-        val xs = joinCallbacks
-        joinCallbacks = Nil
-        if (pending != null) {
-          val cb = pending
-          pending = null
-          cb(Left(e))
-        }
-        xs.foreach(_ (unitToken))
-      }
-    }
+    Effect[F].delay(failUnsafe(e))
 
+  /**
+   * Resolves only if `stream.cancel` ran.
+   * @return
+   */
   def cancelSignal: F[Unit] = Effect[F].promise { cb =>
-    this.synchronized {
-      cancelCallbacks = cb :: cancelCallbacks
-    }
-  }
-
-  private final class QueueStream extends Stream[F, T] {
-
-    def pull(): F[Option[T]] = Effect[F].promise { cb =>
-      underlyingQueue.synchronized {
-        if (error != null) cb(Left(error))
-        else if (closed) cb(noneToken) else {
-          if (underlyingQueue.nonEmpty) {
-            val xs = joinCallbacks
-            joinCallbacks = Nil
-            cb(Right(Option(underlyingQueue.dequeue())))
-            xs.foreach(_ (unitToken))
-          } else if (stopped) {
-            cb(noneToken)
-          } else {
-            pending = cb
-          }
-        }
+    @tailrec def aux(): Unit = {
+      val ref = state.get
+      val newValue = ref.copy(cancelCallbacks = cb :: ref.cancelCallbacks)
+      if (!state.compareAndSet(ref, newValue)) {
+        aux()
       }
     }
-
-    def cancel(): F[Unit] = Effect[F].delay {
-      close()
-      val xs = cancelCallbacks
-      cancelCallbacks = Nil
-      xs.foreach(_ (unitToken))
-      unsafeClose()
-    }
+    aux()
   }
 
   val stream: Stream[F, T] = new QueueStream()
-
-  @volatile protected var stopped = false
-  @volatile private var closed = false
-  @volatile private var error: Throwable = _
-  @volatile private var pending: Promise[Option[T]] = _
-  @volatile private var joinCallbacks = List.empty[Promise[Unit]]
-  @volatile private var cancelCallbacks = List.empty[Promise[Unit]]
-
-  private val underlyingQueue: mutable.Queue[T] = mutable.Queue.empty[T]
 }
 
 object Queue {
+
+  private case class State[T](stopped: Boolean = false,
+                              closed: Boolean = false,
+                              error: Option[Throwable] = None,
+                              pullCallbacks: List[Promise[Option[T]]] = Nil,
+                              canOfferCallbacks: List[Promise[Unit]] = Nil,
+                              cancelCallbacks: List[Promise[Unit]] = Nil,
+                              queue: IQueue[T] = IQueue.empty)
 
   private final val unitToken = Right(())
   private final val noneToken = Right(None)
