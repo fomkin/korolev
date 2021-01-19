@@ -156,10 +156,10 @@ lazy val http4s = project
     normalizedName := "korolev-http4s",
     libraryDependencies ++= Seq(
       "org.http4s"     %% "http4s-server" % "0.21.14",
-      "org.http4s"     %% "http4s-dsl"          % "0.21.14"
+      "org.http4s"     %% "http4s-dsl"    % "0.21.14"
     )
   )
-  .dependsOn(korolev, web, fs2)
+  .dependsOn(korolev, web, fs2, scodec)
 
 lazy val slf4j = project.
   in(interop / "slf4j").
