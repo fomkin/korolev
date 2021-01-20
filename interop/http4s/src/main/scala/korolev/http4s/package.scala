@@ -74,9 +74,9 @@ package object http4s {
     val sink: Pipe[F, WebSocketFrame, Unit]  = (in: FS2Stream[F, WebSocketFrame]) => {
       in.evalMap {
         case Text(t, _) if t != null =>
-          queue.offer(t)
+          queue.offer(t).void
         case _: Close =>
-          implicitly[ConcurrentEffect[F]].pure(())
+          ConcurrentEffect[F].unit
         case f =>
           throw new Exception(s"Invalid frame type ${f.getClass.getName}")
       }.onFinalizeCase(_ => queue.close())

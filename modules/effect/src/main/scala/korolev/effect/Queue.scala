@@ -24,7 +24,6 @@ import scala.collection.immutable.{Queue => IQueue}
 
 /**
  * Nonblocking, concurrent, asynchronous queue.
- * @param maxSize
  */
 class Queue[F[_]: Effect, T](maxSize: Int) {
 
@@ -43,10 +42,14 @@ class Queue[F[_]: Effect, T](maxSize: Int) {
           case None if ref.closed => cb(noneToken)
           case None if ref.queue.nonEmpty =>
             val (value, updatedQueue) = ref.queue.dequeue
-            val newValue = ref.copy(queue = updatedQueue, canOfferCallbacks = Nil)
+            val canOfferCallback = ref.canOfferCallbacks.lastOption
+            val newValue = ref.copy(
+              queue = updatedQueue,
+              canOfferCallbacks = ref.canOfferCallbacks.dropRight(1)
+            )
             if (state.compareAndSet(ref, newValue)) {
               cb(Right(Option(value)))
-              ref.canOfferCallbacks.foreach(_(unitToken))
+              canOfferCallback.foreach(_(unitToken))
             } else {
               aux()
             }
@@ -77,11 +80,14 @@ class Queue[F[_]: Effect, T](maxSize: Int) {
     }
   }
 
-  def offerUnsafe(item: T): Unit = {
+  /**
+   * Strict version of [[offer]]. Still thread safe.
+   */
+  def offerUnsafe(item: T): Boolean = {
     @tailrec
-    def aux(): Unit = {
+    def aux(): Boolean = {
       val ref = state.get()
-      if (!ref.stopped) {
+      if (!ref.stopped && !ref.closed) {
         // Pull callbacks can be nonempty
         // if queue was empty when pull was ran.
         if (ref.pullCallbacks.nonEmpty) {
@@ -89,18 +95,23 @@ class Queue[F[_]: Effect, T](maxSize: Int) {
           if (state.compareAndSet(ref, newValue)) {
             val token = Right(Some(item))
             ref.pullCallbacks.foreach(cb => cb(token))
+            true
+          } else {
+            aux()
+          }
+        } else if (ref.queue.size < maxSize) {
+          val updatedQueue = ref.queue.enqueue(item)
+          val newValue = ref.copy(queue = updatedQueue)
+          if (state.compareAndSet(ref, newValue)) {
+            true
           } else {
             aux()
           }
         } else {
-          val updatedQueue =
-            if (ref.queue.size >= maxSize) ref.queue.drop(1).enqueue(item)
-            else ref.queue.enqueue(item)
-          val newValue = ref.copy(queue = updatedQueue)
-          if (!state.compareAndSet(ref, newValue)) {
-            aux()
-          }
+          false
         }
+      } else {
+        false
       }
     }
     aux()
@@ -133,6 +144,16 @@ class Queue[F[_]: Effect, T](maxSize: Int) {
     aux()
   }
 
+  /**
+   * Signals that queue size became less than [[maxSize]].
+   * @example {{{
+   * def aux(): F[Unit] = queue.offer(o).flatMap {
+   *   case false => queue.canOffer *> aux()
+   *   case true => Effect[F].unit
+   * }
+   * aux()
+   * }}}
+   */
   def canOffer: F[Unit] = Effect[F].promise { cb =>
     @tailrec
     def aux(): Unit = {
@@ -164,7 +185,11 @@ class Queue[F[_]: Effect, T](maxSize: Int) {
     aux()
   }
 
-  def offer(item: T): F[Unit] =
+  /**
+   * Enqueue `item`.
+   * @return true is ok and false if [[maxSize]] reached or queue is stopped.
+   */
+  def offer(item: T): F[Boolean] =
     Effect[F].delay(offerUnsafe(item))
 
   /**

@@ -26,7 +26,7 @@ import levsha.events.EventId
 
 import scala.collection.mutable
 import Context._
-import korolev.data.{Bytes, BytesLike}
+import korolev.data.Bytes
 import korolev.util.JsCode
 import korolev.web.FormData
 
@@ -280,7 +280,7 @@ final class ComponentInstance
         _ <- notifyStateChange(nodeId, newState)
       } yield ()
     if (sync) effect()
-    else immediatePendingEffects.offer(effect)
+    else immediatePendingEffects.offer(effect).unit
   }
 
   def applyEvent(eventId: EventId): Boolean = {
