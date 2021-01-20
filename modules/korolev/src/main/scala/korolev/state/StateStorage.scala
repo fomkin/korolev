@@ -54,7 +54,6 @@ object StateStorage {
     extends StateStorage[F, S] {
 
     private val cache = TrieMap.empty[String, StateManager[F]]
-    private val mutex = new Object()
     private val forDeletionCache = {
       new util.LinkedHashMap[String, StateManager[F]](forDeletionCacheCapacity, 0.7F, true) {
         override def removeEldestEntry(entry: java.util.Map.Entry[String, StateManager[F]]): Boolean = {
@@ -85,7 +84,7 @@ object StateStorage {
       val key = mkKey(deviceId, sessionId)
       cache.get(key) match {
         case None =>
-          Option(mutex.synchronized(forDeletionCache.remove(key))) match {
+          Option(forDeletionCache.synchronized(forDeletionCache.remove(key))) match {
             case Some(sm) =>
               Effect[F].delay {
                 cache.put(key, sm)
@@ -124,7 +123,7 @@ object StateStorage {
     override def remove(deviceId: DeviceId, sessionId: SessionId): Unit = {
       val key = mkKey(deviceId, sessionId)
       cache.remove(key) foreach { sm =>
-        mutex.synchronized {
+        forDeletionCache.synchronized {
           forDeletionCache.put(key, sm)
         }
       }

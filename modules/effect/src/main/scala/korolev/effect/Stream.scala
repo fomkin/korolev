@@ -248,6 +248,7 @@ abstract class Stream[F[_]: Effect, A] { self =>
               }
             } else {
               promises(i) = cb
+              // FIXME where is restart if cas failed?
               if (inProgress.compareAndSet(false, true)) {
                 Effect[F].map(self.pull()) {
                   case maybeItem @ Some(item) =>

@@ -107,7 +107,7 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
     sb.update(sb.length - 1, ' ') // replace last comma to space
     sb.append(']')
 
-    outgoingQueue.offer(sb.mkString)
+    outgoingQueue.enqueue(sb.mkString)
   }
 
   def listenEvent(name: String, preventDefault: Boolean): F[Unit] =
@@ -208,7 +208,10 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
       .after(formDataPromises.remove(descriptor))
 
   def registerCustomCallback(name: String)(f: String => F[Unit]): F[Unit] =
-    Effect[F].delay(customCallbacks.put(name, f))
+    Effect[F].delay {
+      customCallbacks.put(name, f)
+      ()
+    }
 
   private def unescapeJsonString(s: String): String = {
     val sb = new StringBuilder()

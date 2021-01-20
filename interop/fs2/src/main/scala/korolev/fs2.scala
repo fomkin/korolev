@@ -19,7 +19,7 @@ object fs2 {
         .start(
           stream
             .interruptWhen(queue.cancelSignal.as(cancelToken))
-            .evalMap(o => queue.join.flatMap(_ => queue.offer(o)))
+            .evalMap(queue.enqueue)
             .compile
             .drain
             .flatMap(_ => queue.stop())
