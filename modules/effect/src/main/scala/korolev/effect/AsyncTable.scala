@@ -18,28 +18,44 @@ package korolev.effect
 
 import korolev.effect.AsyncTable.{AlreadyContainsKeyException, RemovedBeforePutException}
 
-import scala.collection.mutable
 import korolev.effect.Effect.Promise
 
-final class AsyncTable[F[_]: Effect, K, V](elems: Seq[(K, V)]) {
+import java.util.concurrent.atomic.AtomicReference
+import scala.annotation.tailrec
+
+final class AsyncTable[F[_] : Effect, K, V](elems: Seq[(K, V)]) {
 
   private type Callbacks = List[Promise[V]]
   private type Result = Either[Throwable, V]
-  private val table = mutable.Map[K, Either[Callbacks, Result]](elems.map { case (k, v) => (k, Right(Right(v))) }: _*)
 
-  def get(key: K): F[V] =
-    Effect[F].promise[V] { cb =>
-      table.synchronized {
-        table.get(key) match {
-          case Some(Right(value)) => cb(value)
-          case Some(Left(xs))     => table.update(key, Left(cb :: xs))
-          case None               => table.update(key, Left(cb :: Nil))
-        }
+  private val state = new AtomicReference[Map[K, Either[Callbacks, Result]]](
+    elems.map { case (k, v) => (k, Right(Right(v))) }.toMap
+  )
+
+  def get(key: K): F[V] = Effect[F].promise[V] { cb =>
+    @tailrec
+    def aux(): Unit = {
+      val ref = state.get
+      ref.get(key) match {
+        case Some(Right(value)) => cb(value)
+        case Some(Left(xs)) =>
+          val newValue = ref.updated(key, Left(cb :: xs))
+          if (!state.compareAndSet(ref, newValue)) {
+            aux()
+          }
+        case None =>
+          val newValue = ref.updated(key, Left(cb :: Nil))
+          if (!state.compareAndSet(ref, newValue)) {
+            aux()
+          }
       }
     }
+    aux()
+  }
 
   def getImmediately(key: K): F[Option[V]] =
     Effect[F].delay {
+      val table = state.get
       for {
         lr <- table.get(key)
         res <- lr.toOption
@@ -55,47 +71,65 @@ final class AsyncTable[F[_]: Effect, K, V](elems: Seq[(K, V)]) {
 
   def putEither(key: K, errorOrValue: Either[Throwable, V], silent: Boolean = false): F[Unit] =
     Effect[F].delay {
-      table.synchronized {
-        table.remove(key) match {
+      @tailrec
+      def aux(): Unit = {
+        val ref = state.get
+        ref.get(key) match {
           case Some(Right(_)) if silent => () // Do nothing
           case Some(Right(_)) =>
             throw AlreadyContainsKeyException(key)
           case Some(Left(callbacks)) =>
-            table.update(key, Right(errorOrValue))
-            callbacks.foreach(_(errorOrValue))
+            val newValue = ref.updated(key, Right(errorOrValue))
+            if (state.compareAndSet(ref, newValue)) {
+              callbacks.foreach(_ (errorOrValue))
+            } else {
+              aux()
+            }
           case None =>
-            table.update(key, Right(errorOrValue))
+            val newValue = ref.updated(key, Right(errorOrValue))
+            if (!state.compareAndSet(ref, newValue)) {
+              aux()
+            }
         }
       }
+      aux()
     }
 
-  def remove(key: K): F[Unit] =
-    Effect[F].delay {
-      table.synchronized {
-        table.remove(key) match {
+  def remove(key: K): F[Unit] = Effect[F].delay {
+    @tailrec
+    def aux(): Unit = {
+      val ref = state.get
+      val value = ref.get(key)
+      val updatedRef = ref - key
+      if (state.compareAndSet(ref, updatedRef)) {
+        value match {
           case Some(Left(callbacks)) =>
             val result = Left(RemovedBeforePutException(key))
             callbacks.foreach(_(result))
           case _ => ()
         }
+      } else {
+        aux()
       }
     }
+    aux()
+  }
 }
 
 object AsyncTable {
 
   final case class RemovedBeforePutException(key: Any)
-      extends Exception(s"Key $key removed before value was put to table.")
+    extends Exception(s"Key '$key' removed before value was added.")
 
   final case class AlreadyContainsKeyException(key: Any)
-      extends Exception(s"This table already contains value for $key")
+    extends Exception(s"Already contains value for '$key'.")
 
-  def apply[F[_]: Effect, K, V](elems: (K, V)*) =
+  def apply[F[_] : Effect, K, V](elems: (K, V)*) =
     new AsyncTable[F, K, V](elems)
 
-  def unsafeCreateEmpty[F[_]: Effect, K, V] =
+  def unsafeCreateEmpty[F[_] : Effect, K, V] =
     new AsyncTable[F, K, V](Nil)
 
-  def empty[F[_]: Effect, K, V]: F[AsyncTable[F, K, V]] =
+  def empty[F[_] : Effect, K, V]: F[AsyncTable[F, K, V]] =
     Effect[F].delay(new AsyncTable[F, K, V](Nil))
 }
