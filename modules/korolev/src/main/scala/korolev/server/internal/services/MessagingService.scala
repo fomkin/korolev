@@ -65,7 +65,7 @@ private[korolev] final class MessagingService[F[_]: Effect](reporter: Reporter,
     for {
       topic <- takeTopic(qsid)
       message <- data.fold(Bytes.empty)(_ ++ _).map(_.asUtf8String)
-      _ <- topic.offer(message)
+      _ <- topic.enqueue(message)
     } yield commonOkResponse
   }
 

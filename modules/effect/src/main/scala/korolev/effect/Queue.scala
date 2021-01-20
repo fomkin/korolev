@@ -17,6 +17,7 @@
 package korolev.effect
 
 import korolev.effect.Effect.Promise
+import korolev.effect.syntax._
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.annotation.tailrec
@@ -42,10 +43,10 @@ class Queue[F[_]: Effect, T](maxSize: Int) {
           case None if ref.closed => cb(noneToken)
           case None if ref.queue.nonEmpty =>
             val (value, updatedQueue) = ref.queue.dequeue
-            val canOfferCallback = ref.canOfferCallbacks.lastOption
+            val canOfferCallback = ref.canOfferCallbacks.headOption
             val newValue = ref.copy(
               queue = updatedQueue,
-              canOfferCallbacks = ref.canOfferCallbacks.dropRight(1)
+              canOfferCallbacks = ref.canOfferCallbacks.drop(1)
             )
             if (state.compareAndSet(ref, newValue)) {
               cb(Right(Option(value)))
@@ -120,7 +121,12 @@ class Queue[F[_]: Effect, T](maxSize: Int) {
   def unsafeStop(): Unit = {
     @tailrec def aux(): Unit = {
       val ref = state.get
-      if (!state.compareAndSet(ref, ref.copy(stopped = true))) {
+      if (state.compareAndSet(ref, ref.copy(stopped = true))) {
+        if (ref.queue.isEmpty) {
+          ref.canOfferCallbacks.foreach(cb => cb(unitToken))
+          ref.pullCallbacks.foreach(cb => cb(noneToken))
+        }
+      } else  {
         aux()
       }
     }
@@ -158,7 +164,7 @@ class Queue[F[_]: Effect, T](maxSize: Int) {
     @tailrec
     def aux(): Unit = {
       val ref = state.get
-      if (ref.closed || ref.queue.size < maxSize) {
+      if (ref.closed || ref.stopped || ref.queue.size < maxSize) {
         cb(unitToken)
       } else {
         val newValue = ref.copy(canOfferCallbacks = cb :: ref.canOfferCallbacks)
@@ -186,11 +192,26 @@ class Queue[F[_]: Effect, T](maxSize: Int) {
   }
 
   /**
-   * Enqueue `item`.
+   * Offers `item` to the queue.
    * @return true is ok and false if [[maxSize]] reached or queue is stopped.
    */
   def offer(item: T): F[Boolean] =
     Effect[F].delay(offerUnsafe(item))
+
+  /**
+   * Enqueue item. If [[maxSize]] reached waits until queue will decrease.
+   */
+  def enqueue(item: T): F[Unit] = {
+    def aux(): F[Unit] = {
+      val ref = state.get
+      offer(item).flatMap {
+        case true => Effect[F].unit
+        case false if ref.stopped || ref.closed => Effect[F].unit
+        case false => canOffer *> aux()
+      }
+    }
+    aux()
+  }
 
   /**
    * Disallow to offer new items.
@@ -199,6 +220,10 @@ class Queue[F[_]: Effect, T](maxSize: Int) {
   def stop(): F[Unit] =
     Effect[F].delay(unsafeStop())
 
+  /**
+   * Immediately stop offering and pulling items from the queue.
+   * @return
+   */
   def close(): F[Unit] =
     Effect[F].delay(unsafeClose())
 

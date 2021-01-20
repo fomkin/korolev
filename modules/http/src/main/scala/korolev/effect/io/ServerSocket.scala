@@ -61,7 +61,7 @@ object ServerSocket {
         .foreach { connection =>
           f(connection)
             .start
-            .flatMap(f => connectionsQueue.offer(f.join()))
+            .flatMap(f => connectionsQueue.enqueue(f.join()))
         }
         .start
         .map { fiber =>

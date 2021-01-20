@@ -74,7 +74,7 @@ package object http4s {
     val sink: Pipe[F, WebSocketFrame, Unit]  = (in: FS2Stream[F, WebSocketFrame]) => {
       in.evalMap {
         case Text(t, _) if t != null =>
-          queue.offer(t).void
+          queue.enqueue(t)
         case _: Close =>
           ConcurrentEffect[F].unit
         case f =>

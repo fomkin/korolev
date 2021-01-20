@@ -280,7 +280,7 @@ final class ComponentInstance
         _ <- notifyStateChange(nodeId, newState)
       } yield ()
     if (sync) effect()
-    else immediatePendingEffects.offer(effect).unit
+    else immediatePendingEffects.enqueue(effect)
   }
 
   def applyEvent(eventId: EventId): Boolean = {

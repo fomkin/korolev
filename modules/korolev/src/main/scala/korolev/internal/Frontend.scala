@@ -107,7 +107,7 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
     sb.update(sb.length - 1, ' ') // replace last comma to space
     sb.append(']')
 
-    outgoingQueue.offer(sb.mkString).unit
+    outgoingQueue.enqueue(sb.mkString)
   }
 
   def listenEvent(name: String, preventDefault: Boolean): F[Unit] =

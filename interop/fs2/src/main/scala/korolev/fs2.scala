@@ -19,13 +19,7 @@ object fs2 {
         .start(
           stream
             .interruptWhen(queue.cancelSignal.as(cancelToken))
-            .evalMap { o =>
-              def aux(): F[Unit] = queue.offer(o).flatMap {
-                case false => queue.canOffer *> aux()
-                case true => KorolevEffect[F].unit
-              }
-              aux()
-            }
+            .evalMap(queue.enqueue)
             .compile
             .drain
             .flatMap(_ => queue.stop())
