@@ -27,7 +27,7 @@ import korolev.web.Response.Status
 import korolev.Qsid
 import korolev.data.Bytes
 
-import scala.collection.mutable
+import scala.collection.concurrent.TrieMap
 
 private[korolev] final class MessagingService[F[_]: Effect](reporter: Reporter,
                                                             commonService: CommonService[F],
@@ -90,7 +90,7 @@ private[korolev] final class MessagingService[F[_]: Effect](reporter: Reporter,
     * Sessions created via long polling subscription
     * takes messages from topics stored in this table.
     */
-  private val longPollingTopics = mutable.Map.empty[Qsid, Queue[F, String]]
+  private val longPollingTopics = TrieMap.empty[Qsid, Queue[F, String]]
 
   /**
     * Same headers in all responses
@@ -127,12 +127,11 @@ private[korolev] final class MessagingService[F[_]: Effect](reporter: Reporter,
       else throw new Exception(s"There is no long-polling topic matching $qsid")
     }
 
-  private def createTopic(qsid: Qsid) =
-    longPollingTopics.synchronized {
-      val topic = Queue[F, String]()
-      longPollingTopics.put(qsid, topic)
-      topic.stream
-    }
+  private def createTopic(qsid: Qsid) = {
+    val topic = Queue[F, String]()
+    longPollingTopics.putIfAbsent(qsid, topic)
+    topic.stream
+  }
 }
 
 private[korolev] object MessagingService {
