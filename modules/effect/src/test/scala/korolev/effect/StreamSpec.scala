@@ -1,6 +1,7 @@
 package korolev.effect
 
-import org.scalatest.{AsyncFlatSpec, Matchers}
+import org.scalatest.flatspec.AsyncFlatSpec
+import org.scalatest.matchers.should.Matchers
 
 class StreamSpec extends AsyncFlatSpec with Matchers {
 

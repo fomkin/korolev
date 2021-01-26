@@ -7,7 +7,6 @@ import java.util.Base64
 
 import korolev.data.{BytesLike, BytesReader}
 import korolev.data.syntax._
-import korolev.effect.io.LazyBytes
 import korolev.effect.syntax._
 import korolev.effect.{Decoder, Effect, Stream}
 import korolev.web.Request.Head
@@ -189,9 +188,9 @@ final class WebSocketProtocol[B: BytesLike] {
     * insert handshake headers. Fragments will be merged to single frames.
     */
   def upgrade[F[_]: Effect](intention: Intention)
-                           (f: Request[Stream[F, Frame.Merged[B]]] => F[Response[Stream[F, Frame.Merged[B]]]]): Request[LazyBytes[F]] => F[Response[LazyBytes[F]]] = f
-      .compose[Request[LazyBytes[F]]] { request =>
-        val messages = Decoder(request.body.chunks.map(BytesLike[B].wrapArray))
+                           (f: Request[Stream[F, Frame.Merged[B]]] => F[Response[Stream[F, Frame.Merged[B]]]]): Request[Stream[F, B]] => F[Response[Stream[F, B]]] = f
+      .compose[Request[Stream[F, B]]] { request =>
+        val messages = Decoder(request.body)
           .decode((BytesLike[B].empty, DecodingState.begin)) {
             case ((buffer, state), incoming) =>
               decodeFrames(buffer, state, incoming)
@@ -199,10 +198,10 @@ final class WebSocketProtocol[B: BytesLike] {
           .decode(Option.empty[Frame.Merged[B]])(mergeFrames)
         request.copy(body = messages)
       }
-      .andThen[F[Response[LazyBytes[F]]]] { responseF =>
+      .andThen[F[Response[Stream[F, B]]]] { responseF =>
         responseF.map { response =>
-          val upgradedBody = response.body.map(m => encodeFrame(m, None).asArray)
-          handshake(response, intention).copy(body = LazyBytes(upgradedBody, None))
+          val upgradedBody = response.body.map(m => encodeFrame(m, None))
+          handshake(response, intention).copy(body = upgradedBody)
         }
       }
 }

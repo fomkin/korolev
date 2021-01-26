@@ -19,10 +19,9 @@ package korolev.internal
 import java.util.concurrent.atomic.AtomicInteger
 import scala.collection.mutable
 import scala.annotation.switch
-
 import korolev.Context.FileHandler
+import korolev.data.Bytes
 import korolev.web.{FormData, PathAndQuery}
-import korolev.effect.io.LazyBytes
 import korolev.effect.syntax._
 import korolev.effect.{AsyncTable, Effect, Queue, Reporter, Stream}
 import levsha.Id
@@ -41,7 +40,7 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
   private val customCallbacks = mutable.Map.empty[String, String => F[Unit]]
   private val stringPromises = AsyncTable.unsafeCreateEmpty[F, String, String]
   private val formDataPromises = AsyncTable.unsafeCreateEmpty[F, String, FormData]
-  private val filesPromises = AsyncTable.unsafeCreateEmpty[F, String, LazyBytes[F]]
+  private val filesPromises = AsyncTable.unsafeCreateEmpty[F, String, Stream[F, Bytes]]
 
   // Store file name and it`s length as data
   private val fileNamePromises = AsyncTable.unsafeCreateEmpty[F, String, List[(String, Long)]]
@@ -108,7 +107,7 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
     sb.update(sb.length - 1, ' ') // replace last comma to space
     sb.append(']')
 
-    outgoingQueue.offer(sb.mkString)
+    outgoingQueue.enqueue(sb.mkString)
   }
 
   def listenEvent(name: String, preventDefault: Boolean): F[Unit] =
@@ -128,7 +127,7 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
       files <- fileNamePromises.get(descriptor)
     } yield files
 
-  def uploadFile(id: Id, handler: FileHandler[F]): F[LazyBytes[F]] =
+  def uploadFile(id: Id, handler: FileHandler): F[Stream[F, Bytes]] =
     for {
       descriptor <- nextDescriptor()
       _ <- send(Procedure.UploadFile.code, id.mkString, descriptor, handler.fileName)
@@ -193,7 +192,7 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
       _ <- Effect[F].delay(remoteDomChangesPerformer.buffer.clear())
     } yield ()
 
-  def resolveFile(descriptor: String, file: LazyBytes[F]): F[Unit] =
+  def resolveFile(descriptor: String, file: Stream[F, Bytes]): F[Unit] =
     filesPromises
       .put(descriptor, file)
       .after(filesPromises.remove(descriptor))
@@ -209,7 +208,10 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
       .after(formDataPromises.remove(descriptor))
 
   def registerCustomCallback(name: String)(f: String => F[Unit]): F[Unit] =
-    Effect[F].delay(customCallbacks.put(name, f))
+    Effect[F].delay {
+      customCallbacks.put(name, f)
+      ()
+    }
 
   private def unescapeJsonString(s: String): String = {
     val sb = new StringBuilder()

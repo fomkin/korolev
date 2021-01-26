@@ -17,8 +17,8 @@
 package korolev
 
 import korolev.Context.Binding
+import korolev.data.Bytes
 import korolev.effect.{Effect, Stream}
-import korolev.effect.io.LazyBytes
 import korolev.server.internal.services._
 import korolev.server.internal.{FormDataCodec, KorolevServiceImpl}
 import korolev.state.{DeviceId, StateDeserializer, StateSerializer}
@@ -27,8 +27,8 @@ import korolev.web.{Request, Response}
 
 package object server {
 
-  type HttpRequest[F[_]] = Request[LazyBytes[F]]
-  type HttpResponse[F[_]] = Response[LazyBytes[F]]
+  type HttpRequest[F[_]] = Request[Stream[F, Bytes]]
+  type HttpResponse[F[_]] = Response[Stream[F, Bytes]]
   type WebSocketRequest[F[_]] = Request[Stream[F, String]]
   type WebSocketResponse[F[_]] = Response[Stream[F, String]]
   type StateLoader[F[_], S] = (DeviceId, Head) => F[S]

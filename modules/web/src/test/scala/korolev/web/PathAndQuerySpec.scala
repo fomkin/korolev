@@ -1,10 +1,12 @@
 package korolev.web
 
 import korolev.web.PathAndQuery._
-import scala.language.implicitConversions
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class PathAndQuerySpec extends FlatSpec with Matchers {
+import scala.language.implicitConversions
+
+class PathAndQuerySpec extends AnyFlatSpec with Matchers {
   ".fromString" should "parse path with Root" in {
     val path = PathAndQuery.fromString("/page/1")
     path shouldBe Root / "page" / "1"

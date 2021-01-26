@@ -16,7 +16,6 @@
 
 package korolev.server.internal.services
 
-import korolev.effect.io.LazyBytes
 import korolev.effect.syntax._
 import korolev.effect.{Effect, Queue, Reporter, Stream}
 import korolev.internal.Frontend
@@ -26,8 +25,9 @@ import korolev.web.Request.Head
 import korolev.web.Response
 import korolev.web.Response.Status
 import korolev.Qsid
+import korolev.data.Bytes
 
-import scala.collection.mutable
+import scala.collection.concurrent.TrieMap
 
 private[korolev] final class MessagingService[F[_]: Effect](reporter: Reporter,
                                                             commonService: CommonService[F],
@@ -61,11 +61,11 @@ private[korolev] final class MessagingService[F[_]: Effect](reporter: Reporter,
   /**
     * Push message to session's incoming queue.
     */
-  def longPollingPublish(qsid: Qsid, data: LazyBytes[F]): F[HttpResponse[F]] = {
+  def longPollingPublish(qsid: Qsid, data: Stream[F, Bytes]): F[HttpResponse[F]] = {
     for {
       topic <- takeTopic(qsid)
-      message <- data.toStrictUtf8
-      _ <- topic.offer(message)
+      message <- data.fold(Bytes.empty)(_ ++ _).map(_.asUtf8String)
+      _ <- topic.enqueue(message)
     } yield commonOkResponse
   }
 
@@ -90,7 +90,7 @@ private[korolev] final class MessagingService[F[_]: Effect](reporter: Reporter,
     * Sessions created via long polling subscription
     * takes messages from topics stored in this table.
     */
-  private val longPollingTopics = mutable.Map.empty[Qsid, Queue[F, String]]
+  private val longPollingTopics = TrieMap.empty[Qsid, Queue[F, String]]
 
   /**
     * Same headers in all responses
@@ -105,7 +105,7 @@ private[korolev] final class MessagingService[F[_]: Effect](reporter: Reporter,
     */
   private val commonOkResponse = Response(
     status = Response.Status.Ok,
-    body = LazyBytes.empty[F],
+    body = Stream.empty[F, Bytes],
     headers = commonResponseHeaders,
     contentLength = Some(0L)
   )
@@ -116,7 +116,7 @@ private[korolev] final class MessagingService[F[_]: Effect](reporter: Reporter,
     */
   private val commonGoneResponse = Response(
     status = Response.Status.Gone,
-    body = LazyBytes.empty[F],
+    body = Stream.empty[F, Bytes],
     headers = commonResponseHeaders,
     contentLength = Some(0L)
   )
@@ -127,12 +127,11 @@ private[korolev] final class MessagingService[F[_]: Effect](reporter: Reporter,
       else throw new Exception(s"There is no long-polling topic matching $qsid")
     }
 
-  private def createTopic(qsid: Qsid) =
-    longPollingTopics.synchronized {
-      val topic = Queue[F, String]()
-      longPollingTopics.put(qsid, topic)
-      topic.stream
-    }
+  private def createTopic(qsid: Qsid) = {
+    val topic = Queue[F, String]()
+    longPollingTopics.putIfAbsent(qsid, topic)
+    topic.stream
+  }
 }
 
 private[korolev] object MessagingService {

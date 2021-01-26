@@ -17,7 +17,7 @@
 package korolev.internal
 
 import korolev._
-import korolev.effect.{Effect, Queue, Reporter, Scheduler}
+import korolev.effect.{Effect, Queue, Reporter, Scheduler, Stream}
 import korolev.effect.syntax._
 import korolev.state.{StateDeserializer, StateManager, StateSerializer}
 import levsha.Document.Node
@@ -26,7 +26,7 @@ import levsha.events.EventId
 
 import scala.collection.mutable
 import Context._
-import korolev.effect.io.LazyBytes
+import korolev.data.Bytes
 import korolev.util.JsCode
 import korolev.web.FormData
 
@@ -72,7 +72,7 @@ final class ComponentInstance
   private val markedDelays = mutable.Set.empty[Id] // Set of the delays which are should survive
   private val markedComponentInstances = mutable.Set.empty[Id]
   private val delays = mutable.Map.empty[Id, DelayInstance[F, CS, E]]
-  private val elements = mutable.Map.empty[ElementId[F], Id]
+  private val elements = mutable.Map.empty[ElementId, Id]
   private val events = mutable.Map.empty[EventId, Event[F, CS, E]]
   private val nestedComponents = mutable.Map.empty[Id, ComponentInstance[F, CS, E, _, _, _]]
 
@@ -85,11 +85,11 @@ final class ComponentInstance
 
   private[korolev] object browserAccess extends Access[F, CS, E] {
 
-    private def getId(elementId: ElementId[F]): F[Id] = Effect[F].delay {
+    private def getId(elementId: ElementId): F[Id] = Effect[F].delay {
       unsafeGetId(elementId)
     }
 
-    private def unsafeGetId(elementId: ElementId[F]): Id = {
+    private def unsafeGetId(elementId: ElementId): Id = {
       // miscLock synchronization required
       // because prop handler methods can be
       // invoked during render.
@@ -105,15 +105,9 @@ final class ComponentInstance
       }
     }
 
-    def property(elementId: ElementId[F]): PropertyHandler[F] = {
+    def property(elementId: ElementId): PropertyHandler[F] = {
       val idF = getId(elementId)
       new PropertyHandler[F] {
-        def get(propName: Symbol): F[String] =
-          get(propName.name)
-
-        def set(propName: Symbol, value: Any): F[Unit] =
-          set(propName.name, value)
-
         def get(propName: String): F[String] = idF.flatMap { id =>
           frontend.extractProperty(id, propName)
         }
@@ -125,7 +119,7 @@ final class ComponentInstance
       }
     }
 
-    def focus(element: ElementId[F]): F[Unit] =
+    def focus(element: ElementId): F[Unit] =
       getId(element).flatMap { id =>
         frontend.focus(id)
       }
@@ -145,23 +139,25 @@ final class ComponentInstance
 
     def syncTransition(f: Transition[CS]): F[Unit] = applyTransition(f, sync = true)
 
-    def downloadFormData(element: ElementId[F]): F[FormData] =
+    def downloadFormData(element: ElementId): F[FormData] =
       for {
         id <- getId(element)
         formData <- frontend.uploadForm(id)
       } yield formData
 
-    def downloadFiles(id: ElementId[F]): F[List[(FileHandler[F], Array[Byte])]] = {
+    def downloadFiles(id: ElementId): F[List[(FileHandler, Bytes)]] = {
       downloadFilesAsStream(id).flatMap { streams =>
         Effect[F].sequence {
           streams.map { case (handler, data) =>
-            data.toStrict.map(b => (handler, b))
+            data
+              .fold(Bytes.empty)(_ ++ _)
+              .map(b => (handler, b))
           }
         }
       }
     }
 
-    def downloadFilesAsStream(id: ElementId[F]): F[List[(FileHandler[F], LazyBytes[F])]] = {
+    def downloadFilesAsStream(id: ElementId): F[List[(FileHandler, Stream[F, Bytes])]] = {
       listFiles(id).flatMap { handlers =>
         Effect[F].sequence {
           handlers.map { handler =>
@@ -174,14 +170,14 @@ final class ComponentInstance
     /**
       * Get selected file as a stream from input
       */
-    def downloadFileAsStream(handler: FileHandler[F]): F[LazyBytes[F]] = {
+    def downloadFileAsStream(handler: FileHandler): F[Stream[F, Bytes]] = {
       for {
         id <- getId(handler.elementId)
         streams <- frontend.uploadFile(id, handler)
       } yield streams
     }
 
-    def listFiles(elementId: ElementId[F]): F[List[FileHandler[F]]] =
+    def listFiles(elementId: ElementId): F[List[FileHandler]] =
       for {
         id <- getId(elementId)
         files <- frontend.listFiles(id)
@@ -191,7 +187,7 @@ final class ComponentInstance
         }
       }
 
-    def resetForm(elementId: ElementId[F]): F[Unit] =
+    def resetForm(elementId: ElementId): F[Unit] =
       getId(elementId).flatMap { id =>
         frontend.resetForm(id)
       }
@@ -238,7 +234,7 @@ final class ComponentInstance
           val id = rc.currentContainerId
           events.put(EventId(id, eventType, phase), event)
           eventRegistry.registerEventType(event.`type`)
-        case element: ElementId[F] =>
+        case element: ElementId =>
           val id = rc.currentContainerId
           elements.put(element, id)
           ()
@@ -284,7 +280,7 @@ final class ComponentInstance
         _ <- notifyStateChange(nodeId, newState)
       } yield ()
     if (sync) effect()
-    else immediatePendingEffects.offer(effect)
+    else immediatePendingEffects.enqueue(effect)
   }
 
   def applyEvent(eventId: EventId): Boolean = {

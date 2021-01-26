@@ -4,12 +4,14 @@ import korolev.data.Bytes
 import korolev.effect.Decoder
 import korolev.web.PathAndQuery.Root
 import korolev.web.{Request, Response}
-import org.scalatest.{Assertion, FlatSpec, Matchers}
+import org.scalatest.Assertion
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
 import scala.annotation.tailrec
 import scala.util.Random
 
-class WebSocketProtocolSpec extends FlatSpec with Matchers {
+class WebSocketProtocolSpec extends AnyFlatSpec with Matchers {
 
   final val webSocketProtocol = new WebSocketProtocol[Bytes]
   final val SliceTestFramesNumber = 10

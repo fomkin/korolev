@@ -6,11 +6,12 @@ import korolev.state.StateStorage
 import korolev.state.javaSerialization._
 import korolev.testExecution._
 import levsha.{Id, StatefulRenderContext, XmlNs}
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
 import scala.concurrent.Future
 
-class Issue14Spec extends FlatSpec with Matchers {
+class Issue14Spec extends AnyFlatSpec with Matchers {
 
   import Issue14Spec.context._
   import Reporter.PrintReporter.Implicit

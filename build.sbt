@@ -1,11 +1,13 @@
 import xerial.sbt.Sonatype._
 
 val levshaVersion = "0.10.0"
+val akkaVersion = "2.6.10"
+val akkaHttpVersion = "10.2.1"
 
 val unusedRepo = Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
 
 val crossVersionSettings = Seq(
-  crossScalaVersions := Seq("2.12.11", "2.13.2")
+  crossScalaVersions := Seq("2.12.12", "2.13.4")
 )
 
 val dontPublishSettings = Seq(
@@ -28,12 +30,12 @@ val publishSettings = Seq(
 
 val commonSettings = publishSettings ++ Seq(
   addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
-  addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.0" cross CrossVersion.full),
+  addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.2" cross CrossVersion.full),
   git.useGitDescribe := true,
   organization := "org.fomkin",
   libraryDependencies ++= Seq(
-    "org.scalatest" %% "scalatest" % "3.0.8" % Test,
-    "org.scalacheck" %% "scalacheck" % "1.14.1" % Test
+    "org.scalatest" %% "scalatest" % "3.2.3" % Test,
+    "org.scalatestplus" %% "scalacheck-1-15" % "3.2.3.0" % Test
   ),
   //javaOptions in Test += "-XX:-OmitStackTraceInFastThrow",
   scalacOptions ++= Seq(
@@ -57,14 +59,12 @@ val interop = file("interop")
 val examples = file("examples")
 val misc = file("misc")
 
-
 lazy val effect = project
   .in(modules / "effect")
   .enablePlugins(GitVersioning)
   .settings(crossVersionSettings)
   .settings(commonSettings: _*)
   .settings(
-    addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.0" cross CrossVersion.full),
     normalizedName := "korolev-effect"
   )
 
@@ -84,7 +84,12 @@ lazy val http = project
   .settings(crossVersionSettings)
   .settings(commonSettings: _*)
   .settings(
-    normalizedName := "korolev-http"
+    normalizedName := "korolev-http",
+    libraryDependencies ++= Seq(
+      "com.typesafe.akka" %% "akka-actor-typed" % akkaVersion,
+      "com.typesafe.akka" %% "akka-stream" % akkaVersion,
+      "com.typesafe.akka" %% "akka-http" % akkaHttpVersion % Test
+    )
   )
   .dependsOn(effect, web)
 
@@ -120,6 +125,17 @@ lazy val standalone = project
   )
   .dependsOn(korolev, http)
 
+lazy val testkit = project
+  .in(modules / "testkit")
+  .enablePlugins(GitVersioning)
+  .settings(crossVersionSettings)
+  .settings(commonSettings: _*)
+  .settings(
+    normalizedName := "korolev-testkit",
+    libraryDependencies += "org.graalvm.js" % "js" % "20.3.0"
+  )
+  .dependsOn(korolev)
+
 // Interop
 
 lazy val akka = project
@@ -130,12 +146,26 @@ lazy val akka = project
   .settings(
     normalizedName := "korolev-akka",
     libraryDependencies ++= Seq(
-      "com.typesafe.akka" %% "akka-actor" % "2.6.10",
-      "com.typesafe.akka" %% "akka-stream" % "2.6.10",
-      "com.typesafe.akka" %% "akka-http" % "10.2.1"
+      "com.typesafe.akka" %% "akka-actor" % akkaVersion,
+      "com.typesafe.akka" %% "akka-stream" % akkaVersion,
+      "com.typesafe.akka" %% "akka-http" % akkaHttpVersion
     )
   )
   .dependsOn(korolev)
+
+lazy val http4s = project
+  .in(interop / "http4s")
+  .enablePlugins(GitVersioning)
+  .settings(crossVersionSettings)
+  .settings(commonSettings: _*)
+  .settings(
+    normalizedName := "korolev-http4s",
+    libraryDependencies ++= Seq(
+      "org.http4s"     %% "http4s-server" % "0.21.14",
+      "org.http4s"     %% "http4s-dsl"    % "0.21.14"
+    )
+  )
+  .dependsOn(korolev, web, fs2, scodec)
 
 lazy val slf4j = project.
   in(interop / "slf4j").
@@ -155,7 +185,7 @@ lazy val cats = project.
   settings(commonSettings: _*).
   settings(
     normalizedName := "korolev-cats",
-    libraryDependencies += "org.typelevel" %% "cats-effect" % "2.1.4"
+    libraryDependencies += "org.typelevel" %% "cats-effect" % "2.3.1"
   ).
   dependsOn(effect)
 
@@ -180,7 +210,7 @@ lazy val zio = project
   .settings(commonSettings: _*)
   .settings(
     normalizedName := "korolev-zio",
-    libraryDependencies += "dev.zio" %% "zio" % "1.0.0"
+    libraryDependencies += "dev.zio" %% "zio" % "1.0.4"
   )
   .dependsOn(effect)
 
@@ -194,6 +224,17 @@ lazy val zioStreams = project
     libraryDependencies += "dev.zio" %% "zio-streams" % "1.0.4"
   )
   .dependsOn(effect, zio)
+
+lazy val fs2 = project
+  .in(interop / "fs2")
+  .enablePlugins(GitVersioning)
+  .settings(crossVersionSettings)
+  .settings(commonSettings: _*)
+  .settings(
+    normalizedName := "korolev-fs2",
+    libraryDependencies += "co.fs2" %% "fs2-core" % "2.5.0"
+  )
+  .dependsOn(effect, cats)
 
 lazy val scodec = project
   .in(interop / "scodec")
@@ -288,6 +329,16 @@ lazy val akkaHttpExample = project
   .settings(mainClass := Some("AkkaHttpExample"))
   .dependsOn(akka)
 
+lazy val http4sZioExample = project
+  .in(examples / "http4s-zio")
+  .disablePlugins(HeaderPlugin)
+  .settings(crossVersionSettings)
+  .settings(exampleSettings: _*)
+  .settings(mainClass := Some("Http4sZioExample"))
+  .settings(libraryDependencies += "dev.zio" %% "zio-interop-cats" % "2.1.4.1")
+  .settings(libraryDependencies +=  "org.http4s" %% "http4s-blaze-server" % "0.21.14")
+  .dependsOn(zio, http4s)
+
 lazy val catsEffectExample = project
   .in(examples / "cats")
   .disablePlugins(HeaderPlugin)
@@ -302,7 +353,7 @@ lazy val zioExample = project
   .settings(crossVersionSettings)
   .settings(exampleSettings: _*)
   .settings(mainClass := Some("ZioExample"))
-  .dependsOn(zio, akka)
+  .dependsOn(zio, akka, testkit % Test)
 
 lazy val monixExample = project
   .in(examples / "monix")
@@ -390,17 +441,17 @@ lazy val root = project
   .settings(dontPublishSettings:_*)
   .settings(name := "Korolev Project")
   .aggregate(
-    korolev, effect, web, http, standalone,
+    korolev, effect, web, http, standalone, testkit,
     // Interop
     akka, cats, monix, zio, zioStreams, slf4j,
-    scodec,
+    scodec, fs2, http4s,
     // Examples
     simpleExample, routingExample, gameOfLifeExample,
     formDataExample, `file-streaming-example`, delayExample,
     focusExample, webComponentExample, componentExample,
     akkaHttpExample, contextScopeExample, eventDataExample,
     extensionExample, zioExample, monixExample,
-    catsEffectExample, evalJsExample,
+    catsEffectExample, evalJsExample, http4sZioExample,
     // Misc
     `performance-benchmark`, `integration-tests`
   )

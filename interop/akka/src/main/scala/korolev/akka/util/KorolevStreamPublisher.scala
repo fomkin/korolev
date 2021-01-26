@@ -21,6 +21,8 @@ import korolev.effect.syntax._
 import korolev.effect.{Effect, Hub, Reporter, Stream}
 import org.reactivestreams.{Publisher, Subscriber, Subscription}
 
+import java.util.concurrent.atomic.AtomicReference
+import scala.annotation.tailrec
 import scala.concurrent.ExecutionContext
 
 final class KorolevStreamPublisher[F[_] : Effect, T](stream: Stream[F, T],
@@ -37,34 +39,60 @@ final class KorolevStreamPublisher[F[_] : Effect, T](stream: Stream[F, T],
 
   private final class Counter {
 
-    @volatile var n: Long = 0
-    @volatile var pending: Effect.Promise[Unit] = _
-    val res = Right(())
+    private final val state = new AtomicReference(Counter.State(None, 0))
 
-    def value(): F[Long] = Effect[F].delay(n)
+    def value(): F[Long] = Effect[F].delay(unsafeValue)
 
     def decOrLock(): F[Unit] = Effect[F].promise[Unit] { cb =>
-      this.synchronized { // FIXME use CAS?
-        if (n == 0) {
-          pending = cb
+      @tailrec
+      def aux(): Unit = {
+        val ref = state.get()
+        if (ref.n == 0) {
+          val newValue = ref.copy(pending = Some(cb))
+          if (!state.compareAndSet(ref, newValue)) {
+            aux()
+          }
         } else {
-          n -= 1
-          cb(res)
+          val newValue = ref.copy(n = ref.n - 1)
+          if (state.compareAndSet(ref, newValue)) {
+            cb(Counter.unitToken)
+          } else {
+            aux()
+          }
         }
+      }
+      aux()
+    }
+
+    def unsafeAdd(x: Long): Unit = {
+      // x should be positive
+      if (x > 0) {
+        @tailrec
+        def aux(): Unit = {
+          val ref = state.get()
+          ref.pending match {
+            case Some(cb) =>
+              if (state.compareAndSet(ref, Counter.State(pending = None, n = ref.n + x))) {
+                cb(Counter.unitToken)
+              } else {
+                aux()
+              }
+            case None =>
+              if (!state.compareAndSet(ref, ref.copy(n = ref.n + x))) {
+                aux()
+              }
+          }
+        }
+        aux()
       }
     }
 
-    def unsafeAdd(x: Long): Unit =
-      this.synchronized {
-        n = n + x
-        if (n > 0 && pending != null) {
-          val cb = pending
-          pending = null
-          cb(res)
-        }
-      }
+    def unsafeValue: Long = state.get().n
+  }
 
-    def unsafeValue: Long = n
+  object Counter {
+    val unitToken = Right(())
+    case class State(pending: Option[Effect.Promise[Unit]], n: Long)
   }
 
   private final class StreamSubscription(stream: Stream[F, T],

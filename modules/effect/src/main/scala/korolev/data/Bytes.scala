@@ -9,7 +9,8 @@ import java.nio.charset.{Charset, StandardCharsets}
 sealed trait Bytes {
   def apply(i: Int): Byte
   def apply(i: Long): Byte
-  def mapI(f: (Byte, Long) => Byte): Bytes
+  def mapWithIndex(f: (Byte, Long) => Byte): Bytes
+  def foreach(f: Byte => Unit): Unit
   def length: Long
   def concat(right: Bytes): Bytes
   def ++(right: Bytes): Bytes
@@ -37,7 +38,13 @@ object Bytes {
   def wrap[T: BytesLike](that: T): Bytes = new Bytes {
     def apply(i: Int): Byte = BytesLike[T].get(that, i)
     def apply(i: Long): Byte = BytesLike[T].get(that, i)
-    def concat(right: Bytes): Bytes = Bytes.wrap(BytesLike[T].concat(that, right.as[T]))
+    def concat(right: Bytes): Bytes = {
+      if (BytesLike[T].length(that) == 0) {
+        right
+      } else {
+        Bytes.wrap(BytesLike[T].concat(that, right.as[T]))
+      }
+    }
     def ++(right: Bytes): Bytes = concat(right)
     def as[T2: BytesLike]: T2 = BytesLike[T].as[T2](that)
     def asAsciiString: String = BytesLike[T].asAsciiString(that)
@@ -53,7 +60,8 @@ object Bytes {
     def asBuffer: ByteBuffer = BytesLike[T].asBuffer(that)
     def asHexString: String = BytesLike[T].asHexString(that)
     def indexOf(elem: Byte, start: Long): Long = BytesLike[T].indexOf(that, elem, start)
-    def mapI(f: (Byte, Long) => Byte): Bytes = Bytes.wrap(BytesLike[T].mapI(that, f))
+    def mapWithIndex(f: (Byte, Long) => Byte): Bytes = Bytes.wrap(BytesLike[T].mapWithIndex(that, f))
+    def foreach(f: Byte => Unit): Unit = BytesLike[T].foreach(that, f)
     override def equals(obj: Any): Boolean =
       if (obj.isInstanceOf[Bytes]) BytesLike[T].eq(that, obj.asInstanceOf[Bytes].as[T])
       else false
@@ -96,13 +104,13 @@ object Bytes {
 
     def asArray(bytes: Bytes): Array[Byte] =
       bytes.asArray
-      
+
     def asBuffer(bytes: Bytes): ByteBuffer =
       bytes.asBuffer
 
     def eq(l: Bytes, r: Bytes): Boolean =
       l == r
-    
+
     def get(bytes: Bytes, i: Long): Byte =
       bytes(i)
 
@@ -115,8 +123,11 @@ object Bytes {
     def slice(bytes: Bytes, start: Long, end: Long): Bytes =
       bytes.slice(start, end)
 
-    def mapI(bytes: Bytes, f: (Byte, Long) => Byte): Bytes =
-      bytes.mapI(f)
+    def mapWithIndex(bytes: Bytes, f: (Byte, Long) => Byte): Bytes =
+      bytes.mapWithIndex(f)
+
+    def foreach(bytes: Bytes, f: Byte => Unit): Unit =
+      bytes.foreach(f)
 
     def indexOf(where: Bytes, that: Byte): Long =
       where.indexOf(that)
@@ -132,8 +143,5 @@ object Bytes {
 
     def lastIndexOfSlice(where: Bytes, that: Bytes): Long =
       where.lastIndexOfSlice(that)
-
-    def asHexString(bytes: Bytes): String =
-      bytes.asHexString
   }
 }

@@ -2,11 +2,9 @@ package korolev.zio
 
 import korolev.effect.{Queue, Effect => KorolevEffect, Stream => KorolevStream}
 import korolev.effect.syntax._
-import zio.stream.{Take, ZStream}
-import zio.{RIO, ZIO, ZManaged, Queue => ZQueue}
+import zio.stream.ZStream
+import zio.{RIO, ZIO}
 import scala.concurrent.ExecutionContext
-import scala.util.control.NonFatal
-
 
 package object streams {
 
@@ -32,21 +30,20 @@ package object streams {
 
   implicit class ZStreamOps[R, O](stream: ZStream[R, Throwable, O]) {
 
-    type F = RIO[R, *]
+    type F[A] = RIO[R, A]
 
-    def toKorolev(bufferSize: Int = 1)(implicit ec: ExecutionContext, eff: KorolevEffect[F]): KorolevStream[F, O] = {
+    def toKorolev(bufferSize: Int = 1)(implicit ec: ExecutionContext, eff: KorolevEffect[F]): F[KorolevStream[F, O]] = {
 
-      val queue = new Queue[F, O](bufferSize)
+      val queue = new Queue[RIO[R, *], O](bufferSize)
       val cancelToken: Either[Throwable, Unit] = Right(())
 
       KorolevEffect[F]
         .start(
           stream
-           // .interruptWhen(queue.cancelSignal.as(cancelToken))
-            .flatMap(o => queue.join.flatMap(_ => queue.offer(o)))
-            .compile
-            .drain
-            .flatMap(_ => queue.stop())
+            .interruptWhen(queue.cancelSignal.as(cancelToken))
+            .tap(o => queue.enqueue(o))
+            .runDrain
+            .zipRight(queue.stop())
         )
         .as(queue.stream)
     }
