@@ -184,6 +184,17 @@ lazy val zio = project
   )
   .dependsOn(effect)
 
+lazy val zioStreams = project
+  .in(interop / "zio-streams")
+  .enablePlugins(GitVersioning)
+  .settings(crossVersionSettings)
+  .settings(commonSettings: _*)
+  .settings(
+    normalizedName := "korolev-zio-streams",
+    libraryDependencies += "dev.zio" %% "zio-streams" % "1.0.4"
+  )
+  .dependsOn(effect, zio)
+
 lazy val scodec = project
   .in(interop / "scodec")
   .enablePlugins(GitVersioning)
@@ -381,7 +392,7 @@ lazy val root = project
   .aggregate(
     korolev, effect, web, http, standalone,
     // Interop
-    akka, cats, monix, zio, slf4j,
+    akka, cats, monix, zio, zioStreams, slf4j,
     scodec,
     // Examples
     simpleExample, routingExample, gameOfLifeExample,
