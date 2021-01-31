@@ -327,7 +327,9 @@ object Stream {
 //    val cancel: F[Unit] = Effect[F].unit
 //  }
 
-  def apply[T](xs: T*): Stream.Template[T] = new Template[T] {
+  def apply[T](xs: T*): Template[T] = emits(xs)
+
+  def emits[T](xs: Seq[T]): Stream.Template[T] = new Template[T] {
     def mat[F[_]: Effect](): F[Stream[F, T]] = Effect[F].delay {
       new Stream[F, T] {
         var n = 0
@@ -401,7 +403,6 @@ object Stream {
           }
 
         def cancel(): F[Unit] = Effect[F].delay {
-          println("YARRR")
           resource.close()
         }
       }

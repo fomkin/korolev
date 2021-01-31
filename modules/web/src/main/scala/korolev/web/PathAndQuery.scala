@@ -18,7 +18,7 @@ sealed trait PathAndQuery {
         case Root             => Root
         case :&(prev, (k, v)) => aux(prev)
         case head :? tpl      => head
-        case path: / => aux(path)
+        case path: / => path
       }
     }
     aux(this)

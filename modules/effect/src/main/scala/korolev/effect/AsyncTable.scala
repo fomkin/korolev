@@ -22,6 +22,7 @@ import korolev.effect.Effect.Promise
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.annotation.tailrec
+import korolev.effect.syntax._
 
 final class AsyncTable[F[_] : Effect, K, V](elems: Seq[(K, V)]) {
 
@@ -29,8 +30,9 @@ final class AsyncTable[F[_] : Effect, K, V](elems: Seq[(K, V)]) {
   private type Result = Either[Throwable, V]
 
   private val state = new AtomicReference[Map[K, Either[Callbacks, Result]]](
-    elems.map { case (k, v) => (k, Right(Right(v))) }.toMap
+    elems.toVector.map { case (k, v) => (k, Right(Right(v))) }.toMap
   )
+
 
   def get(key: K): F[V] = Effect[F].promise[V] { cb =>
     @tailrec
@@ -46,6 +48,32 @@ final class AsyncTable[F[_] : Effect, K, V](elems: Seq[(K, V)]) {
         case None =>
           val newValue = ref.updated(key, Left(cb :: Nil))
           if (!state.compareAndSet(ref, newValue)) {
+            aux()
+          }
+      }
+    }
+    aux()
+  }
+
+  def getFill(key: K)(f: => F[V]): F[V] = Effect[F].promiseF[V] { cb =>
+    @tailrec
+    def aux(): F[Unit] = {
+      val ref = state.get
+      ref.get(key) match {
+        case Some(Right(value)) =>
+          Effect[F].delay(cb(value))
+        case Some(Left(xs)) =>
+          val newValue = ref.updated(key, Left(cb :: xs))
+          if (state.compareAndSet(ref, newValue)) {
+            Effect[F].unit
+          } else {
+            aux()
+          }
+        case None =>
+          val newValue = ref.updated(key, Left(cb :: Nil))
+          if (state.compareAndSet(ref, newValue)) {
+            f.flatMap(v => put(key, v))
+          } else {
             aux()
           }
       }
