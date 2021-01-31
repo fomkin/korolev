@@ -401,6 +401,7 @@ object Stream {
           }
 
         def cancel(): F[Unit] = Effect[F].delay {
+          println("YARRR")
           resource.close()
         }
       }

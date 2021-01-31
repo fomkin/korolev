@@ -29,7 +29,8 @@ private[korolev] final class FilesService[F[_]: Effect](commonService: CommonSer
 
   import commonService._
 
-  def resourceFromClasspath(path: PathAndQuery): F[HttpResponse[F]] = {
+  def resourceFromClasspath(pq: PathAndQuery): F[HttpResponse[F]] = {
+    val path = pq.asPath
     val fsPath = path.mkString
     val maybeResourceStream = Option(this.getClass.getResourceAsStream(fsPath))
     maybeResourceStream.fold(notFoundResponseF) { javaSyncStream =>

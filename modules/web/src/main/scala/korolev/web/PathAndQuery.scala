@@ -11,6 +11,19 @@ sealed trait PathAndQuery {
     URLEncoder.encode(value, "UTF-8")
   }
 
+  def asPath: Path = {
+    @tailrec
+    def aux(pq: PathAndQuery): Path = {
+      pq match {
+        case Root             => Root
+        case :&(prev, (k, v)) => aux(prev)
+        case head :? tpl      => head
+        case path: / => aux(path)
+      }
+    }
+    aux(this)
+  }
+
   def startsWith(value: String): Boolean = {
     @tailrec
     def aux(pq: PathAndQuery): Boolean = pq match {
