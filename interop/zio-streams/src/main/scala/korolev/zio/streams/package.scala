@@ -4,6 +4,7 @@ import korolev.effect.{Queue, Effect => KorolevEffect, Stream => KorolevStream}
 import korolev.effect.syntax._
 import zio.stream.ZStream
 import zio.{RIO, ZIO}
+
 import scala.concurrent.ExecutionContext
 
 package object streams {
@@ -31,6 +32,8 @@ package object streams {
   implicit class ZStreamOps[R, O](stream: ZStream[R, Throwable, O]) {
 
     type F[A] = RIO[R, A]
+
+    def none: Option[O] = None
 
     def toKorolev(bufferSize: Int = 1)(implicit ec: ExecutionContext, eff: KorolevEffect[F]): F[KorolevStream[F, O]] = {
 

@@ -949,6 +949,43 @@ Then embed the route into your Http4 HTTP routes structure.
 
 https://github.com/fomkin/korolev/blob/v0.17.0/examples/http4s-zio/src/main/scala/Http4sZioExample.scala[See full example]
 
+=== ZIO-streams
+Conversions between Zio and Korolev streams
+
+To use it, add a dependency:
+[source,scala]
+------------------------------
+libraryDependencies += "org.fomkin" %% "korolev-zio-streams" % "0.17.0"
+------------------------------
+
+Conversion from Korolev to ZIO:
+
+[source,scala]
+------------------------------
+val io = KorolevStream(values: _*)
+.mat[Task]()
+.flatMap { korolevStream: KorolevStream[Task, Int] =>
+korolevStream
+.toZStream
+.run(ZSink.foldLeft(List.empty[Int]){ case (acc, v) => acc :+ v})
+}
+------------------------------
+
+Conversion from ZIO to Korolev:
+[source,scala]
+------------------------------
+val values = Vector(1, 2, 3, 4, 5)
+    val io = ZStream.fromIterable(values)
+      .toKorolev()
+      .flatMap { korolevStream =>
+        korolevStream
+          .fold(Vector.empty[Int])((acc, value) => acc :+ value)
+          .map(result => result shouldEqual values)
+      }
+------------------------------
+
+
+
 === Effects
 
 In addition to standard Scala Futures, Korolev can work with popular effects libraries: ZIO, Cats Effect, and Monix. To use them, add the dependency and set `F` type parameter of` Context` and `KorolevServiceConfig` to demanded effect type.
