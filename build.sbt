@@ -59,6 +59,15 @@ val interop = file("interop")
 val examples = file("examples")
 val misc = file("misc")
 
+lazy val bytes = project
+  .in(modules / "bytes")
+  .enablePlugins(GitVersioning)
+  .settings(crossVersionSettings)
+  .settings(commonSettings: _*)
+  .settings(
+    normalizedName := "korolev-bytes"
+  )
+
 lazy val effect = project
   .in(modules / "effect")
   .enablePlugins(GitVersioning)
@@ -67,6 +76,7 @@ lazy val effect = project
   .settings(
     normalizedName := "korolev-effect"
   )
+  .dependsOn(bytes)
 
 lazy val web = project
   .in(modules / "web")
@@ -74,7 +84,7 @@ lazy val web = project
   .settings(crossVersionSettings)
   .settings(commonSettings: _*)
   .settings(
-    description := "Collection of data classes for Web Standard support",
+    description := "Collection of data classes for Web Standards support",
     normalizedName := "korolev-web"
   )
 
@@ -234,7 +244,7 @@ lazy val scodec = project
     normalizedName := "korolev-scodec",
     libraryDependencies += "org.scodec" %% "scodec-bits" % "1.1.18"
   )
-  .dependsOn(effect)
+  .dependsOn(bytes)
 
 
 // Examples
@@ -431,6 +441,7 @@ lazy val root = project
   .settings(name := "Korolev Project")
   .aggregate(
     korolev, effect, web, http, standalone, testkit,
+    bytes,
     // Interop
     akka, cats, monix, zio, slf4j,
     scodec, fs2, http4s,
