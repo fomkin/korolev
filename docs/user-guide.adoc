@@ -322,7 +322,7 @@ Html(
 )
 -----------------------------------
 
-https://github.com/fomkin/korolev/blob/v0.16.0/examples/component/src/main/scala/ComponentExample.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.17.0/examples/component/src/main/scala/ComponentExample.scala[See full example]
 
 === Access element properties
 
@@ -381,7 +381,7 @@ form(
 )
 -----------------------------------
 
-https://github.com/fomkin/korolev/blob/v0.16.0/examples/form-data/src/main/scala/FormDataExample.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.17.0/examples/form-data/src/main/scala/FormDataExample.scala[See full example]
 
 === Delays
 
@@ -416,7 +416,7 @@ def render(state: Boolean) =
 }
 -----------------------------------
 
-https://github.com/fomkin/korolev/blob/v0.16.0/examples/delay/src/main/scala/DelayExample.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.17.0/examples/delay/src/main/scala/DelayExample.scala[See full example]
 
 === Extensions
 
@@ -459,7 +459,7 @@ KorolevServiceConfig(
 
 Now every session is subscribed to new notifications. Render will be invoked automatically and user will get his page updated.
 
-https://github.com/fomkin/korolev/blob/v0.16.0/examples/extension/src/main/scala/ExtensionExample.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.17.0/examples/extension/src/main/scala/ExtensionExample.scala[See full example]
 
 === Routing
 
@@ -640,7 +640,7 @@ Now you have context scoped to Tab2. If this context is imported, you will have 
 
 Sometimes, being in context scope, you need to apply a transition to all state. In this case, you can handle an event using `eventUnscoped` method of the context. You will get `UnscopedAccess` which ignores current context scope.
 
-https://github.com/fomkin/korolev/blob/v0.16.0/examples/context-scope/src/main/scala/ContextScopeExample.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.17.0/examples/context-scope/src/main/scala/ContextScopeExample.scala[See full example]
 
 == Testing Korolev applications
 
@@ -728,7 +728,7 @@ it should "be handled" in {
 }
 ------------------------------
 
-https://github.com/fomkin/korolev/blob/v0.16.0/examples/zio/src/test/scala/ZioExampleSpec.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.17.0/examples/zio/src/test/scala/ZioExampleSpec.scala[See full example]
 
 === Selenium
 
@@ -745,7 +745,7 @@ If you need to extend your application with something that you can't implement w
 Korolev doesn't have any specific code to support WebComponents. WebComponent (Custom Elements + Shadow DOM) by design should behave as regular HTML tags. There is no difference between, for example, input or textarea, and any custom element.
 ============
 
-https://github.com/fomkin/korolev/blob/v0.16.0/examples/web-component/src/main/scala/WebComponentExample.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.17.0/examples/web-component/src/main/scala/WebComponentExample.scala[See full example]
 
 === Call JavaScript from server
 
@@ -795,7 +795,7 @@ div(myElement)
 access.evalJs(js"""$myElement.innerHTML = 'this is <a href="http://example.com">example</a>'""")
 -------------------------------------------------------------------------------
 
-https://github.com/fomkin/korolev/blob/v0.16.0/examples/evalJs/src/main/scala/EvalJsExample.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.17.0/examples/evalJs/src/main/scala/EvalJsExample.scala[See full example]
 
 === Call server from JavaScript
 
@@ -815,7 +815,7 @@ Now invoke it from the client side.
 Korolev.invokeCallback('myCallback', 'myArgValue');
 -------------------------------------------------------------------------------
 
-https://github.com/fomkin/korolev/blob/v0.16.0/examples/evalJs/src/main/scala/EvalJsExample.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.17.0/examples/evalJs/src/main/scala/EvalJsExample.scala[See full example]
 
 == Productivity
 
@@ -899,7 +899,7 @@ val korolevRoute = akkaHttpService(config).apply(AkkaHttpServerConfig())
 
 Then embed the route into your Akka HTTP routes structure.
 
-https://github.com/fomkin/korolev/blob/v0.16.0/examples/akka-http/src/main/scala/AkkaHttpExample.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.17.0/examples/akka-http/src/main/scala/AkkaHttpExample.scala[See full example]
 
 This integration overrides default logging behavior to `akka.event.Logging`.
 
@@ -976,7 +976,7 @@ val config = KorolevServiceConfig[zio.Task, MyState, Any](...)
 
 Korolev uses `Throwable` inside itself. That means if you want to work with your own, you should provide functions to convert `Throwable` to [[E]] and vice versa.
 
-https://github.com/fomkin/korolev/blob/v0.16.0/examples/zio/src/main/scala/ZioExample.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.17.0/examples/zio/src/main/scala/ZioExample.scala[See full example]
 
 ==== Monix
 
@@ -997,7 +997,7 @@ val ctx = Context[monix.eval.Task, MyState, Any]
 val config = KorolevServiceConfig[monix.eval.Task, MyState, Any](...)
 ------------------------------
 
-https://github.com/fomkin/korolev/blob/v0.16.0/examples/monix/src/main/scala/MonixExample.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.17.0/examples/monix/src/main/scala/MonixExample.scala[See full example]
 
 ==== Cats IO
 
@@ -1018,7 +1018,7 @@ val ctx = Context[IO, MyState, Any]
 val config = KorolevServiceConfig[IO, MyState, Any](...)
 ------------------------------
 
-https://github.com/fomkin/korolev/blob/v0.16.0/examples/cats/src/main/scala/CatsIOExample.scala[See full example]
+https://github.com/fomkin/korolev/blob/v0.17.0/examples/cats/src/main/scala/CatsIOExample.scala[See full example]
 
 == Troubleshooting
 
@@ -1043,7 +1043,7 @@ Now you can see something like this.
 ------------------------------
 
 Message starting with `->` is commands from server. Message started with `<-` is callback and client side events.
-First number is always an procedure or callback code. You can protocol description https://github.com/fomkin/korolev/blob/v0.16.0/korolev/src/main/protocol.md[here].
+First number is always an procedure or callback code. You can protocol description https://github.com/fomkin/korolev/blob/v0.17.0/korolev/src/main/protocol.md[here].
 
 === Reconnections under Kubernetes Ingress
 
