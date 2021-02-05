@@ -56,11 +56,13 @@ final class KorolevStreamPublisher[F[_] : Effect, T](stream: Stream[F, T],
 
     def unsafeAdd(x: Long): Unit =
       this.synchronized {
-        n = n + x
-        if (n > 0 && pending != null) {
+        if (pending != null) {
+          n = n + x - 1
           val cb = pending
           pending = null
           cb(res)
+        } else {
+          n = n + x
         }
       }
 
@@ -79,7 +81,7 @@ final class KorolevStreamPublisher[F[_] : Effect, T](stream: Stream[F, T],
         _ <- maybeItem match {
           case Some(item) =>
             subscriber.onNext(item)
-            Effect[F].fork(loop())
+            loop()
           case None =>
             subscriber.onComplete()
             Effect[F].unit
