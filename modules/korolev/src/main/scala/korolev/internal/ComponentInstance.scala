@@ -73,7 +73,7 @@ final class ComponentInstance
   private val markedComponentInstances = mutable.Set.empty[Id]
   private val delays = mutable.Map.empty[Id, DelayInstance[F, CS, E]]
   private val elements = mutable.Map.empty[ElementId, Id]
-  private val events = mutable.Map.empty[EventId, Event[F, CS, E]]
+  private val events = mutable.Map.empty[EventId, Vector[Event[F, CS, E]]]
   private val nestedComponents = mutable.Map.empty[Id, ComponentInstance[F, CS, E, _, _, _]]
 
   // Why we use '() => F[Unit]'? Because should
@@ -232,7 +232,9 @@ final class ComponentInstance
       misc match {
         case event @ Event(eventType, phase, _, _) =>
           val id = rc.currentContainerId
-          events.put(EventId(id, eventType, phase), event)
+          val eid = EventId(id, eventType, phase)
+          val es = events.getOrElseUpdate(eid, Vector.empty)
+          events.put(eid, es :+ event)
           eventRegistry.registerEventType(event.`type`)
         case element: ElementId =>
           val id = rc.currentContainerId
@@ -285,14 +287,16 @@ final class ComponentInstance
 
   def applyEvent(eventId: EventId): Boolean = {
     events.get(eventId) match {
-      case Some(event: Event[F, CS, E]) =>
+      case Some(events: Vector[Event[F, CS, E]]) =>
         // A user defines the event effect, so we
         // don't control the time of execution.
         // We shouldn't block the application if
         // the user's code waits for something
         // for a long time.
-        event.effect(browserAccess).runAsyncForget
-        !event.stopPropagation
+        events.forall { event =>
+          event.effect(browserAccess).runAsyncForget
+          !event.stopPropagation
+        }
       case None =>
         nestedComponents.values.forall { nested =>
           nested.applyEvent(eventId)
