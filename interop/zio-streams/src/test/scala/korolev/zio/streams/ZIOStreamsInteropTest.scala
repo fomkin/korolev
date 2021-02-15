@@ -57,11 +57,13 @@ class ZIOStreamsInteropTest  extends AsyncFlatSpec with Matchers {
   "ZStream.toKorolevStream" should "provide korolev.effect.Stream that contain exactly same values as original fs2.Stream" in {
     val values = Vector(1, 2, 3, 4, 5)
     val io = ZStream.fromIterable(values)
-      .toKorolev()
+      .toKorolev
       .flatMap { korolevStream =>
         korolevStream
           .fold(Vector.empty[Int])((acc, value) => acc :+ value)
-          .map(result => result shouldEqual values)
+          .map(result =>
+            result shouldEqual values
+          )
       }
     runtime.unsafeRunToFuture(io)
   }

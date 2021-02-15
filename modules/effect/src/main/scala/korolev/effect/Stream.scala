@@ -358,6 +358,7 @@ object Stream {
     }
   }
 
+
   def unfold[F[_]: Effect, S, T](default: S, doCancel: () => F[Unit] = null)
                                 (loop: S => F[(S, Option[T])]): Stream[F, T] = {
     new Stream[F, T] {
