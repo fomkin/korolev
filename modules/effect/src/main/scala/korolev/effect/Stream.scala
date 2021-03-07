@@ -129,18 +129,33 @@ abstract class Stream[F[_]: Effect, A] { self =>
       if (underlying == null) {
         self.pull() flatMap {
           case Some(value) =>
-            f(value).flatMap { newStream =>
-              streams(takeFrom) = newStream
-              newStream.pull()
-            }
+            extractNextStream(value, takeFrom)
           case None =>
             streams(takeFrom) = null
             aux()
         }
       } else {
-        underlying.pull()
+        underlying.pull().flatMap {
+          case Some(value) =>
+            Effect[F].pure(Some(value))
+          case None =>
+            self.pull().flatMap {
+              case Some(value) =>
+                extractNextStream(value, takeFrom)
+              case None =>
+                Effect[F].pure(None)
+            }
+        }
       }
     }
+
+    private def extractNextStream(value: A, takeFrom: Int): F[Option[B]] = {
+      f(value).flatMap { newStream =>
+        streams(takeFrom) = newStream
+        newStream.pull()
+      }
+    }
+
     def pull(): F[Option[B]] = aux()
     def cancel(): F[Unit] = self.cancel()
   }
