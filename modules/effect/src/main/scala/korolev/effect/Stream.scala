@@ -122,37 +122,43 @@ abstract class Stream[F[_]: Effect, A] { self =>
   def flatMapMergeAsync[B](concurrency: Int)(f: A => F[Stream[F, B]]): Stream[F, B] = new Stream[F, B] {
     val streams: Array[Stream[F, B]] = new Array(concurrency)
     var takeFromCounter = 0
+
     def aux(): F[Option[B]] = {
       val takeFrom = takeFromCounter % concurrency
       val underlying = streams(takeFrom)
       takeFromCounter += 1
       if (underlying == null) {
-        self.pull() flatMap {
-          case Some(value) =>
-            extractNextStream(value, takeFrom)
-          case None =>
-            streams(takeFrom) = null
-            aux()
-        }
+        pullNextStream(takeFrom)
       } else {
         underlying.pull().flatMap {
           case Some(value) =>
             Effect[F].pure(Some(value))
           case None =>
-            self.pull().flatMap {
-              case Some(value) =>
-                extractNextStream(value, takeFrom)
-              case None =>
-                Effect[F].pure(None)
-            }
+            pullNextStream(takeFrom)
         }
       }
     }
 
-    private def extractNextStream(value: A, takeFrom: Int): F[Option[B]] = {
+    private def pullNextStream(takeFrom: Int): F[Option[B]] = {
+      self.pull().flatMap {
+        case Some(value) =>
+          takeFromNextStream(value, takeFrom)
+        case None =>
+          streams(takeFrom) = null
+          if(hasNonEmptyStream()) aux()
+          else Effect[F].pure(None)
+      }
+    }
+
+    private def hasNonEmptyStream() = streams.exists(_ != null)
+
+    private def takeFromNextStream(value: A, takeFrom: Int): F[Option[B]] = {
       f(value).flatMap { newStream =>
         streams(takeFrom) = newStream
-        newStream.pull()
+        newStream.pull().flatMap {
+          case Some(value) => Effect[F].pure(Some(value))
+          case None => aux()
+        }
       }
     }
 
