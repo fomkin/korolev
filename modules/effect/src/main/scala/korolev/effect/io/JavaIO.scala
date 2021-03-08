@@ -8,7 +8,7 @@ import scala.annotation.tailrec
 
 object JavaIO {
 
-  def fromInputStream[F[_] : Effect, B: BytesLike](inputStream: InputStream, chunkSize: Int = 8192): F[Stream[F, B]] = {
+  def fromInputStream[F[_] : Effect, B: BytesLike](inputStream: InputStream, chunkSize: Int = 8192 * 2): F[Stream[F, B]] = {
     @tailrec
     def readStream(chunk: Array[Byte], offset: Int, len: Int): (Unit, Option[B]) = {
       val read = inputStream.read(chunk, offset, len)

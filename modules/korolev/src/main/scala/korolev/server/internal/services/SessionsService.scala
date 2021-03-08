@@ -122,7 +122,7 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
           stateManager <- stateStorage.get(qsid.deviceId, qsid.sessionId)
           maybeInitialState <- stateManager.read[S](levsha.Id.TopLevel)
           // Top level state should exists. See 'initAppState'.
-          initialState = maybeInitialState.get
+          initialState <- maybeInitialState.fold(Effect[F].fail[S](BadRequestException(s"Top level state should exists. Snapshot for $qsid is corrupted")))(Effect[F].pure(_))
           frontend = new Frontend[F](incoming)
           app = new ApplicationInstance[F, S, M](
             qsid,

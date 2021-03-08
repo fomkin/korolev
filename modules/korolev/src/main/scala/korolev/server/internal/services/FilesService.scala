@@ -17,34 +17,50 @@
 package korolev.server.internal.services
 
 import korolev.data.Bytes
-import korolev.effect.Effect
+import korolev.effect.{AsyncTable, Effect, Stream}
 import korolev.effect.io.JavaIO
 import korolev.effect.syntax._
 import korolev.server.HttpResponse
 import korolev.server.internal.MimeTypes
 import korolev.web.PathAndQuery._
-import korolev.web.{Headers, PathAndQuery, Response}
+import korolev.web.{Headers, Path, PathAndQuery, Response}
 
 private[korolev] final class FilesService[F[_]: Effect](commonService: CommonService[F]) {
 
-  import commonService._
+  type ResponseFactory = () => F[HttpResponse[F]]
 
-  def resourceFromClasspath(path: PathAndQuery): F[HttpResponse[F]] = {
-    val fsPath = path.mkString
-    val maybeResourceStream = Option(this.getClass.getResourceAsStream(fsPath))
-    maybeResourceStream.fold(notFoundResponseF) { javaSyncStream =>
-      val _ / fileName = path
-      val fileExtension = fileName.lastIndexOf('.') match {
-        case -1    => "bin" // default file extension
-        case index => fileName.substring(index + 1)
+  private val table = AsyncTable.unsafeCreateEmpty[F, Path, ResponseFactory]
+
+  private val notFoundToken = Effect[F].pure(() => commonService.notFoundResponseF)
+
+  def resourceFromClasspath(pq: PathAndQuery): F[HttpResponse[F]] = {
+    val path = pq.asPath
+    table
+      .getFill(path) {
+        val fsPath = path.mkString
+        val maybeResourceStream = Option(this.getClass.getResourceAsStream(fsPath))
+        maybeResourceStream.fold(notFoundToken) { javaSyncStream =>
+          val _ / fileName = path
+          val fileExtension = fileName.lastIndexOf('.') match {
+            case -1    => "bin" // default file extension
+            case index => fileName.substring(index + 1)
+          }
+          val headers = MimeTypes(fileExtension) match {
+            case Some(mimeType) => Seq(Headers.ContentType -> mimeType)
+            case None           => Nil
+          }
+          val size = javaSyncStream.available().toLong
+          for {
+            stream <- JavaIO.fromInputStream[F, Bytes](javaSyncStream) // TODO configure chunk size
+            chunks <- stream.fold(Vector.empty[Bytes])(_ :+ _)
+            template = Stream.emits(chunks)
+          } yield {
+            () => template.mat() map { stream =>
+              Response(Response.Status.Ok, stream, headers, Some(size))
+            }
+          }
+        }
       }
-      val headers = MimeTypes(fileExtension) match {
-        case Some(mimeType) => Seq(Headers.ContentType -> mimeType)
-        case None           => Nil
-      }
-      JavaIO.fromInputStream[F, Bytes](javaSyncStream) map { stream =>
-        Response(Response.Status.Ok, stream, headers, Some(javaSyncStream.available().toLong))
-      }
-    }
+      .flatMap(_())
   }
 }

@@ -63,7 +63,7 @@ object Effect {
 
   def apply[F[_]: Effect]: Effect[F] = implicitly[Effect[F]]
 
-  final class FutureEffect extends Effect[Future] {
+  class FutureEffect extends Effect[Future] {
     private implicit val immediateEc: ExecutionContext = new ExecutionContext {
       // Run on the same thread
       def execute(runnable: Runnable): Unit = runnable.run()
