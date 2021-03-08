@@ -30,7 +30,7 @@ class StreamSpec extends AsyncFlatSpec with Matchers {
       .mat()
       .flatMap { stream =>
         stream.flatMapAsync {
-          chunk => Stream.apply(chunk:_*).mat()
+          chunk => Stream.emits(chunk).mat()
         }.fold(Seq.empty[Int]) { case (acc, x) => acc :+ x }
       }.map { result => assert(result == seq1 ++ seq2 ++ seq3) }
   }
@@ -43,7 +43,7 @@ class StreamSpec extends AsyncFlatSpec with Matchers {
       .mat()
       .flatMap { stream =>
         stream.flatMapMergeAsync(2){
-          chunk => Stream.apply(chunk:_*).mat()
+          chunk => Stream.emits(chunk).mat()
         }.fold(Seq.empty[Int]) { case (acc, x) => acc :+ x }
       }.map { result =>
         assert(result.toSet == (seq1 ++ seq2 ++ seq3).toSet)
@@ -59,7 +59,7 @@ class StreamSpec extends AsyncFlatSpec with Matchers {
       .mat()
       .flatMap { stream =>
         stream.flatMapMergeAsync(3){
-          chunk => Stream.apply(chunk:_*).mat()
+          chunk => Stream.emits(chunk).mat()
         }.fold(Seq.empty[Int]) { case (acc, x) => acc :+ x }
       }.map { result =>
        assert(result.toSet == (seq1 ++ seq2 ++ seq3 ++ seq4).toSet)
@@ -75,7 +75,7 @@ class StreamSpec extends AsyncFlatSpec with Matchers {
       .mat()
       .flatMap { stream =>
         stream.flatMapMergeAsync(3){
-          chunk => Stream.apply(chunk:_*).mat()
+          chunk => Stream.emits(chunk).mat()
         }.fold(Seq.empty[Int]) { case (acc, x) => acc :+ x }
       }.map { result =>
       assert(result.toSet == (seq1 ++ seq2 ++ seq3 ++ seq4).toSet)

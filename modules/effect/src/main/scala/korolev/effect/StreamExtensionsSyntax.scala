@@ -10,7 +10,7 @@ object StreamExtensionsSyntax {
       * @return
       */
     def unchunk[O]: Stream[F, A] =
-      stream.flatMapAsync(chunk => Stream.apply(chunk:_*).mat())
+      stream.flatMapAsync(chunk => Stream.emits(chunk).mat())
 
   }
 
