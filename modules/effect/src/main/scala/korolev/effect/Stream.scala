@@ -336,6 +336,16 @@ abstract class Stream[F[_]: Effect, A] { self =>
 
 object Stream {
 
+  implicit class KorolevUnchunkExtension[F[_]: Effect, A](stream: Stream[F, Seq[A]]) {
+
+    /**
+      * Flatten Stream of any collection to single elements
+      * @return
+      */
+    def unchunk[O]: Stream[F, A] = stream.flatMapAsync(chunk => Stream.emits(chunk).mat())
+
+  }
+
   def empty[F[_]: Effect, T]: Stream[F, T] = {
     new Stream[F, T] {
       val pull: F[Option[T]] = Effect[F].pure(Option.empty[T])

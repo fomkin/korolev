@@ -56,8 +56,6 @@ class ZIOStreamsInteropTest  extends AsyncFlatSpec with Matchers {
 
   "ZStream.toKorolevStream" should "provide korolev.effect.Stream that contain exactly same values as original zio.Stream" in {
 
-    import korolev.effect.StreamExtensionsSyntax._
-
     val v1 = Vector(1, 2, 3, 4, 5)
     val v2 = Vector(5, 4, 3, 2, 1)
     val values = v1 ++ v2
