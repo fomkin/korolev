@@ -32,13 +32,17 @@ final case class Request[Body](method: Request.Method,
 
   private lazy val parsedCookie =
     if (renderedCookie == null || renderedCookie.isEmpty) Map.empty[String, String]
-    else renderedCookie
-      .split(';')
-      .map { xs =>
-        val Array(k, v) = xs.split('=')
-        (URLDecoder.decode(k.trim, "UTF-8"), URLDecoder.decode(v, "UTF-8"))
-      }
-      .toMap
+    else
+      renderedCookie
+        .split(';')
+        .map { xs =>
+          val (key, value) = xs.split('=') match {
+            case Array(k, v) => (k, v)
+            case Array(k)    => (k, "")
+          }
+          (URLDecoder.decode(key.trim, "UTF-8"), URLDecoder.decode(value, "UTF-8"))
+        }
+        .toMap
 
   def param(name: String): Option[String] =
     pq.param(name)
