@@ -122,25 +122,46 @@ abstract class Stream[F[_]: Effect, A] { self =>
   def flatMapMergeAsync[B](concurrency: Int)(f: A => F[Stream[F, B]]): Stream[F, B] = new Stream[F, B] {
     val streams: Array[Stream[F, B]] = new Array(concurrency)
     var takeFromCounter = 0
+
     def aux(): F[Option[B]] = {
       val takeFrom = takeFromCounter % concurrency
       val underlying = streams(takeFrom)
       takeFromCounter += 1
       if (underlying == null) {
-        self.pull() flatMap {
-          case Some(value) =>
-            f(value).flatMap { newStream =>
-              streams(takeFrom) = newStream
-              newStream.pull()
-            }
-          case None =>
-            streams(takeFrom) = null
-            aux()
-        }
+        pullNextStream(takeFrom)
       } else {
-        underlying.pull()
+        underlying.pull().flatMap {
+          case Some(value) =>
+            Effect[F].pure(Some(value))
+          case None =>
+            pullNextStream(takeFrom)
+        }
       }
     }
+
+    private def pullNextStream(takeFrom: Int): F[Option[B]] = {
+      self.pull().flatMap {
+        case Some(value) =>
+          takeFromNextStream(value, takeFrom)
+        case None =>
+          streams(takeFrom) = null
+          if(hasNonEmptyStream()) aux()
+          else Effect[F].pure(None)
+      }
+    }
+
+    private def hasNonEmptyStream() = streams.exists(_ != null)
+
+    private def takeFromNextStream(value: A, takeFrom: Int): F[Option[B]] = {
+      f(value).flatMap { newStream =>
+        streams(takeFrom) = newStream
+        newStream.pull().flatMap {
+          case Some(value) => Effect[F].pure(Some(value))
+          case None => aux()
+        }
+      }
+    }
+
     def pull(): F[Option[B]] = aux()
     def cancel(): F[Unit] = self.cancel()
   }
@@ -315,6 +336,16 @@ abstract class Stream[F[_]: Effect, A] { self =>
 
 object Stream {
 
+  implicit class KorolevUnchunkExtension[F[_]: Effect, A](stream: Stream[F, Seq[A]]) {
+
+    /**
+      * Flatten Stream of any collection to single elements
+      * @return
+      */
+    def unchunk[O]: Stream[F, A] = stream.flatMapAsync(chunk => Stream.emits(chunk).mat())
+
+  }
+
   def empty[F[_]: Effect, T]: Stream[F, T] = {
     new Stream[F, T] {
       val pull: F[Option[T]] = Effect[F].pure(Option.empty[T])
@@ -359,6 +390,7 @@ object Stream {
       def cancel(): F[Unit] = Effect[F].flatMap(eventuallyStream)(_.cancel())
     }
   }
+
 
   def unfold[F[_]: Effect, S, T](default: S, doCancel: () => F[Unit] = null)
                                 (loop: S => F[(S, Option[T])]): Stream[F, T] = {

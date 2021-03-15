@@ -220,9 +220,20 @@ lazy val zio = project
   .settings(commonSettings: _*)
   .settings(
     normalizedName := "korolev-zio",
-    libraryDependencies += "dev.zio" %% "zio" % "1.0.0"
+    libraryDependencies += "dev.zio" %% "zio" % "1.0.4"
   )
   .dependsOn(effect)
+
+lazy val zioStreams = project
+  .in(interop / "zio-streams")
+  .enablePlugins(GitVersioning)
+  .settings(crossVersionSettings)
+  .settings(commonSettings: _*)
+  .settings(
+    normalizedName := "korolev-zio-streams",
+    libraryDependencies += "dev.zio" %% "zio-streams" % "1.0.4"
+  )
+  .dependsOn(effect, zio)
 
 lazy val fs2 = project
   .in(interop / "fs2")
@@ -443,7 +454,7 @@ lazy val root = project
     korolev, effect, web, http, standalone, testkit,
     bytes,
     // Interop
-    akka, cats, monix, zio, slf4j,
+    akka, cats, monix, zio, zioStreams, slf4j,
     scodec, fs2, http4s,
     // Examples
     simpleExample, routingExample, gameOfLifeExample,
