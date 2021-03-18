@@ -107,7 +107,11 @@ object Http4sZioExample extends App {
     type Task[A] = RIO[R, A]
     ZIO.runtime[R].flatMap { implicit rts =>
       BlazeServerBuilder
-        .apply[Task](rts.platform.executor.asEC)
+        // It's unsafe to use default ZIO executor with Blaze server since it could lead to
+        // dead locks at higher RPS thresholds. See the discussion at
+        // https://discord.com/channels/629491597070827530/630498701860929559/821733420341788732
+        // Instead we use global execution context from Scala.
+        .apply[Task](ExecutionContext.global)
         .bindHttp(port, "0.0.0.0")
         .withHttpApp(httpApp)
         .serve
