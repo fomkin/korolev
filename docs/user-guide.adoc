@@ -869,7 +869,7 @@ val config = KorolevServiceConfig(
 )
 ------------------------------
 
-=== Akka
+=== Akka HTTP
 
 Korolev provides smooth Akka HTTP integration out of the box. To use it, add a dependency:
 
@@ -949,43 +949,6 @@ Then embed the route into your Http4 HTTP routes structure.
 
 https://github.com/fomkin/korolev/blob/v0.17.0/examples/http4s-zio/src/main/scala/Http4sZioExample.scala[See full example]
 
-=== ZIO-streams
-Conversions between Zio and Korolev streams
-
-To use it, add a dependency:
-[source,scala]
-------------------------------
-libraryDependencies += "org.fomkin" %% "korolev-zio-streams" % "0.17.0"
-------------------------------
-
-Conversion from Korolev to ZIO:
-
-[source,scala]
-------------------------------
-val io = KorolevStream(values: _*)
-.mat[Task]()
-.flatMap { korolevStream: KorolevStream[Task, Int] =>
-korolevStream
-.toZStream
-.run(ZSink.foldLeft(List.empty[Int]){ case (acc, v) => acc :+ v})
-}
-------------------------------
-
-Conversion from ZIO to Korolev:
-[source,scala]
-------------------------------
-val values = Vector(1, 2, 3, 4, 5)
-    val io = ZStream.fromIterable(values)
-      .toKorolev()
-      .flatMap { korolevStream =>
-        korolevStream
-          .fold(Vector.empty[Int])((acc, value) => acc :+ value)
-          .map(result => result shouldEqual values)
-      }
-------------------------------
-
-
-
 === Effects
 
 In addition to standard Scala Futures, Korolev can work with popular effects libraries: ZIO, Cats Effect, and Monix. To use them, add the dependency and set `F` type parameter of` Context` and `KorolevServiceConfig` to demanded effect type.
@@ -1057,6 +1020,120 @@ val config = KorolevServiceConfig[IO, MyState, Any](...)
 
 https://github.com/fomkin/korolev/blob/v0.17.0/examples/cats/src/main/scala/CatsIOExample.scala[See full example]
 
+=== Streams
+
+Under the hood Korolev uses it's own simple pull based streams which can work with standard Futures. In the most cases you will not meet them, but sometimes you can.  Korolev streams is not suitable to be used in applications, so we offer converters for most popular stream libraries.
+
+==== Reactive Streams
+
+https://www.reactive-streams.org[Reactive Streams]  is a part of <<Akka HTTP>> server integration.
+
+Conversion from Korolev to Publisher.
+
+[source,scala]
+------------------------------
+import korolev.akka.instances._
+
+val publisher = myKorolevStream.asPublisher
+------------------------------
+
+Subscribe to Publisher
+
+[source,scala]
+------------------------------
+import korolev.akka.util.KorolevStreamSubscriber
+
+val subscriber = new KorolevStreamSubscriber[F, T]()
+publisher.subscribe(result)
+------------------------------
+
+==== Akka Streams
+
+Akka streams is a part of <<Akka HTTP>> server integration.
+
+
+Conversion from Akka Stream to Korolev.
+
+[source,scala]
+------------------------------
+import korolev.akka.instances._
+
+val akkaSource = korolevStream.asAkkaSource
+------------------------------
+
+Conversion from Akka Stream to Korolev.
+
+[source,scala]
+------------------------------
+import korolev.akka.instances._
+
+val (stream, korolevSink) = Sink.korolevStream[F, String].preMaterialize()
+
+myFlow.to(korolevSink)
+------------------------------
+
+==== ZIO
+
+To use it, add a dependency:
+[source,scala]
+------------------------------
+libraryDependencies += "org.fomkin" %% "korolev-zio-streams" % "0.17.0"
+------------------------------
+
+Conversion from Korolev to ZIO:
+
+[source,scala]
+------------------------------
+val io = KorolevStream(values: _*)
+  .mat[Task]()
+  .flatMap { korolevStream: KorolevStream[Task, Int] =>
+    korolevStream
+      .toZStream
+      .run(ZSink.foldLeft(List.empty[Int]){ case (acc, v) => acc :+ v})
+  }
+------------------------------
+
+Conversion from ZIO to Korolev:
+[source,scala]
+------------------------------
+val values = Vector(1, 2, 3, 4, 5)
+val io = ZStream.fromIterable(values)
+  .toKorolev()
+  .flatMap { korolevStream =>
+    korolevStream
+      .fold(Vector.empty[Int])((acc, value) => acc :+ value)
+      .map(result => result shouldEqual values)
+  }
+------------------------------
+
+==== Fs2
+
+Conversion from Korolev to Fs2:
+
+To use it, add a dependency:
+[source,scala]
+------------------------------
+libraryDependencies += "org.fomkin" %% "korolev-fs2" % "0.17.0"
+------------------------------
+
+Conversion from Korolev to Fs2.
+
+[source,scala]
+------------------------------
+val io = KorolevStream(values: _*)
+  .mat[Task]()
+  .toFs2
+------------------------------
+
+Conversion from Fs2 to Korolev.
+
+[source,scala]
+------------------------------
+val values = Vector(1, 2, 3, 4, 5)
+val io = fs2.Stream.emits(values)
+  .toKorolev
+------------------------------
+
 == Troubleshooting
 
 === Debug mode
@@ -1080,7 +1157,7 @@ Now you can see something like this.
 ------------------------------
 
 Message starting with `->` is commands from server. Message started with `<-` is callback and client side events.
-First number is always an procedure or callback code. You can protocol description https://github.com/fomkin/korolev/blob/v0.17.0/korolev/src/main/protocol.md[here].
+First number is always an procedure or callback code. You can protocol description https://github.com/fomkin/korolev/blob/v0.17.0/modules/korolev/src/main/protocol.md[here].
 
 === Reconnections under Kubernetes Ingress
 
