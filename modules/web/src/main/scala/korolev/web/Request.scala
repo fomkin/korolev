@@ -30,19 +30,19 @@ final case class Request[Body](method: Request.Method,
                                renderedCookie: String = null)
     extends Request.Head {
 
-  private lazy val parsedCookie =
+  private lazy val parsedCookie = {
+    def d(s: String) = URLDecoder.decode(s.trim, "UTF-8")
     if (renderedCookie == null || renderedCookie.isEmpty) Map.empty[String, String]
     else
       renderedCookie
         .split(';')
-        .map { xs =>
-          val (key, value) = xs.split('=') match {
-            case Array(k, v) => (k, v)
-            case Array(k)    => (k, "")
-          }
-          (URLDecoder.decode(key.trim, "UTF-8"), URLDecoder.decode(value, "UTF-8"))
+        .map(_.split('='))
+        .collect {
+          case Array(k, v) => (d(k), d(v))
+          case Array(k)    => (d(k), "")
         }
         .toMap
+  }
 
   def param(name: String): Option[String] =
     pq.param(name)
