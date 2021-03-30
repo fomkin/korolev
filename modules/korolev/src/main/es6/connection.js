@@ -20,6 +20,7 @@ export class Connection {
    * @param {Location} location
    */
   constructor(deviceId, sessionId, serverRootPath, location) {
+    this._reconnect = true;
     this._deviceId = deviceId;
     this._sessionId = sessionId;
     this._serverRootPath = serverRootPath;
@@ -182,8 +183,10 @@ export class Connection {
     console.log('Connection closed');
     let event = this._createEvent('close');
     this._dispatcher.dispatchEvent(event);
+    if (this._reconnect) {
+      this.connect();
+    }
   }
-
 
   /**
    * @param {string} data
@@ -202,7 +205,11 @@ export class Connection {
     this._send(data);
   }
 
-  disconnect() {
+  /**
+   * @param {boolean} reconnect
+   */
+  disconnect(reconnect = true) {
+    this._reconnect = reconnect;
     if (this._webSocket != null) {
         this._webSocket.close();
         this._onClose();

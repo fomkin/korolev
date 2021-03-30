@@ -40,6 +40,8 @@ object Response {
 
   object Status {
     val Ok: Status = new Status(200, "OK")
+    val Created = new Status(201, "Created")
+    val ResetContent = new Status(205, "Reset Content")
     val NotFound: Status = new Status(404, "Not Found")
     val BadRequest: Status = new Status(400, "Bad Request")
     val Gone: Status = new Status(410, "Gone")

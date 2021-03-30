@@ -44,7 +44,10 @@ export class Bridge {
     let k = this._korolev;
     switch (pCode) {
       case 0: k.setRenderNum.apply(k, commands); break;
-      case 1: k.reload.apply(k, commands); break;
+      case 1:
+        this._connection.disconnect(false);
+        window.location.reload();
+        break;
       case 2: k.listenEvent.apply(k, commands); break;
       case 3: k.extractProperty.apply(k, commands); break;
       case 4: k.modifyDom(commands); break;
