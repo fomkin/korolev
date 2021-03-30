@@ -116,7 +116,7 @@ export class Korolev {
   }
 
   reload() {
-    window.document.location.reload();
+    window.location.reload();
   }
 
    /**

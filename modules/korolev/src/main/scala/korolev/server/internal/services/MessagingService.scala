@@ -80,7 +80,7 @@ private[korolev] final class MessagingService[F[_]: Effect](reporter: Reporter,
           // do not have an information about the state which had been
           // applied to render of the page on a client side.
           Stream(Frontend.ReloadMessage).mat().map { messages =>
-            Response(Status.Ok, messages, Nil, None)
+            Response(Status.Ok, messages ++ Stream.endless, Nil, None)
           }
       }
     }

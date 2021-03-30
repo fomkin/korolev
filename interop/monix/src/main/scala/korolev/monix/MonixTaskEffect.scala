@@ -39,6 +39,9 @@ class MonixTaskEffect(implicit scheduler: Scheduler) extends Effect[Task] {
   def unit: Task[Unit] =
     Task.unit
 
+  def never[T]: Task[T] =
+    Task.never
+
   def fromTry[A](value: => Try[A]): Task[A] =
     Task.fromTry(value)
 

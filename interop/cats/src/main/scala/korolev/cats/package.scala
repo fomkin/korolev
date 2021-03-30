@@ -45,6 +45,9 @@ package object cats {
     def unit: IO[Unit] =
       IO.unit
 
+    def never[T]: IO[T] =
+      IO.never
+
     def fromTry[A](value: => Try[A]): IO[A] =
       IO.fromTry(value)
 
