@@ -51,7 +51,7 @@ abstract class Component
     *  import symbolDsl._
     * }}}
     */
-  val context = Context[F, S, E]
+  val context = Context[F, S]
 
   /**
     * Component render
@@ -62,7 +62,7 @@ abstract class Component
 object Component {
 
   /** (context, state) => document */
-  type Render[F[_], S, P, E] = (Context[F, S, E], P, S) => Node[Binding[F, S, E]]
+  type Render[F[_], S, P, E] = (Context[F, S], P, S) => Node[Binding[F, S]]
 
   /**
     * Create component in functional style
@@ -73,7 +73,7 @@ object Component {
            (initialState: S, id: String = Component.randomId())
            (f: Render[F, S, P, E]): Component[F, S, P, E] = {
     new Component[F, S, P, E](initialState, id) {
-      def render(parameters: P, state: S): Node[Binding[F, S, E]] = f(context, parameters, state)
+      def render(parameters: P, state: S): Node[Binding[F, S]] = f(context, parameters, state)
     }
   }
 

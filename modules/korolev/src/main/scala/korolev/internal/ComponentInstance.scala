@@ -31,6 +31,7 @@ import korolev.util.JsCode
 import korolev.web.FormData
 
 import scala.concurrent.ExecutionContext
+import scala.reflect.{ClassTag, classTag}
 
 /**
   * Component state holder and effects performer
@@ -48,8 +49,8 @@ import scala.concurrent.ExecutionContext
 final class ComponentInstance
   [
     F[_]: Effect,
-    AS: StateSerializer: StateDeserializer, M,
-    CS: StateSerializer: StateDeserializer, P, E
+    AS: StateSerializer: StateDeserializer,
+    CS: StateSerializer: StateDeserializer, P, E: ClassTag
   ](
      nodeId: Id,
      sessionId: Qsid,
@@ -59,7 +60,7 @@ final class ComponentInstance
      getRenderNum: () => Int,
      val component: Component[F, CS, P, E],
      notifyStateChange: (Id, Any) => F[Unit],
-     createMiscProxy: (StatefulRenderContext[Binding[F, AS, M]], (StatefulRenderContext[Binding[F, CS, E]], Binding[F, CS, E]) => Unit) => StatefulRenderContext[Binding[F, CS, E]],
+     createMiscProxy: (StatefulRenderContext[Binding[F, AS]], (StatefulRenderContext[Binding[F, CS]], Binding[F, CS]) => Unit) => StatefulRenderContext[Binding[F, CS]],
      scheduler: Scheduler[F],
      reporter: Reporter
   ) { self =>
@@ -71,19 +72,19 @@ final class ComponentInstance
 
   private val markedDelays = mutable.Set.empty[Id] // Set of the delays which are should survive
   private val markedComponentInstances = mutable.Set.empty[Id]
-  private val delays = mutable.Map.empty[Id, DelayInstance[F, CS, E]]
+  private val delays = mutable.Map.empty[Id, DelayInstance[F, CS]]
   private val elements = mutable.Map.empty[ElementId, Id]
-  private val events = mutable.Map.empty[EventId, Vector[Event[F, CS, E]]]
-  private val nestedComponents = mutable.Map.empty[Id, ComponentInstance[F, CS, E, _, _, _]]
+  private val events = mutable.Map.empty[EventId, Vector[Event[F, CS]]]
+  private val nestedComponents = mutable.Map.empty[Id, ComponentInstance[F, CS, _, _, _]]
 
   // Why we use '() => F[Unit]'? Because should
   // support scala.concurrent.Future which is has
   // strict semantic (runs immediately).
   private val immediatePendingEffects = Queue[F, () => F[Unit]]()
 
-  @volatile private var eventSubscription = Option.empty[E => _]
+  @volatile private var eventSubscription = Option.empty[(ClassTag[_], Any) => _]
 
-  private[korolev] object browserAccess extends Access[F, CS, E] {
+  private[korolev] object browserAccess extends Access[F, CS] {
 
     private def getId(elementId: ElementId): F[Id] = Effect[F].delay {
       unsafeGetId(elementId)
@@ -124,8 +125,8 @@ final class ComponentInstance
         frontend.focus(id)
       }
 
-    def publish(message: E): F[Unit] =
-      Effect[F].delay(eventSubscription.foreach(f => f(message)))
+    def publish[T: ClassTag](message: T): F[Unit] =
+      Effect[F].delay(eventSubscription.foreach(_(classTag[T], message)))
 
     def state: F[CS] = {
       val state = stateManager.read[CS](nodeId)
@@ -206,12 +207,12 @@ final class ComponentInstance
     * Callback will be invoked on call of `access.publish()` in the
     * component instance context.
     */
-  def setEventsSubscription(callback: E => _): Unit = {
+  def setEventsSubscription(callback: (ClassTag[_], Any) => _): Unit = {
     eventSubscription = Some(callback)
   }
 
   def applyRenderContext(parameters: P,
-                         rc: StatefulRenderContext[Binding[F, AS, M]],
+                         rc: StatefulRenderContext[Binding[F, AS]],
                          snapshot: StateManager.Snapshot): Unit = miscLock.synchronized {
     // Reset all event handlers delays and elements
     prepare()
@@ -221,7 +222,7 @@ final class ComponentInstance
         component.render(parameters, state)
       } catch {
         case e: MatchError =>
-          Node[Binding[F, CS, E]] { rc =>
+          Node[Binding[F, CS]] { rc =>
             reporter.error(s"Render is not defined for $state", e)
             rc.openNode(XmlNs.html, "span")
             rc.addTextNode("Render is not defined for the state")
@@ -240,7 +241,7 @@ final class ComponentInstance
           val id = rc.currentContainerId
           elements.put(element, id)
           ()
-        case delay: Delay[F, CS, E] =>
+        case delay: Delay[F, CS] =>
           val id = rc.currentContainerId
           markedDelays += id
           if (!delays.contains(id)) {
@@ -248,13 +249,13 @@ final class ComponentInstance
             delays.put(id, delayInstance)
             delayInstance.start(browserAccess)
           }
-        case entry @ ComponentEntry(_, _: Any, _: ((Access[F, CS, E], Any) => F[Unit])) =>
+        case entry @ ComponentEntry(_, _: Any, _: ((Access[F, CS], Any) => F[Unit])) =>
           val id = rc.subsequentId
           nestedComponents.get(id) match {
-            case Some(n: ComponentInstance[F, CS, E, Any, Any, Any]) if n.component.id == entry.component.id =>
+            case Some(n: ComponentInstance[F, CS, Any, Any, Any]) if n.component.id == entry.component.id =>
               // Use nested component instance
               markedComponentInstances += id
-              n.setEventsSubscription((e: Any) => entry.eventHandler(browserAccess, e).runAsyncForget)
+              n.setEventsSubscription((ct, e) => entry.eventHandler(browserAccess, e).runAsyncForget)
               n.applyRenderContext(entry.parameters, proxy, snapshot)
             case _ =>
               val n = entry.createInstance(
@@ -287,7 +288,7 @@ final class ComponentInstance
 
   def applyEvent(eventId: EventId): Boolean = {
     events.get(eventId) match {
-      case Some(events: Vector[Event[F, CS, E]]) =>
+      case Some(events: Vector[Event[F, CS]]) =>
         // A user defines the event effect, so we
         // don't control the time of execution.
         // We shouldn't block the application if
@@ -379,9 +380,9 @@ private object ComponentInstance {
   import Context.Access
   import Context.Delay
 
-  final class DelayInstance[F[_]: Effect, S, M](delay: Delay[F, S, M],
-                                                scheduler: Scheduler[F],
-                                                reporter: Reporter) {
+  final class DelayInstance[F[_]: Effect, S](delay: Delay[F, S],
+                                             scheduler: Scheduler[F],
+                                             reporter: Reporter) {
 
     @volatile private var handler = Option.empty[Scheduler.JobHandler[F, _]]
     @volatile private var finished = false
@@ -392,7 +393,7 @@ private object ComponentInstance {
       handler.foreach(_.unsafeCancel())
     }
 
-    def start(access: Access[F, S, M]): Unit = {
+    def start(access: Access[F, S]): Unit = {
       handler = Some {
         scheduler.unsafeScheduleOnce(delay.duration) {
           finished = true

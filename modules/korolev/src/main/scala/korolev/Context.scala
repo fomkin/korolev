@@ -26,14 +26,15 @@ import levsha._
 import levsha.events.EventPhase
 
 import scala.concurrent.duration.FiniteDuration
+import scala.reflect.ClassTag
 
 /**
   * Provides DSLs and effects for application or component
   * @since 0.6.0
   */
-final class Context[F[_]: Effect, S: StateSerializer: StateDeserializer, M] extends Context.Scope[F, S, S, M] {
+final class Context[F[_]: Effect, S: StateSerializer: StateDeserializer] extends Context.Scope[F, S, S] {
   type AccessType = S
-  protected val accessScope: Context.Access[F, S, M] => Context.Access[F, S, M] = identity
+  protected val accessScope: Context.Access[F, S] => Context.Access[F, S] = identity
 }
 
 object Context {
@@ -45,31 +46,31 @@ object Context {
     * @tparam S Type of application state
     * @tparam M Type of events
     */
-  def apply[F[_]: Effect, S: StateSerializer: StateDeserializer, M] =
-    new Context[F, S, M]()
+  def apply[F[_]: Effect, S: StateSerializer: StateDeserializer] =
+    new Context[F, S]()
 
-  sealed abstract class Scope[F[_]: Effect, S: StateSerializer: StateDeserializer, AccessType, M] {
+  sealed abstract class Scope[F[_]: Effect, S: StateSerializer: StateDeserializer, AccessType] {
 
-    type Binding = Context.Binding[F, S, M]
-    type Event = Context.Event[F, S, M]
+    type Binding = Context.Binding[F, S]
+    type Event = Context.Event[F, S]
     type EventFactory[T] = T => Event
     type Transition = korolev.Transition[S]
     type Render = PartialFunction[S, Document.Node[Binding]]
     type ElementId = Context.ElementId
-    type Access = Context.Access[F, AccessType, M]
-    type UnscopedAccess = Context.Access[F, S, M]
+    type Access = Context.Access[F, AccessType]
+    type UnscopedAccess = Context.Access[F, S]
     type EventResult = F[Unit]
     type Document = levsha.Document[Binding]
     type Node = levsha.Document.Node[Binding]
     type Attr = levsha.Document.Attr[Binding]
 
-    val symbolDsl = new KorolevTemplateDsl[F, S, M]()
+    val symbolDsl = new KorolevTemplateDsl[F, S]()
 
-    protected val accessScope: Context.Access[F, S, M] => Access
+    protected val accessScope: Context.Access[F, S] => Access
 
-    def scope[S2](read: PartialFunction[S, S2], write: PartialFunction[(S, S2), S]): Scope[F, S, S2, M] = new Scope[F, S, S2, M] {
+    def scope[S2](read: PartialFunction[S, S2], write: PartialFunction[(S, S2), S]): Scope[F, S, S2] = new Scope[F, S, S2] {
 
-      protected val accessScope: Context.Access[F, S, M] => Access = access => new Context.Access[F, S2, M] {
+      protected val accessScope: Context.Access[F, S] => Access = access => new Context.Access[F, S2] {
 
         def eventData: F[String] = access.eventData
 
@@ -79,7 +80,7 @@ object Context {
         def focus(id: Context.ElementId): F[Unit] =
           access.focus(id)
 
-        def publish(message: M): F[Unit] =
+        def publish[M: ClassTag](message: M): F[Unit] =
           access.publish(message)
 
         def downloadFormData(id: Context.ElementId): F[FormData] =
@@ -128,7 +129,7 @@ object Context {
       * Schedules the transition with delay. For example it can be useful
       * when you want to hide something after timeout.
       */
-    def delay(duration: FiniteDuration)(effect: Access => F[Unit]): Delay[F, S, M] = {
+    def delay(duration: FiniteDuration)(effect: Access => F[Unit]): Delay[F, S] = {
       Delay(duration, accessScope.andThen(effect))
     }
 
@@ -143,15 +144,15 @@ object Context {
     val emptyTransition: PartialFunction[S, S] = { case x => x }
 
     implicit final class ComponentDsl[CS: StateSerializer: StateDeserializer, P, E](component: Component[F, CS, P, E]) {
-      def apply(parameters: P)(f: (Access, E) => F[Unit]): ComponentEntry[F, S, M, CS, P, E] =
-        ComponentEntry(component, parameters, (a: Context.Access[F, S, M], e: E) => f(accessScope(a), e))
+      def apply(parameters: P)(f: (Access, E) => F[Unit]): ComponentEntry[F, S, CS, P, E] =
+        ComponentEntry(component, parameters, (a: Context.Access[F, S], e: E) => f(accessScope(a), e))
 
-      def silent(parameters: P): ComponentEntry[F, S, M, CS, P, E] =
+      def silent(parameters: P): ComponentEntry[F, S, CS, P, E] =
         ComponentEntry(component, parameters, (_, _) => Effect[F].unit)
     }
   }
 
-  trait BaseAccess[F[_], S, M] {
+  trait BaseAccess[F[_], S] {
 
     /**
       * Extracts property of element from client-side DOM.
@@ -201,7 +202,7 @@ object Context {
     /**
       * Publish message to environment.
       */
-    def publish(message: M): F[Unit]
+    def publish[M: ClassTag](message: M): F[Unit]
 
     /**
       * Downloads form from the client. Useful when when you
@@ -313,7 +314,7 @@ object Context {
     def registerCallback(name: String)(f: String => F[Unit]): F[Unit]
   }
 
-  trait EventAccess[F[_], S, M] {
+  trait EventAccess[F[_], S] {
 
     /**
       * Gives json with string, number and boolean fields of
@@ -328,9 +329,9 @@ object Context {
   /**
     * Provides access to make side effects
     */
-  trait Access[F[_], S, M] extends BaseAccess[F, S, M] with EventAccess[F, S, M]
+  trait Access[F[_], S] extends BaseAccess[F, S] with EventAccess[F, S]
 
-  sealed trait Binding[+F[_], +S, +M]
+  sealed trait Binding[+F[_], +S]
 
   abstract class PropertyHandler[F[_]: Effect] {
     @deprecated("""Use "propertyName" instead of 'propertyName""", "0.13.0")
@@ -346,14 +347,14 @@ object Context {
   final case class ComponentEntry
     [
       F[_]: Effect,
-      AS: StateSerializer: StateDeserializer, M,
+      AS: StateSerializer: StateDeserializer,
       CS: StateSerializer: StateDeserializer, P, E
     ](
       component: Component[F, CS, P, E],
       parameters: P,
-      eventHandler: (Access[F, AS, M], E) => F[Unit]
+      eventHandler: (Access[F, AS], E) => F[Unit]
     )
-    extends Binding[F, AS, M] {
+    extends Binding[F, AS] {
 
     def createInstance(node: Id,
                        sessionId: Qsid,
@@ -363,10 +364,10 @@ object Context {
                        getRenderNum: () => Int,
                        notifyStateChange: (Id, Any) => F[Unit],
                        scheduler: Scheduler[F],
-                       reporter: Reporter): ComponentInstance[F, AS, M, CS, P, E] = {
+                       reporter: Reporter): ComponentInstance[F, AS, CS, P, E] = {
       new ComponentInstance(
         node, sessionId, frontend, eventRegistry, stateManager, getRenderNum, component, notifyStateChange,
-        createMiscProxy = (rc, k) => new StatefulRenderContext[Binding[F, CS, E]] {
+        createMiscProxy = (rc, k) => new StatefulRenderContext[Binding[F, CS]] {
           def currentContainerId: Id = rc.currentContainerId
           def currentId: Id = rc.currentId
           def subsequentId: Id = rc.subsequentId
@@ -375,22 +376,22 @@ object Context {
           def setAttr(xmlNs: XmlNs, name: String, value: String): Unit = rc.setAttr(xmlNs, name, value)
           def setStyle(name: String, value: String): Unit = rc.setStyle(name, value) 
           def addTextNode(text: String): Unit = rc.addTextNode(text)
-          def addMisc(misc: Binding[F, CS, E]): Unit = k(this, misc)
+          def addMisc(misc: Binding[F, CS]): Unit = k(this, misc)
         },
         scheduler, reporter
       )
     }
   }
 
-  final case class Event[F[_], S, M](
+  final case class Event[F[_], S](
       `type`: String,
       phase: EventPhase,
       stopPropagation: Boolean,
-      effect: Access[F, S, M] => F[Unit]) extends Binding[F, S, M]
+      effect: Access[F, S] => F[Unit]) extends Binding[F, S]
 
-  final case class Delay[F[_]: Effect, S, M](
+  final case class Delay[F[_]: Effect, S](
       duration: FiniteDuration,
-      effect: Access[F, S, M] => F[Unit]) extends Binding[F, S, M]
+      effect: Access[F, S] => F[Unit]) extends Binding[F, S]
 
   final class ElementId (val name: Option[String]) extends Binding[Nothing, Nothing, Nothing] {
     override def equals(obj: Any): Boolean = obj match {

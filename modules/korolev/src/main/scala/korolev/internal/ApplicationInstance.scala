@@ -36,15 +36,14 @@ final class ApplicationInstance
   [
     F[_]: Effect,
     S: StateSerializer: StateDeserializer,
-    M
   ](
      sessionId: Qsid,
      val frontend: Frontend[F],
      stateManager: StateManager[F],
      initialState: S,
-     render: S => Document.Node[Binding[F, S, M]],
+     render: S => Document.Node[Binding[F, S]],
      router: Router[F, S],
-     createMiscProxy: (StatefulRenderContext[Binding[F, S, M]], (StatefulRenderContext[Binding[F, S, M]], Binding[F, S, M]) => Unit) => StatefulRenderContext[Binding[F, S, M]],
+     createMiscProxy: (StatefulRenderContext[Binding[F, S]], (StatefulRenderContext[Binding[F, S]], Binding[F, S]) => Unit) => StatefulRenderContext[Binding[F, S]],
      scheduler: Scheduler[F],
      reporter: Reporter
   ) { application =>
@@ -54,7 +53,7 @@ final class ApplicationInstance
   private val devMode = new DevMode.ForRenderContext(sessionId.toString)
   private val currentRenderNum = new AtomicInteger(0)
   private val stateQueue = Queue[F, (Id, Any)]()
-  private val messagesQueue = Queue[F, M]()
+  private val messagesQueue = Queue[F, (ClassTag, Any)]()
 
   private val renderContext = {
     DiffRenderContext[Binding[F, S, M]](savedBuffer = devMode.loadRenderContext())
