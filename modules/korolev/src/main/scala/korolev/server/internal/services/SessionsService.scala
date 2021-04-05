@@ -25,9 +25,6 @@ import korolev.state.{StateDeserializer, StateSerializer, StateStorage}
 import korolev.web.Request.Head
 import korolev.{Extension, Qsid}
 
-import scala.collection.concurrent.TrieMap
-import scala.util.Random
-
 private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: StateDeserializer, M](
     config: KorolevServiceConfig[F, S, M],
     pageService: PageService[F, S, M]) {
@@ -67,15 +64,21 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
 
     val (incomingConsumed, incoming) = incomingStream.handleConsumed
 
-    def handleAppClose(frontend: Frontend[F], app: App, ehs: ExtensionsHandlers) =
+    def handleAppOrWsOutgoingClose(frontend: Frontend[F], app: App, ehs: ExtensionsHandlers): F[Unit] = {
+      val consumed: F[Unit] = Effect[F].promise[Unit] { cb =>
+        frontend.outgoingConsumed.map(_ => cb(Right()))
+        incomingConsumed.map(_ => cb(Right()))
+      }
+
       for {
-        _ <- incomingConsumed
+        _ <- consumed
         _ <- frontend.outgoingMessages.cancel()
         _ <- app.topLevelComponentInstance.destroy()
         _ <- ehs.map(_.onDestroy()).sequence
         _ <- Effect[F].delay(stateStorage.remove(qsid.deviceId, qsid.sessionId))
         _ <- apps.remove(qsid)
       } yield ()
+    }
 
     def handleStateChange(app: App, ehs: ExtensionsHandlers): F[Unit] =
       app.stateStream.foreach { case (id, state) =>
@@ -112,7 +115,7 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
         ehs <- config.extensions.map(_.setup(browserAccess)).sequence
         _ <- Effect[F].start(handleStateChange(app, ehs))
         _ <- Effect[F].start(handleMessages(app, ehs))
-        _ <- Effect[F].start(handleAppClose(frontend, app, ehs))
+        _ <- Effect[F].start(handleAppOrWsOutgoingClose(frontend, app, ehs))
         _ <- app.initialize()
       } yield {
         app
