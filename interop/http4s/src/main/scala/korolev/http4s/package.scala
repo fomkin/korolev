@@ -10,7 +10,6 @@ import korolev.data.Bytes
 import org.http4s.{Header, Headers, HttpRoutes, Request, Response, Status}
 import org.http4s.dsl.Http4sDsl
 import org.http4s.headers.Cookie
-import org.http4s.server.{Router => WSRouter}
 import org.http4s.server.websocket.WebSocketBuilder
 import org.http4s.websocket.WebSocketFrame.{Close, Text}
 import org.http4s.websocket.WebSocketFrame
@@ -21,51 +20,62 @@ import _root_.cats.syntax.all._
 import _root_.fs2.{Pipe, Stream => FS2Stream}
 import _root_.fs2.Chunk
 import _root_.scodec.bits.ByteVector
+import org.http4s.dsl.impl.Path
 
 package object http4s {
-
-  val WS_PATH_PREFIX = "bridge/web-socket"
 
   def http4sKorolevService[F[_]: Effect: ConcurrentEffect, S: StateSerializer: StateDeserializer, M]
       (config: KorolevServiceConfig[F, S, M])
       (implicit ec: ExecutionContext): HttpRoutes[F] = {
 
-    val korolevServer = korolev.server.korolevService(config)
-    val wsRouter = configureWsRoute(korolevServer)
-    val httpRoute = configureHttpRoute(korolevServer)
+    val dsl: Http4sDsl[F] = Http4sDsl[F]
+    import dsl._
 
-    WSRouter[F](WS_PATH_PREFIX -> wsRouter, "" -> httpRoute)
+    val korolevServer = korolev.server.korolevService(config)
+
+    HttpRoutes.of[F] {
+      case wsReq @ GET -> path if containsUpgradeHeader(wsReq) =>
+        routeWsRequest(wsReq, path, korolevServer)
+
+      case otherReqs =>
+        routeHttpRequest(otherReqs, korolevServer)
+    }
   }
 
-  private def configureWsRoute[F[_]: Effect: ConcurrentEffect, S: StateSerializer: StateDeserializer, M]
-  (korolevServer: KorolevService[F])
-  (implicit ec: ExecutionContext): HttpRoutes[F] = {
+  private def containsUpgradeHeader[F[_]: Effect: ConcurrentEffect](req: Request[F]): Boolean = {
+    val headers = req.headers.toList
+    val found = for {
+      _ <- headers.find(h => h.name.value.toLowerCase == "connection" && h.value.toLowerCase == "upgrade")
+      _ <- headers.find(h => h.name.value.toLowerCase == "upgrade" && h.value.toLowerCase == "websocket")
+    } yield {}
+    found.isDefined
+  }
+
+  private def routeWsRequest[F[_]: Effect: ConcurrentEffect, S: StateSerializer: StateDeserializer, M]
+  (req: Request[F], path: Path, korolevServer: KorolevService[F])
+  (implicit ec: ExecutionContext): F[Response[F]] = {
 
     val dsl: Http4sDsl[F] = Http4sDsl[F]
     import dsl._
 
-    HttpRoutes.of[F] {
+    val (fromClient, kStream) = makeSinkAndSubscriber()
 
-      case req @ GET -> path  =>
-        val (fromClient, kStream) = makeSinkAndSubscriber()
+    val fullPath = path.toString
+    val korolevRequest = mkKorolevRequest[F, KStream[F, String]](req, fullPath, kStream)
 
-        val fullPath = WS_PATH_PREFIX + path.toString
-        val korolevRequest = mkKorolevRequest[F, KStream[F, String]](req, fullPath, kStream)
-
-        for {
-          response <- korolevServer.ws(korolevRequest)
-          toClient = response match {
-              case KorolevResponse(_, outStream, _, _) =>
-                outStream
-                  .map(out => Text(out))
-                  .toFs2
-              case _ =>
-                throw new RuntimeException
-            }
-          route <- WebSocketBuilder[F].build(toClient, fromClient)
-        } yield {
-          route
+    for {
+      response <- korolevServer.ws(korolevRequest)
+      toClient = response match {
+          case KorolevResponse(_, outStream, _, _) =>
+            outStream
+              .map(out => Text(out))
+              .toFs2
+          case _ =>
+            throw new RuntimeException
         }
+      route <- WebSocketBuilder[F].build(toClient, fromClient)
+    } yield {
+      route
     }
   }
 
@@ -84,14 +94,14 @@ package object http4s {
     (sink, queue.stream)
   }
 
-  private def configureHttpRoute[F[_]: Effect: ConcurrentEffect]
-    (korolevServer: KorolevService[F])
-    (implicit ec: ExecutionContext): HttpRoutes[F] = {
+  private def routeHttpRequest[F[_]: Effect: ConcurrentEffect]
+    (request: Request[F], korolevServer: KorolevService[F])
+    (implicit ec: ExecutionContext): F[Response[F]] = {
 
     val dsl: Http4sDsl[F] = Http4sDsl[F]
     import dsl._
-    HttpRoutes.of[F] {
 
+    request match {
       case req @ GET -> path =>
         val body = KStream.empty[F, Bytes]
         val korolevRequest = mkKorolevRequest(req, path.toString, body)
