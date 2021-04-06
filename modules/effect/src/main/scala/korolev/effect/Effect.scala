@@ -34,6 +34,7 @@ trait Effect[F[_]] {
   def delayAsync[A](value: => F[A]): F[A] = flatMap(delay(value))(identity)
   def fail[A](e: Throwable): F[A]
   def unit: F[Unit]
+  def never[T]: F[T]
   def fromTry[A](value: => Try[A]): F[A]
   def promise[A](cb: (Either[Throwable, A] => Unit) => Unit): F[A]
   def promiseF[A](cb: (Either[Throwable, A] => Unit) => F[Unit]): F[A]
@@ -70,6 +71,7 @@ object Effect {
       def reportFailure(cause: Throwable): Unit = cause.printStackTrace()
     }
     val unit: Future[Unit] = Future.unit
+    def never[T]: Future[T] = Future.never
     def toFuture[A](m: Future[A]): Future[A] = m
     def fail[A](e: Throwable): Future[A] = Future.failed(e)
     def pure[A](value: A): Future[A] = Future.successful(value)

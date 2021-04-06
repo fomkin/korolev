@@ -115,10 +115,6 @@ export class Korolev {
     aux("1", rootNode);
   }
 
-  reload() {
-    window.document.location.reload();
-  }
-
    /**
     * @param {string} type
     * @param {boolean} preventDefault

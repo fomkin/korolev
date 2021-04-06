@@ -36,7 +36,7 @@ abstract class Stream[F[_]: Effect, A] { self =>
   /**
     * Sequently concat two streams
     * {{{
-    *   Stream.eval(1,2,3) ++ Stream.eval(4,5,6)
+    *   Stream(1,2,3) ++ Stream(4,5,6)
     *   // 1,2,3,4,5,6
     * }}}
     * @return
@@ -346,17 +346,18 @@ object Stream {
 
   }
 
+  def endless[F[_]: Effect, T]: Stream[F, T] =
+    new Stream[F, T] {
+      val pull: F[Option[T]] = Effect[F].never
+      val cancel: F[Unit] = Effect[F].unit
+    }
+
   def empty[F[_]: Effect, T]: Stream[F, T] = {
     new Stream[F, T] {
       val pull: F[Option[T]] = Effect[F].pure(Option.empty[T])
       val cancel: F[Unit] = Effect[F].unit
     }
   }
-
-//  def never[F[_]: Effect, T]: Stream[F, T] =  new Stream[F, T] {
-//    val pull: F[Option[T]] = Effect[F].never
-//    val cancel: F[Unit] = Effect[F].unit
-//  }
 
   def apply[T](xs: T*): Template[T] = emits(xs)
 
@@ -381,15 +382,16 @@ object Stream {
     }
   }
 
-  /**
-    * Immediately gives same stream as `eventuallyStream`.
-    */
-  def proxy[F[_]: Effect, T](eventuallyStream: F[Stream[F, T]]): Stream[F, T] = {
-    new Stream[F, T] {
-      def pull(): F[Option[T]] = Effect[F].flatMap(eventuallyStream)(_.pull())
-      def cancel(): F[Unit] = Effect[F].flatMap(eventuallyStream)(_.cancel())
-    }
-  }
+//  TODO this implementation doesn't work properly
+//  /**
+//    * Immediately gives same stream as `eventuallyStream`.
+//    */
+//  def proxy[F[_]: Effect, T](eventuallyStream: F[Stream[F, T]]): Stream[F, T] = {
+//    new Stream[F, T] {
+//      def pull(): F[Option[T]] = Effect[F].flatMap(eventuallyStream)(_.pull())
+//      def cancel(): F[Unit] = Effect[F].flatMap(eventuallyStream)(_.cancel())
+//    }
+//  }
 
 
   def unfold[F[_]: Effect, S, T](default: S, doCancel: () => F[Unit] = null)

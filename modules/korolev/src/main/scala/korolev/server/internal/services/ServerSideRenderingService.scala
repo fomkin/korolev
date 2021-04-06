@@ -16,12 +16,14 @@
 
 package korolev.server.internal.services
 
+import korolev.data.Bytes
+import korolev.{Qsid, effect}
 import korolev.effect.Effect
 import korolev.effect.syntax._
 import korolev.server.internal.{Cookies, Html5RenderContext, HttpResponse}
 import korolev.server.{HttpRequest, HttpResponse, KorolevServiceConfig}
 import korolev.web.Response.Status
-import korolev.web.{Headers, PathAndQuery}
+import korolev.web.{Headers, PathAndQuery, Response}
 
 private[korolev] final class ServerSideRenderingService[F[_]: Effect, S, M](sessionsService: SessionsService[F, S, _],
                                                                          pageService: PageService[F, S, M],
