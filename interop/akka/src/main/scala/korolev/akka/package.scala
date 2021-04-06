@@ -41,7 +41,7 @@ package object akka {
   import instances._
 
   def akkaHttpService[F[_]: Effect, S: StateSerializer: StateDeserializer, M]
-      (config: KorolevServiceConfig[F, S, M])
+      (config: KorolevServiceConfig[F, S, M], wsLoggingEnabled: Boolean = false)
       (implicit actorSystem: ActorSystem, materializer: Materializer, ec: ExecutionContext): AkkaHttpService = { akkaHttpConfig =>
     // If reporter wasn't overridden, use akka-logging reporter.
     val actualConfig =
@@ -49,7 +49,7 @@ package object akka {
       else config.copy(reporter = new LoggingReporter(actorSystem))
 
     val korolevServer = korolev.server.korolevService(actualConfig)
-    val wsRouter = configureWsRoute(korolevServer, akkaHttpConfig, actualConfig)
+    val wsRouter = configureWsRoute(korolevServer, akkaHttpConfig, actualConfig, wsLoggingEnabled)
     val httpRoute = configureHttpRoute(korolevServer)
 
     wsRouter ~ httpRoute
@@ -58,7 +58,8 @@ package object akka {
   private def configureWsRoute[F[_]: Effect, S: StateSerializer: StateDeserializer, M]
       (korolevServer: KorolevService[F],
        akkaHttpConfig: AkkaHttpServerConfig,
-       korolevServiceConfig: KorolevServiceConfig[F, S, M])
+       korolevServiceConfig: KorolevServiceConfig[F, S, M],
+       wsLoggingEnabled: Boolean)
       (implicit materializer: Materializer, ec: ExecutionContext): Route =
     extractRequest { request =>
       extractUnmatchedPath { path =>
@@ -84,7 +85,11 @@ package object akka {
                     .to(inSink)
 
                 upgrade.handleMessages(
-                  Flow.fromSinkAndSourceCoupled(sink, source)
+                  if(wsLoggingEnabled) {
+                    Flow.fromSinkAndSourceCoupled(sink, source).log("korolev-ws")
+                  } else {
+                    Flow.fromSinkAndSourceCoupled(sink, source)
+                  }
                 )
               case _ =>
                 throw new RuntimeException // cannot happen
