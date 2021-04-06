@@ -49,7 +49,7 @@ package object akka {
       else config.copy(reporter = new LoggingReporter(actorSystem))
 
     val korolevServer = korolev.server.korolevService(actualConfig)
-    val wsRouter = configureWsRoute(korolevServer, akkaHttpConfig, actualConfig)
+    val wsRouter = configureWsRoute(korolevServer, akkaHttpConfig, actualConfig, wsLoggingEnabled)
     val httpRoute = configureHttpRoute(korolevServer)
 
     wsRouter ~ httpRoute
