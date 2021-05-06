@@ -383,6 +383,76 @@ form(
 
 https://github.com/fomkin/korolev/blob/v0.17.1/examples/form-data/src/main/scala/FormDataExample.scala[See full example]
 
+=== File upload
+
+Currently Korolev have two way for file uploading: upload all files at once and manual choose what and when upload
+
+In both approach html is the same, you need form with file upload input and button with upload handler
+
+[source,scala]
+-----------------------------------
+Html(
+    body(
+      delay(1.second) { access => access.transition(_.copy(aliveIndicator = !aliveIndicator)) },
+      div(when(aliveIndicator)(backgroundColor @= "red"), "Online"),
+      input(`type` := "file", multiple, fileInput),
+      ul(
+        progress.map {
+          case (name, (loaded, total)) =>
+            li(s"$name: $loaded / $total")
+        }
+      ),
+      button(
+        "Upload",
+        when(inProgress)(disabled),
+        event("click")(onUploadClick)
+      )
+    )
+  )
+-----------------------------------
+
+Processing of uploaded files if very simple `downloadFilesAsStream` return collection of minimal file information and `Stream` with file data
+
+*Warning* `downloadFilesAsStream` allocate resources on server for all files before any data processing is performed. If you need upload multiple big files or huge amount of small files please read next section.
+
+[source,scala]
+-----------------------------------
+for {
+  files <- access.downloadFilesAsStream(fileInput)
+  _ <- Task.sequence {
+    files.map { case (handler, data) =>
+      val path = Paths.get(handler.fileName)
+      data.to(FileIO.write(path))
+    }
+  }
+} yield ()
+-----------------------------------
+
+https://github.com/fomkin/korolev/blob/v0.17.1/examples/file-streaming/src/main/scala/FileStreamingExample.scala[See full example]
+
+==== Upload many big files
+
+In some case you may need to upload many large files or huge amount of small files that does not fit at server memory at once. To handle this situation Korolev have different approach.
+First you need load from UI list of all file for upload via `access.listFiles()`, then you can process files one by one calling `access.downloadFileAsStream()`.
+
+[source,scala]
+-----------------------------------
+for {
+  files <- access.listFiles(fileInput)
+  _ <- Task.sequence {
+    files.map { handler: FileHandler =>
+      access.downloadFileAsStream(handler).flatMap { data =>
+        val path = Paths.get(handler.fileName)
+        data
+          .to(FileIO.write(path))
+      }
+    }
+  }
+} yield ()
+-----------------------------------
+
+https://github.com/fomkin/korolev/blob/v0.17.1/examples/file-streaming/src/main/scala/OneByOneFileStreamingExample.scala[See full example]
+
 === Delays
 
 Sometimes you want to update a page after a timeout. For example it is useful when you want to show some sort of notification and have to close it after a few seconds. Delays apply transition after a given `FiniteDuration`
