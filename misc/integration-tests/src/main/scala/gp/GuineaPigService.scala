@@ -49,7 +49,7 @@ object GuineaPigService {
 
   val TheComponent = Component[Future, Int, String, Unit](0) { (context, label, state) =>
     import context._
-    import symbolDsl._
+
     span(
       id := "the-component",
       s"$label $state",

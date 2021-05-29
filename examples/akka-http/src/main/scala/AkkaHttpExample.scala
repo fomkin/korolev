@@ -20,15 +20,14 @@ object AkkaHttpExample extends App {
 
   private val config = KorolevServiceConfig[Future, Boolean, Any](
     stateLoader = StateLoader.default(false),
-    document = s => optimize {
-      Html(
-        body(
-          s"Hello akka-http: $s",
-          button("Click me!",
-            event("click")(_.transition(!_))
+    document = (s: Boolean) =>
+      optimize {
+        Html(
+          body(
+            s"Hello akka-http: $s",
+            button("Click me!", event("click")(_.transition(!_)))
           )
         )
-      )
     }
   )
 

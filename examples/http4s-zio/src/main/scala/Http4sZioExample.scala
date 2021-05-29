@@ -38,7 +38,7 @@ object Http4sZioExample extends App {
       stateLoader = StateLoader.default(Option.empty[Int]),
       rootPath = "/",
       document = {
-        case Some(n) => optimize {
+        case Some(n: Node) => optimize {
           Html(
             body(
               delay(3.seconds) { access =>

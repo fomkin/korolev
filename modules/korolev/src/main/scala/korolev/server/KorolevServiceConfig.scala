@@ -27,7 +27,8 @@ import scala.concurrent.duration._
 case class KorolevServiceConfig[F[_]: Effect, S, M](
   stateLoader: StateLoader[F, S],
   stateStorage: korolev.state.StateStorage[F, S] = null, // By default it StateStorage.DefaultStateStorage
-  http: PartialFunction[HttpRequest[F], F[HttpResponse[F]]] = PartialFunction.empty,
+  // Without typing this does not compile properly
+  http: PartialFunction[HttpRequest[F], F[HttpResponse[F]]] = PartialFunction.empty[HttpRequest[F], F[HttpResponse[F]]],
   router: Router[F, S] = Router.empty[F, S],
   rootPath: String = "/",
   @deprecated("Use `document` instead of `render`. Do not use `render` and `document` together.", "0.16.0") render: S => Document.Node[Context.Binding[F, S, M]] = (_: S) => levsha.dsl.html.body(),

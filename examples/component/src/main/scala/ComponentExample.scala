@@ -45,7 +45,6 @@ object ComponentExample extends SimpleAkkaHttpKorolevApp {
   object ComponentAsObject extends Component[Future, Rgb, String, Unit](Black) {
 
     import context._
-    import symbolDsl._
 
     def render(label: String, state: (Int, Int, Int)): Node = {
       val (r, g, b) = state

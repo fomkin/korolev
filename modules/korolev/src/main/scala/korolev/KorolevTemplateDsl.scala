@@ -20,12 +20,11 @@ import levsha.Document
 import Context.Binding
 import korolev.effect.Effect
 import korolev.util.HtmlUtil
-import levsha.dsl.SymbolDsl
 
 /**
   * Levsha DSL with enrichments.
   */
-final class KorolevTemplateDsl[F[_]: Effect, S, M] extends SymbolDsl[Binding[F, S, M]] {
+final class KorolevTemplateDsl[F[_]: Effect, S, M] {
 
   implicit final class KorolevSymbolOps(s: Symbol) {
 
@@ -43,10 +42,10 @@ final class KorolevTemplateDsl[F[_]: Effect, S, M] extends SymbolDsl[Binding[F, 
       rc.setAttr(levsha.XmlNs.html, HtmlUtil.camelCaseToSnakeCase(s.name, '^', 0), value)
     }
   }
-
-  /**
-    * Make 'a tag non-clickable
-    */
-  val disableHref: Document.Attr[Binding[F, S, M]] =
-    Symbol("onclick") /= "return false"
+// Fixme: have no idea how to fix that
+//  /**
+//    * Make 'a tag non-clickable
+//    */
+//  val disableHref: Document.Attr[Binding[F, S, M]] =
+//    AttrDef("onclick") := "return false"
 }

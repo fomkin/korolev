@@ -57,7 +57,7 @@ abstract class Stream[F[_]: Effect, A] { self =>
   def collect[B](f: PartialFunction[A, B]): Stream[F, B] = new Stream[F, B] {
     val liftedF: A => Option[B] = f.lift
     def cancel(): F[Unit] = self.cancel()
-    def pull(): F[Option[B]] = self.pull() flatMap {
+    def pull(): F[Option[B]] = self.pull().flatMap {
       case None => Effect[F].pure(None)
       case Some(value) =>
         val result = liftedF(value)
@@ -336,7 +336,7 @@ abstract class Stream[F[_]: Effect, A] { self =>
 
 object Stream {
 
-  implicit class KorolevUnchunkExtension[F[_]: Effect, A](stream: Stream[F, Seq[A]]) {
+  implicit class KorolevUnchunkExtension[F[T]: Effect, A](stream: Stream[F, Seq[A]]) {
 
     /**
       * Flatten Stream of any collection to single elements
@@ -348,14 +348,15 @@ object Stream {
 
   def endless[F[_]: Effect, T]: Stream[F, T] =
     new Stream[F, T] {
-      val pull: F[Option[T]] = Effect[F].never
-      val cancel: F[Unit] = Effect[F].unit
+      // override to val for some reason not work
+      override def pull(): F[Option[T]] = Effect[F].never
+      override def cancel(): F[Unit] = Effect[F].unit
     }
 
   def empty[F[_]: Effect, T]: Stream[F, T] = {
     new Stream[F, T] {
-      val pull: F[Option[T]] = Effect[F].pure(Option.empty[T])
-      val cancel: F[Unit] = Effect[F].unit
+      override def pull(): F[Option[T]] = Effect[F].pure(Option.empty[T])
+      override def cancel(): F[Unit] = Effect[F].unit
     }
   }
 

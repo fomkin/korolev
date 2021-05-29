@@ -65,14 +65,16 @@ object ServerSocket {
         }
         .start
         .map { fiber =>
-          new ServerSocketHandler[F] {
-            def awaitShutdown(): F[_] =
-              fiber.join() *>
-                connectionsQueue.stop() *>
-                connectionsQueue.stream.foreach(identity)
-            def stopServingRequests(): F[_] =
-              server.cancel()
-          }
+        // FIXME: can't figure out how to fix this problem (problem with typing)
+//          new ServerSocketHandler[F] {
+//            def awaitShutdown(): F[_] =
+//              fiber.join() *>
+//                connectionsQueue.stop() *>
+//                connectionsQueue.stream.foreach(identity)
+//            def stopServingRequests(): F[_] =
+//              server.cancel()
+//          }
+          ???
         }
     }
 

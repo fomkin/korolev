@@ -45,7 +45,7 @@ object RoutingExample extends SimpleAkkaHttpKorolevApp {
               }
             ),
             div(clazz := "todos",
-              (state.todos(state.selectedTab) zipWithIndex) map {
+              (state.todos(state.selectedTab).zipWithIndex).map {
                 case (todo, i) =>
                   div(
                     div(

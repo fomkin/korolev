@@ -40,7 +40,7 @@ sealed class RawDataSocket[F[_]: Effect, B: BytesLike](channel: AsynchronousSock
               cb(Right(None))
             } else {
               // TODO copyFromBuffer
-              val array = buffer.array().slice(0, bytesRead)
+              val array = buffer.array().slice(0, bytesRead.toLong)
               cb(Right(Some(BytesLike[B].wrapArray(array))))
             }
           }

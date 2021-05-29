@@ -32,12 +32,13 @@ object SimpleExample extends SimpleAkkaHttpKorolevApp {
                       when(state.edit.nonEmpty)(disabled),
                       when(todo.done)(checked),
                       // Generate transition when clicking checkboxes
-                      event("click") { access =>
-                        access.transition { s =>
-                          val updated = s.todos.updated(i, s.todos(i).copy(done = !todo.done))
-                          s.copy(todos = updated)
-                        }
-                      }
+                      // Fixme: Don't know why this not compile
+//                      event("click") { access =>
+//                        access.transition { s =>
+//                          val updated = s.todos.updated(i, s.todos(i).copy(done = !todo.done))
+//                          s.copy(todos = updated)
+//                        }
+//                      }
                     ),
                     if (state.edit.contains(i)) {
                       form(
@@ -64,9 +65,10 @@ object SimpleExample extends SimpleAkkaHttpKorolevApp {
                       span(
                         when(todo.done)(textDecoration @= "line-through"),
                         todo.text,
-                        event("dblclick") { access =>
-                          access.transition(_.copy(edit = Some(i)))
-                        }
+                        // Fixme: Don't know why this not compile
+//                        event("dblclick") { access =>
+//                          access.transition(_.copy(edit = Some(i)))
+//                        }
                       )
                     }
                   )
@@ -85,7 +87,7 @@ object SimpleExample extends SimpleAkkaHttpKorolevApp {
               },
               input(
                 when(state.edit.nonEmpty)(disabled),
-                inputId,
+//                inputId,
                 `type` := "text",
                 placeholder := "What should be done?"
               ),
@@ -96,7 +98,7 @@ object SimpleExample extends SimpleAkkaHttpKorolevApp {
             )
           )
         )
-      }
+//      }
     )
   }
 }

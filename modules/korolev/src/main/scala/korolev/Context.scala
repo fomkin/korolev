@@ -63,7 +63,7 @@ object Context {
     type Node = levsha.Document.Node[Binding]
     type Attr = levsha.Document.Attr[Binding]
 
-    val symbolDsl = new KorolevTemplateDsl[F, S, M]()
+//    val symbolDsl = new KorolevTemplateDsl[F, S, M]()
 
     protected val accessScope: Context.Access[F, S, M] => Access
 
