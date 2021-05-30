@@ -69,8 +69,8 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
 
     def handleAppOrWsOutgoingClose(frontend: Frontend[F], app: App, ehs: ExtensionsHandlers): F[Unit] = {
       val consumed: F[Unit] = Effect[F].promise[Unit] { cb =>
-        frontend.outgoingConsumed.map(_ => cb(Right()))
-        incomingConsumed.map(_ => cb(Right()))
+        frontend.outgoingConsumed.map(_ => cb(Right(())))
+        incomingConsumed.map(_ => cb(Right(())))
       }
 
       for {

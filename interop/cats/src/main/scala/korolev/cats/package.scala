@@ -53,7 +53,11 @@ package object cats {
 
     def start[A](m: => IO[A])(implicit ec: ExecutionContext): IO[KEffect.Fiber[IO, A]] = m
       .start(cs.getOrElseUpdate(ec, IO.contextShift(ec)))
-      .map(fiber => () => fiber.join)
+      .map { fiber =>
+        new KEffect.Fiber[IO, A] {
+          def join(): IO[A] = fiber.join
+        }
+      }
 
     def promise[A](cb: (Either[Throwable, A] => Unit) => Unit): IO[A] =
       IO.async(cb)

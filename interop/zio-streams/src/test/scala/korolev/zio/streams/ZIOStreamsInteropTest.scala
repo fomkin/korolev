@@ -9,8 +9,8 @@ import zio.stream.{ZSink, ZStream}
 
 class ZIOStreamsInteropTest  extends AsyncFlatSpec with Matchers {
 
-  implicit val runtime = Runtime.default
-  implicit val effect = taskEffectInstance[Any](runtime)
+  implicit val runtime: Runtime[zio.ZEnv] = Runtime.default
+  implicit val effect: KorolevEffect[Task] = taskEffectInstance[Any](runtime)
 
   "KorolevStream.toZStream" should "provide zio.Stream that contain exactly same values as original Korolev stream" in {
 
@@ -18,7 +18,7 @@ class ZIOStreamsInteropTest  extends AsyncFlatSpec with Matchers {
 
     val io = KorolevStream(values: _*)
       .mat[Task]()
-      .flatMap { korolevStream: KorolevStream[Task, Int] =>
+      .flatMap { (korolevStream: KorolevStream[Task, Int]) =>
         korolevStream
           .toZStream
           .run(ZSink.foldLeft(List.empty[Int]){ case (acc, v) => acc :+ v})
@@ -62,7 +62,7 @@ class ZIOStreamsInteropTest  extends AsyncFlatSpec with Matchers {
     val io = ZStream.fromIterable(v1)
       .concat(ZStream.fromIterable(v2)) // concat need for multiple chunks test
       .toKorolev
-      .flatMap { korolevStream: KorolevStream[Task, Seq[Int]] =>
+      .flatMap { (korolevStream: KorolevStream[Task, Seq[Int]]) =>
         korolevStream
           .unchunk
           .fold(Vector.empty[Int])((acc, value) => acc :+ value)

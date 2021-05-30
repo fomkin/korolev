@@ -15,7 +15,7 @@ object GuineaPigScenarios {
 
   private val appUrl = "http://localhost:8000"
 
-  private def wait(wd: WebDriver) = new WebDriverWait(wd, 60)
+  private def wait(wd: WebDriver):WebDriverWait = new WebDriverWait(wd, 60)
 
   val allInOne = scenario("All-in-one scenario")(
     step("Page should be open successfully") { wd =>

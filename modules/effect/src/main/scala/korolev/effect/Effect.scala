@@ -97,7 +97,11 @@ object Effect {
       Future.sequence(in)
     def start[A](create: => Future[A])(implicit ec: ExecutionContext): Future[Fiber[Future, A]] = {
       val f = Future(create)(ec).flatten
-      Future.successful(() => f)
+      Future.successful {
+        new Fiber[Future, A] {
+          override def join(): Future[A] = f
+        }
+      }
     }
     def promise[A](cb: (Either[Throwable, A] => Unit) => Unit): Future[A] = {
       val promise = scala.concurrent.Promise[A]()

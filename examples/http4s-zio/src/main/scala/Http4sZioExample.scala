@@ -9,6 +9,7 @@ import zio.{App, RIO, Runtime, ZEnv, ZIO, ExitCode => ZExitCode}
 import zio.interop.catz._
 import korolev.Context
 import korolev.server.{KorolevServiceConfig, StateLoader}
+import korolev.effect.{Effect => KEffect}
 import korolev.zio.zioEffectInstance
 import korolev.state.javaSerialization._
 import org.http4s.server.Router
@@ -27,7 +28,7 @@ object Http4sZioExample extends App {
     import scala.concurrent.duration._
 
     implicit val ec: ExecutionContext = runtime.platform.executor.asEC
-    implicit val effect = zioEffectInstance[ZEnv, Throwable](runtime)(identity)(identity)
+    implicit val effect: KEffect[AppTask] = zioEffectInstance[ZEnv, Throwable](runtime)(identity)(identity)
 
     val ctx = Context[ZIO[ZEnv, Throwable, *], Option[Int], Any]
 

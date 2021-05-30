@@ -22,7 +22,7 @@ package object korolev {
   @inline val Root: PathAndQuery.Root.type = PathAndQuery.Root
   @inline val / : PathAndQuery./.type = PathAndQuery./
   @inline val :? : PathAndQuery.:?.type = PathAndQuery.:?
-  @inline val :?? : PathAndQuery.:??.type = PathAndQuery.:??
+  //@inline val :?? : PathAndQuery.:??.type = PathAndQuery.:??
   @inline val :?* : PathAndQuery.:?*.type = PathAndQuery.:?*
   @inline val *& : PathAndQuery.*&.type = PathAndQuery.*&
   @inline val :& : PathAndQuery.:&.type = PathAndQuery.:&

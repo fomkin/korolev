@@ -63,8 +63,6 @@ object Context {
     type Node = levsha.Document.Node[Binding]
     type Attr = levsha.Document.Attr[Binding]
 
-    val symbolDsl = new KorolevTemplateDsl[F, S, M]()
-
     protected val accessScope: Context.Access[F, S, M] => Access
 
     def scope[S2](read: PartialFunction[S, S2], write: PartialFunction[(S, S2), S]): Scope[F, S, S2, M] = new Scope[F, S, S2, M] {
@@ -128,6 +126,7 @@ object Context {
       * Schedules the transition with delay. For example it can be useful
       * when you want to hide something after timeout.
       */
+    @deprecated("Delays often is using for hacks", "0.18.0")
     def delay(duration: FiniteDuration)(effect: Access => F[Unit]): Delay[F, S, M] = {
       Delay(duration, accessScope.andThen(effect))
     }
