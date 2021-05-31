@@ -48,7 +48,6 @@ abstract class Component
     *
     * {{{
     *  import context._
-    *  import symbolDsl._
     * }}}
     */
   val context = Context[F, S, E]

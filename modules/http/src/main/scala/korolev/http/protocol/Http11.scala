@@ -315,7 +315,7 @@ class Http11[B: BytesLike] {
 }
 
 object Http11 {
-  implicit final class StringBuilderOps(val builder: StringBuilder) extends AnyVal {
+  private implicit final class StringBuilderOps(val builder: StringBuilder) extends AnyVal {
     def newLine(): StringBuilder = builder
       .append('\r')
       .append('\n')

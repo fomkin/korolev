@@ -9,7 +9,7 @@ import korolev.scodec._
 import korolev.data.Bytes
 import org.http4s.{Header, Headers, HttpRoutes, Request, Response, Status}
 import org.http4s.dsl.Http4sDsl
-import org.http4s.headers.Cookie
+import org.http4s.headers.{Cookie, `Content-Length`}
 import org.http4s.server.websocket.WebSocketBuilder
 import org.http4s.websocket.WebSocketFrame.{Close, Text}
 import org.http4s.websocket.WebSocketFrame
@@ -70,7 +70,7 @@ package object http4s {
             outStream
               .map(out => Text(out))
               .toFs2
-          case _ =>
+          case null =>
             throw new RuntimeException
         }
       route <- WebSocketBuilder[F].build(toClient, fromClient)
@@ -150,7 +150,7 @@ package object http4s {
       pq = PQ.fromString(path).withParams(request.params),
       method = KorolevRequest.Method.fromString(request.method.name),
       renderedCookie = cookies.orNull,
-      contentLength = request.headers.find(_.name == "content-length").map(_.value.toLong),
+      contentLength = request.headers.find(_.name == `Content-Length`.name).map(_.value.toLong),
       headers = {
         val contentType = request.contentType
         val contentTypeHeaders = {

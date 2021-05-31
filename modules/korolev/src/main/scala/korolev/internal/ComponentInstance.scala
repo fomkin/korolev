@@ -230,9 +230,9 @@ final class ComponentInstance
       }
     val proxy = createMiscProxy(rc, { (proxy, misc) =>
       misc match {
-        case event @ Event(eventType, phase, _, _) =>
+        case event: Event[F, CS, E] =>
           val id = rc.currentContainerId
-          val eid = EventId(id, eventType, phase)
+          val eid = EventId(id, event.`type`, event.phase)
           val es = events.getOrElseUpdate(eid, Vector.empty)
           events.put(eid, es :+ event)
           eventRegistry.registerEventType(event.`type`)
@@ -248,7 +248,7 @@ final class ComponentInstance
             delays.put(id, delayInstance)
             delayInstance.start(browserAccess)
           }
-        case entry @ ComponentEntry(_, _: Any, _: ((Access[F, CS, E], Any) => F[Unit])) =>
+        case entry: ComponentEntry[F, CS, E, Any, Any, Any] =>
           val id = rc.subsequentId
           nestedComponents.get(id) match {
             case Some(n: ComponentInstance[F, CS, E, Any, Any, Any]) if n.component.id == entry.component.id =>

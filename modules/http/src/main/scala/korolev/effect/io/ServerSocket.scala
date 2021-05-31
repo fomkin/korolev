@@ -66,11 +66,11 @@ object ServerSocket {
         .start
         .map { fiber =>
           new ServerSocketHandler[F] {
-            def awaitShutdown(): F[_] =
+            def awaitShutdown(): F[Unit] =
               fiber.join() *>
                 connectionsQueue.stop() *>
                 connectionsQueue.stream.foreach(identity)
-            def stopServingRequests(): F[_] =
+            def stopServingRequests(): F[Unit] =
               server.cancel()
           }
         }
@@ -96,7 +96,7 @@ object ServerSocket {
     /**
       * Await until all connections are closed.
       */
-    def awaitShutdown(): F[_]
+    def awaitShutdown(): F[Unit]
 
     /**
       * Stop accepting new connections and serving requests.
@@ -105,6 +105,6 @@ object ServerSocket {
       * and other request without content length will be open
       * until connection closed by a client.
       */
-    def stopServingRequests(): F[_]
+    def stopServingRequests(): F[Unit]
   }
 }

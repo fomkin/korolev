@@ -217,24 +217,10 @@ case class Browser(properties: Map[(ElementId, String), String] = Map.empty,
           val context = GraalContext.create()
           val finalCode = code.mkString(elements.map(_.swap))
           val bindings = context.getBindings("js")
-
-          class Handler {
-            @HostAccess.Export
-            def result(value: String): Unit = {
-              val result = Right(value)
-              actions += Action.EvalJs(result)
-              cb(result)
-            }
-            @HostAccess.Export
-            def error(value: String): Unit = {
-              val result = Left(ClientSideException(value))
-              actions += Action.EvalJs(result)
-              cb(result)
-            }
-          }
+          val handler = new Browser.Handler(actions, cb)
 
           bindings.putMember("code", finalCode)
-          bindings.putMember("handler", new Handler())
+          bindings.putMember("handler", handler)
 
           context.eval("js",
             jsMocks.mkString("\n") + """
@@ -280,4 +266,23 @@ case class Browser(properties: Map[(ElementId, String), String] = Map.empty,
     f(stub).map(_ => actions.toSeq)
   }
 
+}
+
+object Browser {
+
+  class Handler[F[_], S, M](actions: mutable.Buffer[Action[F, S, M]],
+                            cb: Either[Throwable, String] => Unit) {
+    @HostAccess.Export
+    def result(value: String): Unit = {
+      val result = Right(value)
+      actions += Action.EvalJs(result)
+      cb(result)
+    }
+    @HostAccess.Export
+    def error(value: String): Unit = {
+      val result = Left(ClientSideException(value))
+      actions += Action.EvalJs(result)
+      cb(result)
+    }
+  }
 }

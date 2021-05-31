@@ -197,19 +197,21 @@ object PathAndQuery {
     }
   }
 
-  object :?? {
-    def unapplySeq(pq: PathAndQuery): Some[(Path, Seq[(String, String)])] = {
-      @tailrec
-      def aux(pq: PathAndQuery, query: Seq[(String, String)]): (Path, Seq[(String, String)]) = pq match {
-        case :&(prev, (k, v))     => aux(prev, (k, v) +: query)
-        case path :? tpl => (path, tpl +: query)
-        case path: /              => (path, query)
-        case Root                 => (Root, query)
-      }
+// Doesn't work in Scala 3
 
-      Some(aux(pq, Seq.empty))
-    }
-  }
+//  object :?? {
+//    def unapplySeq(pq: PathAndQuery): Some[(Path, Seq[(String, String)])] = {
+//      @tailrec
+//      def aux(pq: PathAndQuery, query: Seq[(String, String)]): (Path, Seq[(String, String)]) = pq match {
+//        case :&(prev, (k, v))     => aux(prev, (k, v) +: query)
+//        case path :? tpl => (path, tpl +: query)
+//        case path: /              => (path, query)
+//        case Root                 => (Root, query)
+//      }
+//
+//      Some(aux(pq, Seq.empty))
+//    }
+//  }
 
   /**
     * Math required path parameter

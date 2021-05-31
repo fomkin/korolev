@@ -37,14 +37,14 @@ package object streams {
   private[streams] class ZKorolevStream[R, O]
     (
       runtime: Runtime[R],
-      pull: ZIO[R, Option[Throwable], Chunk[O]]
+      zPull: ZIO[R, Option[Throwable], Chunk[O]]
     )(implicit eff: KorolevEffect[RIO[R, *]]) extends KorolevStream[RIO[R, *], Seq[O]] {
 
     type F[A] = RIO[R, A]
 
 
     def unfoldPull: Iterator[Chunk[O]] = {
-      runtime.unsafeRunSync(pull) match {
+      runtime.unsafeRunSync(zPull) match {
         case Exit.Success(chunk) => Iterator.single(chunk) ++ unfoldPull
         case Exit.Failure(cause) =>
           cause.failureOrCause match {

@@ -3,8 +3,7 @@ package korolev.effect.io
 import java.net.SocketAddress
 import java.nio.ByteBuffer
 import java.nio.channels.{AsynchronousChannelGroup, AsynchronousSocketChannel, CompletionHandler}
-
-import korolev.data.BytesLike
+import korolev.data.{Bytes, BytesLike}
 import korolev.data.syntax._
 import korolev.effect.{Effect, Stream}
 
@@ -40,8 +39,8 @@ sealed class RawDataSocket[F[_]: Effect, B: BytesLike](channel: AsynchronousSock
               cb(Right(None))
             } else {
               // TODO copyFromBuffer
-              val array = buffer.array().slice(0, bytesRead)
-              cb(Right(Some(BytesLike[B].wrapArray(array))))
+              val array = BytesLike[B].copyFromArray(buffer.array()).slice(0, bytesRead.toLong)
+              cb(Right(Some(array)))
             }
           }
 

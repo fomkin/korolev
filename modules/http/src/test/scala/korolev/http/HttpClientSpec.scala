@@ -162,11 +162,12 @@ object HttpClientSpec {
     val buffer = new Array[Byte](50)
     var result = new Array[Byte](0)
     var n = 0
-    do {
-      n = stream.read(buffer)
-      if (n > 0)
-        result = result ++ buffer.slice(0, n)
-    } while (n > 0)
+    while ({
+      { n = stream.read(buffer) };
+      n > 0
+    }) {
+      result = result ++ buffer.slice(0, n)
+    }
     result
   }
 

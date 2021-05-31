@@ -1,13 +1,26 @@
 import xerial.sbt.Sonatype._
 
-val levshaVersion = "0.10.0"
-val akkaVersion = "2.6.10"
-val akkaHttpVersion = "10.2.1"
+val scala2_12Version = "2.12.14"
+val scala2_13Version = "2.13.6"
+val scala3Version = "3.0.0"
+
+val levshaVersion = "1.0.1"
+
+val akkaVersion = "2.6.14"
+val akkaHttpVersion = "10.2.4"
+val http4sVersion = "0.21.14" // Scala 3 is not supported in final releases yet
+
+val circeVersion = "0.14.1"
+val cats2Version = "2.5.1"
+val zioVersion = "1.0.8"
+val fs2_2Version = "2.5.6"
+val monixVersion = "3.4.0"
+val scodecVersion = "1.1.27"
 
 val unusedRepo = Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
 
 val crossVersionSettings = Seq(
-  crossScalaVersions := Seq("2.12.12", "2.13.4")
+  crossScalaVersions := Seq(scala2_12Version, scala2_13Version, scala3Version)
 )
 
 val dontPublishSettings = Seq(
@@ -19,7 +32,7 @@ val dontPublishSettings = Seq(
 
 val publishSettings = Seq(
   publishMavenStyle := true,
-  publishArtifact in Test := false,
+  Test / publishArtifact := false,
   pomIncludeRepository := { _ => false },
   publishTo := sonatypePublishTo.value,
   sonatypeProfileName := "org.fomkin",
@@ -29,25 +42,50 @@ val publishSettings = Seq(
 )
 
 val commonSettings = publishSettings ++ Seq(
-  addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
-  addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.2" cross CrossVersion.full),
   git.useGitDescribe := true,
   organization := "org.fomkin",
+  // Add Scala 2 compiler plugins
+  libraryDependencies ++= {
+    CrossVersion.partialVersion(scalaVersion.value) match {
+      case Some((2, _)) =>
+        Seq(
+          compilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
+          compilerPlugin("org.typelevel" %% "kind-projector" % "0.13.0" cross CrossVersion.full),
+        )
+      case _ => Seq()
+    }
+  },
   libraryDependencies ++= Seq(
-    "org.scalatest" %% "scalatest" % "3.2.3" % Test,
-    "org.scalatestplus" %% "scalacheck-1-15" % "3.2.3.0" % Test
+    "org.scalatest" %% "scalatest" % "3.2.9" % Test,
+    "org.scalatestplus" %% "scalacheck-1-15" % "3.2.9.0" % Test
   ),
   //javaOptions in Test += "-XX:-OmitStackTraceInFastThrow",
-  scalacOptions ++= Seq(
-    "-deprecation",
-    "-feature",
-    "-language:postfixOps",
-    "-language:implicitConversions",
-    "-language:higherKinds",
-    "-Xlint",
-    "-Ywarn-numeric-widen",
-    "-Ywarn-value-discard"
-  )
+  scalacOptions ++= {
+    CrossVersion.partialVersion(scalaVersion.value) match {
+      case Some((2, _)) =>
+        Seq(
+          "-deprecation",
+          "-feature",
+          "-language:postfixOps",
+          "-language:implicitConversions",
+          "-language:higherKinds",
+          "-Xlint",
+          "-Ywarn-numeric-widen",
+          "-Ywarn-value-discard",
+          "-Xsource:3",
+          //"-P:kind-projector:underscore-placeholders",
+        )
+      case _ =>
+        Seq(
+          "-deprecation",
+          "-feature",
+          "-language:postfixOps",
+          "-language:implicitConversions",
+          "-language:higherKinds",
+          "-Ykind-projector"
+        )
+    }
+  }
 )
 
 val exampleSettings = commonSettings ++ dontPublishSettings ++ Seq(
@@ -96,9 +134,9 @@ lazy val http = project
   .settings(
     normalizedName := "korolev-http",
     libraryDependencies ++= Seq(
-      "com.typesafe.akka" %% "akka-actor-typed" % akkaVersion,
-      "com.typesafe.akka" %% "akka-stream" % akkaVersion,
-      "com.typesafe.akka" %% "akka-http" % akkaHttpVersion % Test
+      ("com.typesafe.akka" %% "akka-actor-typed" % akkaVersion % Test).cross(CrossVersion.for3Use2_13),
+      ("com.typesafe.akka" %% "akka-stream" % akkaVersion % Test).cross(CrossVersion.for3Use2_13),
+      ("com.typesafe.akka" %% "akka-http" % akkaHttpVersion % Test).cross(CrossVersion.for3Use2_13),
     )
   )
   .dependsOn(effect, web)
@@ -114,10 +152,10 @@ lazy val korolev = project
       "com.github.fomkin" %% "levsha-core" % levshaVersion,
       "com.github.fomkin" %% "levsha-events" % levshaVersion
     ),
-    resourceGenerators in Compile += Def
+    Compile / resourceGenerators += Def
       .task {
         val source = baseDirectory.value / "src" / "main" / "es6"
-        val target = (resourceManaged in Compile).value / "static"
+        val target = (Compile / resourceManaged).value / "static"
         val log = streams.value.log
         JsUtils.assembleJs(source, target, log)
       }
@@ -156,9 +194,9 @@ lazy val akka = project
   .settings(
     normalizedName := "korolev-akka",
     libraryDependencies ++= Seq(
-      "com.typesafe.akka" %% "akka-actor" % akkaVersion,
-      "com.typesafe.akka" %% "akka-stream" % akkaVersion,
-      "com.typesafe.akka" %% "akka-http" % akkaHttpVersion
+      ("com.typesafe.akka" %% "akka-actor" % akkaVersion).cross(CrossVersion.for3Use2_13),
+      ("com.typesafe.akka" %% "akka-stream" % akkaVersion).cross(CrossVersion.for3Use2_13),
+      ("com.typesafe.akka" %% "akka-http" % akkaHttpVersion).cross(CrossVersion.for3Use2_13)
     )
   )
   .dependsOn(korolev)
@@ -171,8 +209,8 @@ lazy val http4s = project
   .settings(
     normalizedName := "korolev-http4s",
     libraryDependencies ++= Seq(
-      "org.http4s"     %% "http4s-server" % "0.21.14",
-      "org.http4s"     %% "http4s-dsl"    % "0.21.14"
+      ("org.http4s"     %% "http4s-server" % http4sVersion).cross(CrossVersion.for3Use2_13),
+      ("org.http4s"     %% "http4s-dsl"    % http4sVersion).cross(CrossVersion.for3Use2_13)
     )
   )
   .dependsOn(korolev, web, fs2, scodec)
@@ -195,7 +233,7 @@ lazy val cats = project.
   settings(commonSettings: _*).
   settings(
     normalizedName := "korolev-cats",
-    libraryDependencies += "org.typelevel" %% "cats-effect" % "2.3.1"
+    libraryDependencies += "org.typelevel" %% "cats-effect" % cats2Version
   ).
   dependsOn(effect)
 
@@ -207,8 +245,8 @@ lazy val monix = project
   .settings(
     normalizedName := "korolev-monix",
     libraryDependencies ++= List(
-      "io.monix" %% "monix-eval" % "3.1.0",
-      "io.monix" %% "monix-execution" % "3.1.0"
+      "io.monix" %% "monix-eval" % monixVersion,
+      "io.monix" %% "monix-execution" % monixVersion
     )
   )
   .dependsOn(effect)
@@ -220,7 +258,7 @@ lazy val zio = project
   .settings(commonSettings: _*)
   .settings(
     normalizedName := "korolev-zio",
-    libraryDependencies += "dev.zio" %% "zio" % "1.0.4"
+    libraryDependencies += "dev.zio" %% "zio" % zioVersion
   )
   .dependsOn(effect)
 
@@ -231,7 +269,7 @@ lazy val zioStreams = project
   .settings(commonSettings: _*)
   .settings(
     normalizedName := "korolev-zio-streams",
-    libraryDependencies += "dev.zio" %% "zio-streams" % "1.0.4"
+    libraryDependencies += "dev.zio" %% "zio-streams" % zioVersion
   )
   .dependsOn(effect, zio)
 
@@ -242,7 +280,7 @@ lazy val fs2 = project
   .settings(commonSettings: _*)
   .settings(
     normalizedName := "korolev-fs2",
-    libraryDependencies += "co.fs2" %% "fs2-core" % "2.5.0"
+    libraryDependencies += "co.fs2" %% "fs2-core" % fs2_2Version
   )
   .dependsOn(effect, cats)
 
@@ -253,7 +291,7 @@ lazy val scodec = project
   .settings(commonSettings: _*)
   .settings(
     normalizedName := "korolev-scodec",
-    libraryDependencies += "org.scodec" %% "scodec-bits" % "1.1.18"
+    libraryDependencies += "org.scodec" %% "scodec-bits" % scodecVersion
   )
   .dependsOn(bytes)
 
@@ -345,8 +383,8 @@ lazy val http4sZioExample = project
   .settings(crossVersionSettings)
   .settings(exampleSettings: _*)
   .settings(mainClass := Some("Http4sZioExample"))
-  .settings(libraryDependencies += "dev.zio" %% "zio-interop-cats" % "2.1.4.1")
-  .settings(libraryDependencies +=  "org.http4s" %% "http4s-blaze-server" % "0.21.14")
+  .settings(libraryDependencies += "dev.zio" %% "zio-interop-cats" % "2.5.1.0")
+  .settings(libraryDependencies += ("org.http4s" %% "http4s-blaze-server" % http4sVersion).cross(CrossVersion.for3Use2_13))
   .dependsOn(zio, http4s)
 
 lazy val catsEffectExample = project
@@ -410,17 +448,18 @@ lazy val extensionExample = project
 lazy val `integration-tests` = project
   .in(misc / "integration-tests")
   .disablePlugins(HeaderPlugin)
-  .settings(crossVersionSettings)
+  //.settings(crossVersionSettings)
   .settings(commonSettings)
   .settings(dontPublishSettings:_*)
   .settings(
-    fork in run := true,
+    scalaVersion := scala2_13Version,
+    run / fork := true,
     libraryDependencies ++= Seq(
       "org.slf4j" % "slf4j-simple" % "1.7.+",
       "org.seleniumhq.selenium" % "selenium-java" % "2.53.1",
-      "io.circe" %% "circe-core" % "0.12.2",
-      "io.circe" %% "circe-generic" % "0.12.2",
-      "io.circe" %% "circe-parser" % "0.12.2"
+      "io.circe" %% "circe-core" % circeVersion,
+      "io.circe" %% "circe-generic" % circeVersion,
+      "io.circe" %% "circe-parser" % circeVersion
     )
   )
   .dependsOn(slf4j)
@@ -431,15 +470,15 @@ lazy val `performance-benchmark` = project
   .disablePlugins(HeaderPlugin)
   .settings(commonSettings)
   .settings(dontPublishSettings:_*)
-  .settings(crossVersionSettings)
   .settings(
-    fork in run := true,
+    scalaVersion := scala2_13Version,
+    run / fork := true,
     libraryDependencies ++= Seq(
-      "com.typesafe.akka" %% "akka-http" % "10.2.0",
-      "com.typesafe.akka" %% "akka-stream" % "2.6.8",
-      "com.typesafe.akka" %% "akka-actor"  % "2.6.8",
-      "com.typesafe.akka" %% "akka-actor-typed" % "2.6.8",
-      "com.lihaoyi" %% "ujson" % "0.9.5"
+      ("com.typesafe.akka" %% "akka-http" % akkaHttpVersion).cross(CrossVersion.for3Use2_13),
+      ("com.typesafe.akka" %% "akka-stream" % akkaVersion).cross(CrossVersion.for3Use2_13),
+      ("com.typesafe.akka" %% "akka-actor"  % akkaVersion).cross(CrossVersion.for3Use2_13),
+      ("com.typesafe.akka" %% "akka-actor-typed" % akkaVersion).cross(CrossVersion.for3Use2_13),
+      "com.lihaoyi" %% "ujson" % "1.3.15"
     )
   )
   .dependsOn(korolev)
@@ -463,7 +502,5 @@ lazy val root = project
     akkaHttpExample, contextScopeExample, eventDataExample,
     extensionExample, zioExample, monixExample,
     catsEffectExample, evalJsExample, http4sZioExample,
-    // Misc
-    `performance-benchmark`, `integration-tests`
   )
 

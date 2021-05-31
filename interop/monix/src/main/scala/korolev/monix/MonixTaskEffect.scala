@@ -48,7 +48,12 @@ class MonixTaskEffect(implicit scheduler: Scheduler) extends Effect[Task] {
   def start[A](m: => Task[A])(implicit ec: ExecutionContext): Task[Effect.Fiber[Task, A]] = m
     .executeOn(Scheduler(ec))
     .start
-    .map(fiber => () => fiber.join)
+    .map { fiber =>
+      new Effect.Fiber[Task, A] {
+        def join(): Task[A] = fiber.join
+      }
+    }
+
 
   def promise[A](cb: (Either[Throwable, A] => Unit) => Unit): Task[A] =
     Task.async(cb)

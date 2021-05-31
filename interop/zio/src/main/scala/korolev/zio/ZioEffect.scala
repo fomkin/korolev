@@ -88,7 +88,10 @@ class ZioEffect[R, E](rts: Runtime[R],
       .interruptible(task.mapError(unliftError))
       .forkDaemon
       .map { fiber =>
-        () => fiber.join.mapError(liftError)
+        new Effect.Fiber[ZIO[R, E, *], A] {
+          def join(): ZIO[R, E, A] =
+            fiber.join.mapError(liftError)
+        }
       }
 
   def fork[A](m: => ZIO[R, E, A])(implicit ec: ExecutionContext): ZIO[R, E, A] =

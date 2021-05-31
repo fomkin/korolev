@@ -348,14 +348,14 @@ object Stream {
 
   def endless[F[_]: Effect, T]: Stream[F, T] =
     new Stream[F, T] {
-      val pull: F[Option[T]] = Effect[F].never
-      val cancel: F[Unit] = Effect[F].unit
+      def pull(): F[Option[T]] = Effect[F].never
+      def cancel(): F[Unit] = Effect[F].unit
     }
 
   def empty[F[_]: Effect, T]: Stream[F, T] = {
     new Stream[F, T] {
-      val pull: F[Option[T]] = Effect[F].pure(Option.empty[T])
-      val cancel: F[Unit] = Effect[F].unit
+      def pull(): F[Option[T]] = Effect[F].pure(Option.empty[T])
+      def cancel(): F[Unit] = Effect[F].unit
     }
   }
 
