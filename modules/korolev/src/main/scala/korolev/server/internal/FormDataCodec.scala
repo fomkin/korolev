@@ -46,12 +46,16 @@ private[korolev] final class FormDataCodec(maxPartSize: Int) {
       val d = delimiter.getBytes
       @tailrec def aux(pos: Int, startPos: Int): Boolean = {
         if (pos < d.length) {
-          val b = source.get()
-          if (b == '\r') aux(pos, startPos)
-          else if (b == d(pos)) aux(pos + 1, startPos)
-          else {
-            source.position(startPos)
-            false
+          if(source.position() == source.limit()) {
+            true
+          } else {
+            val b = source.get()
+            if (b == '\r') aux(pos, startPos)
+            else if (b == d(pos)) aux(pos + 1, startPos)
+            else {
+              source.position(startPos)
+              false
+            }
           }
         } else true
       }
@@ -101,9 +105,10 @@ private[korolev] final class FormDataCodec(maxPartSize: Int) {
           buffer.rewind()
           buffer.get(bytes)
           val rawHeaders = new String(bytes, StandardCharsets.ISO_8859_1)
-          val headers = rawHeaders.split('\n').toList map { line =>
-            val Array(key, value) = line.split(":", 2)
-            key.trim -> value.trim
+          val headers = rawHeaders.split('\n').toList.collect {
+            case line if line.contains(":") =>
+              val Array(key, value) = line.split(":", 2)
+              key.trim -> value.trim
           }
           buffer.clear()
           loop(entries, headers, Buffering)
