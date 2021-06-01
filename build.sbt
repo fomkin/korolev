@@ -8,7 +8,7 @@ val levshaVersion = "1.0.1"
 
 val akkaVersion = "2.6.14"
 val akkaHttpVersion = "10.2.4"
-val http4sVersion = "0.21.14" // Scala 3 is not supported in final releases yet
+val http4sVersion = "0.21.24" // Scala 3 is not supported in final releases yet
 
 val circeVersion = "0.14.1"
 val cats2Version = "2.5.1"
