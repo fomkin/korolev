@@ -115,10 +115,16 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
           config.reporter
         )
         browserAccess = app.topLevelComponentInstance.browserAccess
-        ehs <- config.extensions.map(_.setup(browserAccess)).sequence
-        _ <- Effect[F].start(handleStateChange(app, ehs))
-        _ <- Effect[F].start(handleMessages(app, ehs))
-        _ <- Effect[F].start(handleAppOrWsOutgoingClose(frontend, app, ehs))
+        _ <- config.extensions.map(_.setup(browserAccess))
+          .sequence
+          .flatMap { ehs =>
+            for {
+              _ <- Effect[F].start(handleStateChange(app, ehs))
+              _ <- Effect[F].start(handleMessages(app, ehs))
+              _ <- Effect[F].start(handleAppOrWsOutgoingClose(frontend, app, ehs))
+            } yield ()
+          }
+          .start
         _ <- app.initialize()
       } yield {
         app
