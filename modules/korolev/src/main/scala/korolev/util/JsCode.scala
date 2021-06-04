@@ -54,6 +54,7 @@ object JsCode {
         is match {
           case (ix: ElementId) :: ixs => combine(ix :: px :: acc, pxs, ixs)
           case (ix: String) :: ixs => combine(ix :: px :: acc, pxs, ixs)
+          case ix :: ixs => combine(ix.toString :: px :: acc, pxs, ixs)
           case Nil => combine(px :: acc, pxs, Nil)
         }
     }

@@ -25,6 +25,11 @@ abstract class KorolevApp[
 
   val context: Context[F, S, M] = Context[F, S, M]
 
+//  /**
+//    * @return (KorolevServiceConfig, Free Resources Hook)
+//    */
+//  def config: F[(KorolevServiceConfig[F, S, M], () => F[Unit])]
+
   val config: F[KorolevServiceConfig[F, S, M]]
 
   val channelGroup: AsynchronousChannelGroup =
