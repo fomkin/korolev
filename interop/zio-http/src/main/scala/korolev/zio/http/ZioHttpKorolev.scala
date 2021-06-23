@@ -88,13 +88,13 @@ class ZioHttpKorolev[R] {
     (req: Request, fullPath: String, korolevServer: KorolevService[RIO[R, *]])
     (implicit eff:  ZEffect): ResponseM[R, Throwable] = {
 
-    val (fromClientIO, kStream) = makeSinkAndSubscriber()
 
-    val korolevRequest = mkKorolevRequest[KStream[RIO[R, *], String]](req, fullPath, kStream)
+    val fromClientKQueue = Queue[RIO[R, *], String]()
+    val korolevRequest = mkKorolevRequest[KStream[RIO[R, *], String]](req, fullPath, fromClientKQueue.stream)
 
     for {
       response <- korolevServer.ws(korolevRequest)
-      fromClient <- fromClientIO
+
       toClient = response match {
         case KorolevResponse(_, outStream, _, _) =>
           outStream
@@ -103,50 +103,33 @@ class ZioHttpKorolev[R] {
         case _ =>
           throw new RuntimeException
       }
-      route <- buildSocket(toClient, fromClient)
-      _ <- fromClient.take.forever.forkDaemon
+      route <- buildSocket(toClient, fromClientKQueue)
     } yield {
       route
     }
   }
 
-  def makeSinkAndSubscriber()(implicit eff:  ZEffect) = {
-    val queue = Queue[RIO[R, *], String]()
-
-    val zSink = for {
-      zQueue <- ZIOQueue.unbounded[WebSocketFrame]
-      result = zQueue.mapM[R, Throwable, Unit] {
-        case WebSocketFrame.Text(t) =>
-          queue.enqueue(t)
-        case _: WebSocketFrame.Close =>
-          queue.close()
-        case frame =>
-          ZIO.fail(new Exception(s"Invalid frame type ${frame.getClass.getName}"))
-      }
-      _ <- (result.awaitShutdown *> queue.close()).forkDaemon
-    } yield {
-      result
-    }
-
-    (zSink, queue.stream)
-  }
-
   private def buildSocket(
                            toClientStream: ZStream[R, Throwable, WebSocketFrame],
-                           fromClientQueue: ZQueue[Any, R, Nothing, Throwable, WebSocketFrame, Unit]
+                           fromClientKQueue: Queue[RIO[R, *], String]
                          ): RIO[R ,Response[R, Throwable]] = {
 
 
-    val onMessage: Socket[R, Nothing, WebSocketFrame, WebSocketFrame] = Socket
+    val onMessage: Socket[R, Throwable, WebSocketFrame, WebSocketFrame] = Socket
       .fromFunction[WebSocketFrame] { _ => ZStream.empty }
-      .contramapM {frame =>
-        fromClientQueue.offer(frame).as(frame)
+      .contramapM {
+        case f @ WebSocketFrame.Text(t) =>
+          fromClientKQueue.offer(t).as(f)
+        case f: WebSocketFrame.Close =>
+          fromClientKQueue.close().as(f)
+        case frame =>
+          ZIO.fail(new Exception(s"Invalid frame type ${frame.getClass.getName}"))
       }
 
     val app =
       SocketApp.open(Socket.fromFunction[Any] { _ => toClientStream}) ++
         SocketApp.message(onMessage) ++
-        SocketApp.close(_ => fromClientQueue.shutdown) ++
+        SocketApp.close(_ => fromClientKQueue.close().asInstanceOf[ZIO[R, Nothing, Any]]) ++
         SocketApp.decoder(SocketDecoder.allowExtensions)
 
     ZIO(Response.socket(app))
