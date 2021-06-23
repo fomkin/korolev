@@ -70,6 +70,9 @@ package object http4s {
             outStream
               .map(out => Text(out))
               .toFs2
+              .onComplete(
+                FS2Stream(Close(1000)).map(_.right.get)
+              )
           case null =>
             throw new RuntimeException
         }
