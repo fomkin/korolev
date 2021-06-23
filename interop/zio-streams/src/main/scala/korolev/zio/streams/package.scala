@@ -11,7 +11,7 @@ package object streams {
 
   implicit class KorolevtSreamOps[R, O](stream: KorolevStream[RIO[R, *], O]) {
 
-    def toZStream[R1 <: R]: ZStream[R1, Throwable, O] = {
+    def toZStream: ZStream[R, Throwable, O] = {
       ZStream.unfoldM(()) { _ =>
         stream
           .pull()
@@ -24,7 +24,7 @@ package object streams {
 
     type F[A] = RIO[R, A]
 
-    def toKorolev(implicit ec: ExecutionContext, eff: KorolevEffect[F]): F[KorolevStream[F, Seq[O]]] = {
+    def toKorolev(implicit eff: KorolevEffect[F]): F[KorolevStream[F, Seq[O]]] = {
       (for {
         runtime <- ZIO.runtime[R].toManaged_
         pull <- stream.process

@@ -12,7 +12,10 @@ val http4sVersion = "0.21.24" // Scala 3 is not supported in final releases yet
 
 val circeVersion = "0.14.1"
 val cats2Version = "2.5.3"
+
 val zioVersion = "1.0.11"
+val zioHttpVersion = "1.0.0.0-RC17"
+
 val fs2_2Version = "2.5.6"
 val monixVersion = "3.4.0"
 val scodecVersion = "1.1.27"
@@ -215,6 +218,19 @@ lazy val http4s = project
   )
   .dependsOn(korolev, web, fs2, scodec)
 
+lazy val zioHttp = project
+  .in(interop / "zio-http")
+  .enablePlugins(GitVersioning)
+  .settings(crossVersionSettings)
+  .settings(commonSettings: _*)
+  .settings(
+    normalizedName := "korolev-zio-http",
+    libraryDependencies ++= Seq(
+      ("io.d11" %% "zhttp" % zioHttpVersion).cross(CrossVersion.for3Use2_13)
+    )
+  )
+  .dependsOn(korolev, web, zio, zioStreams)
+
 lazy val slf4j = project.
   in(interop / "slf4j").
   enablePlugins(GitVersioning).
@@ -387,6 +403,14 @@ lazy val http4sZioExample = project
   .settings(libraryDependencies += ("org.http4s" %% "http4s-blaze-server" % http4sVersion).cross(CrossVersion.for3Use2_13))
   .dependsOn(zio, http4s)
 
+lazy val zioHttpExample = project
+  .in(examples / "zio-http")
+  .disablePlugins(HeaderPlugin)
+  .settings(crossVersionSettings)
+  .settings(exampleSettings: _*)
+  .settings(mainClass := Some("ZioHttpExample"))
+  .dependsOn(zio, zioHttp)
+
 lazy val catsEffectExample = project
   .in(examples / "cats")
   .disablePlugins(HeaderPlugin)
@@ -494,7 +518,7 @@ lazy val root = project
     bytes,
     // Interop
     akka, cats, monix, zio, zioStreams, slf4j,
-    scodec, fs2, http4s,
+    scodec, fs2, http4s, zioHttp,
     // Examples
     simpleExample, routingExample, gameOfLifeExample,
     formDataExample, `file-streaming-example`, delayExample,
@@ -502,5 +526,6 @@ lazy val root = project
     akkaHttpExample, contextScopeExample, eventDataExample,
     extensionExample, zioExample, monixExample,
     catsEffectExample, evalJsExample, http4sZioExample,
+    zioHttpExample
   )
 
