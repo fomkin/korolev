@@ -22,6 +22,11 @@ class PathAndQuerySpec extends AnyFlatSpec with Matchers {
     path shouldBe Root / "page" / "1" :? "k1" -> "v1"
   }
 
+  ".fromString" should "parse path with parameter without value" in {
+    val path = PathAndQuery.fromString("/page/1?k1")
+    path shouldBe Root / "page" / "1" :? "k1" -> ""
+  }
+
   ".fromString" should "parse path with many parameters" in {
     val path = PathAndQuery.fromString("/page/1?k1=v1&k2=v2&k3=v3&k4=v4")
     path shouldBe Root / "page" / "1" :? "k1" -> "v1" :& "k2" -> "v2" :& "k3" -> "v3" :& "k4" -> "v4"
@@ -121,17 +126,6 @@ class PathAndQuerySpec extends AnyFlatSpec with Matchers {
 
     pf(path) shouldBe true
   }
-
-//  "path matching" should "correct exact match parameter" in {
-//    val path = Root / "test" :? "k1" -> "v1" :& "k2" -> "v2" :& "k3" -> "v3"
-//
-//    val pf: PartialFunction[PathAndQuery, (String, String, String)] = {
-//      case Root / "test" :?? (("k1", v1), ("k2", v2), ("k3", v3)) =>
-//        (v1, v2, v3)
-//    }
-//
-//    pf(path) shouldBe ("v1", "v2", "v3")
-//  }
 
   "path matching" should "correct exact match ignore parameters" in {
     val path = Root / "test" :? "k1" -> "v1"
