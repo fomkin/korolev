@@ -24,6 +24,10 @@ import org.http4s.dsl.impl.Path
 
 package object http4s {
 
+  object CloseCode {
+    val NormalClosure = 1000
+  }
+
   def http4sKorolevService[F[_]: Effect: ConcurrentEffect, S: StateSerializer: StateDeserializer, M]
       (config: KorolevServiceConfig[F, S, M])
       (implicit ec: ExecutionContext): HttpRoutes[F] = {
@@ -71,7 +75,7 @@ package object http4s {
               .map(out => Text(out))
               .toFs2
               .onComplete(
-                FS2Stream(Close(1000)).map(_.right.get)
+                FS2Stream(Close(CloseCode.NormalClosure)).map(_.right.get)
               )
           case null =>
             throw new RuntimeException
