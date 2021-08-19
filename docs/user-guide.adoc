@@ -273,7 +273,7 @@ val MyComponent = Component[Future, ComponentState, ComponentParameters, EventTy
   div(
     parameters.toString,
     state.toString,
-    event("click) { access =>
+    event("click") { access =>
       // Change component state here
       // using transition as usual.
     }
