@@ -35,7 +35,7 @@ object OneByOneFileStreamingExample extends SimpleAkkaHttpKorolevApp {
       files <- access.listFiles(fileInput)
       _ <- access.transition(_.copy(progress = files.map { case FileHandler(fileName, size) => (fileName, (0L, size))}.toMap, inProgress = true))
       _ <- Task.sequence {
-        files.map { handler: FileHandler =>
+        files.map { (handler: FileHandler) =>
           val size = handler.size
           access.downloadFileAsStream(handler).flatMap { data =>
             // File will be saved in 'downloads' directory

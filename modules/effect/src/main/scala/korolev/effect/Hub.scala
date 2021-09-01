@@ -43,7 +43,7 @@ final class Hub[F[_]: Effect, T](upstream: Stream[F, T], bufferSize: Int) {
     private def end(): F[Unit] =
       Effect[F].delay {
         val end = inProgress.compareAndSet(true, false)
-        if (!end) throw new IllegalStateException("Can't be false")
+        if (end == false) throw new IllegalStateException("Can't be false")
       }
 
     private def pullUpstream(): F[Option[T]] = upstream

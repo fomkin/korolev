@@ -2,17 +2,17 @@ import xerial.sbt.Sonatype._
 
 val scala2_12Version = "2.12.14"
 val scala2_13Version = "2.13.6"
-val scala3Version = "3.0.0"
+val scala3Version = "3.0.2"
 
-val levshaVersion = "1.0.1"
+val levshaVersion = "1.1.0"
 
 val akkaVersion = "2.6.14"
 val akkaHttpVersion = "10.2.4"
 val http4sVersion = "0.21.24" // Scala 3 is not supported in final releases yet
 
 val circeVersion = "0.14.1"
-val cats2Version = "2.5.1"
-val zioVersion = "1.0.8"
+val cats2Version = "2.5.3"
+val zioVersion = "1.0.11"
 val fs2_2Version = "2.5.6"
 val monixVersion = "3.4.0"
 val scodecVersion = "1.1.27"
