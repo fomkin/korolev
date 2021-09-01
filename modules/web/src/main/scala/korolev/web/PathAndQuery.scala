@@ -51,13 +51,21 @@ sealed trait PathAndQuery {
     aux(this)
   }
 
+  private[this] def encodeParam(key: String, value: String): String = {
+    if(value.length > 0) {
+      encode(key) + "=" + encode(value)
+    } else {
+      encode(key)
+    }
+  }
+
   def mkString: String = {
     @tailrec
     def aux(pq: PathAndQuery, query: String): String = {
       pq match {
         case value: /  => aux(value.prev, "/" + value.value + query)
-        case value: :& => aux(value.prev, "&" + encode(value.next._1) + "=" + encode(value.next._2) + query)
-        case value: :? => aux(value.path, "?" + encode(value.next._1) + "=" + encode(value.next._2) + query)
+        case value: :& => aux(value.prev, "&" + encodeParam(value.next._1, value.next._2) + query)
+        case value: :? => aux(value.path, "?" + encodeParam(value.next._1, value.next._2) + query)
         case Root =>
           if (query.isEmpty) {
             "/"
@@ -273,7 +281,7 @@ object PathAndQuery {
           xs
         } else {
           PathAndQuery./(xs, x)
-      })
+        })
   }
 
   private[web] def parseParams(path: PathAndQuery, raw: String): PathAndQuery = {
@@ -284,7 +292,7 @@ object PathAndQuery {
           case -1 =>
             acc.withParam(decode(raw), "")
           case i =>
-            acc.withParam(decode(raw.substring(0, i)), raw.substring(i + 1, raw.length))
+            acc.withParam(decode(raw.substring(0, i)), decode(raw.substring(i + 1, raw.length)))
         }
       }
   }
