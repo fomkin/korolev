@@ -32,6 +32,11 @@ class PathAndQuerySpec extends AnyFlatSpec with Matchers {
     path shouldBe Root / "page" / "1" :? "k1" -> "v1" :& "k2" -> "v2" :& "k3" -> "v3" :& "k4" -> "v4"
   }
 
+  ".mkString" should "correct render query parameter without value" in {
+    val result = PathAndQuery.fromString("/test/tset?k1=v1&k2&k3=v3").mkString
+    result shouldBe "/test/tset?k1=v1&k2&k3=v3"
+  }
+
   ".mkString" should "make from Root" in {
     val path = Root
     path.mkString shouldBe "/"
@@ -61,6 +66,11 @@ class PathAndQuerySpec extends AnyFlatSpec with Matchers {
     val result = PathAndQuery.fromString("/page/1?k1=v1&k2=v2&k3=v3&k4=v4&k5=v5")
 
     result.mkString shouldBe "/page/1?k1=v1&k2=v2&k3=v3&k4=v4&k5=v5"
+  }
+
+  ".withParams" should "encode query parameters when parse from string" in {
+    val result = Root.withParams(Some("k%22%7DX%22%5D6%27%3F=pPdqII6%25tS")).mkString
+    result shouldBe "?k%22%7DX%22%5D6%27%3F=pPdqII6%25tS"
   }
 
   ".endsWith" should "correct work without parameters" in {
