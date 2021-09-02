@@ -225,9 +225,7 @@ lazy val zioHttp = project
   .settings(commonSettings: _*)
   .settings(
     normalizedName := "korolev-zio-http",
-    libraryDependencies ++= Seq(
-      ("io.d11" %% "zhttp" % zioHttpVersion).cross(CrossVersion.for3Use2_13)
-    )
+    libraryDependencies += "io.d11" %% "zhttp" % zioHttpVersion
   )
   .dependsOn(korolev, web, zio, zioStreams)
 

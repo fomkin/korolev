@@ -19,8 +19,8 @@ class ZioHttpKorolev[R] {
   type ZEffect = ZioEffect[R, Throwable]
 
   def service[S: StateSerializer: StateDeserializer, M]
-    (config: KorolevServiceConfig[RIO[R, *], S, M])
-    (implicit eff:  ZEffect): HttpApp[R, Throwable] = {
+  (config: KorolevServiceConfig[RIO[R, *], S, M])
+  (implicit eff:  ZEffect): HttpApp[R, Throwable] = {
 
     val korolevServer = korolev.server.korolevService(config)
 
@@ -45,8 +45,8 @@ class ZioHttpKorolev[R] {
   }
 
   private def routeHttpRequest
-    (rootPath: Path, req: Request, korolevServer: KorolevService[RIO[R, *]])
-    (implicit eff:  ZEffect): ResponseM[R, Throwable] = {
+  (rootPath: Path, req: Request, korolevServer: KorolevService[RIO[R, *]])
+  (implicit eff:  ZEffect): ResponseM[R, Throwable] = {
 
     val prefLength = rootPath.toList.length
 
@@ -85,8 +85,8 @@ class ZioHttpKorolev[R] {
   }
 
   private def routeWsRequest[S: StateSerializer: StateDeserializer, M]
-    (req: Request, fullPath: String, korolevServer: KorolevService[RIO[R, *]])
-    (implicit eff:  ZEffect): ResponseM[R, Throwable] = {
+  (req: Request, fullPath: String, korolevServer: KorolevService[RIO[R, *]])
+  (implicit eff:  ZEffect): ResponseM[R, Throwable] = {
 
 
     val fromClientKQueue = Queue[RIO[R, *], String]()
@@ -164,7 +164,7 @@ class ZioHttpKorolev[R] {
     korolevServer.http(korolevRequest).map {
       case KorolevResponse(status, stream, responseHeaders, _) =>
         val headers = korolevToZioHttpHeaders(responseHeaders)
-        val body = stream.toZStream.flatMap { bytes: Bytes =>
+        val body = stream.toZStream.flatMap { (bytes: Bytes) =>
           ZStream.fromIterable(bytes.as[Array[Byte]])
         }
 
