@@ -1019,6 +1019,55 @@ Then embed the route into your Http4 HTTP routes structure.
 
 https://github.com/fomkin/korolev/blob/v0.17.1/examples/http4s-zio/src/main/scala/Http4sZioExample.scala[See full example]
 
+=== Zio-Http
+
+Korolev provides smooth Zio-Http integration out of the box.
+
+To use it, add a dependency:
+
+[source,scala]
+------------------------------
+libraryDependencies += "org.fomkin" %% "korolev-zio-http" % "1.0.0"
+------------------------------
+
+And create Korolev service:
+
+[source,scala]
+------------------------------
+
+implicit val effect= new ZioEffect[ZEnv, Throwable](runtime, identity, identity)
+
+val config = KorolevServiceConfig[AppTask, String, Any](
+  stateLoader = StateLoader.default("world"),
+  document = state => Html(body(div(s"Hello $state")))
+)
+
+def route(): HttpApp[ZEnv, Throwable] = {
+  new ZioHttpKorolev[ZEnv].service(config)
+}
+
+
+------------------------------
+
+Then embed the route into your Zio-Http application.
+
+[source,scala]
+----------------------------
+def getAppRoute(): ZIO[ZEnv, Nothing, HttpApp[ZEnv, Throwable]] = {
+    ZIO.runtime[ZEnv].map { implicit rts =>
+        new Service().route()
+    }
+}
+
+val prog = for {
+  httpApp <- getAppRoute()
+  _       <- Server.start(8088, httpApp)
+} yield ZExitCode.success
+
+----------------------------
+
+https://github.com/fomkin/korolev/blob/v1.0.0/examples/zio-http/src/main/scala/ZioHttpExample.scala[See full example]
+
 === Effects
 
 In addition to standard Scala Futures, Korolev can work with popular effects libraries: ZIO, Cats Effect, and Monix. To use them, add the dependency and set `F` type parameter of` Context` and `KorolevServiceConfig` to demanded effect type.
