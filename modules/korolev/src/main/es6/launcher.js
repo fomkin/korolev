@@ -25,8 +25,8 @@ window.document.addEventListener("DOMContentLoaded", () => {
     window.location
   );
 
-  window['Korolev']['disconnect'] = () => {
-    connection.disconnect(false);
+  window['Korolev']['disconnect'] = (reconnect = false) => {
+    connection.disconnect(reconnect);
   }
 
   window['Korolev']['connect'] = () => connection.connect();

@@ -164,7 +164,7 @@ class ZioHttpKorolev[R] {
     korolevServer.http(korolevRequest).map {
       case KorolevResponse(status, stream, responseHeaders, _) =>
         val headers = korolevToZioHttpHeaders(responseHeaders)
-        val body = stream.toZStream.flatMap { bytes: Bytes =>
+        val body = stream.toZStream.flatMap { (bytes: Bytes) =>
           ZStream.fromIterable(bytes.as[Array[Byte]])
         }
 
