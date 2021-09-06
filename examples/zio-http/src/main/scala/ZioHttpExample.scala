@@ -2,8 +2,7 @@
 import zio.{App, RIO, Runtime, ZEnv, ZIO, ExitCode => ZExitCode}
 import korolev.Context
 import korolev.server.{KorolevServiceConfig, StateLoader}
-import korolev.effect.{Effect => KEffect}
-import korolev.zio.{ZioEffect, zioEffectInstance}
+import korolev.zio.ZioEffect
 import korolev.state.javaSerialization._
 import korolev.zio.http.ZioHttpKorolev
 import zhttp.http.HttpApp
@@ -19,11 +18,11 @@ object ZioHttpExample extends App {
   private class Service()(implicit runtime: Runtime[ZEnv])  {
 
     import levsha.dsl._
-    import html._
+    import levsha.dsl.html._
     import scala.concurrent.duration._
 
     implicit val ec: ExecutionContext = runtime.platform.executor.asEC
-    implicit val effect= new ZioEffect[ZEnv, Throwable](runtime, identity, identity)
+    implicit val effect: ZioEffect[ZEnv, Throwable] = new ZioEffect[ZEnv, Throwable](runtime, identity, identity)
 
     val ctx = Context[ZIO[ZEnv, Throwable, *], Option[Int], Any]
 
