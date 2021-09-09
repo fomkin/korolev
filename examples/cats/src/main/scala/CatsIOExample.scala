@@ -3,7 +3,7 @@ import akka.http.scaladsl.Http
 import cats.effect.IO
 import korolev.Context
 import korolev.akka.{AkkaHttpServerConfig, akkaHttpService}
-import korolev.cats.IOEffect
+import korolev.cats._
 import korolev.server.{KorolevServiceConfig, StateLoader}
 import korolev.state.javaSerialization._
 

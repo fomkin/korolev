@@ -12,6 +12,7 @@ val http4sVersion = "0.21.24" // Scala 3 is not supported in final releases yet
 
 val circeVersion = "0.14.1"
 val cats2Version = "2.5.3"
+val cats3Version = "3.2.7"
 
 val zioVersion = "1.0.11"
 val zioHttpVersion = "1.0.0.0-RC17"
@@ -240,14 +241,25 @@ lazy val slf4j = project.
   ).
   dependsOn(effect)
 
-lazy val cats = project.
-  in(interop / "cats").
+lazy val cats2 = project.
+  in(interop / "cats-2").
   enablePlugins(GitVersioning).
   settings(crossVersionSettings).
   settings(commonSettings: _*).
   settings(
     normalizedName := "korolev-cats",
     libraryDependencies += "org.typelevel" %% "cats-effect" % cats2Version
+  ).
+  dependsOn(effect)
+
+lazy val cats3 = project.
+  in(interop / "cats-3").
+  enablePlugins(GitVersioning).
+  settings(crossVersionSettings).
+  settings(commonSettings: _*).
+  settings(
+    normalizedName := "korolev-cats3",
+    libraryDependencies += "org.typelevel" %% "cats-effect" % cats3Version
   ).
   dependsOn(effect)
 
@@ -296,7 +308,7 @@ lazy val fs2 = project
     normalizedName := "korolev-fs2",
     libraryDependencies += "co.fs2" %% "fs2-core" % fs2_2Version
   )
-  .dependsOn(effect, cats)
+  .dependsOn(effect, cats2)
 
 lazy val scodec = project
   .in(interop / "scodec")
@@ -415,7 +427,7 @@ lazy val catsEffectExample = project
   .settings(crossVersionSettings)
   .settings(exampleSettings: _*)
   .settings(mainClass := Some("CatsIOExample"))
-  .dependsOn(cats, akka)
+  .dependsOn(cats3, akka)
 
 lazy val zioExample = project
   .in(examples / "zio")
@@ -515,7 +527,7 @@ lazy val root = project
     korolev, effect, web, http, standalone, testkit,
     bytes,
     // Interop
-    akka, cats, monix, zio, zioStreams, slf4j,
+    akka, cats2, cats3, monix, zio, zioStreams, slf4j,
     scodec, fs2, http4s, zioHttp,
     // Examples
     simpleExample, routingExample, gameOfLifeExample,
