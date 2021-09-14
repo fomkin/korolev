@@ -16,8 +16,16 @@
 
 package korolev.web
 
+import java.util.Base64
+
 object Headers {
 
+  def basicAuthorization(userInfo: String): (String, String) = {
+    val credentials = Base64.getEncoder.encodeToString(userInfo.getBytes)
+    Authorization -> s"Basic $credentials"
+  }
+
+  final val Authorization = "Authorization"
   final val Host = "Host"
   final val Connection = "Connection"
   final val Upgrade = "Upgrade"

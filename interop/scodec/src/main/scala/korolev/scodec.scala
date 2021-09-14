@@ -21,6 +21,9 @@ object scodec {
     def wrapArray(bytes: Array[Byte]): ByteVector =
       ByteVector(bytes)
 
+    def copyToBuffer(b: ByteVector, buffer: ByteBuffer): Int =
+      b.copyToBuffer(buffer)
+
     def copyBuffer(buffer: ByteBuffer): ByteVector =
       ByteVector(buffer)
 

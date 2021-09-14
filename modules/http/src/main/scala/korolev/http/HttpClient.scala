@@ -1,27 +1,63 @@
 package korolev.http
 
 import korolev.data.BytesLike
-import korolev.effect.io.RawDataSocket
+import korolev.effect.io.{DataSocket, RawDataSocket, SecureDataSocket}
 import korolev.effect.syntax._
 import korolev.effect.{Decoder, Effect, Stream}
+import korolev.http.protocol.WebSocketProtocol.Frame
 import korolev.http.protocol.{Http11, WebSocketProtocol}
-import korolev.web.{Headers, Path, Request, Response}
+import korolev.web.{Headers, PathAndQuery, Request, Response}
 
-import java.net.InetSocketAddress
+import java.net.{InetSocketAddress, URI}
 import java.nio.ByteBuffer
+import java.nio.channels.AsynchronousChannelGroup
+import java.util.concurrent.{Executor, Executors}
+import javax.net.ssl.SSLContext
 import scala.concurrent.ExecutionContext
 
-object HttpClient {
+class HttpClient[F[_] : Effect, B: BytesLike] private (blockingExecutor: Executor,
+                                                       group: AsynchronousChannelGroup,
+                                                       incomingBufferSize: Int,
+                                                       sslContext: SSLContext)(implicit executor: ExecutionContext) {
 
-  def apply[F[_]: Effect, B: BytesLike](host: String,
-                                        port: Int,
-                                        request: Request[Stream[F, B]],
-                                        bufferSize: Int = 8096)
-                                       (implicit executor: ExecutionContext): F[Response[Stream[F, B]]] = {
-    val http11 = new Http11[B]()
+  private val http11 = new Http11[B]()
 
+  def apply(method: Request.Method,
+            uri: URI,
+            headers: Seq[(String, String)],
+            contentLength: Option[Long],
+            body: Stream[F, B]): F[Response[Stream[F, B]]] = {
+    val updatedHeaders =
+      if (uri.getUserInfo != null) Headers.basicAuthorization(uri.getUserInfo) +: headers
+      else headers
+    val request = Request(method, pqFromUri(uri), updatedHeaders, contentLength, body)
+
+    uri.getScheme match {
+      case "http" if uri.getPort == -1 => http(new InetSocketAddress(uri.getHost, 80), request)
+      case "https" if uri.getPort == -1 => https(new InetSocketAddress(uri.getHost, 443), request)
+      case "http" => http(new InetSocketAddress(uri.getHost, uri.getPort), request)
+      case "https" => https(new InetSocketAddress(uri.getHost, uri.getPort), request)
+      case "ws" | "wss" => Effect[F].fail(new IllegalArgumentException(s"Use HttpClient.webSocket() of HttpClient()"))
+      case scheme => Effect[F].fail(new IllegalArgumentException(s"$scheme is not supported"))
+    }
+  }
+
+  def https(address: InetSocketAddress, request: Request[Stream[F, B]]): F[Response[Stream[F, B]]] =
     for {
-      socket <- RawDataSocket.connect(new InetSocketAddress(host, port), buffer = ByteBuffer.allocate(bufferSize))
+      rawSocket <- RawDataSocket.connect(address, buffer = ByteBuffer.allocate(incomingBufferSize), group)
+      engine = sslContext.createSSLEngine(address.getHostName, address.getPort)
+      socket <- SecureDataSocket.forClientMode(rawSocket, engine, blockingExecutor)
+      response <- http(socket, address.getHostName, request)
+    } yield response
+
+  def http(address: InetSocketAddress, request: Request[Stream[F, B]]): F[Response[Stream[F, B]]] =
+    for {
+      socket <- RawDataSocket.connect(address, buffer = ByteBuffer.allocate(incomingBufferSize), group)
+      response <- http(socket, address.getHostName, request)
+    } yield response
+
+  def http(socket: DataSocket[F, B], host: String, request: Request[Stream[F, B]]): F[Response[Stream[F, B]]] =
+    for {
       requestStream <- http11.renderRequest(request.withHeader(Headers.Host, host))
       writeBytesFiber <- requestStream.foreach(socket.write).start // Write response asynchronously
       maybeResponse <- http11.decodeResponse(Decoder(socket.stream)).pull()
@@ -41,29 +77,86 @@ object HttpClient {
               new IllegalStateException("Peer has closed connection before sending response."))
         }
     } yield response
+
+  def secureWebSocket(address: InetSocketAddress,
+                      path: PathAndQuery,
+                      outgoingFrames: Stream[F, WebSocketProtocol.Frame[B]],
+                      cookie: Map[String, String],
+                      headers: Map[String, String]): F[Response[Stream[F, Frame.Merged[B]]]] =
+    for {
+      rawSocket <- RawDataSocket.connect(address, buffer = ByteBuffer.allocate(incomingBufferSize), group)
+      engine = sslContext.createSSLEngine(address.getHostName, address.getPort)
+      socket <- SecureDataSocket.forClientMode(rawSocket, engine, blockingExecutor)
+      frames <- webSocket(socket, address.getHostName, path, outgoingFrames, cookie, headers)
+    } yield frames
+
+  def webSocket(uri: URI,
+                outgoingFrames: Stream[F, WebSocketProtocol.Frame[B]],
+                cookie: Map[String, String],
+                headers: Map[String, String]): F[Response[Stream[F, Frame.Merged[B]]]] = {
+    val pq = pqFromUri(uri)
+    val updatedHeaders =
+      if (uri.getUserInfo != null) headers + Headers.basicAuthorization(uri.getUserInfo)
+      else headers
+
+    uri.getScheme match {
+      case "ws" if uri.getPort == -1 => webSocket(new InetSocketAddress(uri.getHost, 80), pq, outgoingFrames, cookie, updatedHeaders)
+      case "wss" if uri.getPort == -1 => secureWebSocket(new InetSocketAddress(uri.getHost, 443), pq, outgoingFrames, cookie, updatedHeaders)
+      case "ws" =>  webSocket(new InetSocketAddress(uri.getHost, uri.getPort), pq, outgoingFrames, cookie, updatedHeaders)
+      case "wss" => secureWebSocket(new InetSocketAddress(uri.getHost, uri.getPort), pq, outgoingFrames, cookie, updatedHeaders)
+      case "http" | "https" => Effect[F].fail(new IllegalArgumentException(s"Use HttpClient.http() of HttpClient.webSocket()"))
+      case scheme => Effect[F].fail(new IllegalArgumentException(s"$scheme is not supported"))
+    }
   }
 
-  def webSocket[F[_]: Effect, B: BytesLike](host: String,
-                              port: Int,
-                              path: Path,
-                              outgoingFrames: Stream[F, WebSocketProtocol.Frame[B]],
-                              params: Map[String, String] = Map.empty,
-                              cookie: Map[String, String] = Map.empty,
-                              headers: Map[String, String] = Map.empty)
-                             (implicit executor: ExecutionContext): F[Response[Stream[F, WebSocketProtocol.Frame.Merged[B]]]] = {
+  def webSocket(address: InetSocketAddress,
+                path: PathAndQuery,
+                outgoingFrames: Stream[F, WebSocketProtocol.Frame[B]],
+                cookie: Map[String, String],
+                headers: Map[String, String]): F[Response[Stream[F, Frame.Merged[B]]]] =
+    for {
+      socket <- RawDataSocket.connect(address, buffer = ByteBuffer.allocate(incomingBufferSize), group)
+      frames <- webSocket(socket, address.getHostName, path, outgoingFrames, cookie, headers)
+    } yield frames
+
+  def webSocket(socket: DataSocket[F, B],
+                host: String,
+                path: PathAndQuery,
+                outgoingFrames: Stream[F, WebSocketProtocol.Frame[B]],
+                cookie: Map[String, String],
+                headers: Map[String, String]): F[Response[Stream[F, WebSocketProtocol.Frame.Merged[B]]]] = {
     val webSocketProtocol = new WebSocketProtocol[B]()
     for {
       intention <- WebSocketProtocol.Intention.random
       encodedOutgoingFrames = outgoingFrames.map(frame => webSocketProtocol.encodeFrame(frame, Some(123)))
       requestRaw = Request(Request.Method.Get, path, headers.toSeq, None, encodedOutgoingFrames)
-      requestWithParams = params.foldLeft(requestRaw) { case (acc, (k, v)) => acc.withParam(k, v) }
-      requestWithCookie = cookie.foldLeft(requestWithParams) { case (acc, (k, v)) => acc.withCookie(k, v) }
+      requestWithCookie = cookie.foldLeft(requestRaw) { case (acc, (k, v)) => acc.withCookie(k, v) }
       requestWithIntention = webSocketProtocol.addIntention(requestWithCookie, intention)
-      rawResponse <- HttpClient(host, port, requestWithIntention)
+      rawResponse <- http(socket, host, requestWithIntention)
       frameDecoder = Decoder(rawResponse.body)
       frames = webSocketProtocol.mergeFrames(webSocketProtocol.decodeFrames(frameDecoder))
     } yield {
       rawResponse.copy(body = frames)
     }
+  }
+
+  private def pqFromUri(uri: URI) = {
+    val path = if (uri.getPath == null) "" else uri.getPath
+    val query = if (uri.getQuery == null) "" else uri.getQuery
+    PathAndQuery.fromString(s"$path$query")
+  }
+}
+
+object HttpClient {
+
+  def create[F[_]: Effect, B: BytesLike](blockingExecutor: Executor = null,
+                                         group: AsynchronousChannelGroup = null,
+                                         incomingBufferSize: Int = 8096,
+                                         sslContext: SSLContext = SSLContext.getDefault)
+                                        (implicit executor: ExecutionContext): F[HttpClient[F, B]] = Effect[F].delay {
+    val updatedExecutor =
+      if (blockingExecutor != null) blockingExecutor
+      else Executors.newCachedThreadPool()
+    new HttpClient(updatedExecutor, group, incomingBufferSize, sslContext)
   }
 }
