@@ -25,7 +25,6 @@ sealed class RawDataSocket[F[_]: Effect, B: BytesLike](channel: AsynchronousSock
           Thread
             .currentThread()
             .getStackTrace
-//            .filter(_.getClassName.contains("korolev"))
             .foreach { ste =>
               println(s"${Console.RED}  $ste${Console.RESET}")
             }
@@ -60,8 +59,15 @@ sealed class RawDataSocket[F[_]: Effect, B: BytesLike](channel: AsynchronousSock
       }
   }
 
-  def write(bytes: B): F[Unit] = {
-    val buffer = bytes.asBuffer // TODO Maybe it should be static allocated buffer
+  def read(buffer: ByteBuffer): F[Int] = Effect[F].promise[Int] { cb =>
+    val handler = new CompletionHandler[Integer, Unit] {
+      def completed(result: Integer, attachment: Unit): Unit = cb(Right(result))
+      def failed(exc: Throwable, attachment: Unit): Unit = cb(Left(exc))
+    }
+    channel.read(buffer, (), handler)
+  }
+
+  def write(buffer: ByteBuffer): F[Unit] = {
     Effect[F].promise { cb =>
       val handler = new CompletionHandler[Integer, Unit] {
         def completed(bytesWritten: Integer, notUsed: Unit): Unit =
@@ -72,6 +78,11 @@ sealed class RawDataSocket[F[_]: Effect, B: BytesLike](channel: AsynchronousSock
       }
       channel.write(buffer, (), handler)
     }
+  }
+
+  def write(bytes: B): F[Unit] = {
+    val buffer = bytes.asBuffer // TODO Maybe it should be static allocated buffer
+    write(buffer)
   }
 }
 

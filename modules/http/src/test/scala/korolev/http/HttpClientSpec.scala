@@ -10,11 +10,11 @@ import korolev.http.protocol.WebSocketProtocol.Frame
 import korolev.web.PathAndQuery._
 import korolev.web.Request.Method
 import korolev.web.Response.Status
-import korolev.web.{Headers, Request}
+import korolev.web.{Headers, PathAndQuery, Request}
 import org.scalatest.freespec.AsyncFreeSpec
 
 import java.io.ByteArrayInputStream
-import java.net.BindException
+import java.net.{BindException, InetSocketAddress, URI}
 import java.util.zip.GZIPInputStream
 import scala.concurrent.Future
 
@@ -25,9 +25,9 @@ class HttpClientSpec extends AsyncFreeSpec {
   "HttpClient" - {
     "should properly send GET (content-length: 0) requests" in withServer(helloWorldRoute) { port =>
       for {
-        response <- HttpClient[Future, Array[Byte]](
-          host = "localhost",
-          port = port,
+        client <- HttpClient.create[Future, Array[Byte]]()
+        response <- client.http(
+          new InetSocketAddress("localhost", port),
           request = Request(Method.Get, Root / "hello", Nil, Some(0), Stream.empty[Future, Array[Byte]])
         )
         strictResponseBody <- response.body.fold(Array.empty[Byte])(_ ++ _)
@@ -37,11 +37,24 @@ class HttpClientSpec extends AsyncFreeSpec {
       }
     }
 
+    "should properly send GET requests over TLS" in {
+      for {
+        client <- HttpClient.create[Future, Array[Byte]]()
+        response <- client(
+          Method.Get, URI.create("https://fomkin.org/hello.txt"),
+          Seq.empty, None, Stream.empty)
+        strictResponseBody <- response.body.fold(Array.empty[Byte])(_ ++ _)
+        utf8Body = strictResponseBody.asUtf8String
+      } yield {
+        assert(utf8Body.contains("Hello world") && response.status == Status.Ok)
+      }
+    }
+
     "should receive gzipped bodies well" in withServer(gzippedRoute) { port =>
       for {
-        response <- HttpClient(
-          host = "localhost",
-          port = port,
+        client <- HttpClient.create[Future, Array[Byte]]()
+        response <- client.http(
+          new InetSocketAddress("localhost", port),
           request = Request(
             Method.Get,
             Root / "gz",
@@ -59,9 +72,9 @@ class HttpClientSpec extends AsyncFreeSpec {
 
     "should receive chunked bodies well" in withServer(chunkedRoute) { port =>
       for {
-        response <- HttpClient(
-          host = "localhost",
-          port = port,
+        client <- HttpClient.create[Future, Array[Byte]]()
+        response <- client.http(
+          address = new InetSocketAddress("localhost", port),
           request = Request(
             Method.Get,
             Root / "chunked",
@@ -83,12 +96,14 @@ class HttpClientSpec extends AsyncFreeSpec {
       val wsSample2 = Frame.Text(Bytes.wrap("I'm cow!".getBytes))
 
       for {
+        client <- HttpClient.create[Future, Bytes]()
         queue <- Future.successful(Queue[Future, Frame[Bytes]]())
-        response <- HttpClient.webSocket(
-          host = "localhost",
-          port = port,
-          path = Root / "echo",
-          outgoingFrames = queue.stream
+        response <- client.webSocket(
+          address = new InetSocketAddress("localhost", port),
+          path = (Root / "echo"): PathAndQuery,
+          outgoingFrames = queue.stream,
+          cookie = Map.empty,
+          headers = Map.empty
         )
         _ <- queue.offer(wsSample1)
         echo1 <- response.body.pull()

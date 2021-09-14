@@ -10,6 +10,7 @@ trait BytesLike[T] {
   def utf8(s: String): T
   def wrapArray(bytes: Array[Byte]): T
   def copyBuffer(buffer: ByteBuffer): T
+  def copyToBuffer(b: T, buffer: ByteBuffer): Int
   def copyFromArray(bytes: Array[Byte]): T
   def copyFromArray(bytes: Array[Byte], offset: Int, size: Int): T
   // Convert
@@ -112,6 +113,12 @@ object BytesLike {
       val array = new Array[Byte](buffer.remaining())
       buffer.get(array)
       array
+    }
+
+    def copyToBuffer(b: Array[Byte], buffer: ByteBuffer): Int = {
+      val r = buffer.remaining()
+      buffer.put(b)
+      r
     }
 
     def asArray(bytes: Array[Byte]): Array[Byte] =

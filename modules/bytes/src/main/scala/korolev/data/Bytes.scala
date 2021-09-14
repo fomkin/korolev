@@ -27,6 +27,7 @@ sealed trait Bytes {
   def lastIndexOf(elem: Byte): Long
   def indexOfSlice(elem: Bytes): Long
   def lastIndexOfSlice(elem: Bytes): Long
+  def copyToBuffer(buffer: ByteBuffer): Int
 }
 
 object Bytes {
@@ -62,6 +63,8 @@ object Bytes {
     def indexOf(elem: Byte, start: Long): Long = BytesLike[T].indexOf(that, elem, start)
     def mapWithIndex(f: (Byte, Long) => Byte): Bytes = Bytes.wrap(BytesLike[T].mapWithIndex(that, f))
     def foreach(f: Byte => Unit): Unit = BytesLike[T].foreach(that, f)
+    def copyToBuffer(buffer: ByteBuffer): Int = BytesLike[T].copyToBuffer(that, buffer)
+
     override def equals(obj: Any): Boolean =
       if (obj.isInstanceOf[Bytes]) BytesLike[T].eq(that, obj.asInstanceOf[Bytes].as[T])
       else false
@@ -86,6 +89,9 @@ object Bytes {
 
     def copyFromArray(bytes: Array[Byte]): Bytes =
       wrapArray(bytes.clone())
+
+    def copyToBuffer(b: Bytes, buffer: ByteBuffer): Int =
+      b.copyToBuffer(buffer)
 
     def copyFromArray(bytes: Array[Byte], offset: Int, size: Int): Bytes =
       wrapArray(bytes.slice(offset.toInt, (offset + size).toInt))

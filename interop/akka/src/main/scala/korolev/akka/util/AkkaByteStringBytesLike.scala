@@ -18,6 +18,8 @@ final class AkkaByteStringBytesLike extends BytesLike[ByteString] {
 
   def copyBuffer(buffer: ByteBuffer): ByteString = ByteString.fromByteBuffer(buffer)
 
+  def copyToBuffer(b: ByteString, buffer: ByteBuffer): Int = b.copyToBuffer(buffer)
+
   def copyFromArray(bytes: Array[Byte]): ByteString = ByteString.fromArray(bytes)
 
   def copyFromArray(bytes: Array[Byte], offset: Int, size: Int): ByteString = ByteString.fromArray(bytes, offset, size)
