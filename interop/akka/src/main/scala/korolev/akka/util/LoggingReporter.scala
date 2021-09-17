@@ -33,4 +33,8 @@ final class LoggingReporter(actorSystem: ActorSystem) extends Reporter {
   def warning(message: String, cause: Throwable): Unit = log.warning(s"$message: {}", cause)
   def warning(message: String): Unit = log.warning(message)
   def info(message: String): Unit = log.info(message)
+  def debug(message: String): Unit = log.debug(message)
+  def debug(message: String, arg1: Any): Unit = log.debug(message, arg1)
+  def debug(message: String, arg1: Any, arg2: Any): Unit = log.debug(message, arg1, arg2)
+  def debug(message: String, arg1: Any, arg2: Any, arg3: Any): Unit = log.debug(message, arg1, arg2, arg3)
 }

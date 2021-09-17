@@ -27,30 +27,57 @@ trait Reporter {
   def warning(message: String, cause: Throwable): Unit
   def warning(message: String): Unit
   def info(message: String): Unit
+  def debug(message: String): Unit
+  def debug(message: String, arg1: Any): Unit
+  def debug(message: String, arg1: Any, arg2: Any): Unit
+  def debug(message: String, arg1: Any, arg2: Any, arg3: Any): Unit
+//  def debug(message: String, args: Any*): Unit
 }
 
 object Reporter {
 
-  /**
-    * Default STDOUT reporting
-    */
+  object Level extends Enumeration {
+    final val Debug = Value(0, "Debug")
+    final val Info = Value(1, "Info")
+    final val Warning = Value(2, "Warning")
+    final val Error = Value(3, "Error")
+  }
+
   final object PrintReporter extends Reporter {
-    def error(message: String, error: Throwable): Unit = {
+
+    var level: Level.Value = Level.Info
+
+    def error(message: String, error: Throwable): Unit = if (level <= Level.Error) {
       println(s"[ERROR] $message")
       error.printStackTrace(System.out)
     }
-    def error(message: String): Unit = {
+    def error(message: String): Unit = if (level <= Level.Error) {
       println(s"[ERROR] $message")
     }
-    def warning(message: String, error: Throwable): Unit = {
+    def warning(message: String, error: Throwable): Unit = if (level <= Level.Warning) {
       println(s"[WARNING] $message")
       error.printStackTrace(System.out)
     }
-    def warning(message: String): Unit = {
+    def warning(message: String): Unit = if (level <= Level.Warning) {
       println(s"[WARNING] $message")
     }
-    def info(message: String): Unit = {
+    def info(message: String): Unit = if (level <= Level.Info) {
       println(s"[INFO] $message")
     }
+    def debug(message: String): Unit = if (level <= Level.Debug) {
+      println(s"[DEBUG] $message")
+    }
+    def debug(message: String, arg1: Any): Unit = if (level <= Level.Debug) {
+      println(s"[DEBUG] ${message.format(arg1)}")
+    }
+    def debug(message: String, arg1: Any, arg2: Any): Unit = if (level <= Level.Debug) {
+      println(s"[DEBUG] ${message.format(arg1, arg2)}")
+    }
+    def debug(message: String, arg1: Any, arg2: Any, arg3: Any): Unit = if (level <= Level.Debug) {
+      println(s"[DEBUG] ${message.format(arg1, arg2, arg3)}")
+    }
+//    def debug(message: String, args: Any*): Unit = if (level <= Level.Debug) {
+//      println(s"[DEBUG] ${String.format(message, args:_*)}")
+//    }
   }
 }
