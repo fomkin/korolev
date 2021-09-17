@@ -54,6 +54,9 @@ class SecureDataSocket[F[_] : Effect, B: BytesLike] private(engine: SSLEngine,
     doWrap().unit
   }
 
+  def onClose(): F[DataSocket.CloseReason] =
+    socket.onClose()
+
   private val appBuffer: ByteBuffer = ByteBuffer.allocate(engine.getSession.getApplicationBufferSize)
   @volatile private var netBuffer: ByteBuffer = ByteBuffer.allocate(engine.getSession.getPacketBufferSize)
   @volatile private var peerAppBuffer: ByteBuffer = ByteBuffer.allocate(engine.getSession.getApplicationBufferSize)

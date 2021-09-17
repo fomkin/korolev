@@ -17,14 +17,14 @@
 package korolev.effect
 
 import java.util.{Timer, TimerTask}
-
 import korolev.effect.Effect.Promise
 import korolev.effect.syntax._
 
+import scala.collection.concurrent.TrieMap
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
 
-final class Scheduler[F[_]: Effect](implicit ec: ExecutionContext) {
+final class Scheduler[F[_]: Effect] {
 
   import Scheduler._
 
@@ -69,12 +69,10 @@ final class Scheduler[F[_]: Effect](implicit ec: ExecutionContext) {
 
       private val task = new TimerTask {
         def run(): Unit = {
-          Effect[F]
-            .fork(job)
-            .runAsync { errorOrResult =>
-              if (promise != null) promise(errorOrResult)
-              else completed = errorOrResult
-            }
+          job.runAsync { errorOrResult =>
+            if (promise != null) promise(errorOrResult)
+            else completed = errorOrResult
+          }
         }
       }
 
@@ -95,6 +93,15 @@ final class Scheduler[F[_]: Effect](implicit ec: ExecutionContext) {
 }
 
 object Scheduler {
+
+  private val cache = TrieMap.empty[AnyRef, Scheduler[List]]
+
+  implicit def schedulerF[F[_]: Effect]: Scheduler[F] = cache
+    .getOrElseUpdate(Effect[F], new Scheduler[F].asInstanceOf[Scheduler[List]])
+    .asInstanceOf[Scheduler[F]]
+
+  def apply[F[_]: Scheduler]: Scheduler[F] =
+    implicitly[Scheduler[F]]
 
   trait JobHandler[F[_], T] {
     def unsafeCancel(): Unit

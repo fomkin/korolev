@@ -73,6 +73,18 @@ class MonixTaskEffect(implicit scheduler: Scheduler) extends Effect[Task] {
   def recoverF[A, AA >: A](m: Task[A])(f: PartialFunction[Throwable, Task[AA]]): Task[AA] =
     m.onErrorRecoverWith(f)
 
+//  def onError[A](m: Task[A])(f: Throwable => Unit): Task[A] =
+//    m.doOnFinish {
+//      case Some(error) => Task.delay(f(error))
+//      case None => Task.unit
+//    }
+//
+//  def onErrorF[A](m: Task[A])(f: Throwable => Task[Unit]): Task[A] =
+//    m.doOnFinish {
+//      case Some(error) => f(error)
+//      case None => Task.unit
+//    }
+
   def sequence[A](in: List[Task[A]]): Task[List[A]] =
     Task.sequence(in)
 

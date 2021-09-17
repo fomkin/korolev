@@ -24,7 +24,7 @@ class ServerSocket[F[_]: Effect, B: BytesLike](channel: AsynchronousServerSocket
     if (canceled) cb(Right(None)) else {
       channel.accept((), new CompletionHandler[AsynchronousSocketChannel, Unit] {
         def completed(socket: AsynchronousSocketChannel, notUsed: Unit): Unit =
-          cb(Right(Some(new RawDataSocket[F, B](socket, ByteBuffer.allocate(readBufferSize), "incoming connection"))))
+          cb(Right(Some(new RawDataSocket[F, B](socket, ByteBuffer.allocate(readBufferSize)))))
         def failed(throwable: Throwable, notUsed: Unit): Unit = throwable match {
           case _: AsynchronousCloseException if canceled =>
             // Its okay. Accepting new connection was

@@ -5,7 +5,9 @@ import akka.http.scaladsl.server.Route
 import akka.stream.scaladsl.{Flow, Source}
 import korolev.data.Bytes
 import korolev.data.syntax._
-import korolev.effect.{Queue, Stream}
+import korolev.effect.Reporter.PrintReporter
+import korolev.effect.Reporter.PrintReporter.Implicit
+import korolev.effect.{Queue, Reporter, Stream}
 import korolev.http.protocol.WebSocketProtocol.Frame
 import korolev.web.PathAndQuery._
 import korolev.web.Request.Method

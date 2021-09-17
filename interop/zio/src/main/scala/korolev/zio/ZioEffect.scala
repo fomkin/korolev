@@ -71,6 +71,17 @@ class ZioEffect[R, E](rts: Runtime[R],
       }
     }
 
+//  def onError[A](m: ZIO[R, E, A])(f: Throwable => Unit): ZIO[R, E, A] =
+//    m.catchAll { e =>
+//      f(unliftError(e))
+//      ZIO.fail(e)
+//    }
+//
+//  def onErrorF[A](m: ZIO[R, E, A])(f: Throwable => ZIO[R, E, Unit]): ZIO[R, E, A] =
+//    m.catchAll { e =>
+//      f(unliftError(e)) *> ZIO.fail(e)
+//    }
+
   def flatMap[A, B](m: ZIO[R, E, A])(f: A => ZIO[R, E, B]): ZIO[R, E, B] =
     m.flatMap(f)
 

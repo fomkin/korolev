@@ -25,11 +25,6 @@ abstract class KorolevApp[
 
   val context: Context[F, S, M] = Context[F, S, M]
 
-//  /**
-//    * @return (KorolevServiceConfig, Free Resources Hook)
-//    */
-//  def config: F[(KorolevServiceConfig[F, S, M], () => F[Unit])]
-
   val config: F[KorolevServiceConfig[F, S, M]]
 
   val channelGroup: AsynchronousChannelGroup =
@@ -62,10 +57,12 @@ abstract class KorolevApp[
       } yield {
         (cfg, handler)
       }
-    server.runAsync {
-      case Left(error) => error.printStackTrace()
+    Effect[F].run(server) match {
+      case Left(error) =>
+        error.printStackTrace()
       case Right((cfg, handler)) if gracefulShutdown =>
         logServerStarted(cfg)
+        handler.awaitShutdown()
         addShutdownHook(cfg, handler)
       case Right((cfg, _)) =>
         logServerStarted(cfg)

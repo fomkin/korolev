@@ -1,9 +1,10 @@
 package korolev.http
 
 import korolev.data.BytesLike
+import korolev.effect.AsyncResourcePool.Borrow
 import korolev.effect.io.{DataSocket, RawDataSocket, SecureDataSocket}
 import korolev.effect.syntax._
-import korolev.effect.{Decoder, Effect, Stream}
+import korolev.effect.{AsyncResourcePool, Decoder, Effect, Reporter, Scheduler, Stream}
 import korolev.http.protocol.WebSocketProtocol.Frame
 import korolev.http.protocol.{Http11, WebSocketProtocol}
 import korolev.web.{Headers, PathAndQuery, Request, Response}
@@ -13,15 +14,21 @@ import java.nio.ByteBuffer
 import java.nio.channels.AsynchronousChannelGroup
 import java.util.concurrent.{Executor, Executors}
 import javax.net.ssl.SSLContext
+import scala.collection.concurrent.TrieMap
 import scala.concurrent.ExecutionContext
+import scala.concurrent.duration._
+import scala.util.Random
 
-class HttpClient[F[_] : Effect, B: BytesLike] private (blockingExecutor: Executor,
+class HttpClient[F[_] : Effect, B: BytesLike] private (name: String,
+                                                       maxIdleTime: FiniteDuration,
+                                                       maxConnectionsPerAddress: Int,
+                                                       blockingExecutor: Executor,
                                                        group: AsynchronousChannelGroup,
                                                        incomingBufferSize: Int,
-                                                       sslContext: SSLContext)(implicit executor: ExecutionContext) {
-
-  private val http11 = new Http11[B]()
-
+                                                       sslContext: SSLContext,
+                                                       cleanupTicks: Stream[F, Unit])
+                                                      (implicit executor: ExecutionContext,
+                                                       reporter: Reporter) {
   def apply(method: Request.Method,
             uri: URI,
             headers: Seq[(String, String)],
@@ -44,21 +51,20 @@ class HttpClient[F[_] : Effect, B: BytesLike] private (blockingExecutor: Executo
 
   def https(address: InetSocketAddress, request: Request[Stream[F, B]]): F[Response[Stream[F, B]]] =
     for {
-      rawSocket <- RawDataSocket.connect(address, buffer = ByteBuffer.allocate(incomingBufferSize), group)
-      engine = sslContext.createSSLEngine(address.getHostName, address.getPort)
-      socket <- SecureDataSocket.forClientMode(rawSocket, engine, blockingExecutor)
-      response <- http(socket, address.getHostName, request)
+      borrow <- takeSecureConnection(address)
+      response <- http(borrow, address.getHostName, request)
     } yield response
 
   def http(address: InetSocketAddress, request: Request[Stream[F, B]]): F[Response[Stream[F, B]]] =
     for {
-      socket <- RawDataSocket.connect(address, buffer = ByteBuffer.allocate(incomingBufferSize), group)
-      response <- http(socket, address.getHostName, request)
+      borrow <- takeRawConnection(address)
+      response <- http(borrow, address.getHostName, request)
     } yield response
 
-  def http(socket: DataSocket[F, B], host: String, request: Request[Stream[F, B]]): F[Response[Stream[F, B]]] =
+  private def http(borrow: Borrow[F, DataSocket[F, B]], host: String, request: Request[Stream[F, B]]): F[Response[Stream[F, B]]] =
     for {
       requestStream <- http11.renderRequest(request.withHeader(Headers.Host, host))
+      socket = borrow.value
       writeBytesFiber <- requestStream.foreach(socket.write).start // Write response asynchronously
       maybeResponse <- http11.decodeResponse(Decoder(socket.stream)).pull()
       response <-
@@ -67,16 +73,17 @@ class HttpClient[F[_] : Effect, B: BytesLike] private (blockingExecutor: Executo
             val (consumed, consumableBody) = response.body.handleConsumed
             consumed
               .after(writeBytesFiber.join())
-              // Close socket when body was consumed
-              // TODO socket connections should be recycled
-              .after(socket.stream.cancel())
+              // Give back connection when body was consumed
+              .after(borrow.give())
               .start
               .as(response.copy(body = consumableBody))
           case None =>
             Effect[F].fail[Response[Stream[F, B]]](
               new IllegalStateException("Peer has closed connection before sending response."))
         }
-    } yield response
+    } yield {
+      response
+    }
 
   def secureWebSocket(address: InetSocketAddress,
                       path: PathAndQuery,
@@ -84,10 +91,8 @@ class HttpClient[F[_] : Effect, B: BytesLike] private (blockingExecutor: Executo
                       cookie: Map[String, String],
                       headers: Map[String, String]): F[Response[Stream[F, Frame.Merged[B]]]] =
     for {
-      rawSocket <- RawDataSocket.connect(address, buffer = ByteBuffer.allocate(incomingBufferSize), group)
-      engine = sslContext.createSSLEngine(address.getHostName, address.getPort)
-      socket <- SecureDataSocket.forClientMode(rawSocket, engine, blockingExecutor)
-      frames <- webSocket(socket, address.getHostName, path, outgoingFrames, cookie, headers)
+      borrow <- takeRawConnection(address)
+      frames <- webSocket(borrow, address.getHostName, path, outgoingFrames, cookie, headers)
     } yield frames
 
   def webSocket(uri: URI,
@@ -115,48 +120,108 @@ class HttpClient[F[_] : Effect, B: BytesLike] private (blockingExecutor: Executo
                 cookie: Map[String, String],
                 headers: Map[String, String]): F[Response[Stream[F, Frame.Merged[B]]]] =
     for {
-      socket <- RawDataSocket.connect(address, buffer = ByteBuffer.allocate(incomingBufferSize), group)
-      frames <- webSocket(socket, address.getHostName, path, outgoingFrames, cookie, headers)
+      borrow <- takeRawConnection(address)
+      frames <- webSocket(borrow, address.getHostName, path, outgoingFrames, cookie, headers)
     } yield frames
 
-  def webSocket(socket: DataSocket[F, B],
-                host: String,
-                path: PathAndQuery,
-                outgoingFrames: Stream[F, WebSocketProtocol.Frame[B]],
-                cookie: Map[String, String],
-                headers: Map[String, String]): F[Response[Stream[F, WebSocketProtocol.Frame.Merged[B]]]] = {
-    val webSocketProtocol = new WebSocketProtocol[B]()
+  private def webSocket(borrow: Borrow[F, DataSocket[F, B]],
+                        host: String,
+                        path: PathAndQuery,
+                        outgoingFrames: Stream[F, WebSocketProtocol.Frame[B]],
+                        cookie: Map[String, String],
+                        headers: Map[String, String]): F[Response[Stream[F, WebSocketProtocol.Frame.Merged[B]]]] =
     for {
       intention <- WebSocketProtocol.Intention.random
       encodedOutgoingFrames = outgoingFrames.map(frame => webSocketProtocol.encodeFrame(frame, Some(123)))
       requestRaw = Request(Request.Method.Get, path, headers.toSeq, None, encodedOutgoingFrames)
       requestWithCookie = cookie.foldLeft(requestRaw) { case (acc, (k, v)) => acc.withCookie(k, v) }
       requestWithIntention = webSocketProtocol.addIntention(requestWithCookie, intention)
-      rawResponse <- http(socket, host, requestWithIntention)
+      rawResponse <- http(borrow, host, requestWithIntention)
       frameDecoder = Decoder(rawResponse.body)
       frames = webSocketProtocol.mergeFrames(webSocketProtocol.decodeFrames(frameDecoder))
     } yield {
       rawResponse.copy(body = frames)
     }
-  }
 
   private def pqFromUri(uri: URI) = {
     val path = if (uri.getPath == null) "" else uri.getPath
     val query = if (uri.getQuery == null) "" else uri.getQuery
     PathAndQuery.fromString(s"$path$query")
   }
+
+  private def takeRawConnection(address: InetSocketAddress) = {
+    def factory = RawDataSocket.connect(address, buffer = ByteBuffer.allocate(incomingBufferSize), group)
+    val pool = rawConnectionsPools.getOrElseUpdate(address,
+      new AsyncResourcePool(
+        s"$name-raw-socket-pool", factory,
+        () => Effect[F].delay(System.nanoTime()),
+        maxConnectionsPerAddress, maxIdleTime
+      )
+    )
+    pool.borrow()
+  }
+
+  private def takeSecureConnection(address: InetSocketAddress) = {
+    def factory =
+      for {
+        rawSocket <- RawDataSocket.connect(address, buffer = ByteBuffer.allocate(incomingBufferSize), group)
+        _ = reporter.debug("%s - Connection established", name)
+        engine = sslContext.createSSLEngine(address.getHostName, address.getPort)
+        socket <- SecureDataSocket.forClientMode(rawSocket, engine, blockingExecutor)
+        _ = reporter.debug("%s - TLS handshake finished", name)
+      } yield socket
+    val pool = secureConnectionsPools.getOrElseUpdate(address,
+      new AsyncResourcePool(
+        s"$name-tls-socket-pool", factory,
+        () => Effect[F].delay(System.nanoTime()),
+        maxConnectionsPerAddress, maxIdleTime
+      )
+    )
+    pool.borrow()
+  }
+
+  cleanupTicks
+    .foreach { _ =>
+      (rawConnectionsPools.values ++ secureConnectionsPools.values)
+        .toList
+        .map(_.cleanup())
+        .sequence
+        .map { results =>
+          val sum = results.sum
+          if (sum > 0) {
+            reporter.debug("HttpClient(%s) closes %d idle connection after timeout", name, sum)
+          }
+        }
+    }
+    .runAsyncForget
+
+  private val http11 = new Http11[B]()
+  private val webSocketProtocol = new WebSocketProtocol[B]()
+  private val rawConnectionsPools = TrieMap.empty[InetSocketAddress, AsyncResourcePool[F, RawDataSocket[F, B]]]
+  private val secureConnectionsPools = TrieMap.empty[InetSocketAddress, AsyncResourcePool[F, SecureDataSocket[F, B]]]
 }
 
 object HttpClient {
 
-  def create[F[_]: Effect, B: BytesLike](blockingExecutor: Executor = null,
-                                         group: AsynchronousChannelGroup = null,
-                                         incomingBufferSize: Int = 8096,
-                                         sslContext: SSLContext = SSLContext.getDefault)
-                                        (implicit executor: ExecutionContext): F[HttpClient[F, B]] = Effect[F].delay {
-    val updatedExecutor =
-      if (blockingExecutor != null) blockingExecutor
-      else Executors.newCachedThreadPool()
-    new HttpClient(updatedExecutor, group, incomingBufferSize, sslContext)
-  }
+  private lazy val defaultBlockingExecutor = Executors.newCachedThreadPool()
+
+  def create[F[_] : Effect : Scheduler, B: BytesLike](name: String = null,
+                                                      maxIdleTime: FiniteDuration = 10.seconds,
+                                                      maxConnectionsPerAddress: Int = 8,
+                                                      poolCleanupInterval: FiniteDuration = 11.seconds,
+                                                      blockingExecutor: Executor = null,
+                                                      group: AsynchronousChannelGroup = null,
+                                                      incomingBufferSize: Int = 8096,
+                                                      sslContext: SSLContext = SSLContext.getDefault)
+                                                     (implicit executor: ExecutionContext, reporter: Reporter): F[HttpClient[F, B]] =
+    for {
+      ticks <- Scheduler[F].schedule(poolCleanupInterval)
+    } yield {
+      val safeName = Option(name).getOrElse(s"${Random.alphanumeric.take(5).mkString}-http-client")
+      val updatedExecutor =
+        if (blockingExecutor != null) blockingExecutor
+        else defaultBlockingExecutor
+      new HttpClient(safeName, maxIdleTime, maxConnectionsPerAddress,
+        updatedExecutor, group, incomingBufferSize, sslContext, ticks)
+    }
 }

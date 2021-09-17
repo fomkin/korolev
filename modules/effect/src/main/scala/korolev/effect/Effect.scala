@@ -21,7 +21,7 @@ import korolev.effect.Effect.Fiber
 import scala.annotation.implicitNotFound
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, ExecutionContext, Future}
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 /**
   * Korolev's internal presentation of effect (such as Future, cats.effect.IO, Monix or ZIO tasks).
@@ -29,6 +29,8 @@ import scala.util.Try
   */
 @implicitNotFound("Instance of Effect for ${F} is not found.")
 trait Effect[F[_]] {
+  private val noneVal: F[None.type] = pure(None)
+  def none[A]: F[Option[A]] = noneVal.asInstanceOf[F[Option[A]]]
   def pure[A](value: A): F[A]
   def delay[A](value: => A): F[A]
   def delayAsync[A](value: => F[A]): F[A] = flatMap(delay(value))(identity)
@@ -42,6 +44,8 @@ trait Effect[F[_]] {
   def map[A, B](m: F[A])(f: A => B): F[B]
   def recover[A, AA >: A](m: F[A])(f: PartialFunction[Throwable, AA]): F[AA]
   def recoverF[A, AA >: A](m: F[A])(f: PartialFunction[Throwable, F[AA]]): F[AA]
+//  def onError[A](m: F[A])(f: Throwable => Unit): F[A]
+//  def onErrorF[A](m: F[A])(f: Throwable => F[Unit]): F[A]
   /** Keep in mind that when [[F]] has strict semantic, effect should
     * created inside 'start()' brackets. */
   def start[A](create: => F[A])(implicit ec: ExecutionContext): F[Fiber[F, A]]
@@ -93,6 +97,24 @@ object Effect {
       Try(Await.result(m, Duration.Inf)).toEither
     def recover[A, AA >: A](m: Future[A])(f: PartialFunction[Throwable, AA]): Future[AA] = m.recover(f)
     def recoverF[A, AA >: A](m: Future[A])(f: PartialFunction[Throwable, Future[AA]]): Future[AA] = m.recoverWith(f)
+//    def onError[A](m: Future[A])(f: Throwable => Unit): Future[A] = {
+//      m.onComplete {
+//        case Success(value) => ()
+//        case Failure(exception) =>
+//          f(exception)
+//      }
+//      m
+//    }
+//    def onErrorF[A](m: Future[A])(f: Throwable => Future[Unit]): Future[A] = {
+//      m.onComplete {
+//        case Success(value) => ()
+//        case Failure(exception) =>
+//          f(exception)
+//      }
+//      m
+//    }
+    /** Keep in mind that when [[F]] has strict semantic, effect should
+     * created inside 'start()' brackets. */
     def sequence[A](in: List[Future[A]]): Future[List[A]] =
       Future.sequence(in)
     def start[A](create: => Future[A])(implicit ec: ExecutionContext): Future[Fiber[Future, A]] = {
