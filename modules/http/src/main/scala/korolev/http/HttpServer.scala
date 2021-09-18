@@ -22,14 +22,15 @@ object HttpServer {
   def apply[F[_]: Effect, B: BytesLike](address: SocketAddress,
                                         backlog: Int = 0,
                                         readBufferSize: Int = 8096,
-                                        group: AsynchronousChannelGroup = null)
+                                        group: AsynchronousChannelGroup = null,
+                                        gracefulShutdown: Boolean = false)
                                        (f: Request[Stream[F, B]] => F[Response[Stream[F, B]]])
                                        (implicit ec: ExecutionContext): F[ServerSocket.ServerSocketHandler[F]] = {
 
     val InternalServerErrorMessage = BytesLike[B].ascii("Internal server error")
     val http11 = new Http11[B]
 
-    ServerSocket.accept[F, B](address, backlog, readBufferSize, group) { client =>
+    ServerSocket.accept[F, B](address, backlog, readBufferSize, group, gracefulShutdown) { client =>
       http11
         .decodeRequest(Decoder(client.stream))
         .foreach { request =>
