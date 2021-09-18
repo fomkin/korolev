@@ -3,9 +3,8 @@ package korolev.effect.io
 import java.net.SocketAddress
 import java.nio.ByteBuffer
 import java.nio.channels.{AsynchronousChannelGroup, AsynchronousCloseException, AsynchronousServerSocketChannel, AsynchronousSocketChannel, CompletionHandler}
-
 import korolev.data.BytesLike
-import korolev.effect.{Effect, Queue, Stream}
+import korolev.effect.{Close, Effect, Queue, Stream}
 import korolev.effect.syntax._
 
 import scala.concurrent.ExecutionContext
@@ -52,7 +51,8 @@ object ServerSocket {
   def accept[F[_]: Effect, B: BytesLike](address: SocketAddress,
                                          backlog: Int = 0,
                                          readBufferSize: Int = 8096,
-                                         group: AsynchronousChannelGroup = null)
+                                         group: AsynchronousChannelGroup = null,
+                                         gracefulShutdown: Boolean = false)
                                         (f: RawDataSocket[F, B] => F[Unit])
                                         (implicit ec: ExecutionContext): F[ServerSocketHandler[F]] =
     bind(address, backlog, readBufferSize, group = group).flatMap { server =>
@@ -64,12 +64,19 @@ object ServerSocket {
             .flatMap(f => connectionsQueue.enqueue(f.join()))
         }
         .start
-        .map { fiber =>
+        .map { serverFiber =>
           new ServerSocketHandler[F] {
-            def awaitShutdown(): F[Unit] =
-              fiber.join() *>
-                connectionsQueue.stop() *>
-                connectionsQueue.stream.foreach(identity)
+
+            def awaitShutdown(): F[Unit] = {
+              if (gracefulShutdown) {
+                serverFiber.join() *>
+                  connectionsQueue.stop() *>
+                  connectionsQueue.stream.foreach(identity)
+              } else {
+                serverFiber.join()
+              }
+            }
+
             def stopServingRequests(): F[Unit] =
               server.cancel()
           }
@@ -94,7 +101,8 @@ object ServerSocket {
   sealed trait ServerSocketHandler[F[_]] {
 
     /**
-      * Await until all connections are closed.
+      * Awaits server socket close.
+     * If server configured with graceful shutdown, waits until all client connections are closed.
       */
     def awaitShutdown(): F[Unit]
 
@@ -106,5 +114,16 @@ object ServerSocket {
       * until connection closed by a client.
       */
     def stopServingRequests(): F[Unit]
+  }
+
+  object ServerSocketHandler {
+    implicit def serverSocketHandlerCloseInstance[F[_]: Effect]: Close[F, ServerSocketHandler[F]] =
+      new Close[F, ServerSocketHandler[F]] {
+        def onClose(that: ServerSocketHandler[F]): F[Unit] =
+          that.awaitShutdown()
+
+        def close(that: ServerSocketHandler[F]): F[Unit] =
+          that.stopServingRequests()
+      }
   }
 }

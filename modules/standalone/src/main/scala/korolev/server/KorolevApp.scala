@@ -30,11 +30,12 @@ abstract class KorolevApp[
   val channelGroup: AsynchronousChannelGroup =
     AsynchronousChannelGroup.withThreadPool(executionContext)
 
-  private def logServerStarted(config: KorolevServiceConfig[F, S, M]): Unit =
+  private def logServerStarted(config: KorolevServiceConfig[F, S, M]) = Effect[F].delay {
     config.reporter.info(s"Server stated at $address")
+  }
 
   private def addShutdownHook(config: KorolevServiceConfig[F, S, M],
-                              handler: ServerSocketHandler[F]): Unit =
+                              handler: ServerSocketHandler[F]) = Effect[F].delay {
     Runtime.getRuntime.addShutdownHook(
       new Thread {
         override def run(): Unit = {
@@ -48,24 +49,20 @@ abstract class KorolevApp[
         }
       }
     )
+  }
 
   def main(args: Array[String]): Unit = {
-    val server =
+    val job =
       for {
         cfg <- config
-        handler <- standalone.buildServer[F, B](korolevService(cfg), address, channelGroup)
-      } yield {
-        (cfg, handler)
-      }
-    Effect[F].run(server) match {
-      case Left(error) =>
-        error.printStackTrace()
-      case Right((cfg, handler)) if gracefulShutdown =>
-        logServerStarted(cfg)
-        handler.awaitShutdown()
-        addShutdownHook(cfg, handler)
-      case Right((cfg, _)) =>
-        logServerStarted(cfg)
+        handler <- standalone.buildServer[F, B](korolevService(cfg), address, channelGroup, gracefulShutdown)
+        _ <- logServerStarted(cfg)
+        _ <- addShutdownHook(cfg, handler)
+        _ <- handler.awaitShutdown()
+      } yield ()
+    Effect[F].run(job) match {
+      case Left(e) => e.printStackTrace()
+      case Right(_) =>
     }
   }
 }

@@ -17,10 +17,11 @@ object standalone {
 
   def buildServer[F[_]: Effect, B: BytesLike](service: KorolevService[F],
                                               address: SocketAddress,
-                                              group: AsynchronousChannelGroup = null)
+                                              group: AsynchronousChannelGroup = null,
+                                              gracefulShutdown: Boolean)
                                              (implicit ec: ExecutionContext): F[ServerSocket.ServerSocketHandler[F]] = {
     val webSocketProtocol = new WebSocketProtocol[B]
-    HttpServer[F, B](address, group = group) { request =>
+    HttpServer[F, B](address, group = group, gracefulShutdown = gracefulShutdown) { request =>
       webSocketProtocol.findIntention(request) match {
         case Some(intention) =>
           val f = webSocketProtocol.upgrade[F](intention) { (request: Request[Stream[F, WebSocketProtocol.Frame.Merged[B]]]) =>
