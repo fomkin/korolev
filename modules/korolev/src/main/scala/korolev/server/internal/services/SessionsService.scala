@@ -16,7 +16,7 @@
 
 package korolev.server.internal.services
 
-import korolev.effect.syntax._
+import korolev.effect.syntax.*
 import korolev.effect.{AsyncTable, Effect, Scheduler, Stream}
 import korolev.internal.{ApplicationInstance, Frontend}
 import korolev.server.KorolevServiceConfig
@@ -25,6 +25,7 @@ import korolev.state.{StateDeserializer, StateSerializer, StateStorage}
 import korolev.web.Request.Head
 import korolev.{Extension, Qsid}
 
+import java.util.concurrent.atomic.AtomicBoolean
 import scala.collection.concurrent.TrieMap
 import scala.util.Random
 
@@ -44,7 +45,7 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
     for {
       deviceId <- rh.cookie(Cookies.DeviceId) match {
         case Some(d) => Effect[F].pure(d)
-        case None => config.idGenerator.generateDeviceId()
+        case None    => config.idGenerator.generateDeviceId()
       }
       sessionId <- config.idGenerator.generateSessionId()
     } yield {
@@ -69,12 +70,22 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
 
     def handleAppOrWsOutgoingClose(frontend: Frontend[F], app: App, ehs: ExtensionsHandlers): F[Unit] = {
       val consumed: F[Unit] = Effect[F].promise[Unit] { cb =>
-        frontend.outgoingConsumed.runAsync(cb)
-        incomingConsumed.runAsync(cb)
+        val consumed = new AtomicBoolean(false)
+        frontend.outgoingConsumed.runAsync(f =>
+          if(consumed.compareAndSet(false, true)) {
+            cb(f)
+          }
+        )
+        incomingConsumed.runAsync(f =>
+          if(consumed.compareAndSet(false, true)) {
+            cb(f)
+          }
+        )
       }
 
       for {
         _ <- consumed
+        _ <- incoming.cancel()
         _ <- frontend.outgoingMessages.cancel()
         _ <- app.topLevelComponentInstance.destroy()
         _ <- ehs.map(_.onDestroy()).sequence
@@ -84,24 +95,29 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
     }
 
     def handleStateChange(app: App, ehs: ExtensionsHandlers): F[Unit] =
-      app.stateStream.foreach { case (id, state) =>
-        if (id != levsha.Id.TopLevel) Effect[F].unit else ehs
-          .map(_.onState(state.asInstanceOf[S]))
-          .sequence
-          .unit
+      app.stateStream.foreach {
+        case (id, state) =>
+          if (id != levsha.Id.TopLevel) Effect[F].unit
+          else
+            ehs
+              .map(_.onState(state.asInstanceOf[S]))
+              .sequence
+              .unit
       }
 
     def handleMessages(app: App, ehs: ExtensionsHandlers): F[Unit] =
-        app.messagesStream.foreach { m =>
-          ehs.map(_.onMessage(m)).sequence.unit
-        }
+      app.messagesStream.foreach { m =>
+        ehs.map(_.onMessage(m)).sequence.unit
+      }
 
     def create() =
       for {
         stateManager <- stateStorage.get(qsid.deviceId, qsid.sessionId)
         maybeInitialState <- stateManager.read[S](levsha.Id.TopLevel)
         // Top level state should exists. See 'initAppState'.
-        initialState <- maybeInitialState.fold(Effect[F].fail[S](BadRequestException(s"Top level state should exists. Snapshot for $qsid is corrupted")))(Effect[F].pure(_))
+        initialState <- maybeInitialState.fold(
+          Effect[F].fail[S](BadRequestException(s"Top level state should exists. Snapshot for $qsid is corrupted")))(
+          Effect[F].pure(_))
         frontend = new Frontend[F](incoming)
         app = new ApplicationInstance[F, S, M](
           qsid,
@@ -115,7 +131,8 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
           config.reporter
         )
         browserAccess = app.topLevelComponentInstance.browserAccess
-        _ <- config.extensions.map(_.setup(browserAccess))
+        _ <- config.extensions
+          .map(_.setup(browserAccess))
           .sequence
           .flatMap { ehs =>
             for {
