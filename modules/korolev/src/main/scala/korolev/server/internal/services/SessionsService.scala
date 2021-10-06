@@ -68,22 +68,16 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
 
     def handleAppOrWsOutgoingClose(frontend: Frontend[F], app: App, ehs: ExtensionsHandlers): F[Unit] = {
       val consumed: F[Unit] = Effect[F].promise[Unit] { cb =>
-        val consumed = new AtomicBoolean(false)
-        frontend.outgoingConsumed.runAsync(f =>
-          if(consumed.compareAndSet(false, true)) {
-            cb(f)
-          }
-        )
-        incomingConsumed.runAsync(f =>
-          if(consumed.compareAndSet(false, true)) {
-            cb(f)
-          }
-        )
+        val invoked = new AtomicBoolean(false)
+        val invokeOnce = (x: Either[Throwable, Unit]) =>
+          if (invoked.compareAndSet(false, true)) cb(x)
+
+        frontend.outgoingConsumed.runAsync(invokeOnce)
+        incomingConsumed.runAsync(invokeOnce)
       }
 
       for {
         _ <- consumed
-        _ <- incoming.cancel()
         _ <- frontend.outgoingMessages.cancel()
         _ <- app.topLevelComponentInstance.destroy()
         _ <- ehs.map(_.onDestroy()).sequence
