@@ -77,12 +77,19 @@ package object akka {
                     .map(text => TextMessage.Strict(text))
 
                 val sink = Flow[Message]
-                    .mapConcat {
-                      case tm: TextMessage.Strict => tm.text :: Nil
-                      case tm: TextMessage.Streamed => tm.textStream.runWith(Sink.ignore); Nil
-                      case bm: BinaryMessage => bm.dataStream.runWith(Sink.ignore); Nil
-                    }
-                    .to(inSink)
+                  .collect {
+                    case TextMessage.Strict(message) =>
+                      Effect[F].toFuture {
+                        Effect[F].pure(message)
+                      }
+                    case TextMessage.Streamed(stream) =>
+                      stream
+                        .limit(akkaHttpConfig.wsStreamedLimit)
+                        .completionTimeout(akkaHttpConfig.wsStreamedCompletionTimeout)
+                        .runFold("")(_ + _)
+                  }
+                  .mapAsync(akkaHttpConfig.wsStreamedParallelism)(identity)
+                  .to(inSink)
 
                 upgrade.handleMessages(
                   if(wsLoggingEnabled) {
