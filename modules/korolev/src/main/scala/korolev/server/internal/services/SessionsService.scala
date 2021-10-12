@@ -25,8 +25,7 @@ import korolev.state.{StateDeserializer, StateSerializer, StateStorage}
 import korolev.web.Request.Head
 import korolev.{Extension, Qsid}
 
-import scala.collection.concurrent.TrieMap
-import scala.util.Random
+import java.util.concurrent.atomic.AtomicBoolean
 
 private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: StateDeserializer, M](
     config: KorolevServiceConfig[F, S, M],
@@ -69,8 +68,12 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
 
     def handleAppOrWsOutgoingClose(frontend: Frontend[F], app: App, ehs: ExtensionsHandlers): F[Unit] = {
       val consumed: F[Unit] = Effect[F].promise[Unit] { cb =>
-        frontend.outgoingConsumed.runAsync(cb)
-        incomingConsumed.runAsync(cb)
+        val invoked = new AtomicBoolean(false)
+        val invokeOnce = (x: Either[Throwable, Unit]) =>
+          if (invoked.compareAndSet(false, true)) cb(x)
+
+        frontend.outgoingConsumed.runAsync(invokeOnce)
+        incomingConsumed.runAsync(invokeOnce)
       }
 
       for {
