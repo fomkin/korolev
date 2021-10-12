@@ -28,6 +28,6 @@ object AkkaHttpServerConfig {
   val DefaultMaxRequestBodySize: Int = 8 * 1024 * 1024
   val DefaultOutputBufferSize: Int = 1000
   val DefaultWsStreamedLimit: Int = 100
-  val DefaultWsStreamedCompletionTimeout: FiniteDuration = 4.seconds
+  val DefaultWsStreamedCompletionTimeout: FiniteDuration = 30.seconds
   val DefaultWsStreamedParallelism: Int = 2
 }

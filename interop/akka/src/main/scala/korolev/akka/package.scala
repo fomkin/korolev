@@ -77,18 +77,23 @@ package object akka {
                     .map(text => TextMessage.Strict(text))
 
                 val sink = Flow[Message]
-                  .collect {
+                  .mapAsync(akkaHttpConfig.wsStreamedParallelism) {
                     case TextMessage.Strict(message) =>
-                      Effect[F].toFuture {
-                        Effect[F].pure(message)
-                      }
+                      Future.successful(Some(message))
                     case TextMessage.Streamed(stream) =>
                       stream
                         .limit(akkaHttpConfig.wsStreamedLimit)
                         .completionTimeout(akkaHttpConfig.wsStreamedCompletionTimeout)
                         .runFold("")(_ + _)
+                        .map(Some(_))
+                    case _: BinaryMessage =>
+                      materializer.system.log.warning("WS connection receive 'BinaryMessage' but currently it not supported")
+                      Future.successful(None)
                   }
-                  .mapAsync(akkaHttpConfig.wsStreamedParallelism)(identity)
+                  .collect {
+                    case Some(message) =>
+                      message
+                  }
                   .to(inSink)
 
                 upgrade.handleMessages(
