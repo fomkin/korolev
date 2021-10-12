@@ -16,10 +16,16 @@
 
 package korolev.akka
 
+import scala.concurrent.duration._
+
 case class AkkaHttpServerConfig(maxRequestBodySize: Int = AkkaHttpServerConfig.DefaultMaxRequestBodySize,
-                                outputBufferSize: Int = AkkaHttpServerConfig.DefaultOutputBufferSize)
+                                outputBufferSize: Int = AkkaHttpServerConfig.DefaultOutputBufferSize,
+                                wsStreamedCompletionTimeout: FiniteDuration = AkkaHttpServerConfig.DefaultWsStreamedCompletionTimeout,
+                                wsStreamedParallelism: Int = AkkaHttpServerConfig.DefaultWsStreamedParallelism)
 
 object AkkaHttpServerConfig {
   val DefaultMaxRequestBodySize: Int = 8 * 1024 * 1024
   val DefaultOutputBufferSize: Int = 1000
+  val DefaultWsStreamedCompletionTimeout: FiniteDuration = 30.seconds
+  val DefaultWsStreamedParallelism: Int = 2
 }
