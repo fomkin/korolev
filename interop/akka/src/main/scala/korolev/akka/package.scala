@@ -82,7 +82,6 @@ package object akka {
                       Future.successful(Some(message))
                     case TextMessage.Streamed(stream) =>
                       stream
-                        .limit(akkaHttpConfig.wsStreamedLimit)
                         .completionTimeout(akkaHttpConfig.wsStreamedCompletionTimeout)
                         .runFold("")(_ + _)
                         .map(Some(_))
