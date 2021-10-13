@@ -2,6 +2,7 @@ package korolev.web
 
 import java.net.{URLDecoder, URLEncoder}
 import scala.annotation.tailrec
+import scala.util.hashing.MurmurHash3
 
 sealed trait PathAndQuery {
 
@@ -51,31 +52,30 @@ sealed trait PathAndQuery {
     aux(this)
   }
 
-  private[this] def encodeParam(key: String, value: String): String = {
-    if(value.length > 0) {
-      encode(key) + "=" + encode(value)
-    } else {
-      encode(key)
+  def mkString(builder: StringBuilder): Unit = {
+    def encodeParam(key: String, value: String, tail: List[String]): List[String] = {
+      if (value.nonEmpty) encode(key) :: "=" :: encode(value) :: tail
+      else encode(key) :: tail
+    }
+    @tailrec
+    def aux(pq: PathAndQuery, result: List[String]): List[String] = {
+      pq match {
+        case value: /  => aux(value.prev, "/" :: value.value :: result)
+        case value: :& => aux(value.prev, "&" :: encodeParam(value.next._1, value.next._2, result))
+        case value: :? => aux(value.path, "?" :: encodeParam(value.next._1, value.next._2, result))
+        case Root => if (result.isEmpty) "/" :: Nil else result
+      }
+    }
+
+    aux(this, Nil).foreach { chunk =>
+      builder.appendAll(chunk)
     }
   }
 
   def mkString: String = {
-    @tailrec
-    def aux(pq: PathAndQuery, query: String): String = {
-      pq match {
-        case value: /  => aux(value.prev, "/" + value.value + query)
-        case value: :& => aux(value.prev, "&" + encodeParam(value.next._1, value.next._2) + query)
-        case value: :? => aux(value.path, "?" + encodeParam(value.next._1, value.next._2) + query)
-        case Root =>
-          if (query.isEmpty) {
-            "/"
-          } else {
-            query
-          }
-      }
-    }
-
-    aux(this, "")
+    val sb = new StringBuilder()
+    mkString(sb)
+    sb.mkString
   }
 
   def param(name: String): Option[String] = {

@@ -15,7 +15,7 @@ import scala.concurrent.ExecutionContext
   * @see [[AsynchronousServerSocketChannel]]
   */
 class ServerSocket[F[_]: Effect, B: BytesLike](channel: AsynchronousServerSocketChannel,
-                                               readBufferSize: Int) extends Stream[F, RawDataSocket[F, B]] {
+                                               bufferSize: Int) extends Stream[F, RawDataSocket[F, B]] {
 
   @volatile private var canceled = false
 
@@ -23,7 +23,7 @@ class ServerSocket[F[_]: Effect, B: BytesLike](channel: AsynchronousServerSocket
     if (canceled) cb(Right(None)) else {
       channel.accept((), new CompletionHandler[AsynchronousSocketChannel, Unit] {
         def completed(socket: AsynchronousSocketChannel, notUsed: Unit): Unit =
-          cb(Right(Some(new RawDataSocket[F, B](socket, ByteBuffer.allocate(readBufferSize)))))
+          cb(Right(Some(new RawDataSocket[F, B](socket, ByteBuffer.allocate(bufferSize), ByteBuffer.allocate(bufferSize)))))
         def failed(throwable: Throwable, notUsed: Unit): Unit = throwable match {
           case _: AsynchronousCloseException if canceled =>
             // Its okay. Accepting new connection was
@@ -50,12 +50,12 @@ object ServerSocket {
     */
   def accept[F[_]: Effect, B: BytesLike](address: SocketAddress,
                                          backlog: Int = 0,
-                                         readBufferSize: Int = 8096,
+                                         bufferSize: Int = 8096,
                                          group: AsynchronousChannelGroup = null,
                                          gracefulShutdown: Boolean = false)
                                         (f: RawDataSocket[F, B] => F[Unit])
                                         (implicit ec: ExecutionContext): F[ServerSocketHandler[F]] =
-    bind(address, backlog, readBufferSize, group = group).flatMap { server =>
+    bind(address, backlog, bufferSize, group = group).flatMap { server =>
       val connectionsQueue = Queue[F, F[Unit]]()
       server
         .foreach { connection =>
@@ -89,13 +89,13 @@ object ServerSocket {
     */
   def bind[F[_]: Effect, B: BytesLike](socketAddress: SocketAddress,
                                        backlog: Int = 0,
-                                       readBufferSize: Int = 8096,
+                                       bufferSize: Int = 8096,
                                        group: AsynchronousChannelGroup = null): F[ServerSocket[F, B]] =
     Effect[F].delay {
       val channel = AsynchronousServerSocketChannel
         .open(group)
         .bind(socketAddress, backlog)
-      new ServerSocket[F, B](channel, readBufferSize)
+      new ServerSocket[F, B](channel, bufferSize)
     }
 
   sealed trait ServerSocketHandler[F[_]] {

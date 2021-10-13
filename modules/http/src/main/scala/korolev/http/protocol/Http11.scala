@@ -13,6 +13,7 @@ class Http11[B: BytesLike] {
 
   import Http11._
 
+  private final val NewLine = "\r\n"
   private final val LastChunk = Stream(BytesLike[B].ascii("0\r\n\r\n"))
   private final val HeaderDelimiter = BytesLike[B].ascii("\r\n\r\n")
   private final val CRLF = BytesLike[B].ascii("\r\n")
@@ -222,56 +223,70 @@ class Http11[B: BytesLike] {
     (bodyBytes, response)
   }
 
+  private val sb = new ThreadLocal[java.lang.StringBuilder]()
+
   def renderResponseHeader(status: Status, headers: Seq[(String, String)]): String = {
-    val builder = new StringBuilder()
-    builder.append("HTTP/1.1 ")
+    val builder = {
+      val b = sb.get()
+      if (b == null) {
+        val nb = new java.lang.StringBuilder()
+        sb.set(nb)
+        nb
+      } else {
+        b.setLength(0)
+        b
+      }
+    }
+    //val builder = new java.lang.StringBuilder()
+    //val builder = new StringBuilder()
+    builder
+      .append("HTTP/1.1 ")
       .append(status.codeAsString)
       .append(' ')
       .append(status.phrase)
-      .newLine()
+      .append(NewLine)
     def putHeader(name: String, value: String) = builder
       .append(name)
       .append(':')
       .append(' ')
       .append(value)
-      .newLine()
+      .append(NewLine)
     headers.foreach {
       case (name, value) =>
         putHeader(name, value)
     }
     builder
-      .newLine()
-      .mkString
+      .append(NewLine)
+      .toString
   }
 
   def renderRequestHead[T](request: Request[T]): String = {
     val sb = new StringBuilder()
-      .append(request.method.value)
+      .appendAll(request.method.value)
       .append(' ')
-      .append(request.pq.mkString)
-
+    request.pq.mkString(sb)
     sb
       .append(' ')
-      .append("HTTP/1.1")
+      .appendAll("HTTP/1.1")
       .newLine()
     if (request.renderedCookie != null && request.renderedCookie.nonEmpty) sb
-      .append(Headers.Cookie)
-      .append(": ")
-      .append(request.renderedCookie)
+      .appendAll(Headers.Cookie)
+      .appendAll(": ")
+      .appendAll(request.renderedCookie)
       .newLine()
     request.contentLength match {
       case None => ()
       case Some(contentLength) => sb
-        .append(Headers.ContentLength)
-        .append(": ")
+        .appendAll(Headers.ContentLength)
+        .appendAll(": ")
         .append(contentLength)
         .newLine()
     }
     request.headers.foreach {
       case (k, v) => sb
-        .append(k)
-        .append(": ")
-        .append(v)
+        .appendAll(k)
+        .appendAll(": ")
+        .appendAll(v)
         .newLine()
     }
     sb
@@ -315,6 +330,7 @@ class Http11[B: BytesLike] {
 }
 
 object Http11 {
+
   private implicit final class StringBuilderOps(val builder: StringBuilder) extends AnyVal {
     def newLine(): StringBuilder = builder
       .append('\r')
