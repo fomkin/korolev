@@ -24,7 +24,7 @@ class HttpClient[F[_] : Effect, B: BytesLike] private (name: String,
                                                        maxConnectionsPerAddress: Int,
                                                        blockingExecutor: Executor,
                                                        group: AsynchronousChannelGroup,
-                                                       incomingBufferSize: Int,
+                                                       bufferSize: Int,
                                                        sslContext: SSLContext,
                                                        cleanupTicks: Stream[F, Unit])
                                                       (implicit executor: ExecutionContext,
@@ -150,7 +150,11 @@ class HttpClient[F[_] : Effect, B: BytesLike] private (name: String,
   }
 
   private def takeRawConnection(address: InetSocketAddress) = {
-    def factory = RawDataSocket.connect(address, buffer = ByteBuffer.allocate(incomingBufferSize), group)
+    def factory = RawDataSocket.connect(
+      address,
+      readBuffer = ByteBuffer.allocate(bufferSize),
+      writeBuffer = ByteBuffer.allocate(bufferSize),
+      group)
     val pool = rawConnectionsPools.getOrElseUpdate(address,
       new AsyncResourcePool(
         s"$name-raw-socket-pool", factory,
@@ -164,7 +168,11 @@ class HttpClient[F[_] : Effect, B: BytesLike] private (name: String,
   private def takeSecureConnection(address: InetSocketAddress) = {
     def factory =
       for {
-        rawSocket <- RawDataSocket.connect(address, buffer = ByteBuffer.allocate(incomingBufferSize), group)
+        rawSocket <- RawDataSocket.connect(
+          address,
+          readBuffer = ByteBuffer.allocate(bufferSize),
+          writeBuffer = ByteBuffer.allocate(bufferSize),
+          group)
         _ = reporter.debug("%s - Connection established", name)
         engine = sslContext.createSSLEngine(address.getHostName, address.getPort)
         socket <- SecureDataSocket.forClientMode(rawSocket, engine, blockingExecutor)

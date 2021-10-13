@@ -47,6 +47,7 @@ val publishSettings = Seq(
 val commonSettings = publishSettings ++ Seq(
   git.useGitDescribe := true,
   organization := "org.fomkin",
+  scalaVersion := scala2_13Version,
   // Add Scala 2 compiler plugins
   libraryDependencies ++= {
     CrossVersion.partialVersion(scalaVersion.value) match {

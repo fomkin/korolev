@@ -13,16 +13,17 @@ import java.util.concurrent.atomic.AtomicReference
 import scala.annotation.tailrec
 
 sealed class RawDataSocket[F[_]: Effect, B: BytesLike](channel: AsynchronousSocketChannel,
-                                                       buffer: ByteBuffer) extends DataSocket[F, B] {
+                                                       readBuffer: ByteBuffer,
+                                                       writeBuffer: ByteBuffer) extends DataSocket[F, B] {
 
   val stream: Stream[F, B] = new Stream[F, B] {
 
-    def pull(): F[Option[B]] = read(buffer).map {
+    def pull(): F[Option[B]] = read(readBuffer).map {
       case -1 => None
       case _ =>
-        buffer.flip()
-        val bytes = BytesLike[B].copyBuffer(buffer)
-        buffer.clear()
+        readBuffer.flip()
+        val bytes = BytesLike[B].copyBuffer(readBuffer)
+        readBuffer.clear()
         Some(bytes)
     }
 
@@ -117,6 +118,10 @@ sealed class RawDataSocket[F[_]: Effect, B: BytesLike](channel: AsynchronousSock
   }
 
   def write(bytes: B): F[Unit] = {
+//    writeBuffer.clear()
+//    BytesLike[B].copyToBuffer(bytes, writeBuffer)
+//    writeBuffer.flip()
+//    write(writeBuffer)
     val buffer = bytes.asBuffer // TODO Maybe it should be static allocated buffer
     write(buffer)
   }
@@ -151,11 +156,12 @@ sealed class RawDataSocket[F[_]: Effect, B: BytesLike](channel: AsynchronousSock
 object RawDataSocket {
 
   def connect[F[_]: Effect, B: BytesLike](address: SocketAddress,
-                                          buffer: ByteBuffer = ByteBuffer.allocate(8096),
+                                          readBuffer: ByteBuffer = ByteBuffer.allocate(8096),
+                                          writeBuffer: ByteBuffer = ByteBuffer.allocate(8096),
                                           group: AsynchronousChannelGroup = null): F[RawDataSocket[F, B]] =
     Effect[F].promise { cb =>
       val channel = AsynchronousSocketChannel.open(group)
-      lazy val ds = new RawDataSocket[F, B](channel, buffer)
+      lazy val ds = new RawDataSocket[F, B](channel, readBuffer, writeBuffer)
       channel.connect(address, (), completionHandler[Void](cb.compose(_.map(_ => ds))))
     }
 }
