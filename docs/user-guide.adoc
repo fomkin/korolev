@@ -1118,13 +1118,20 @@ val config = KorolevServiceConfig[monix.eval.Task, MyState, Any](...)
 
 https://github.com/fomkin/korolev/blob/v1.0.0/examples/monix/src/main/scala/MonixExample.scala[See full example]
 
-==== Cats IO
+==== Cats Effect
 
-Add Cats interop dependency.
+Add Cats dependency. If you use Cats Effect 2
 
 [source,scala]
 ------------------------------
-libraryDependencies += "org.fomkin" %% "korolev-cats" % "1.0.0"
+libraryDependencies += "org.fomkin" %% "korolev-ce2" % "1.0.0"
+------------------------------
+
+Or is you use Cats Effect 3
+
+[source,scala]
+------------------------------
+libraryDependencies += "org.fomkin" %% "korolev-ce3" % "1.0.0"
 ------------------------------
 
 Initialise your app with IO.
@@ -1138,13 +1145,6 @@ val config = KorolevServiceConfig[IO, MyState, Any](...)
 ------------------------------
 
 https://github.com/fomkin/korolev/blob/v1.0.0/examples/cats/src/main/scala/CatsIOExample.scala[See full example]
-
-Also you can use Cats Effect 3.
-
-[source,scala]
-------------------------------
-libraryDependencies += "org.fomkin" %% "korolev-cats-3" % "1.0.0"
-------------------------------
 
 === Streams
 
@@ -1236,10 +1236,13 @@ val io = ZStream.fromIterable(values)
 
 Conversion from Korolev to Fs2:
 
-To use it, add a dependency:
+To use it, add a dependency.
 [source,scala]
 ------------------------------
-libraryDependencies += "org.fomkin" %% "korolev-fs2" % "1.0.0"
+// For Fs2-2.* and Cats Effect 2:
+libraryDependencies += "org.fomkin" %% "korolev-fs2-ce2" % "1.0.0"
+// For Fs2-3.* and Cats Effect 3:
+libraryDependencies += "org.fomkin" %% "korolev-fs2-ce3" % "1.0.0"
 ------------------------------
 
 Conversion from Korolev to Fs2.
