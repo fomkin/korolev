@@ -21,9 +21,8 @@ import korolev.effect.{AsyncTable, Effect, Stream}
 import korolev.effect.io.JavaIO
 import korolev.effect.syntax._
 import korolev.server.HttpResponse
-import korolev.server.internal.MimeTypes
 import korolev.web.PathAndQuery._
-import korolev.web.{Headers, Path, PathAndQuery, Response}
+import korolev.web.{Headers, MimeTypes, Path, PathAndQuery, Response}
 
 private[korolev] final class FilesService[F[_]: Effect](commonService: CommonService[F]) {
 
@@ -45,7 +44,7 @@ private[korolev] final class FilesService[F[_]: Effect](commonService: CommonSer
             case -1    => "bin" // default file extension
             case index => fileName.substring(index + 1)
           }
-          val headers = MimeTypes(fileExtension) match {
+          val headers = MimeTypes.typeForExtension.get(fileExtension) match {
             case Some(mimeType) => Seq(Headers.ContentType -> mimeType)
             case None           => Nil
           }

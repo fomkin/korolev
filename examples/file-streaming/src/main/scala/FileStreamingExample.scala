@@ -2,13 +2,16 @@ import java.nio.file.Paths
 import korolev.Context
 import korolev.Context.FileHandler
 import korolev.akka._
+import korolev.data.Bytes
 import korolev.effect.io.FileIO
 import korolev.server.{KorolevServiceConfig, StateLoader}
 import korolev.state.javaSerialization._
 import korolev.monix._
+import korolev.web.MimeTypes
 import monix.eval.Task
 import monix.execution.Scheduler.Implicits.global
 
+import java.nio.charset.StandardCharsets
 import scala.concurrent.duration.DurationInt
 
 object FileStreamingExample extends SimpleAkkaHttpKorolevApp {
@@ -22,6 +25,13 @@ object FileStreamingExample extends SimpleAkkaHttpKorolevApp {
   import html._
 
   val fileInput = elementId()
+
+  def onDownloadClick(access: Access): Task[Unit] =
+    for {
+      stream <- korolev.effect.Stream("hello", " ", "world").mat()
+      bytes = stream.map(s => Bytes.wrap(s.getBytes(StandardCharsets.UTF_8)))
+      _ <- access.uploadFile("hello-world.txt", bytes, Some(11L), MimeTypes.`text/plain`)
+    } yield ()
 
   def onUploadClick(access: Access): Task[Unit] = {
 
@@ -74,6 +84,10 @@ object FileStreamingExample extends SimpleAkkaHttpKorolevApp {
                 "Upload",
                 when(inProgress)(disabled),
                 event("click")(onUploadClick)
+              ),
+              button(
+                "Generate and download file",
+                event("click")(onDownloadClick)
               )
             )
           )

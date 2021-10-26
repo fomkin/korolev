@@ -21,6 +21,7 @@ import korolev.effect.Effect
 import korolev.server.internal.services._
 import korolev.server._
 import korolev.web.PathAndQuery._
+import korolev.web.Request
 
 private[korolev] final class KorolevServiceImpl[F[_]: Effect](http: PartialFunction[HttpRequest[F], F[HttpResponse[F]]],
                                                               commonService: CommonService[F],
@@ -50,8 +51,14 @@ private[korolev] final class KorolevServiceImpl[F[_]: Effect](http: PartialFunct
         postService.formData(Qsid(deviceId, sessionId), descriptor, request.headers, request.body)
       case Root / "bridge" / deviceId / sessionId / "file" / descriptor / "info" =>
         postService.filesInfo(Qsid(deviceId, sessionId), descriptor, request.body)
-      case Root / "bridge" / deviceId / sessionId / "file" / descriptor =>
-        postService.file(Qsid(deviceId, sessionId), descriptor, request.headers, request.body)
+      case Root / "bridge" / deviceId / sessionId / "file" / descriptor / _ =>
+        request.method match {
+          case Request.Method.Post | Request.Method.Put =>
+            postService.uploadFile(Qsid(deviceId, sessionId), descriptor, request.headers, request.body)
+          case Request.Method.Get =>
+            postService.downloadFile(Qsid(deviceId, sessionId), descriptor)
+        }
+
 
       // Server side rendering
       case path if path == Root || ssrService.canBeRendered(request.pq) =>

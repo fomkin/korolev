@@ -21,7 +21,7 @@ import korolev.effect.{Effect, Reporter, Scheduler, Stream}
 import korolev.internal.{ComponentInstance, EventRegistry, Frontend}
 import korolev.state.{StateDeserializer, StateManager, StateSerializer}
 import korolev.util.JsCode
-import korolev.web.FormData
+import korolev.web.{FormData, MimeTypes}
 import levsha._
 import levsha.events.EventPhase
 
@@ -94,6 +94,11 @@ object Context {
 
         def listFiles(id: Context.ElementId): F[List[FileHandler]] =
           access.listFiles(id)
+
+        def uploadFile(name: String,
+                       stream: Stream[F, Bytes],
+                       size: Option[Long],
+                       mimeType: String): F[Unit] = access.uploadFile(name, stream, size, mimeType)
 
         def resetForm(id: Context.ElementId): F[Unit] =
           access.resetForm(id)
@@ -240,7 +245,7 @@ object Context {
     def downloadFilesAsStream(id: ElementId): F[List[(FileHandler, Stream[F, Bytes])]]
 
     /**
-      * Get selected file as a stream from input
+      * Download file from the client side by file handler
       */
     def downloadFileAsStream(handler: FileHandler): F[Stream[F, Bytes]]
 
@@ -248,6 +253,14 @@ object Context {
       * Get only file list for input
       */
     def listFiles(id: ElementId): F[List[FileHandler]]
+
+    /**
+     * Upload stream to the client side with selected name, size and mimeType
+     */
+    def uploadFile(name: String,
+                   stream: Stream[F, Bytes],
+                   size: Option[Long],
+                   mimeType: String = MimeTypes.`application/octet-stream`): F[Unit]
 
     /**
       * Purge inputs in given form.
