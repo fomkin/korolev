@@ -26,14 +26,14 @@ object FileStreamingExample extends SimpleAkkaHttpKorolevApp {
 
   val fileInput = elementId()
 
-  def onDownloadClick(access: Access): Task[Unit] =
+  def onUpload(access: Access): Task[Unit] =
     for {
       stream <- korolev.effect.Stream("hello", " ", "world").mat()
       bytes = stream.map(s => Bytes.wrap(s.getBytes(StandardCharsets.UTF_8)))
       _ <- access.uploadFile("hello-world.txt", bytes, Some(11L), MimeTypes.`text/plain`)
     } yield ()
 
-  def onUploadClick(access: Access): Task[Unit] = {
+  def onDownload(access: Access): Task[Unit] = {
 
     def showProgress(fileName: String, loaded: Long, total: Long): Task[Unit] = access
       .transition { state =>
@@ -81,13 +81,13 @@ object FileStreamingExample extends SimpleAkkaHttpKorolevApp {
                 }
               ),
               button(
-                "Upload",
+                "Upload to server",
                 when(inProgress)(disabled),
-                event("click")(onUploadClick)
+                event("click")(onDownload)
               ),
               button(
-                "Generate and download file",
-                event("click")(onDownloadClick)
+                "Generate and download file from server",
+                event("click")(onUpload)
               )
             )
           )

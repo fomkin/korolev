@@ -383,18 +383,23 @@ form(
 
 https://github.com/fomkin/korolev/blob/v1.0.0/examples/form-data/src/main/scala/FormDataExample.scala[See full example]
 
-=== File upload
+=== File streaming
 
-Currently Korolev have two way for file uploading: upload all files at once and manual choose what and when upload
+Don't get confused. Korolev applications works on the server side and client side is remote host. So when we say 'download' it means 'download from client to server'. When we say 'upload' it means 'upload from server to client'.
 
-In both approach html is the same, you need form with file upload input and button with upload handler
+==== Downloading
+
+Currently Korolev have few ways to download files from the client side:
+1. Download all files, selected within input, as byte arrays.
+2. Download all files, but using streams.
+3. Manual selection files from input.
+
+In all approaches HTML is the same, you need form with file input and button with handler.
 
 [source,scala]
 -----------------------------------
 Html(
     body(
-      delay(1.second) { access => access.transition(_.copy(aliveIndicator = !aliveIndicator)) },
-      div(when(aliveIndicator)(backgroundColor @= "red"), "Online"),
       input(`type` := "file", multiple, fileInput),
       ul(
         progress.map {
@@ -405,21 +410,28 @@ Html(
       button(
         "Upload",
         when(inProgress)(disabled),
-        event("click")(onUploadClick)
+        event("click")(onClick)
       )
     )
   )
 -----------------------------------
 
-Processing of uploaded files if very simple `downloadFilesAsStream` return collection of minimal file information and `Stream` with file data
+Then you have a methods for each scenario:
 
-*Warning* `downloadFilesAsStream` allocate resources on server for all files before any data processing is performed. If you need upload multiple big files or huge amount of small files please read next section.
+1. `downloadFiles` gives you byte arrays.
+2. `downloadFilesAsStream` gives you streams.
+3. `listFiles` and `downloadFileAsStream` gives you way to select specific file to download.
+
+[WARNING]
+==========================
+`downloadFiles` will store all files in server's RAM until download complete. If you work with large files or huge amount of small files please use streamed approach. Generally streamed approach is a best practice.
+==========================
 
 [source,scala]
 -----------------------------------
 for {
   files <- access.downloadFilesAsStream(fileInput)
-  _ <- Task.sequence {
+  _ <- Future.sequence {
     files.map { case (handler, data) =>
       val path = Paths.get(handler.fileName)
       data.to(FileIO.write(path))
@@ -428,30 +440,20 @@ for {
 } yield ()
 -----------------------------------
 
-https://github.com/fomkin/korolev/blob/v1.0.0/examples/file-streaming/src/main/scala/FileStreamingExample.scala[See full example]
+==== Uploading
 
-==== Upload many big files
-
-In some case you may need to upload many large files or huge amount of small files that does not fit at server memory at once. To handle this situation Korolev have different approach.
-First you need load from UI list of all file for upload via `access.listFiles()`, then you can process files one by one calling `access.downloadFileAsStream()`.
+You can upload to client side any stream of bytes using `access.uploadFile`.
 
 [source,scala]
 -----------------------------------
 for {
-  files <- access.listFiles(fileInput)
-  _ <- Task.sequence {
-    files.map { handler: FileHandler =>
-      access.downloadFileAsStream(handler).flatMap { data =>
-        val path = Paths.get(handler.fileName)
-        data
-          .to(FileIO.write(path))
-      }
-    }
-  }
+  stream <- effect.Stream("hello", " ", "world").mat()
+  bytes = stream.map(s => Bytes.wrap(s.getBytes(StandardCharsets.UTF_8)))
+  _ <- access.uploadFile("hello-world.txt", bytes, Some(11L), MimeTypes.`text/plain`)
 } yield ()
 -----------------------------------
 
-https://github.com/fomkin/korolev/blob/v1.0.0/examples/file-streaming/src/main/scala/OneByOneFileStreamingExample.scala[See full example]
+https://github.com/fomkin/korolev/blob/v1.0.0/examples/file-streaming/src/main/scala/FileStreamingExample.scala[See full example]
 
 === Delays
 

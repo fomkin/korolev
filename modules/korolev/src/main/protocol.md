@@ -26,6 +26,7 @@ From server to the client
  * 12 - ListFiles(id, descriptor)
  * 13 - UploadFile(id, descriptor, fileName)
  * 14 - ResetForm(id)
+ * 15 - DownloadFile(name, descriptor)
 
 ### Modify dom commands
 
