@@ -187,6 +187,12 @@ final class ComponentInstance
         }
       }
 
+    def uploadFile(name: String,
+                   stream: Stream[F, Bytes],
+                   size: Option[Long],
+                   mimeType: String): F[Unit] =
+      frontend.downloadFile(name, stream, size, mimeType)
+
     def resetForm(elementId: ElementId): F[Unit] =
       getId(elementId).flatMap { id =>
         frontend.resetForm(id)

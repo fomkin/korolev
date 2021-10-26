@@ -405,6 +405,24 @@ export class Korolev {
     }
   }
 
+  downloadFile(descriptor, name) {
+    const self = this;
+    const deviceId = getDeviceId();
+    const a = document.createElement('a');
+    document.body.appendChild(a);
+    a.style.display = 'none';
+    a.download = name;
+    a.href = self.config['r'] +
+      'bridge' +
+      '/' + deviceId +
+      '/' + self.config['sid'] +
+      '/file' +
+      '/' + descriptor +
+      '/' + name;
+    a.click();
+    document.body.removeChild(a);
+  }
+
   resetForm(id) {
     let element = this.els[id];
     element.reset();

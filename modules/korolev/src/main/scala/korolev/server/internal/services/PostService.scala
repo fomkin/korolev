@@ -20,8 +20,10 @@ import korolev.Qsid
 import korolev.data.Bytes
 import korolev.effect.syntax._
 import korolev.effect.{Effect, Reporter, Stream}
+import korolev.internal.Frontend.DownloadFileMeta
 import korolev.server.HttpResponse
-import korolev.server.internal.FormDataCodec
+import korolev.server.internal.{FormDataCodec, HttpResponse}
+import korolev.web.{Headers, Response}
 
 import scala.concurrent.ExecutionContext
 
@@ -94,7 +96,23 @@ private[korolev] final class PostService[F[_]: Effect](reporter: Reporter,
     }
   }
 
-  def file(qsid: Qsid, descriptor: String, headers: Seq[(String, String)], body: Stream[F, Bytes]): F[HttpResponse[F]] = {
+  def downloadFile(qsid: Qsid, descriptor: String): F[HttpResponse[F]] = {
+    sessionsService.getApp(qsid) flatMap {
+      case Some(app) =>
+        app.frontend.resolveFileDownload(descriptor).flatMap {
+          case Some(DownloadFileMeta(stream, maybeLength, mimeType)) =>
+            val headers =
+              (Headers.ContentType -> mimeType) ::
+              ("Accept-Ranges" -> "none") :: Nil
+            val response = Response(Response.Status.Ok, stream, headers, maybeLength)
+            Effect[F].pure(response)
+          case None => commonService.notFoundResponseF
+        }
+      case None => commonService.badRequest(ErrorSessionNotFound(qsid))
+    }
+  }
+
+  def uploadFile(qsid: Qsid, descriptor: String, headers: Seq[(String, String)], body: Stream[F, Bytes]): F[HttpResponse[F]] = {
     val (consumed, chunks) = body.handleConsumed
     sessionsService.getApp(qsid) flatMap {
       case Some(app) =>

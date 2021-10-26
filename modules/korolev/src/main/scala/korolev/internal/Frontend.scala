@@ -38,6 +38,7 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
   private val remoteDomChangesPerformer = new RemoteDomChangesPerformer()
 
   private val customCallbacks = mutable.Map.empty[String, String => F[Unit]]
+  private val downloadFiles = mutable.Map.empty[String, DownloadFileMeta[F]]
   private val stringPromises = AsyncTable.unsafeCreateEmpty[F, String, String]
   private val formDataPromises = AsyncTable.unsafeCreateEmpty[F, String, FormData]
   private val filesPromises = AsyncTable.unsafeCreateEmpty[F, String, Stream[F, Bytes]]
@@ -133,6 +134,17 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
       _ <- send(Procedure.UploadFile.code, id.mkString, descriptor, handler.fileName)
       file <- filesPromises.get(descriptor)
     } yield file
+
+  def downloadFile(name: String, stream: Stream[F, Bytes], size: Option[Long], mimeType: String): F[Unit] = {
+    val (consumed, updatedStream) = stream.handleConsumed
+    val id = lastDescriptor.getAndIncrement().toString
+    consumed.runAsync(_ => downloadFiles.remove(name))
+    downloadFiles.put(id, DownloadFileMeta(updatedStream, size, mimeType))
+    send(Procedure.DownloadFile.code, id, name)
+  }
+
+  def resolveFileDownload(descriptor: String): F[Option[DownloadFileMeta[F]]] =
+    Effect[F].delay(downloadFiles.get(descriptor))
 
   def focus(id: Id): F[Unit] =
     send(Procedure.Focus.code, id.mkString)
@@ -324,6 +336,7 @@ object Frontend {
     case object ListFiles extends Procedure(12) // (id, descriptor)
     case object UploadFile extends Procedure(13) // (id, descriptor, fileName)
     case object RestForm extends Procedure(14) // (id)
+    case object DownloadFile extends Procedure(15) // (descriptor, fileName)
 
     val All = Set(
       SetRenderNum,
@@ -340,7 +353,8 @@ object Frontend {
       ExtractEventData,
       ListFiles,
       UploadFile,
-      RestForm
+      RestForm,
+      DownloadFile
     )
 
     def apply(n: Int): Option[Procedure] =
@@ -402,6 +416,8 @@ object Frontend {
   case class ClientSideException(message: String) extends Exception(message)
   case class UnknownCallbackException(callbackType: Int, args: String)
     extends Exception(s"Unknown callback $callbackType with args '$args' received")
+
+  final case class DownloadFileMeta[F[_]: Effect](stream: Stream[F, Bytes], size: Option[Long], mimeType: String)
 
   val ReloadMessage: String = "[1]"
 }
