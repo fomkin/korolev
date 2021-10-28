@@ -34,5 +34,5 @@ object Slf4jReporter extends Reporter {
   def debug(message: String): Unit = logger.debug(message)
   def debug(message: String, arg1: Any): Unit = logger.debug(message, arg1)
   def debug(message: String, arg1: Any, arg2: Any): Unit = logger.debug(message, arg1, arg2)
-  def debug(message: String, arg1: Any, arg2: Any, arg3: Any): Unit = logger.debug(message, arg1, arg2, arg3)
+  def debug(message: String, arg1: Any, arg2: Any, arg3: Any): Unit = logger.debug(message.format(arg1, arg2, arg3))
 }

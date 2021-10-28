@@ -206,6 +206,9 @@ case class Browser(properties: Map[(ElementId, String), String] = Map.empty,
           }
         }
 
+      def uploadFile(name: String, stream: Stream[F, Bytes], size: Option[Long], mimeType: String): F[Unit] =
+        Effect[F].unit
+
       def evalJs(code: JsCode): F[String] = Effect[F]
         .promise[String] { cb =>
 
