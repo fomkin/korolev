@@ -52,13 +52,9 @@ private[korolev] final class KorolevServiceImpl[F[_]: Effect](http: PartialFunct
       case Root / "bridge" / deviceId / sessionId / "file" / descriptor / "info" =>
         postService.filesInfo(Qsid(deviceId, sessionId), descriptor, request.body)
       case Root / "bridge" / deviceId / sessionId / "file" / descriptor / _ =>
-        request.method match {
-          case Request.Method.Post | Request.Method.Put =>
-            postService.uploadFile(Qsid(deviceId, sessionId), descriptor, request.headers, request.body)
-          case Request.Method.Get =>
-            postService.downloadFile(Qsid(deviceId, sessionId), descriptor)
-        }
-
+        postService.downloadFile(Qsid(deviceId, sessionId), descriptor)
+      case Root / "bridge" / deviceId / sessionId / "file" / descriptor =>
+        postService.uploadFile(Qsid(deviceId, sessionId), descriptor, request.headers, request.body)
 
       // Server side rendering
       case path if path == Root || ssrService.canBeRendered(request.pq) =>
