@@ -105,6 +105,9 @@ final class ComponentInstance
       }
     }
 
+    def imap[S2](read: PartialFunction[CS, S2], write: PartialFunction[(CS, S2), CS]): Access[F, S2, E] =
+      new MappedAccess[F, CS, S2, E](this, read, write)
+
     def property(elementId: ElementId): PropertyHandler[F] = {
       val idF = getId(elementId)
       new PropertyHandler[F] {

@@ -36,8 +36,8 @@ import scala.util.Random
   */
 abstract class Component
   [
-    F[_]: Effect,
-    S: StateSerializer: StateDeserializer, P, E
+    F[_],
+    S, P, E
   ](
     val initialState: S,
     val id: String = Component.randomId()

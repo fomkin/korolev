@@ -31,7 +31,7 @@ import scala.concurrent.duration.FiniteDuration
   * Provides DSLs and effects for application or component
   * @since 0.6.0
   */
-final class Context[F[_]: Effect, S: StateSerializer: StateDeserializer, M] extends Context.Scope[F, S, S, M] {
+final class Context[F[_], S, M] extends Context.Scope[F, S, S, M] {
   type AccessType = S
   protected val accessScope: Context.Access[F, S, M] => Context.Access[F, S, M] = identity
 }
@@ -45,10 +45,10 @@ object Context {
     * @tparam S Type of application state
     * @tparam M Type of events
     */
-  def apply[F[_]: Effect, S: StateSerializer: StateDeserializer, M] =
+  def apply[F[_], S, M] =
     new Context[F, S, M]()
 
-  sealed abstract class Scope[F[_]: Effect, S: StateSerializer: StateDeserializer, AccessType, M] {
+  sealed abstract class Scope[F[_], S, AccessType, M] {
 
     type Binding = Context.Binding[F, S, M]
     type Event = Context.Event[F, S, M]
@@ -65,60 +65,11 @@ object Context {
 
     protected val accessScope: Context.Access[F, S, M] => Access
 
-    def scope[S2](read: PartialFunction[S, S2], write: PartialFunction[(S, S2), S]): Scope[F, S, S2, M] = new Scope[F, S, S2, M] {
-
-      protected val accessScope: Context.Access[F, S, M] => Access = access => new Context.Access[F, S2, M] {
-
-        def eventData: F[String] = access.eventData
-
-        def property(id: Context.ElementId): PropertyHandler[F] =
-          access.property(id)
-
-        def focus(id: Context.ElementId): F[Unit] =
-          access.focus(id)
-
-        def publish(message: M): F[Unit] =
-          access.publish(message)
-
-        def downloadFormData(id: Context.ElementId): F[FormData] =
-          access.downloadFormData(id)
-
-        def downloadFiles(id: Context.ElementId): F[List[(FileHandler, Bytes)]] =
-          access.downloadFiles(id)
-
-        def downloadFilesAsStream(id: Context.ElementId): F[List[(FileHandler, Stream[F, Bytes])]] =
-          access.downloadFilesAsStream(id)
-
-        def downloadFileAsStream(handler: FileHandler): F[Stream[F, Bytes]] =
-          access.downloadFileAsStream(handler)
-
-        def listFiles(id: Context.ElementId): F[List[FileHandler]] =
-          access.listFiles(id)
-
-        def uploadFile(name: String,
-                       stream: Stream[F, Bytes],
-                       size: Option[Long],
-                       mimeType: String): F[Unit] = access.uploadFile(name, stream, size, mimeType)
-
-        def resetForm(id: Context.ElementId): F[Unit] =
-          access.resetForm(id)
-
-        def state: F[S2] = Effect[F].map(access.state)(read)
-
-        def transition(f: korolev.Transition[S2]): F[Unit] =
-          access.transition(s => write((s, f(read(s)))))
-
-        def syncTransition(f: korolev.Transition[S2]): F[Unit] =
-          access.syncTransition(s => write((s, f(read(s)))))
-
-        def sessionId: F[Qsid] = access.sessionId
-
-        def evalJs(code: JsCode): F[String] = access.evalJs(code)
-
-        def registerCallback(name: String)(f: String => F[Unit]): F[Unit] =
-          access.registerCallback(name)(f)
+    def scope[S2](read: PartialFunction[S, S2], write: PartialFunction[(S, S2), S]): Scope[F, S, S2, M] =
+      new Scope[F, S, S2, M] {
+        protected val accessScope: Context.Access[F, S, M] => Access =
+          access => access.imap(read, write)
       }
-    }
 
     implicit class JsCodeHelper(sc: StringContext) {
       def js(args: Any*): JsCode =
@@ -146,7 +97,10 @@ object Context {
 
     val emptyTransition: PartialFunction[S, S] = { case x => x }
 
-    implicit final class ComponentDsl[CS: StateSerializer: StateDeserializer, P, E](component: Component[F, CS, P, E]) {
+    implicit final class ComponentDsl[CS: StateSerializer: StateDeserializer, P, E](component: Component[F, CS, P, E])
+                                                                                   (implicit _e: Effect[F],
+                                                                                    _css: StateSerializer[S],
+                                                                                    _csd: StateDeserializer[S]) {
       def apply(parameters: P)(f: (Access, E) => F[Unit]): ComponentEntry[F, S, M, CS, P, E] =
         ComponentEntry(component, parameters, (a: Context.Access[F, S, M], e: E) => f(accessScope(a), e))
 
@@ -340,7 +294,30 @@ object Context {
   /**
     * Provides access to make side effects
     */
-  trait Access[F[_], S, M] extends BaseAccess[F, S, M] with EventAccess[F, S, M]
+  trait Access[F[_], S, M] extends BaseAccess[F, S, M] with EventAccess[F, S, M] {
+    def imap[S2](map: PartialFunction[S, S2], contramap: PartialFunction[(S, S2), S]): Access[F, S2, M]
+  }
+
+  class MappedAccess[F[_]: Effect, S1, SN, E](self: Access[F, S1, E], read: PartialFunction[S1, SN], write: PartialFunction[(S1, SN), S1]) extends Access[F, SN, E] {
+    def imap[S2](read: PartialFunction[SN, S2], write: PartialFunction[(SN, S2), SN]): Access[F, S2, E] = new MappedAccess[F, SN, S2, E](this, read, write)
+    def eventData: F[String] = self.eventData
+    def property(id: Context.ElementId): PropertyHandler[F] = self.property(id)
+    def focus(id: Context.ElementId): F[Unit] = self.focus(id)
+    def publish(message: E): F[Unit] = self.publish(message)
+    def downloadFormData(id: Context.ElementId): F[FormData] = self.downloadFormData(id)
+    def downloadFiles(id: Context.ElementId): F[List[(FileHandler, Bytes)]] = self.downloadFiles(id)
+    def downloadFilesAsStream(id: Context.ElementId): F[List[(FileHandler, Stream[F, Bytes])]] = self.downloadFilesAsStream(id)
+    def downloadFileAsStream(handler: FileHandler): F[Stream[F, Bytes]] = self.downloadFileAsStream(handler)
+    def listFiles(id: Context.ElementId): F[List[FileHandler]] = self.listFiles(id)
+    def uploadFile(name: String, stream: Stream[F, Bytes], size: Option[Long], mimeType: String): F[Unit] = self.uploadFile(name, stream, size, mimeType)
+    def resetForm(id: Context.ElementId): F[Unit] = self.resetForm(id)
+    def state: F[SN] = Effect[F].map(self.state)(read)
+    def transition(f: korolev.Transition[SN]): F[Unit] = self.transition(s => write((s, f(read(s)))))
+    def syncTransition(f: korolev.Transition[SN]): F[Unit] = self.syncTransition(s => write((s, f(read(s)))))
+    def sessionId: F[Qsid] = self.sessionId
+    def evalJs(code: JsCode): F[String] = self.evalJs(code)
+    def registerCallback(name: String)(f: String => F[Unit]): F[Unit] = self.registerCallback(name)(f)
+  }
 
   sealed trait Binding[+F[_], +S, +M]
 
@@ -400,7 +377,7 @@ object Context {
       stopPropagation: Boolean,
       effect: Access[F, S, M] => F[Unit]) extends Binding[F, S, M]
 
-  final case class Delay[F[_]: Effect, S, M](
+  final case class Delay[F[_], S, M](
       duration: FiniteDuration,
       effect: Access[F, S, M] => F[Unit]) extends Binding[F, S, M]
 

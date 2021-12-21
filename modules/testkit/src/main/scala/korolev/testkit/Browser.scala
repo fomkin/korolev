@@ -1,9 +1,9 @@
 package korolev.testkit
 
-import korolev.Context.{Access, Binding, ElementId}
+import korolev.Context.{Access, Binding, ElementId, MappedAccess}
 import korolev.data.Bytes
 import korolev.effect.Effect
-import korolev.effect.syntax._
+import korolev.effect.syntax.*
 import korolev.internal.Frontend.ClientSideException
 import korolev.util.JsCode
 import korolev.web.FormData
@@ -124,6 +124,9 @@ case class Browser(properties: Map[(ElementId, String), String] = Map.empty,
     var browser = this
     var currentState = initialState
     val stub = new Access[F, S, M] {
+
+      def imap[S2](read: PartialFunction[S, S2], write: PartialFunction[(S, S2), S]): Access[F, S2, M] =
+        new MappedAccess[F, S, S2, M](this, read, write)
 
       def property(id: ElementId): Context.PropertyHandler[F] =
         new Context.PropertyHandler[F] {
