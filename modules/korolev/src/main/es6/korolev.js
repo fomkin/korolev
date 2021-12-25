@@ -127,14 +127,16 @@ export class Korolev {
    * @param {Array} data
    */
   modifyDom(data) {
+    let t1 = (new Date()).getTime()
     // Reverse data to use pop() instead of shift()
     // pop() faster than shift()
     let atad = data.reverse();
     let r = atad.pop.bind(atad);
+    let fgs = {};
     while (data.length > 0) {
       switch (r()) {
-        case 0: this.create(r(), r(), r(), r()); break;
-        case 1: this.createText(r(), r(), r()); break;
+        case 0: this.create(fgs, r(), r(), r(), r()); break;
+        case 1: this.createText(fgs, r(), r(), r()); break;
         case 2: this.remove(r(), r()); break;
         case 3: this.setAttr(r(), r(), r(), r(), r()); break;
         case 4: this.removeAttr(r(), r(), r(), r()); break;
@@ -142,6 +144,15 @@ export class Korolev {
         case 6: this.removeStyle(r(), r()); break;
       }
     }
+    //console.log(Object.keys(fgs).reverse());
+    for (let key of Object.keys(fgs).reverse()) {
+      let fg = fgs[key];
+      let el = this.els[key];
+//      console.log(`${key} -> ${fg.childElementCount}`)
+      el.appendChild(fg);
+    }
+    let t2 = (new Date()).getTime()
+    console.log(`modifyDom time ${t2-t1}`)
   }
   
    /**
@@ -149,7 +160,7 @@ export class Korolev {
     * @param {string} childId
     * @param {string} tag
     */
-  create(id, childId, xmlNs, tag) {
+  create(fgs, id, childId, xmlNs, tag) {
     var parent = this.els[id],
       child = this.els[childId],
       newElement;
@@ -163,7 +174,11 @@ export class Korolev {
     if (child && child.parentNode === parent) {
       parent.replaceChild(newElement, child);
     } else {
-      parent.appendChild(newElement);
+      let fg = fgs[id];
+      if (!fg)
+        fgs[id] = fg = document.createDocumentFragment();
+      fg.appendChild(newElement);
+//      parent.appendChild(newElement);
     }
     this.els[childId] = newElement;
   }
@@ -173,7 +188,7 @@ export class Korolev {
     * @param {string} childId
     * @param {string} text
     */
-  createText(id, childId, text) {
+  createText(fgs, id, childId, text) {
     var parent = this.els[id],
       child = this.els[childId],
       newElement;
@@ -183,7 +198,11 @@ export class Korolev {
     if (child && child.parentNode === parent) {
       parent.replaceChild(newElement, child);
     } else {
-      parent.appendChild(newElement);
+      let fg = fgs[id]
+      if (!fg)
+        fgs[id] = fg = document.createDocumentFragment();
+      fg.appendChild(newElement);
+//      parent.appendChild(newElement);
     }
     this.els[childId] = newElement;
   }
