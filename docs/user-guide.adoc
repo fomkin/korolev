@@ -440,6 +440,8 @@ for {
 } yield ()
 -----------------------------------
 
+Note that `downloadFilesAsStream` gives you Korolev streams, which is not suitable to be used in applications. Korolev has built-in converters for popular stream libraries; see <<Streams>>. 
+
 ==== Uploading
 
 You can upload to client side any stream of bytes using `access.uploadFile`.
