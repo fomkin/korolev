@@ -61,7 +61,8 @@ final class ComponentInstance
      stateQueue: Queue[F, (Id, Any)],
      createMiscProxy: (StatefulRenderContext[Binding[F, AS, M]], (StatefulRenderContext[Binding[F, CS, E]], Binding[F, CS, E]) => Unit) => StatefulRenderContext[Binding[F, CS, E]],
      scheduler: Scheduler[F],
-     reporter: Reporter
+     reporter: Reporter,
+     eventRecovery: Access[F, _, _] => PartialFunction[Throwable, F[Unit]]
   ) { self =>
 
   import ComponentInstance._
@@ -269,7 +270,7 @@ final class ComponentInstance
               val n = entry.createInstance(
                 id, sessionId, frontend, eventRegistry,
                 stateManager, getRenderNum, stateQueue,
-                scheduler, reporter
+                scheduler, reporter, eventRecovery
               )
               markedComponentInstances += id
               nestedComponents.put(id, n)
@@ -303,7 +304,7 @@ final class ComponentInstance
         // the user's code waits for something
         // for a long time.
         events.forall { event =>
-          event.effect(browserAccess).runAsyncForget
+          event.effect(browserAccess).recoverF(eventRecovery(browserAccess)).runAsyncForget
           !event.stopPropagation
         }
       case None =>

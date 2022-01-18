@@ -39,8 +39,12 @@ case class KorolevServiceConfig[F[_]: Effect, S, M](
   extensions: List[Extension[F, S, M]] = Nil,
   idGenerator: IdGenerator[F] = IdGenerator.default[F](),
   heartbeatInterval: FiniteDuration = 5.seconds,
-  reporter: Reporter = Reporter.PrintReporter
-)(implicit val executionContext: ExecutionContext)
+  reporter: Reporter = Reporter.PrintReporter,
+)(implicit val executionContext: ExecutionContext) {
+  def eventRecovery: Context.Access[F, _, _] => PartialFunction[Throwable, F[Unit]] = { _ =>
+    PartialFunction.empty[Throwable, F[Unit]]
+  }
+}
 
 object KorolevServiceConfig {
 
