@@ -118,7 +118,8 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
           config.router,
           createMiscProxy = (rc, k) => pageService.setupStatefulProxy(rc, qsid, k),
           scheduler,
-          config.reporter
+          config.reporter,
+          config.eventRecovery
         )
         browserAccess = app.topLevelComponentInstance.browserAccess
         _ <- config.extensions.map(_.setup(browserAccess))

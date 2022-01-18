@@ -56,7 +56,8 @@ class Issue14Spec extends AnyFlatSpec with Matchers {
         def setStyle(name: String, value: String): Unit = rc.setStyle(name, value)
         def addTextNode(text: String): Unit = rc.addTextNode(text)
         def addMisc(misc: Context.Binding[Future, Issue14Spec.S, Any]): Unit = k(rc, misc)
-      }
+      },
+      eventRecovery = ???
     )
 
     def fireEvent(data: String) =
