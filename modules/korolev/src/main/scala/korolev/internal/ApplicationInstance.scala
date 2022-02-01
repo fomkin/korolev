@@ -46,7 +46,7 @@ final class ApplicationInstance
      createMiscProxy: (StatefulRenderContext[Binding[F, S, M]], (StatefulRenderContext[Binding[F, S, M]], Binding[F, S, M]) => Unit) => StatefulRenderContext[Binding[F, S, M]],
      scheduler: Scheduler[F],
      reporter: Reporter,
-     eventRecovery: Access[F, _, _] => PartialFunction[Throwable, F[Unit]]
+     actionRecovery: Access[F, _, _] => PartialFunction[Throwable, F[Unit]]
   ) { application =>
 
   import reporter.Implicit
@@ -82,7 +82,7 @@ final class ApplicationInstance
     val componentInstance = new ComponentInstance[F, S, M, S, Any, M](
       Id.TopLevel, sessionId, frontend, eventRegistry,
       stateManager, () => currentRenderNum.get(), component,
-      stateQueue, createMiscProxy, scheduler, reporter, eventRecovery
+      stateQueue, createMiscProxy, scheduler, reporter, actionRecovery
     )
     componentInstance.setEventsSubscription(messagesQueue.offerUnsafe)
     componentInstance
