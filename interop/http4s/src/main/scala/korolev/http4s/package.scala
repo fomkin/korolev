@@ -1,11 +1,11 @@
 package korolev
 
-import korolev.effect.{Effect, Queue, Stream => KStream}
-import korolev.server.{KorolevService, KorolevServiceConfig, HttpRequest => KorolevHttpRequest}
-import korolev.web.{PathAndQuery => PQ, Request => KorolevRequest, Response => KorolevResponse}
+import korolev.effect.{Effect, Queue, Stream as KStream}
+import korolev.server.{KorolevService, KorolevServiceConfig, HttpRequest as KorolevHttpRequest}
+import korolev.web.{PathAndQuery as PQ, Request as KorolevRequest, Response as KorolevResponse}
 import korolev.state.{StateDeserializer, StateSerializer}
-import korolev.fs2._
-import korolev.scodec._
+import korolev.fs2.*
+import korolev.scodec.*
 import korolev.data.Bytes
 import org.http4s.{Header, Headers, HttpRoutes, Request, Response, Status}
 import org.http4s.dsl.Http4sDsl
@@ -15,12 +15,13 @@ import org.http4s.websocket.WebSocketFrame.{Close, Continuation, Ping, Text}
 import org.http4s.websocket.WebSocketFrame
 
 import scala.concurrent.ExecutionContext
-import _root_.cats.effect.ConcurrentEffect
-import _root_.cats.syntax.all._
-import _root_.fs2.{Pipe, Stream => FS2Stream}
+import _root_.cats.effect.kernel.Concurrent
+import _root_.cats.syntax.all.*
+import _root_.fs2.{Pipe, Stream as FS2Stream}
 import _root_.fs2.Chunk
 import _root_.scodec.bits.ByteVector
-import org.http4s.dsl.impl.Path
+import org.http4s.Uri.Path
+import org.typelevel.ci.CIString
 
 import java.nio.charset.StandardCharsets
 
@@ -30,7 +31,7 @@ package object http4s {
     val NormalClosure = 1000
   }
 
-  def http4sKorolevService[F[_] : Effect : ConcurrentEffect, S: StateSerializer : StateDeserializer, M]
+  def http4sKorolevService[F[_] : Effect : Concurrent, S: StateSerializer : StateDeserializer, M]
   (config: KorolevServiceConfig[F, S, M])
   (implicit ec: ExecutionContext): HttpRoutes[F] = {
 
@@ -48,8 +49,8 @@ package object http4s {
     }
   }
 
-  private def containsUpgradeHeader[F[_] : Effect : ConcurrentEffect](req: Request[F]): Boolean = {
-    val headers = req.headers.toList
+  private def containsUpgradeHeader[F[_] : Effect : Concurrent](req: Request[F]): Boolean = {
+    val headers = req.headers.headers
     val found = for {
       _ <- headers.find(h => h.name.value.toLowerCase == "connection" && h.value.toLowerCase == "upgrade")
       _ <- headers.find(h => h.name.value.toLowerCase == "upgrade" && h.value.toLowerCase == "websocket")
@@ -57,7 +58,7 @@ package object http4s {
     found.isDefined
   }
 
-  private def routeWsRequest[F[_] : Effect : ConcurrentEffect, S: StateSerializer : StateDeserializer, M]
+  private def routeWsRequest[F[_] : Effect : Concurrent, S: StateSerializer : StateDeserializer, M]
   (req: Request[F], path: Path, korolevServer: KorolevService[F])
   (implicit ec: ExecutionContext): F[Response[F]] = {
 
@@ -88,7 +89,7 @@ package object http4s {
     }
   }
 
-  private def makeSinkAndSubscriber[F[_] : Effect : ConcurrentEffect]() = {
+  private def makeSinkAndSubscriber[F[_] : Effect : Concurrent]() = {
     val queue = Queue[F, String]()
     val sink: Pipe[F, WebSocketFrame, Unit] = (in: FS2Stream[F, WebSocketFrame]) => {
       continuationReducer(in)
@@ -96,7 +97,7 @@ package object http4s {
           case Text(t, true) if t != null =>
             queue.enqueue(t)
           case _: Close =>
-            ConcurrentEffect[F].unit
+            Concurrent[F].unit
           case f =>
             throw new Exception(s"Invalid frame type ${f.getClass.getName}")
         }.onFinalizeCase(_ => queue.close())
@@ -104,7 +105,7 @@ package object http4s {
     (sink, queue.stream)
   }
 
-  private def continuationReducer[F[_] : Effect : ConcurrentEffect](in: FS2Stream[F, WebSocketFrame]) = {
+  private def continuationReducer[F[_] : Effect : Concurrent](in: FS2Stream[F, WebSocketFrame]) = {
     in
       .mapAccumulate(new StringBuilder()) {
         case (s, t: Text) if t.last && t != null =>
@@ -137,7 +138,7 @@ package object http4s {
       .collect { case (_, Some(dt: WebSocketFrame)) => dt }
   }
 
-  private def routeHttpRequest[F[_] : Effect : ConcurrentEffect]
+  private def routeHttpRequest[F[_] : Effect : Concurrent]
   (request: Request[F], korolevServer: KorolevService[F])
   (implicit ec: ExecutionContext): F[Response[F]] = {
 
@@ -161,7 +162,7 @@ package object http4s {
     }
   }
 
-  private def handleHttpResponse[F[_] : Effect : ConcurrentEffect](korolevServer: KorolevService[F],
+  private def handleHttpResponse[F[_] : Effect : Concurrent](korolevServer: KorolevService[F],
                                                                    korolevRequest: KorolevHttpRequest[F])
                                                                   (implicit ec: ExecutionContext) = {
     korolevServer.http(korolevRequest).map {
@@ -174,7 +175,7 @@ package object http4s {
         }
         Response[F](
           status = Status(status.code),
-          headers = Headers.of(headers: _*),
+          headers = Headers(headers),
           body = body
         )
     }
@@ -188,12 +189,12 @@ package object http4s {
   private def mkKorolevRequest[F[_], Body](request: Request[F],
                                            path: String,
                                            body: Body): KorolevRequest[Body] = {
-    val cookies = request.headers.get(Cookie).map(x => x.value)
+    val cookies = request.headers.get(CIString("cookie")).map(_.head.value)
     KorolevRequest(
       pq = PQ.fromString(path).withParams(request.params),
       method = KorolevRequest.Method.fromString(request.method.name),
       renderedCookie = cookies.orNull,
-      contentLength = request.headers.find(_.name == `Content-Length`.name).map(_.value.toLong),
+      contentLength = request.headers.get[`Content-Length`].map(_.length),
       headers = {
         val contentType = request.contentType
         val contentTypeHeaders = {
@@ -201,7 +202,7 @@ package object http4s {
             if (ct.mediaType.isMultipart) Seq("content-type" -> contentType.toString) else Seq.empty
           }.getOrElse(Seq.empty)
         }
-        request.headers.toList.map(h => (h.name.value, h.value)) ++ contentTypeHeaders
+        request.headers.headers.map(h => (h.name.toString, h.value)) ++ contentTypeHeaders
       },
       body = body
     )

@@ -1,14 +1,14 @@
 import xerial.sbt.Sonatype._
 
-val scala2_12Version = "2.12.14"
-val scala2_13Version = "2.13.6"
-val scala3Version = "3.0.2"
+val scala2_12Version = "2.12.15"
+val scala2_13Version = "2.13.8"
+val scala3Version = "3.1.1"
 
 val levshaVersion = "1.1.0"
 
 val akkaVersion = "2.6.14"
 val akkaHttpVersion = "10.2.4"
-val http4sVersion = "0.21.24" // Scala 3 is not supported in final releases yet
+val http4sVersion = "0.23.10" // Scala 3 is not supported in final releases yet
 
 val circeVersion = "0.14.1"
 val ce2Version = "2.5.3"
@@ -20,7 +20,7 @@ val zioHttpVersion = "1.0.0.0-RC17"
 val fs2ce2Version = "2.5.10"
 val fs2ce3Version = "3.2.4"
 val monixVersion = "3.4.0"
-val scodecVersion = "1.1.27"
+val scodecVersion = "1.1.30"
 
 scalaVersion := scala2_13Version
 
@@ -58,7 +58,7 @@ val commonSettings = publishSettings ++ Seq(
       case Some((2, _)) =>
         Seq(
           compilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
-          compilerPlugin("org.typelevel" %% "kind-projector" % "0.13.0" cross CrossVersion.full),
+          compilerPlugin("org.typelevel" %% "kind-projector" % "0.13.2" cross CrossVersion.full),
         )
       case _ => Seq()
     }
@@ -217,11 +217,11 @@ lazy val http4s = project
   .settings(
     normalizedName := "korolev-http4s",
     libraryDependencies ++= Seq(
-      ("org.http4s"     %% "http4s-server" % http4sVersion).cross(CrossVersion.for3Use2_13),
-      ("org.http4s"     %% "http4s-dsl"    % http4sVersion).cross(CrossVersion.for3Use2_13)
+      "org.http4s"     %% "http4s-server" % http4sVersion,
+      "org.http4s"     %% "http4s-dsl"    % http4sVersion
     )
   )
-  .dependsOn(korolev, web, fs2ce2, scodec)
+  .dependsOn(korolev, web, fs2ce3, scodec)
 
 lazy val zioHttp = project
   .in(interop / "zio-http")
@@ -424,8 +424,8 @@ lazy val http4sZioExample = project
   .settings(crossVersionSettings)
   .settings(exampleSettings: _*)
   .settings(mainClass := Some("Http4sZioExample"))
-  .settings(libraryDependencies += "dev.zio" %% "zio-interop-cats" % "2.5.1.0")
-  .settings(libraryDependencies += ("org.http4s" %% "http4s-blaze-server" % http4sVersion).cross(CrossVersion.for3Use2_13))
+  .settings(libraryDependencies += "dev.zio" %% "zio-interop-cats" % "3.2.9.0")
+  .settings(libraryDependencies += "org.http4s" %% "http4s-blaze-server" % http4sVersion)
   .dependsOn(zio, http4s)
 
 lazy val zioHttpExample = project

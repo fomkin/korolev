@@ -1,11 +1,9 @@
-
-
 import org.http4s.{HttpApp, HttpRoutes, Request, Response}
-import org.http4s.server.blaze.BlazeServerBuilder
+import org.http4s.blaze.server.BlazeServerBuilder
 import zio.clock.Clock
 import cats.effect.{ExitCode => CatsExitCode, _}
 import korolev.http4s
-import zio.{App, RIO, Runtime, ZEnv, ZIO, ExitCode => ZExitCode}
+import zio.{App, Task, RIO, Runtime, ZEnv, ZIO, ExitCode => ZExitCode}
 import zio.interop.catz._
 import korolev.Context
 import korolev.server.{KorolevServiceConfig, StateLoader}
@@ -14,8 +12,9 @@ import korolev.zio.zioEffectInstance
 import korolev.state.javaSerialization._
 import org.http4s.server.Router
 import org.http4s.implicits._
-import scala.concurrent.ExecutionContext
+import zio.blocking.Blocking
 
+import scala.concurrent.ExecutionContext
 
 object Http4sZioExample extends App {
 
@@ -75,13 +74,9 @@ object Http4sZioExample extends App {
     )
 
     def route(): ZIO[ZEnv, Throwable, HttpRoutes[AppTask]] = {
-      RIO.concurrentEffectWith { implicit CE: ConcurrentEffect[AppTask] =>
-        ZIO(http4s.http4sKorolevService(config))
-      }
+      ZIO(http4s.http4sKorolevService(config))
     }
   }
-
-
 
   private def getAppRoute(): ZIO[ZEnv, Throwable, HttpRoutes[AppTask]] = {
     ZIO.runtime[ZEnv].flatMap { implicit rts =>
@@ -100,19 +95,14 @@ object Http4sZioExample extends App {
     prog.orDie
   }
 
-
-  def runHttp[R <: Clock](
+  def runHttp[R <: Clock with Blocking](
                            httpApp: HttpApp[RIO[R, *]],
                            port: Int
-                         ): ZIO[R, Throwable, Unit] = {
-    type Task[A] = RIO[R, A]
-    ZIO.runtime[R].flatMap { implicit rts =>
-      BlazeServerBuilder
-        // It's unsafe to use default ZIO executor with Blaze server since it could lead to
-        // dead locks at higher RPS thresholds. See the discussion at
-        // https://discord.com/channels/629491597070827530/630498701860929559/821733420341788732
-        // Instead we use global execution context from Scala.
-        .apply[Task](ExecutionContext.global)
+                         )= {
+    type Task[A] = ZIO[R, Throwable, A]
+    ZIO.runtime[R].flatMap { implicit r =>
+      BlazeServerBuilder[Task]
+        .withExecutionContext(ExecutionContext.global)
         .bindHttp(port, "0.0.0.0")
         .withHttpApp(httpApp)
         .serve
