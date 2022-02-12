@@ -17,12 +17,12 @@
 package korolev
 
 import korolev.data.{Bytes, BytesLike}
-import korolev.effect.{Effect, Reporter, Scheduler, Stream}
+import korolev.effect.{Effect, Queue, Reporter, Scheduler, Stream}
 import korolev.internal.{ComponentInstance, EventRegistry, Frontend}
 import korolev.state.{StateDeserializer, StateManager, StateSerializer}
 import korolev.util.JsCode
 import korolev.web.{FormData, MimeTypes}
-import levsha._
+import levsha.*
 import levsha.events.EventPhase
 
 import scala.concurrent.duration.FiniteDuration
@@ -350,11 +350,11 @@ object Context {
                        eventRegistry: EventRegistry[F],
                        stateManager: StateManager[F],
                        getRenderNum: () => Int,
-                       notifyStateChange: (Id, Any) => F[Unit],
+                       stateQueue: Queue[F, (Id, Any)],
                        scheduler: Scheduler[F],
                        reporter: Reporter): ComponentInstance[F, AS, M, CS, P, E] = {
       new ComponentInstance(
-        node, sessionId, frontend, eventRegistry, stateManager, getRenderNum, component, notifyStateChange,
+        node, sessionId, frontend, eventRegistry, stateManager, getRenderNum, component, stateQueue,
         createMiscProxy = (rc, k) => new StatefulRenderContext[Binding[F, CS, E]] {
           def currentContainerId: Id = rc.currentContainerId
           def currentId: Id = rc.currentId

@@ -17,11 +17,10 @@
 package korolev.internal
 
 import java.util.concurrent.atomic.AtomicInteger
-
-import korolev.Context._
-import korolev.effect.syntax._
-import korolev._
-import korolev.effect.{Effect, Queue, Reporter, Scheduler, Stream}
+import korolev.Context.*
+import korolev.effect.syntax.*
+import korolev.*
+import korolev.effect.{Effect, Hub, Queue, Reporter, Scheduler, Stream}
 import korolev.internal.Frontend.DomEventMessage
 import korolev.state.{StateDeserializer, StateManager, StateSerializer}
 import korolev.web.PathAndQuery
@@ -54,6 +53,7 @@ final class ApplicationInstance
   private val devMode = new DevMode.ForRenderContext(sessionId.toString)
   private val currentRenderNum = new AtomicInteger(0)
   private val stateQueue = Queue[F, (Id, Any)]()
+  private val stateHub = Hub(stateQueue.stream)
   private val messagesQueue = Queue[F, M]()
 
   private val renderContext = {
@@ -81,8 +81,7 @@ final class ApplicationInstance
     val componentInstance = new ComponentInstance[F, S, M, S, Any, M](
       Id.TopLevel, sessionId, frontend, eventRegistry,
       stateManager, () => currentRenderNum.get(), component,
-      notifyStateChange = (id, state) => onState() *> stateQueue.enqueue((id, state)),
-      createMiscProxy, scheduler, reporter
+      stateQueue, createMiscProxy, scheduler, reporter
     )
     componentInstance.setEventsSubscription(messagesQueue.offerUnsafe)
     componentInstance
@@ -138,7 +137,7 @@ final class ApplicationInstance
         case Some(newState) =>
           stateManager
             .write(Id.TopLevel, newState)
-            .after(onState())
+            .after(stateQueue.enqueue(Id.TopLevel, newState))
         case None =>
           Effect[F].unit
       }
@@ -163,8 +162,13 @@ final class ApplicationInstance
     .foreach(onEvent)
     .runAsyncForget
 
-  val stateStream: Stream[F, (Id, Any)] =
-    stateQueue.stream
+  stateHub
+    .newStream()
+    .flatMap(_.foreach(_ => onState()))
+    .runAsyncForget
+
+  val stateStream: F[Stream[F, (Id, Any)]] =
+    stateHub.newStream()
 
   val messagesStream: Stream[F, M] =
     messagesQueue.stream

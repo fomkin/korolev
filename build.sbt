@@ -12,13 +12,13 @@ val http4sVersion = "0.21.24" // Scala 3 is not supported in final releases yet
 
 val circeVersion = "0.14.1"
 val ce2Version = "2.5.3"
-val ce3Version = "3.2.9"
+val ce3Version = "3.3.1"
 
 val zioVersion = "1.0.11"
 val zioHttpVersion = "1.0.0.0-RC17"
 
 val fs2ce2Version = "2.5.10"
-val fs2ce3Version = "3.1.6"
+val fs2ce3Version = "3.2.4"
 val monixVersion = "3.4.0"
 val scodecVersion = "1.1.27"
 
