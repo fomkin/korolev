@@ -58,7 +58,7 @@ final class ComponentInstance
      stateManager: StateManager[F],
      getRenderNum: () => Int,
      val component: Component[F, CS, P, E],
-     notifyStateChange: (Id, Any) => F[Unit],
+     stateQueue: Queue[F, (Id, Any)],
      createMiscProxy: (StatefulRenderContext[Binding[F, AS, M]], (StatefulRenderContext[Binding[F, CS, E]], Binding[F, CS, E]) => Unit) => StatefulRenderContext[Binding[F, CS, E]],
      scheduler: Scheduler[F],
      reporter: Reporter
@@ -268,7 +268,7 @@ final class ComponentInstance
             case _ =>
               val n = entry.createInstance(
                 id, sessionId, frontend, eventRegistry,
-                stateManager, getRenderNum, notifyStateChange,
+                stateManager, getRenderNum, stateQueue,
                 scheduler, reporter
               )
               markedComponentInstances += id
@@ -288,7 +288,7 @@ final class ComponentInstance
         state <- stateManager.read[CS](nodeId)
         newState = transition(state.getOrElse(component.initialState))
         _ <- stateManager.write(nodeId, newState)
-        _ <- notifyStateChange(nodeId, newState)
+        _ <- stateQueue.enqueue(nodeId, newState)
       } yield ()
     if (sync) effect()
     else immediatePendingEffects.enqueue(effect)

@@ -2,7 +2,12 @@ package korolev.testkit
 
 import korolev.Context.ElementId
 
-sealed trait Action[+F[_], +S, +M]
+sealed trait Action[+F[_], +S, +M] {
+  def transition(f: S => Boolean): Boolean = this match {
+    case Action.Transition(newState) => f(newState)
+    case _ => false
+  }
+}
 
 object Action {
 

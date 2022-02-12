@@ -86,13 +86,16 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
       } yield ()
     }
 
-    def handleStateChange(app: App, ehs: ExtensionsHandlers): F[Unit] =
-      app.stateStream.foreach { case (id, state) =>
-        if (id != levsha.Id.TopLevel) Effect[F].unit else ehs
-          .map(_.onState(state.asInstanceOf[S]))
-          .sequence
-          .unit
+    def handleStateChange(app: App, ehs: ExtensionsHandlers): F[Unit] = {
+      app.stateStream.flatMap { stream =>
+        stream.foreach { case (id, state) =>
+          if (id != levsha.Id.TopLevel) Effect[F].unit else ehs
+            .map(_.onState(state.asInstanceOf[S]))
+            .sequence
+            .unit
+        }
       }
+    }
 
     def handleMessages(app: App, ehs: ExtensionsHandlers): F[Unit] =
         app.messagesStream.foreach { m =>
