@@ -20,7 +20,7 @@ import korolev.data.{Bytes, BytesLike}
 import korolev.effect.{Effect, Queue, Reporter, Scheduler, Stream}
 import korolev.internal.{ComponentInstance, EventRegistry, Frontend}
 import korolev.state.{StateDeserializer, StateManager, StateSerializer}
-import korolev.util.JsCode
+import korolev.util.{JsCode, Lens}
 import korolev.web.{FormData, MimeTypes}
 import levsha.*
 import levsha.events.EventPhase
@@ -64,6 +64,9 @@ object Context {
     type Attr = levsha.Document.Attr[Binding]
 
     protected val accessScope: Context.Access[F, S, M] => Access
+
+    def scope[S2](lens: Lens[S, S2]): Scope[F, S, S2, M] =
+      scope(lens.read, lens.write)
 
     def scope[S2](read: PartialFunction[S, S2], write: PartialFunction[(S, S2), S]): Scope[F, S, S2, M] =
       new Scope[F, S, S2, M] {
@@ -110,6 +113,11 @@ object Context {
   }
 
   trait BaseAccess[F[_], S, M] {
+
+    def imap[S2](lens: Lens[S, S2]): Access[F, S2, M] =
+      imap(lens.read, lens.write)
+
+    def imap[S2](map: PartialFunction[S, S2], contramap: PartialFunction[(S, S2), S]): Access[F, S2, M]
 
     /**
       * Extracts property of element from client-side DOM.
@@ -294,9 +302,7 @@ object Context {
   /**
     * Provides access to make side effects
     */
-  trait Access[F[_], S, M] extends BaseAccess[F, S, M] with EventAccess[F, S, M] {
-    def imap[S2](map: PartialFunction[S, S2], contramap: PartialFunction[(S, S2), S]): Access[F, S2, M]
-  }
+  trait Access[F[_], S, M] extends BaseAccess[F, S, M] with EventAccess[F, S, M]
 
   class MappedAccess[F[_]: Effect, S1, SN, E](self: Access[F, S1, E], read: PartialFunction[S1, SN], write: PartialFunction[(S1, SN), S1]) extends Access[F, SN, E] {
     def imap[S2](read: PartialFunction[SN, S2], write: PartialFunction[(SN, S2), SN]): Access[F, S2, E] = new MappedAccess[F, SN, S2, E](this, read, write)
