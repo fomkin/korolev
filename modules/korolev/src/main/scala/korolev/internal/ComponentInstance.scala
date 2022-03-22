@@ -63,7 +63,7 @@ final class ComponentInstance
      createMiscProxy: (StatefulRenderContext[Binding[F, AS, M]], (StatefulRenderContext[Binding[F, CS, E]], Binding[F, CS, E]) => Unit) => StatefulRenderContext[Binding[F, CS, E]],
      scheduler: Scheduler[F],
      reporter: Reporter,
-     actionRecovery: Access[F, _, _] => PartialFunction[Throwable, F[Unit]]
+     recovery: PartialFunction[Throwable, F[Unit]]
   ) { self =>
 
   import ComponentInstance._
@@ -224,69 +224,53 @@ final class ComponentInstance
   def applyRenderContext(parameters: P,
                          rc: StatefulRenderContext[Binding[F, AS, M]],
                          snapshot: StateManager.Snapshot): Unit = miscLock.synchronized {
-    try {
-      // Reset all event handlers delays and elements
-      prepare()
-      val state = snapshot[CS](nodeId).getOrElse(component.initialState)
-      val node =
-        try {
-          component.render(parameters, state)
-        } catch {
-          case e: MatchError =>
-            Node[Binding[F, CS, E]] { rc =>
-              reporter.error(s"Render is not defined for $state", e)
-              rc.openNode(XmlNs.html, "span")
-              rc.addTextNode("Render is not defined for the state")
-              rc.closeNode("span")
-            }
-        }
-      val proxy = createMiscProxy(rc, { (proxy, misc) =>
-        misc match {
-          case event: Event[F, CS, E] =>
-            val id = rc.currentContainerId
-            val eid = EventId(id, event.`type`, event.phase)
-            val es = events.getOrElseUpdate(eid, Vector.empty)
-            events.put(eid, es :+ event)
-            eventRegistry.registerEventType(event.`type`)
-          case element: ElementId =>
-            val id = rc.currentContainerId
-            elements.put(element, id)
-            ()
-          case delay: Delay[F, CS, E] =>
-            val id = rc.currentContainerId
-            markedDelays += id
-            if (!delays.contains(id)) {
-              val delayInstance = new DelayInstance(delay, scheduler, reporter)
-              delays.put(id, delayInstance)
-              delayInstance.start(browserAccess)
-            }
-          case entry: ComponentEntry[F, CS, E, Any, Any, Any] =>
-            val id = rc.subsequentId
-            nestedComponents.get(id) match {
-              case Some(n: ComponentInstance[F, CS, E, Any, Any, Any]) if n.component.id == entry.component.id =>
-                // Use nested component instance
-                markedComponentInstances += id
-                n.setEventsSubscription((e: Any) => entry.eventHandler(browserAccess, e).runAsyncForget)
-                n.applyRenderContext(entry.parameters, proxy, snapshot)
-              case _ =>
-                val n = entry.createInstance(
-                  id, sessionId, frontend, eventRegistry,
-                  stateManager, getRenderNum, stateQueue,
-                  scheduler, reporter, actionRecovery
-                )
-                markedComponentInstances += id
-                nestedComponents.put(id, n)
-                n.unsafeInitialize()
-                n.setEventsSubscription((e: Any) => entry.eventHandler(browserAccess, e).runAsyncForget)
-                n.applyRenderContext(entry.parameters, proxy, snapshot)
-            }
-        }
-      })
-      node(proxy)
-    } catch {
-      case NonFatal(ex) =>
-        actionRecovery(browserAccess)(ex)
-    }
+    // Reset all event handlers delays and elements
+    prepare()
+    val state = snapshot[CS](nodeId).getOrElse(component.initialState)
+    val node = component.render(parameters, state)
+    val proxy = createMiscProxy(rc, { (proxy, misc) =>
+      misc match {
+        case event: Event[F, CS, E] =>
+          val id = rc.currentContainerId
+          val eid = EventId(id, event.`type`, event.phase)
+          val es = events.getOrElseUpdate(eid, Vector.empty)
+          events.put(eid, es :+ event)
+          eventRegistry.registerEventType(event.`type`)
+        case element: ElementId =>
+          val id = rc.currentContainerId
+          elements.put(element, id)
+          ()
+        case delay: Delay[F, CS, E] =>
+          val id = rc.currentContainerId
+          markedDelays += id
+          if (!delays.contains(id)) {
+            val delayInstance = new DelayInstance(delay, scheduler, reporter)
+            delays.put(id, delayInstance)
+            delayInstance.start(browserAccess)
+          }
+        case entry: ComponentEntry[F, CS, E, Any, Any, Any] =>
+          val id = rc.subsequentId
+          nestedComponents.get(id) match {
+            case Some(n: ComponentInstance[F, CS, E, Any, Any, Any]) if n.component.id == entry.component.id =>
+              // Use nested component instance
+              markedComponentInstances += id
+              n.setEventsSubscription((e: Any) => entry.eventHandler(browserAccess, e).runAsyncForget)
+              n.applyRenderContext(entry.parameters, proxy, snapshot)
+            case _ =>
+              val n = entry.createInstance(
+                id, sessionId, frontend, eventRegistry,
+                stateManager, getRenderNum, stateQueue,
+                scheduler, reporter, recovery
+              )
+              markedComponentInstances += id
+              nestedComponents.put(id, n)
+              n.unsafeInitialize()
+              n.setEventsSubscription((e: Any) => entry.eventHandler(browserAccess, e).runAsyncForget)
+              n.applyRenderContext(entry.parameters, proxy, snapshot)
+          }
+      }
+    })
+    node(proxy)
   }
 
   def applyTransition(transition: Transition[CS], sync: Boolean): F[Unit] = {
@@ -302,21 +286,28 @@ final class ComponentInstance
   }
 
   def applyEvent(eventId: EventId): Boolean = {
-    events.get(eventId) match {
-      case Some(events: Vector[Event[F, CS, E]]) =>
-        // A user defines the event effect, so we
-        // don't control the time of execution.
-        // We shouldn't block the application if
-        // the user's code waits for something
-        // for a long time.
-        events.forall { event =>
-          event.effect(browserAccess).recoverF(actionRecovery(browserAccess)).runAsyncForget
-          !event.stopPropagation
-        }
-      case None =>
-        nestedComponents.values.forall { nested =>
-          nested.applyEvent(eventId)
-        }
+    try {
+      events.get(eventId) match {
+        case Some(events: Vector[Event[F, CS, E]]) =>
+          // A user defines the event effect, so we
+          // don't control the time of execution.
+          // We shouldn't block the application if
+          // the user's code waits for something
+          // for a long time.
+          events.forall { event =>
+            event.effect(browserAccess).runAsyncForget
+            !event.stopPropagation
+          }
+        case None =>
+          nestedComponents.values.forall { nested =>
+            nested.applyEvent(eventId)
+          }
+      }
+    } catch {
+      case NonFatal(ex) =>
+        recovery(ex).runAsyncForget
+        // Stop event propagation because error happen
+        false
     }
   }
 
