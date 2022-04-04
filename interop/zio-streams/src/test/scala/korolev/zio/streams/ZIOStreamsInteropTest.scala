@@ -62,7 +62,7 @@ class ZIOStreamsInteropTest  extends AsyncFlatSpec with Matchers {
     val io = ZStream.fromIterable(v1)
       .concat(ZStream.fromIterable(v2)) // concat need for multiple chunks test
       .toKorolev
-      .flatMap { (korolevStream: KorolevStream[Task, Seq[Int]]) =>
+      .use { (korolevStream: KorolevStream[Task, Seq[Int]]) =>
         korolevStream
           .unchunk
           .fold(Vector.empty[Int])((acc, value) => acc :+ value)
