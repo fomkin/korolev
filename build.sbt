@@ -15,7 +15,7 @@ val ce2Version = "2.5.3"
 val ce3Version = "3.3.1"
 
 val zioVersion = "1.0.11"
-val zioHttpVersion = "1.0.0.0-RC17"
+val zioHttpVersion = "1.0.0.0-RC27"
 
 val fs2ce2Version = "2.5.10"
 val fs2ce3Version = "3.2.4"
