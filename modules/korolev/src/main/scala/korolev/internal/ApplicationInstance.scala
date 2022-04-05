@@ -23,7 +23,7 @@ import korolev.*
 import korolev.effect.{Effect, Hub, Queue, Reporter, Scheduler, Stream}
 import korolev.internal.Frontend.DomEventMessage
 import korolev.state.{StateDeserializer, StateManager, StateSerializer}
-import korolev.web.PathAndQuery
+import korolev.web.{Path, PathAndQuery}
 import levsha.events.calculateEventPropagation
 import levsha.impl.DiffRenderContext
 import levsha.impl.DiffRenderContext.ChangesPerformer
@@ -42,6 +42,7 @@ final class ApplicationInstance
      stateManager: StateManager[F],
      initialState: S,
      render: S => Document.Node[Binding[F, S, M]],
+     rootPath: String,
      router: Router[F, S],
      createMiscProxy: (StatefulRenderContext[Binding[F, S, M]], (StatefulRenderContext[Binding[F, S, M]], Binding[F, S, M]) => Unit) => StatefulRenderContext[Binding[F, S, M]],
      scheduler: Scheduler[F],
@@ -101,9 +102,12 @@ final class ApplicationInstance
     for {
       snapshot <- stateManager.snapshot
       // Set page url if router exists
-      _ <-  router.fromState
+      _ <- {
+        val root: Path = PathAndQuery.fromString(rootPath).asPath
+        router.fromState
           .lift(snapshot(Id.TopLevel).getOrElse(initialState))
-          .fold(Effect[F].unit)(uri => frontend.changePageUrl(uri))
+          .fold(Effect[F].unit)(uri => frontend.changePageUrl(root / uri.mkString.drop(1)))
+      }
       _ <- Effect[F].delay {
         // Prepare render context
         renderContext.swap()
