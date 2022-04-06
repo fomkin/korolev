@@ -2,6 +2,7 @@
 import zio.{App, RIO, Runtime, ZEnv, ZIO, ExitCode => ZExitCode}
 import korolev.Context
 import korolev.server.{KorolevServiceConfig, StateLoader}
+import korolev.web.PathAndQuery
 import korolev.zio.ZioEffect
 import korolev.state.javaSerialization._
 import korolev.zio.http.ZioHttpKorolev
@@ -31,7 +32,7 @@ object ZioHttpExample extends App {
 
     def config = KorolevServiceConfig [AppTask, Option[Int], Any] (
       stateLoader = StateLoader.default(Option.empty[Int]),
-      rootPath = "/",
+      rootPath = PathAndQuery.Root,
       document = {
         case Some(n) => optimize {
           Html(

@@ -27,8 +27,8 @@ final class PageService[F[_]: Effect, S, M](config: KorolevServiceConfig[F, S, M
     rc.addTextNode(kfg)
     rc.closeNode("script")
     rc.openNode(XmlNs.html, "script")
-    rc.setAttr(XmlNs.html, name="src", s"${rp}static/korolev-client.min.js")
-    rc.setAttr(XmlNs.html, name="defer", "")
+    rc.setAttr(XmlNs.html, name = "src", (rp / "static/korolev-client.min.js").mkString)
+    rc.setAttr(XmlNs.html, name = "defer", "")
     rc.closeNode("script")
   }
 

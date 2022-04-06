@@ -16,14 +16,12 @@
 
 package korolev.server.internal.services
 
-import korolev.data.Bytes
-import korolev.{Qsid, effect}
 import korolev.effect.Effect
-import korolev.effect.syntax._
+import korolev.effect.syntax.*
 import korolev.server.internal.{Cookies, Html5RenderContext, HttpResponse}
 import korolev.server.{HttpRequest, HttpResponse, KorolevServiceConfig}
 import korolev.web.Response.Status
-import korolev.web.{Headers, PathAndQuery, Response}
+import korolev.web.{Headers, PathAndQuery}
 
 private[korolev] final class ServerSideRenderingService[F[_]: Effect, S, M](sessionsService: SessionsService[F, S, _],
                                                                          pageService: PageService[F, S, M],
@@ -47,7 +45,7 @@ private[korolev] final class ServerSideRenderingService[F[_]: Effect, S, M](sess
         Seq(
           Headers.ContentTypeHtmlUtf8,
           Headers.CacheControlNoCache,
-          Headers.setCookie(Cookies.DeviceId, qsid.deviceId, config.rootPath,
+          Headers.setCookie(Cookies.DeviceId, qsid.deviceId, config.rootPath.mkString,
           maxAge = 60 * 60 * 24 * 365 * 10 /* 10 years */)
         )
       )

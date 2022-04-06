@@ -20,16 +20,17 @@ import korolev.effect.{Effect, Reporter}
 import korolev.state.IdGenerator
 import korolev.{Context, Extension, Router}
 import levsha.Document
-
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
+
+import korolev.web.{Path, PathAndQuery}
 
 case class KorolevServiceConfig[F[_]: Effect, S, M](
   stateLoader: StateLoader[F, S],
   stateStorage: korolev.state.StateStorage[F, S] = null, // By default it StateStorage.DefaultStateStorage
   http: PartialFunction[HttpRequest[F], F[HttpResponse[F]]] = PartialFunction.empty[HttpRequest[F], F[HttpResponse[F]]],
   router: Router[F, S] = Router.empty[F, S],
-  rootPath: String = "/",
+  rootPath: Path = PathAndQuery.Root,
   @deprecated("Use `document` instead of `render`. Do not use `render` and `document` together.", "0.16.0") render: S => Document.Node[Context.Binding[F, S, M]] = (_: S) => levsha.dsl.html.body(),
   @deprecated("Add head() tag to `document`. Do not use `head` and `document` together.", "0.16.0") head: S => Seq[Document.Node[Context.Binding[F, S, M]]] = (_: S) => Seq.empty,
   document: S => Document.Node[Context.Binding[F, S, M]] = null, // TODO (_: S) => levsha.dsl.html.Html(),

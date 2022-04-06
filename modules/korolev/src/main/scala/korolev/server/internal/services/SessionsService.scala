@@ -116,7 +116,7 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
           stateManager,
           initialState,
           config.document,
-          PathAndQuery.fromString(config.rootPath).asPath,
+          config.rootPath,
           config.router,
           createMiscProxy = (rc, k) => pageService.setupStatefulProxy(rc, qsid, k),
           scheduler,
