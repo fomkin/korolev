@@ -25,7 +25,7 @@ class Issue14Spec extends AnyFlatSpec with Matchers {
     val app = new ApplicationInstance[Future, Issue14Spec.S, Any](
       sessionId = Qsid("", ""),
       frontend = frontend,
-      rootPath = "/",
+      rootPath = Root,
       router = Router.empty[Future, String],
       render = {
         Issue14Spec.render(

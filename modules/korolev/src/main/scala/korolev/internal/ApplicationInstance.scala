@@ -42,7 +42,7 @@ final class ApplicationInstance
      stateManager: StateManager[F],
      initialState: S,
      render: S => Document.Node[Binding[F, S, M]],
-     rootPath: String,
+     rootPath: Path,
      router: Router[F, S],
      createMiscProxy: (StatefulRenderContext[Binding[F, S, M]], (StatefulRenderContext[Binding[F, S, M]], Binding[F, S, M]) => Unit) => StatefulRenderContext[Binding[F, S, M]],
      scheduler: Scheduler[F],
@@ -102,12 +102,9 @@ final class ApplicationInstance
     for {
       snapshot <- stateManager.snapshot
       // Set page url if router exists
-      _ <- {
-        val root: Path = PathAndQuery.fromString(rootPath).asPath
-        router.fromState
-          .lift(snapshot(Id.TopLevel).getOrElse(initialState))
-          .fold(Effect[F].unit)(uri => frontend.changePageUrl(root / uri.mkString.drop(1)))
-      }
+      _ <- router.fromState
+        .lift(snapshot(Id.TopLevel).getOrElse(initialState))
+        .fold(Effect[F].unit)(uri => frontend.changePageUrl(if (rootPath == Root) uri else rootPath / uri.mkString))
       _ <- Effect[F].delay {
         // Prepare render context
         renderContext.swap()
