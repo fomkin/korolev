@@ -99,7 +99,9 @@ sealed trait PathAndQuery {
           aux(value.path)
         }
         case Root => {
-          ()
+          if(result.isEmpty) {
+            result += "/"
+          }
         }
       }
     }
