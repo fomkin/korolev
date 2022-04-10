@@ -1,9 +1,8 @@
 package korolev.zio
 
-import korolev.effect.{Effect as KorolevEffect, Stream as KorolevStream}
+import korolev.effect.{Effect => KorolevEffect, Stream => KorolevStream}
 import zio.stream.ZStream
-import zio.{Chunk, Exit, FiberFailure, RIO, Runtime, ZIO, ZManaged}
-
+import zio.{Chunk, Exit, FiberFailure, RIO, Runtime, ZIO}
 import scala.concurrent.ExecutionContext
 
 
@@ -25,13 +24,14 @@ package object streams {
 
     type F[A] = RIO[R, A]
 
-    def toKorolev(implicit eff: KorolevEffect[F]): ZManaged[R, Throwable, KorolevStream[F, Seq[O]]] =
-      for {
+    def toKorolev(implicit eff: KorolevEffect[F]): F[KorolevStream[F, Seq[O]]] = {
+      (for {
         runtime <- ZIO.runtime[R].toManaged_
         pull <- stream.process
-        (consumed, stream) = new ZKorolevStream(runtime, pull).handleConsumed
-        _ <- consumed.toManaged_
-      } yield stream
+      } yield {
+        new ZKorolevStream(runtime, pull)
+      }).useNow
+    }
   }
 
   private[streams] class ZKorolevStream[R, O]
