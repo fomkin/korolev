@@ -1,7 +1,9 @@
 package korolev.web
 
 import java.net.{URLDecoder, URLEncoder}
+import java.nio.charset.Charset
 import scala.annotation.tailrec
+import scala.collection.mutable.ArrayBuffer
 import scala.util.hashing.MurmurHash3
 
 sealed trait PathAndQuery {
@@ -53,29 +55,60 @@ sealed trait PathAndQuery {
   }
 
   def mkString(builder: StringBuilder): Unit = {
-    def encodeParam(key: String, value: String, tail: List[String]): List[String] = {
-      if (value.nonEmpty) encode(key) :: "=" :: encode(value) :: tail
-      else encode(key) :: tail
-    }
-    @tailrec
-    def aux(pq: PathAndQuery, result: List[String]): List[String] = {
-      pq match {
-        case value: /  => aux(value.prev, "/" :: value.value :: result)
-        case value: :& => aux(value.prev, "&" :: encodeParam(value.next._1, value.next._2, result))
-        case value: :? => aux(value.path, "?" :: encodeParam(value.next._1, value.next._2, result))
-        case Root => if (result.isEmpty) "/" :: Nil else result
-      }
-    }
-
-    aux(this, Nil).foreach { chunk =>
+    doMkString().reverseIterator.foreach { chunk =>
       builder.appendAll(chunk)
     }
   }
 
   def mkString: String = {
-    val sb = new StringBuilder()
-    mkString(sb)
-    sb.mkString
+    doMkString().reverseIterator.mkString
+  }
+
+  private[this] def doMkString(): ArrayBuffer[String] = {
+    val result = new ArrayBuffer[String]()
+
+    @tailrec
+    def aux(pq: PathAndQuery): Unit = {
+      pq match {
+        case value: / => {
+          result += value.value
+          result += "/"
+          aux(value.prev)
+        }
+        case value: :& => {
+          if (value.next._2.nonEmpty) {
+            result += encode(value.next._2)
+            result += "="
+            result += encode(value.next._1)
+          } else {
+            result += encode(value.next._1)
+          }
+
+          result += "&"
+          aux(value.prev)
+        }
+        case value: :? => {
+          if (value.next._2.nonEmpty) {
+            result += encode(value.next._2)
+            result += "="
+            result += encode(value.next._1)
+          } else {
+            result += encode(value.next._1)
+          }
+          result += "?"
+          aux(value.path)
+        }
+        case Root => {
+          if(result.isEmpty) {
+            result += "/"
+          }
+        }
+      }
+    }
+
+    aux(this)
+
+    result
   }
 
   def param(name: String): Option[String] = {
@@ -297,11 +330,13 @@ object PathAndQuery {
       }
   }
 
+  private[this] val charset: Charset = Charset.forName("UTF-8")
+
   private[web] def decode(value: String): String = {
-    URLDecoder.decode(value, "UTF-8")
+    URLDecoder.decode(value, charset)
   }
 
   private[web] def encode(value: String): String = {
-    URLEncoder.encode(value, "UTF-8")
+    URLEncoder.encode(value, charset)
   }
 }
