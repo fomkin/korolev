@@ -104,7 +104,7 @@ final class ApplicationInstance
       // Set page url if router exists
       _ <- router.fromState
         .lift(snapshot(Id.TopLevel).getOrElse(initialState))
-        .fold(Effect[F].unit)(uri => frontend.changePageUrl(if (rootPath == Root) uri else rootPath / uri.mkString))
+        .fold(Effect[F].unit)(uri => frontend.changePageUrl(rootPath ++ uri))
       _ <- Effect[F].delay {
         // Prepare render context
         renderContext.swap()
