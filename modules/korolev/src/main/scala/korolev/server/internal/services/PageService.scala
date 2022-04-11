@@ -21,7 +21,7 @@ final class PageService[F[_]: Effect, S, M](config: KorolevServiceConfig[F, S, M
   def appendScripts(rc: RenderContext[_], qsid: Qsid): Unit = {
     val rp = config.rootPath
     val heartbeatInterval = config.heartbeatInterval.toMillis
-    val kfg = s"window['kfg']={sid:'${qsid.sessionId}',r:'$rp',clw:'$clw',heartbeatInterval:$heartbeatInterval}"
+    val kfg = s"window['kfg']={sid:'${qsid.sessionId}',r:'${(rp / "").mkString}',clw:'$clw',heartbeatInterval:$heartbeatInterval}"
 
     rc.openNode(XmlNs.html, "script")
     rc.addTextNode(kfg)
