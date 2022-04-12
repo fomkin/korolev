@@ -1,20 +1,21 @@
 import scala.concurrent.ExecutionContext
 
-import cats.effect.{ExitCode as CatsExitCode, *}
-import korolev.effect.Effect as KEffect
-import korolev.server.{KorolevServiceConfig, StateLoader}
-import korolev.state.javaSerialization.*
-import korolev.web.PathAndQuery
-import korolev.zio.zioEffectInstance
-import korolev.{Context, http4s}
+import cats.effect.{ExitCode as CatsExitCode, _}
 import org.http4s.blaze.server.BlazeServerBuilder
-import org.http4s.implicits.*
+import org.http4s.implicits._
 import org.http4s.server.Router
 import org.http4s.{HttpApp, HttpRoutes}
 import zio.blocking.Blocking
 import zio.clock.Clock
-import zio.interop.catz.*
+import zio.interop.catz._
 import zio.{App, RIO, Runtime, Task, ZEnv, ZIO, ExitCode as ZExitCode}
+
+import korolev.effect.Effect as KEffect
+import korolev.server.{KorolevServiceConfig, StateLoader}
+import korolev.state.javaSerialization._
+import korolev.web.PathAndQuery
+import korolev.zio.zioEffectInstance
+import korolev.{Context, http4s}
 
 object Http4sZioExample extends App {
 
@@ -22,17 +23,17 @@ object Http4sZioExample extends App {
 
   private class Service()(implicit runtime: Runtime[ZEnv])  {
 
-    import scala.concurrent.duration.*
+    import scala.concurrent.duration._
 
-    import levsha.dsl.*
-    import html.*
+    import levsha.dsl._
+    import html._
 
     implicit val ec: ExecutionContext = runtime.platform.executor.asEC
     implicit val effect: KEffect[AppTask] = zioEffectInstance[ZEnv, Throwable](runtime)(identity)(identity)
 
     val ctx = Context[ZIO[ZEnv, Throwable, *], Option[Int], Any]
 
-    import ctx.*
+    import ctx._
 
 
     def config = KorolevServiceConfig [AppTask, Option[Int], Any] (

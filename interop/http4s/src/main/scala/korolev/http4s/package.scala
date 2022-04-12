@@ -4,8 +4,8 @@ import korolev.effect.{Effect, Queue, Stream as KStream}
 import korolev.server.{KorolevService, KorolevServiceConfig, HttpRequest as KorolevHttpRequest}
 import korolev.web.{PathAndQuery as PQ, Request as KorolevRequest, Response as KorolevResponse}
 import korolev.state.{StateDeserializer, StateSerializer}
-import korolev.fs2.*
-import korolev.scodec.*
+import korolev.fs2._
+import korolev.scodec._
 import korolev.data.Bytes
 import org.http4s.{Header, Headers, HttpRoutes, Request, Response, Status}
 import org.http4s.dsl.Http4sDsl
@@ -16,7 +16,7 @@ import org.http4s.websocket.WebSocketFrame
 
 import scala.concurrent.ExecutionContext
 import _root_.cats.effect.kernel.Concurrent
-import _root_.cats.syntax.all.*
+import _root_.cats.syntax.all._
 import _root_.fs2.{Pipe, Stream as FS2Stream}
 import _root_.fs2.Chunk
 import _root_.scodec.bits.ByteVector

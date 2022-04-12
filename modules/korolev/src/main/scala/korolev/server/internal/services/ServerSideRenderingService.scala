@@ -17,7 +17,7 @@
 package korolev.server.internal.services
 
 import korolev.effect.Effect
-import korolev.effect.syntax.*
+import korolev.effect.syntax._
 import korolev.server.internal.{Cookies, Html5RenderContext, HttpResponse}
 import korolev.server.{HttpRequest, HttpResponse, KorolevServiceConfig}
 import korolev.web.Response.Status

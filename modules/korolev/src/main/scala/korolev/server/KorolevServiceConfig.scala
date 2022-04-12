@@ -21,7 +21,7 @@ import korolev.state.IdGenerator
 import korolev.{Context, Extension, Router}
 import levsha.Document
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 
 import korolev.web.{Path, PathAndQuery}
 
