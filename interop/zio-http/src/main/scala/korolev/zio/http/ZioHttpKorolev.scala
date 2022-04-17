@@ -191,7 +191,7 @@ class ZioHttpKorolev[R] {
       case HttpData.StreamData(zStream) =>
         zStream.toKorolev(eff).map { kStream =>
           kStream.map(bytes => Bytes.wrap(bytes.toArray))
-        }
+        }.useNow
     }
   }
 
