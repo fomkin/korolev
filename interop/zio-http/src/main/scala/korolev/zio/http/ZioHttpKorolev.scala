@@ -23,7 +23,7 @@ class ZioHttpKorolev[R] {
 
     val korolevServer = korolev.server.korolevService(config)
 
-    val rootPath = Path(config.rootPath)
+    val rootPath = Path(config.rootPath.mkString)
 
     def app(req: Request): ResponseM[R, Throwable] = req match {
 

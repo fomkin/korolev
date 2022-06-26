@@ -22,6 +22,7 @@ import korolev.internal.{ApplicationInstance, Frontend}
 import korolev.server.KorolevServiceConfig
 import korolev.server.internal.{BadRequestException, Cookies}
 import korolev.state.{StateDeserializer, StateSerializer, StateStorage}
+import korolev.web.PathAndQuery
 import korolev.web.Request.Head
 import korolev.{Extension, Qsid}
 
@@ -115,6 +116,7 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
           stateManager,
           initialState,
           config.document,
+          config.rootPath,
           config.router,
           createMiscProxy = (rc, k) => pageService.setupStatefulProxy(rc, qsid, k),
           scheduler,

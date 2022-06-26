@@ -1,20 +1,21 @@
-import org.http4s.{HttpApp, HttpRoutes, Request, Response}
-import org.http4s.blaze.server.BlazeServerBuilder
-import zio.clock.Clock
-import cats.effect.{ExitCode => CatsExitCode, _}
-import korolev.http4s
-import zio.{App, Task, RIO, Runtime, ZEnv, ZIO, ExitCode => ZExitCode}
-import zio.interop.catz._
-import korolev.Context
-import korolev.server.{KorolevServiceConfig, StateLoader}
-import korolev.effect.{Effect => KEffect}
-import korolev.zio.zioEffectInstance
-import korolev.state.javaSerialization._
-import org.http4s.server.Router
-import org.http4s.implicits._
-import zio.blocking.Blocking
-
 import scala.concurrent.ExecutionContext
+
+import cats.effect.{ExitCode as CatsExitCode, _}
+import org.http4s.blaze.server.BlazeServerBuilder
+import org.http4s.implicits._
+import org.http4s.server.Router
+import org.http4s.{HttpApp, HttpRoutes}
+import zio.blocking.Blocking
+import zio.clock.Clock
+import zio.interop.catz._
+import zio.{App, RIO, Runtime, Task, ZEnv, ZIO, ExitCode as ZExitCode}
+
+import korolev.effect.Effect as KEffect
+import korolev.server.{KorolevServiceConfig, StateLoader}
+import korolev.state.javaSerialization._
+import korolev.web.PathAndQuery
+import korolev.zio.zioEffectInstance
+import korolev.{Context, http4s}
 
 object Http4sZioExample extends App {
 
@@ -22,9 +23,10 @@ object Http4sZioExample extends App {
 
   private class Service()(implicit runtime: Runtime[ZEnv])  {
 
+    import scala.concurrent.duration._
+
     import levsha.dsl._
     import html._
-    import scala.concurrent.duration._
 
     implicit val ec: ExecutionContext = runtime.platform.executor.asEC
     implicit val effect: KEffect[AppTask] = zioEffectInstance[ZEnv, Throwable](runtime)(identity)(identity)
@@ -36,7 +38,7 @@ object Http4sZioExample extends App {
 
     def config = KorolevServiceConfig [AppTask, Option[Int], Any] (
       stateLoader = StateLoader.default(Option.empty[Int]),
-      rootPath = "/",
+      rootPath = PathAndQuery.Root,
       document = {
         case Some(n) => optimize {
           Html(

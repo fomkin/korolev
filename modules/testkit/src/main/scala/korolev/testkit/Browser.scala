@@ -3,7 +3,7 @@ package korolev.testkit
 import korolev.Context.{Access, Binding, ElementId, MappedAccess}
 import korolev.data.Bytes
 import korolev.effect.Effect
-import korolev.effect.syntax.*
+import korolev.effect.syntax._
 import korolev.internal.Frontend.ClientSideException
 import korolev.util.JsCode
 import korolev.web.FormData

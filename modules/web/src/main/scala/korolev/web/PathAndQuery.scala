@@ -206,6 +206,21 @@ sealed trait Path extends PathAndQuery {
 
     aux(this, tail.reverse)
   }
+
+  def ++(tail: PathAndQuery): PathAndQuery = {
+    @tailrec
+    def helper(pq: PathAndQuery, query: List[(String, String)]): (Path, List[(String, String)]) = pq match {
+      case q: :& => helper(q.prev, q.next :: query)
+      case q: :? => (q.path, q.next :: query)
+      case p: / => (p, query)
+      case Root => (Root, query)
+    }
+
+    val (tailPath, tailQueryReversed) = helper(tail, List.empty)
+    tailQueryReversed.foldLeft[PathAndQuery](this ++ tailPath) {
+      case (pq, (key, value)) => pq.withParam(key, value)
+    }
+  }
 }
 
 object PathAndQuery {
