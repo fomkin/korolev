@@ -4,23 +4,24 @@ val scala2_12Version = "2.12.15"
 val scala2_13Version = "2.13.8"
 val scala3Version = "3.1.1"
 
-val levshaVersion = "1.1.0"
+val levshaVersion = "1.2.0"
 
-val akkaVersion = "2.6.14"
-val akkaHttpVersion = "10.2.4"
+val akkaVersion = "2.6.19"
+val akkaHttpVersion = "10.2.9"
 val http4sVersion = "0.23.10" // Scala 3 is not supported in final releases yet
 
 val circeVersion = "0.14.1"
-val ce2Version = "2.5.3"
-val ce3Version = "3.3.1"
+val ce2Version = "2.5.5"
+val ce3Version = "3.3.12"
 
-val zioVersion = "1.0.11"
+val zioVersion = "1.0.15"
+val zio2Version = "2.0.0"
 val zioHttpVersion = "1.0.0.0-RC17"
 
-val fs2ce2Version = "2.5.10"
-val fs2ce3Version = "3.2.4"
-val monixVersion = "3.4.0"
-val scodecVersion = "1.1.30"
+val fs2ce2Version = "2.5.11"
+val fs2ce3Version = "3.2.8"
+val monixVersion = "3.4.1"
+val scodecVersion = "1.1.34"
 
 scalaVersion := scala2_13Version
 
@@ -292,6 +293,17 @@ lazy val zio = project
   )
   .dependsOn(effect)
 
+lazy val zio2 = project
+  .in(interop / "zio2")
+  .enablePlugins(GitVersioning)
+  .settings(crossVersionSettings)
+  .settings(commonSettings: _*)
+  .settings(
+    normalizedName := "korolev-zio2",
+    libraryDependencies += "dev.zio" %% "zio" % zio2Version
+  )
+  .dependsOn(effect)
+
 lazy val zioStreams = project
   .in(interop / "zio-streams")
   .enablePlugins(GitVersioning)
@@ -302,6 +314,17 @@ lazy val zioStreams = project
     libraryDependencies += "dev.zio" %% "zio-streams" % zioVersion
   )
   .dependsOn(effect, zio)
+
+lazy val zio2Streams = project
+  .in(interop / "zio2-streams")
+  .enablePlugins(GitVersioning)
+  .settings(crossVersionSettings)
+  .settings(commonSettings: _*)
+  .settings(
+    normalizedName := "korolev-zio2-streams",
+    libraryDependencies += "dev.zio" %% "zio-streams" % zio2Version
+  )
+  .dependsOn(effect, zio2)
 
 lazy val fs2ce2 = project
   .in(interop / "fs2-ce2")
@@ -541,7 +564,7 @@ lazy val root = project
     korolev, effect, web, http, standalone, testkit,
     bytes,
     // Interop
-    akka, ce2, ce3, monix, zio, zioStreams, slf4j,
+    akka, ce2, ce3, monix, zio, zioStreams, zio2, zio2Streams, slf4j,
     scodec, fs2ce2, fs2ce3, http4s, zioHttp,
     // Examples
     simpleExample, routingExample, gameOfLifeExample,

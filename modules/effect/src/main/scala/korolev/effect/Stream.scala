@@ -342,7 +342,7 @@ object Stream {
       * Flatten Stream of any collection to single elements
       * @return
       */
-    def unchunk[O]: Stream[F, A] = stream.flatMapAsync(chunk => Stream.emits(chunk).mat())
+    def unchunk: Stream[F, A] = stream.flatMapAsync(chunk => Stream.emits(chunk).mat())
 
   }
 

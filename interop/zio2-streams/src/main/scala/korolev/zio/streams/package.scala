@@ -2,7 +2,8 @@ package korolev.zio
 
 import korolev.effect.{Effect as KorolevEffect, Stream as KorolevStream}
 import zio.stream.ZStream
-import zio.{Chunk, RIO, ZIO, ZManaged}
+import zio.{Chunk, RIO, Runtime, Scope, ZIO}
+
 
 package object streams {
 
@@ -10,7 +11,7 @@ package object streams {
   implicit class KorolevSreamOps[R, O](stream: KorolevStream[RIO[R, *], O]) {
 
     def toZStream: ZStream[R, Throwable, O] = {
-      ZStream.unfoldM(()) { _ =>
+      ZStream.unfoldZIO(()) { _ =>
         stream
           .pull()
           .map(mv => mv.map(v => (v, ())))
@@ -22,14 +23,17 @@ package object streams {
 
     type F[A] = RIO[R, A]
 
-    def toKorolev(implicit eff: KorolevEffect[F]): ZManaged[R, Throwable, KorolevStream[F, Seq[O]]] =
-      stream.process.map { zPull =>
-        new ZKorolevStream(zPull)
-      }
+    def toKorolev(implicit eff: KorolevEffect[F]): ZIO[R with Scope, Nothing, ZKorolevStream[R, O]] = {
+      for {
+        runtime <- ZIO.runtime[R]
+        pull <- stream.toPull
+      } yield new ZKorolevStream(runtime, pull)
+    }
   }
 
   private[streams] class ZKorolevStream[R, O]
     (
+      runtime: Runtime[R],
       zPull: ZIO[R, Option[Throwable], Chunk[O]]
     )(implicit eff: KorolevEffect[RIO[R, *]]) extends KorolevStream[RIO[R, *], Seq[O]] {
 

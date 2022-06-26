@@ -63,7 +63,7 @@ final class ComponentInstance
      createMiscProxy: (StatefulRenderContext[Binding[F, AS, M]], (StatefulRenderContext[Binding[F, CS, E]], Binding[F, CS, E]) => Unit) => StatefulRenderContext[Binding[F, CS, E]],
      scheduler: Scheduler[F],
      reporter: Reporter,
-     recovery: PartialFunction[Throwable, F[Unit]]
+     recovery: PartialFunction[Throwable, F[Unit]],
   ) { self =>
 
   import ComponentInstance._
