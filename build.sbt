@@ -16,7 +16,7 @@ val ce3Version = "3.3.12"
 
 val zioVersion = "1.0.15"
 val zio2Version = "2.0.0"
-val zioHttpVersion = "1.0.0.0-RC17"
+val zioHttpVersion = "2.0.0-RC10"
 
 val fs2ce2Version = "2.5.11"
 val fs2ce3Version = "3.2.8"
@@ -39,6 +39,7 @@ val dontPublishSettings = Seq(
 )
 
 val publishSettings = Seq(
+  version := "1.4.2-SNAPSHOT",
   publishMavenStyle := true,
   Test / publishArtifact := false,
   pomIncludeRepository := { _ => false },
@@ -244,7 +245,7 @@ lazy val zioHttp = project
     normalizedName := "korolev-zio-http",
     libraryDependencies += "io.d11" %% "zhttp" % zioHttpVersion
   )
-  .dependsOn(korolev, web, zio, zioStreams)
+  .dependsOn(korolev, web, zio2, zio2Streams)
 
 lazy val slf4j = project.
   in(interop / "slf4j").
