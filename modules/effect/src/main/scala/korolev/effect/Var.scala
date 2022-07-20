@@ -16,19 +16,120 @@
 
 package korolev.effect
 
-import java.util.concurrent.atomic.AtomicReference
+import korolev.effect.syntax.*
 
-final class Var[F[_]: Effect, T](initialValue: T) {
-  private val casRef = new AtomicReference[T](initialValue)
-  def set(value: T): F[Unit] =
-    Effect[F].delay(casRef.set(value))
-  def get: F[T] =
-    Effect[F].delay(casRef.get)
-  def compareAndSet(expected: T, value: T): F[Boolean] =
-    Effect[F].delay(casRef.compareAndSet(expected, value))
+import java.util.concurrent.atomic.AtomicReference
+import scala.annotation.tailrec
+
+trait Var[F[_], A] {
+  def get: F[A]
+  def set(value: A): F[Unit]
+  // Update
+  def tryUpdate(f: A => A): F[Option[A]]
+  def tryUpdateF(f: A => F[A]): F[Option[A]]
+  def update(f: A => A): F[A]
+  def updateF(f: A => F[A]): F[A]
+  // Modify
+  def tryModify[B](f: A => (A, B)): F[Option[B]]
+//  def tryModifyF[B](f: A => F[(A, B)]): F[Option[B]]
+  def modify[B](f: A => (A, B)): F[B]
+  def modifyF[B](f: A => F[(A, B)]): F[B]
+}
+
+class VarImpl[F[_]: Effect, A](atomic: AtomicReference[A]) extends Var[F, A] {
+
+  def get: F[A] = Effect[F].delay(atomic.get())
+
+  def set(value: A): F[Unit] = Effect[F].delay(atomic.set(value))
+
+  // Update
+
+  def tryUpdate(f: A => A): F[Option[A]] = Effect[F].delay {
+    val x = atomic.get()
+    val x2 = f(x)
+    if (atomic.compareAndSet(x, x2)) Some(x2)
+    else None
+  }
+
+  def tryUpdateF(f: A => F[A]): F[Option[A]] = Effect[F].delayAsync {
+    val x = atomic.get()
+    f(x).map { x2 =>
+      if (atomic.compareAndSet(x, x2)) Some(x2)
+      else None
+    }
+  }
+
+  def update(f: A => A): F[A] = Effect[F].delay {
+    @tailrec def aux(): A = {
+      val x = atomic.get()
+      val x2 = f(x)
+      if (atomic.compareAndSet(x, x2)) x2
+      else aux()
+    }
+    aux()
+  }
+
+  def updateF(f: A => F[A]): F[A] = Effect[F].delayAsync {
+    def aux(): F[A] = {
+      val x = atomic.get()
+      f(x).flatMap { x2 =>
+        if (atomic.compareAndSet(x, x2)) Effect[F].pure(x2)
+        else aux()
+      }
+    }
+    aux()
+  }
+
+  // Modify
+
+  def tryModify[B](f: A => (A, B)): F[Option[B]] = Effect[F].delay {
+    val x = atomic.get()
+    val (x2, ret) = f(x)
+    if (atomic.compareAndSet(x, x2)) Some(ret)
+    else None
+  }
+
+  def tryModifyF[B](f: A => (A, B)): F[Option[B]] = Effect[F].delay {
+    val x = atomic.get()
+    val (x2, ret) = f(x)
+    if (atomic.compareAndSet(x, x2)) Some(ret)
+    else None
+  }
+
+  def modify[B](f: A => (A, B)): F[B] = Effect[F].delay {
+    @tailrec def aux(): B = {
+      val x = atomic.get()
+      val (x2, ret) = f(x)
+      if (atomic.compareAndSet(x, x2)) ret
+      else aux()
+    }
+    aux()
+  }
+
+  def modifyF[B](f: A => F[(A, B)]): F[B] = Effect[F].delayAsync {
+    def aux(): F[B] = {
+      val x = atomic.get()
+      f(x).flatMap { case (x2, ret) =>
+        if (atomic.compareAndSet(x, x2)) Effect[F].pure(ret)
+        else aux()
+      }
+    }
+    aux()
+  }
+
 }
 
 object Var {
-  def apply[F[_]: Effect, T](initialValue: T): Var[F, T] =
-    new Var(initialValue)
+
+  def apply[F[_]]: ApplyMake[F] =
+    new ApplyMake[F](true)
+
+  class ApplyMake[F[_]](dummy: Boolean) extends AnyVal {
+    def make[T](initialValue: T)(implicit effect: Effect[F]): F[Var[F, T]] =
+      Effect[F].delay(new VarImpl(new AtomicReference[T](initialValue)))
+
+    def makeUnsafe[T](initialValue: T)(implicit effect: Effect[F]): Var[F, T] =
+      new VarImpl(new AtomicReference[T](initialValue))
+  }
+
 }

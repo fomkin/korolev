@@ -19,7 +19,6 @@ package korolev.internal
 import java.util.concurrent.atomic.AtomicInteger
 import scala.collection.mutable
 import scala.annotation.switch
-import korolev.Context.FileHandler
 import korolev.data.Bytes
 import korolev.web.{FormData, PathAndQuery}
 import korolev.effect.syntax._
@@ -128,10 +127,10 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
       files <- fileNamePromises.get(descriptor)
     } yield files
 
-  def uploadFile(id: Id, handler: FileHandler): F[Stream[F, Bytes]] =
+  def uploadFile(id: Id, fileName: String): F[Stream[F, Bytes]] =
     for {
       descriptor <- nextDescriptor()
-      _ <- send(Procedure.UploadFile.code, id.mkString, descriptor, handler.fileName)
+      _ <- send(Procedure.UploadFile.code, id.mkString, descriptor, fileName)
       file <- filesPromises.get(descriptor)
     } yield file
 

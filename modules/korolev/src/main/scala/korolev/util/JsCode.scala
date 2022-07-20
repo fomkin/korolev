@@ -17,6 +17,7 @@
 package korolev.util
 
 import korolev.Context.ElementId
+import korolev.context.Binding
 import korolev.util.JsCode.{Element, Part}
 
 import scala.annotation.tailrec
@@ -25,13 +26,13 @@ sealed trait JsCode {
   def ::(s: String): Part = Part(s, this)
   def ::(s: ElementId): Element = Element(s, this)
 
-  def mkString(elementToId: ElementId => levsha.Id): String = {
+  def mkString(elementToId: Binding.Element => levsha.Id): String = {
     @tailrec
     def aux(acc: String, jsCode: JsCode): String = jsCode match {
       case JsCode.End => acc
       case JsCode.Part(x, xs) => aux(acc + x, xs)
       case JsCode.Element(x, xs) =>
-        val id = elementToId(x.asInstanceOf[ElementId])
+        val id = elementToId(x.asInstanceOf[Binding.Element])
         aux(acc + s"Korolev.element('$id')", xs)
     }
     aux("", this)
