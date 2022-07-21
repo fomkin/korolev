@@ -22,7 +22,7 @@ import _root_.cats.instances.list._
 import korolev.effect.{Effect => KEffect}
 
 import scala.collection.concurrent.TrieMap
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, Future, blocking => futureBlocking}
 import scala.util.Try
 
 package object cats {
@@ -42,6 +42,9 @@ package object cats {
     def fork[A](m: => IO[A])(implicit ec: ExecutionContext): IO[A] =
       cs.getOrElseUpdate(ec, IO.contextShift(ec)).shift *> m
 
+    def blocking[A](f: => A)(implicit ec: ExecutionContext): IO[A] =
+      IO.fromFuture(IO.pure(Future(futureBlocking(f))))(IO.contextShift(ec))
+
     def unit: IO[Unit] =
       IO.unit
 
@@ -51,13 +54,13 @@ package object cats {
     def fromTry[A](value: => Try[A]): IO[A] =
       IO.fromTry(value)
 
-    def start[A](m: => IO[A])(implicit ec: ExecutionContext): IO[KEffect.Fiber[IO, A]] = m
-      .start(cs.getOrElseUpdate(ec, IO.contextShift(ec)))
-      .map { fiber =>
-        new KEffect.Fiber[IO, A] {
-          def join(): IO[A] = fiber.join
+    def start[A](m: => IO[A])(implicit ec: ExecutionContext): IO[KEffect.Fiber[IO, A]] =
+      m.start(cs.getOrElseUpdate(ec, IO.contextShift(ec)))
+        .map { fiber =>
+          new KEffect.Fiber[IO, A] {
+            def join(): IO[A] = fiber.join
+          }
         }
-      }
 
     def promise[A](cb: (Either[Throwable, A] => Unit) => Unit): IO[A] =
       IO.async(cb)

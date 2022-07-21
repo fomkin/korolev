@@ -16,7 +16,7 @@
 
 package korolev.internal
 
-import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.{AtomicInteger, AtomicLong}
 import scala.collection.mutable
 import scala.annotation.switch
 import korolev.Context.FileHandler
@@ -27,14 +27,18 @@ import korolev.effect.{AsyncTable, Effect, Queue, Reporter, Stream}
 import levsha.Id
 import levsha.impl.DiffRenderContext.ChangesPerformer
 
+import scala.concurrent.ExecutionContext
+
 /**
   * Typed interface to client side
   */
-final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit reporter: Reporter) {
+final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit reporter: Reporter,
+                                                                        ec: ExecutionContext) {
 
   import Frontend._
 
   private val lastDescriptor = new AtomicInteger(0)
+  private val avgDiffTime = new AtomicLong(0)
   private val remoteDomChangesPerformer = new RemoteDomChangesPerformer()
 
   private val customCallbacks = mutable.Map.empty[String, String => F[Unit]]
@@ -70,36 +74,18 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
       case (_, args) => PathAndQuery.fromString(args)
     }
 
+  private def sendRaw(str: String) =
+    outgoingQueue.enqueue(str)
+
   private def send(args: Any*): F[Unit] = {
 
-    def escape(sb: StringBuilder, s: String, unicode: Boolean): Unit = {
-      sb.append('"')
-      var i = 0
-      val len = s.length
-      while (i < len) {
-        (s.charAt(i): @switch) match {
-          case '"'  => sb.append("\\\"")
-          case '\\' => sb.append("\\\\")
-          case '\b' => sb.append("\\b")
-          case '\f' => sb.append("\\f")
-          case '\n' => sb.append("\\n")
-          case '\r' => sb.append("\\r")
-          case '\t' => sb.append("\\t")
-          case c =>
-            if (c < ' ' || (c > '~' && unicode)) sb.append("\\u%04x" format c.toInt)
-            else sb.append(c)
-        }
-        i += 1
-      }
-      sb.append('"')
-      ()
-    }
-
-    val sb = new StringBuilder()
+    val sb = new mutable.StringBuilder()
     sb.append('[')
     args.foreach {
       case s: String =>
-        escape(sb, s, unicode = true)
+        sb.append('"')
+        jsonEscape(sb, s, unicode = true)
+        sb.append('"')
         sb.append(',')
       case x =>
         sb.append(x.toString)
@@ -107,8 +93,7 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
     }
     sb.update(sb.length - 1, ' ') // replace last comma to space
     sb.append(']')
-
-    outgoingQueue.enqueue(sb.mkString)
+    sendRaw(sb.result())
   }
 
   def listenEvent(name: String, preventDefault: Boolean): F[Unit] =
@@ -193,16 +178,28 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
       result <- stringPromises.get(descriptor)
     } yield result
 
-  def performDomChanges(f: ChangesPerformer => Unit): F[Unit] =
+  def performDomChanges(f: ChangesPerformer => Unit): F[Unit] = {
+    def diff = {
+      val startTime = System.nanoTime()
+      val sb = remoteDomChangesPerformer.buffer
+      sb.append('[')
+      sb.append(Procedure.ModifyDom.codeString)
+      sb.append(',')
+      f(remoteDomChangesPerformer)
+      sb.update(sb.length - 1, ' ') // replace last comma to space
+      sb.append(']')
+      val result = remoteDomChangesPerformer.buffer.result()
+      val endTime = System.nanoTime()
+      avgDiffTime.set((avgDiffTime.get + endTime - startTime) / 2)
+      result
+    }
     for {
-      _ <- Effect[F]
-        .delay {
-          remoteDomChangesPerformer.buffer.append(Procedure.ModifyDom.code)
-          f(remoteDomChangesPerformer)
-        }
-      _ <- send(remoteDomChangesPerformer.buffer.toSeq: _*)
+      // Switch to blocking context if rendering is slow
+      result <- if (avgDiffTime.get() > HeavyRenderThresholdNanos) Effect[F].blocking(diff) else Effect[F].delay(diff)
+      _ <- sendRaw(result)
       _ <- Effect[F].delay(remoteDomChangesPerformer.buffer.clear())
     } yield ()
+  }
 
   def resolveFile(descriptor: String, file: Stream[F, Bytes]): F[Unit] =
     filesPromises
@@ -226,7 +223,7 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
     }
 
   private def unescapeJsonString(s: String): String = {
-    val sb = new StringBuilder()
+    val sb = new mutable.StringBuilder()
     var i = 1
     val len = s.length - 1
     while (i < len) {
@@ -267,58 +264,56 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
     (callbackType.toInt, args)
   }
 
-  rawClientMessages
-    .foreach {
-      case (CallbackType.Heartbeat.code, _) =>
-        Effect[F].unit
-      case (CallbackType.ExtractPropertyResponse.code, args) =>
-        val Array(descriptor, propertyType, value) = args.split(":", 3)
-        propertyType.toInt match {
-          case PropertyType.Error.code =>
-            stringPromises
-              .fail(descriptor, ClientSideException(value))
-              .after(stringPromises.remove(descriptor))
-          case _ =>
-            stringPromises
-              .put(descriptor, value)
-              .after(stringPromises.remove(descriptor))
-        }
-      case (CallbackType.ExtractEventDataResponse.code, args) =>
-        val Array(descriptor, value) = args.split(":", 2)
-        stringPromises
-          .put(descriptor, value)
-          .after(stringPromises.remove(descriptor))
-      case (CallbackType.EvalJsResponse.code, args) =>
-        val Array(descriptor, status, json) = args.split(":", 3)
-        status.toInt match {
-          case EvalJsStatus.Success.code =>
-            stringPromises
-              .put(descriptor, json)
-              .after(stringPromises.remove(descriptor))
-          case EvalJsStatus.Failure.code =>
-            stringPromises
-              .fail(descriptor, ClientSideException(json))
-              .after(stringPromises.remove(descriptor))
-        }
-      case (CallbackType.CustomCallback.code, args) =>
-        val Array(name, arg) = args.split(":", 2)
-        customCallbacks.get(name) match {
-          case Some(f) => f(arg)
-          case None => Effect[F].unit
-        }
-      case (callbackType, args) =>
-        Effect[F].fail(UnknownCallbackException(callbackType, args))
-    }
-    .runAsyncForget
+  rawClientMessages.foreach {
+    case (CallbackType.Heartbeat.code, _) =>
+      Effect[F].unit
+    case (CallbackType.ExtractPropertyResponse.code, args) =>
+      val Array(descriptor, propertyType, value) = args.split(":", 3)
+      propertyType.toInt match {
+        case PropertyType.Error.code =>
+          stringPromises
+            .fail(descriptor, ClientSideException(value))
+            .after(stringPromises.remove(descriptor))
+        case _ =>
+          stringPromises
+            .put(descriptor, value)
+            .after(stringPromises.remove(descriptor))
+      }
+    case (CallbackType.ExtractEventDataResponse.code, args) =>
+      val Array(descriptor, value) = args.split(":", 2)
+      stringPromises
+        .put(descriptor, value)
+        .after(stringPromises.remove(descriptor))
+    case (CallbackType.EvalJsResponse.code, args) =>
+      val Array(descriptor, status, json) = args.split(":", 3)
+      status.toInt match {
+        case EvalJsStatus.Success.code =>
+          stringPromises
+            .put(descriptor, json)
+            .after(stringPromises.remove(descriptor))
+        case EvalJsStatus.Failure.code =>
+          stringPromises
+            .fail(descriptor, ClientSideException(json))
+            .after(stringPromises.remove(descriptor))
+      }
+    case (CallbackType.CustomCallback.code, args) =>
+      val Array(name, arg) = args.split(":", 2)
+      customCallbacks.get(name) match {
+        case Some(f) => f(arg)
+        case None    => Effect[F].unit
+      }
+    case (callbackType, args) =>
+      Effect[F].fail(UnknownCallbackException(callbackType, args))
+  }.runAsyncForget
 }
 
 object Frontend {
 
-  final case class DomEventMessage(renderNum: Int,
-                                   target: Id,
-                                   eventType: String)
+  final case class DomEventMessage(renderNum: Int, target: Id, eventType: String)
 
-  sealed abstract class Procedure(final val code: Int)
+  sealed abstract class Procedure(final val code: Int) {
+    final val codeString = code.toString
+  }
 
   object Procedure {
     case object SetRenderNum extends Procedure(0) // (n)
@@ -361,7 +356,9 @@ object Frontend {
       All.find(_.code == n)
   }
 
-  sealed abstract class ModifyDomProcedure(final val code: Int)
+  sealed abstract class ModifyDomProcedure(final val code: Int) {
+    final val codeString = code.toString
+  }
 
   object ModifyDomProcedure {
     case object Create extends ModifyDomProcedure(0) // (id, childId, xmlNs, tag)
@@ -415,9 +412,10 @@ object Frontend {
 
   case class ClientSideException(message: String) extends Exception(message)
   case class UnknownCallbackException(callbackType: Int, args: String)
-    extends Exception(s"Unknown callback $callbackType with args '$args' received")
+      extends Exception(s"Unknown callback $callbackType with args '$args' received")
 
   final case class DownloadFileMeta[F[_]: Effect](stream: Stream[F, Bytes], size: Option[Long], mimeType: String)
 
-  val ReloadMessage: String = "[1]"
+  final val ReloadMessage: String = "[1]"
+  final val HeavyRenderThresholdNanos = 50000000L
 }
