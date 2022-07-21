@@ -57,7 +57,7 @@ class ZIOStreamsInteropTest extends AsyncFlatSpec with Matchers {
     val v1 = Vector(1, 2, 3, 4, 5)
     val v2 = Vector(5, 4, 3, 2, 1)
     val values = v1 ++ v2
-    val io = ZIO.scoped {
+    val io =
       ZStream
         .fromIterable(v1)
         .concat(ZStream.fromIterable(v2)) // concat need for multiple chunks test
@@ -68,7 +68,6 @@ class ZIOStreamsInteropTest extends AsyncFlatSpec with Matchers {
             .fold(Vector.empty[Int])((acc, value) => acc :+ value)
             .map(result => result shouldEqual values)
         }
-    }
     zio.Unsafe.unsafeCompat { implicit u =>
       runtime.unsafe.runToFuture(io)
     }

@@ -2,13 +2,11 @@ package korolev.zio
 
 import korolev.effect.{Effect as KorolevEffect, Stream as KorolevStream}
 import zio.stream.ZStream
-import zio.{Chunk, RIO, Runtime, Scope, ZIO}
-
+import zio._
 
 package object streams {
 
-
-  implicit class KorolevSreamOps[R, O](stream: KorolevStream[RIO[R, *], O]) {
+  implicit class KorolevStreamOps[R, O](stream: KorolevStream[RIO[R, *], O]) {
 
     def toZStream: ZStream[R, Throwable, O] = {
       ZStream.unfoldZIO(()) { _ =>
@@ -19,28 +17,38 @@ package object streams {
     }
   }
 
+  private type Finalizer = Exit[Any, Any] => UIO[Any]
+
   implicit class ZStreamOps[R, O](stream: ZStream[R, Throwable, O]) {
 
-    type F[A] = RIO[R, A]
-
-    def toKorolev(implicit eff: KorolevEffect[F]): ZIO[R with Scope, Nothing, ZKorolevStream[R, O]] = {
-      for {
-        runtime <- ZIO.runtime[R]
-        pull <- stream.toPull
-      } yield new ZKorolevStream(runtime, pull)
+    def toKorolev(implicit eff: KorolevEffect[RIO[R, *]]): RIO[R, ZKorolevStream[R, O]] = {
+      Ref.make(List.empty[Finalizer]).flatMap { finalizersRef =>
+        val scope = new Scope {
+          def addFinalizerExit(finalizer: Finalizer)(implicit trace: Trace): UIO[Unit] =
+            finalizersRef.update(finalizer :: _)
+          def forkWith(executionStrategy: => ExecutionStrategy)(implicit trace: Trace): UIO[Scope.Closeable] =
+            ZIO.dieMessage("Can't fork ZKorolevStream")
+        }
+        (for {
+          pull <- stream.toPull
+          zStream = ZKorolevStream[R, O](pull, finalizersRef)
+        } yield zStream).provideSomeLayer[R](ZLayer.succeed(scope))
+      }
     }
   }
 
-  private[streams] class ZKorolevStream[R, O]
-    (
-      runtime: Runtime[R],
-      zPull: ZIO[R, Option[Throwable], Chunk[O]]
+  private[streams] case class ZKorolevStream[R, O]
+    (zPull: ZIO[R, Option[Throwable], Chunk[O]],
+     finalizersRef: Ref[List[Finalizer]]
     )(implicit eff: KorolevEffect[RIO[R, *]]) extends KorolevStream[RIO[R, *], Seq[O]] {
 
     def pull(): RIO[R, Option[Seq[O]]] =
       zPull.option
 
     def cancel(): RIO[R, Unit] =
-      ZIO.dieMessage("Can't cancel ZStream from Korolev")
+      for {
+        finalizers <- finalizersRef.get
+        _ <- ZIO.collectAll(finalizers.map(_(Exit.unit))).unit
+      } yield ()
   }
 }
