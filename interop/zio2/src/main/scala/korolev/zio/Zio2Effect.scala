@@ -22,12 +22,10 @@ import korolev.effect.Effect
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
-class Zio2Effect[R, E](rts: Runtime[R],
-                       liftError: Throwable => E,
-                       unliftError: E => Throwable) extends Effect[ZIO[R, E, *]] {
+class Zio2Effect[R, E](rts: Runtime[R], liftError: Throwable => E, unliftError: E => Throwable)
+    extends Effect[ZIO[R, E, *]] {
 
-  private val unliftErrorP: PartialFunction[E, Throwable] =
-    { case x => unliftError(x) }
+  private val unliftErrorP: PartialFunction[E, Throwable] = { case x => unliftError(x) }
 
   def pure[A](value: A): ZIO[R, E, A] =
     ZIO.succeed(value)
@@ -37,6 +35,9 @@ class Zio2Effect[R, E](rts: Runtime[R],
 
   def fail[A](e: Throwable): ZIO[R, E, A] =
     ZIO.fail(e).mapError(liftError)
+
+  def blocking[T](f: => T)(implicit ec: ExecutionContext): ZIO[R, E, T] =
+    ZIO.attempt(f).mapError(liftError)
 
   def unit: ZIO[R, E, Unit] =
     ZIO.unit
@@ -52,7 +53,7 @@ class Zio2Effect[R, E](rts: Runtime[R],
       callback { either =>
         register {
           either match {
-            case Left(error) => ZIO.fail(liftError(error))
+            case Left(error)  => ZIO.fail(liftError(error))
             case Right(value) => ZIO.succeed(value)
           }
         }
@@ -64,7 +65,7 @@ class Zio2Effect[R, E](rts: Runtime[R],
       callback { either =>
         register {
           either match {
-            case Left(error) => ZIO.fail(liftError(error))
+            case Left(error)  => ZIO.fail(liftError(error))
             case Right(value) => ZIO.succeed(value)
           }
         }
@@ -102,8 +103,7 @@ class Zio2Effect[R, E](rts: Runtime[R],
 
   def runAsync[A](m: ZIO[R, E, A])(callback: Either[Throwable, A] => Unit): Unit =
     Unsafe.unsafeCompat { implicit u: Unsafe =>
-      rts
-        .unsafe
+      rts.unsafe
         .fork(m)
         .unsafe
         .addObserver(exit => callback(exit.toEither))
@@ -111,8 +111,7 @@ class Zio2Effect[R, E](rts: Runtime[R],
 
   def run[A](m: ZIO[R, E, A]): Either[Throwable, A] =
     Unsafe.unsafeCompat { implicit u: Unsafe =>
-      rts
-        .unsafe
+      rts.unsafe
         .run(m)
         .toEither
     }

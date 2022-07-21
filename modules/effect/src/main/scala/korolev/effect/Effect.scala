@@ -20,7 +20,7 @@ import korolev.effect.Effect.Fiber
 
 import scala.annotation.implicitNotFound
 import scala.concurrent.duration.Duration
-import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.concurrent.{Await, ExecutionContext, Future, blocking => futureBlocking}
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -49,6 +49,8 @@ trait Effect[F[_]] {
   /** Keep in mind that when [[F]] has strict semantic, effect should
     * created inside 'start()' brackets. */
   def start[A](create: => F[A])(implicit ec: ExecutionContext): F[Fiber[F, A]]
+  def blocking[T](f: => T)(implicit ec: ExecutionContext): F[T]
+
   /** Keep in mind that when [[F]] has strict semantic, effect should
     * created inside 'fork()' brackets. */
   def fork[A](m: => F[A])(implicit ec: ExecutionContext): F[A]
@@ -114,7 +116,7 @@ object Effect {
 //      m
 //    }
     /** Keep in mind that when [[F]] has strict semantic, effect should
-     * created inside 'start()' brackets. */
+      * created inside 'start()' brackets. */
     def sequence[A](in: List[Future[A]]): Future[List[A]] =
       Future.sequence(in)
     def start[A](create: => Future[A])(implicit ec: ExecutionContext): Future[Fiber[Future, A]] = {
@@ -142,6 +144,8 @@ object Effect {
         promise.future
       }
     }
+    def blocking[T](f: => T)(implicit ec: ExecutionContext): Future[T] =
+      Future(futureBlocking(f))(ec)
   }
 
   implicit val futureEffect: Effect[Future] =

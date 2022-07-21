@@ -20,7 +20,7 @@ import korolev.effect.Effect
 import _root_.monix.eval.Task
 import _root_.monix.execution.Scheduler
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, Future, blocking => futureBlocking}
 import scala.util.Try
 
 class MonixTaskEffect(implicit scheduler: Scheduler) extends Effect[Task] {
@@ -36,6 +36,9 @@ class MonixTaskEffect(implicit scheduler: Scheduler) extends Effect[Task] {
   def fork[A](m: => Task[A])(implicit ec: ExecutionContext): Task[A] =
     m.executeOn(Scheduler(ec))
 
+  def blocking[A](f: => A)(implicit ec: ExecutionContext): Task[A] =
+    Task.fromFuture(Future(futureBlocking(f)))
+
   def unit: Task[Unit] =
     Task.unit
 
@@ -45,15 +48,14 @@ class MonixTaskEffect(implicit scheduler: Scheduler) extends Effect[Task] {
   def fromTry[A](value: => Try[A]): Task[A] =
     Task.fromTry(value)
 
-  def start[A](m: => Task[A])(implicit ec: ExecutionContext): Task[Effect.Fiber[Task, A]] = m
-    .executeOn(Scheduler(ec))
-    .start
-    .map { fiber =>
-      new Effect.Fiber[Task, A] {
-        def join(): Task[A] = fiber.join
+  def start[A](m: => Task[A])(implicit ec: ExecutionContext): Task[Effect.Fiber[Task, A]] =
+    m.executeOn(Scheduler(ec))
+      .start
+      .map { fiber =>
+        new Effect.Fiber[Task, A] {
+          def join(): Task[A] = fiber.join
+        }
       }
-    }
-
 
   def promise[A](cb: (Either[Throwable, A] => Unit) => Unit): Task[A] =
     Task.async(cb)

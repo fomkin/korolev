@@ -22,18 +22,19 @@ import korolev.effect.Effect
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
-class ZioEffect[R, E](rts: Runtime[R],
-                      liftError: Throwable => E,
-                      unliftError: E => Throwable) extends Effect[ZIO[R, E, *]] {
+class ZioEffect[R, E](rts: Runtime[R], liftError: Throwable => E, unliftError: E => Throwable)
+    extends Effect[ZIO[R, E, *]] {
 
-  private val unliftErrorP: PartialFunction[E, Throwable] =
-    { case x => unliftError(x) }
+  private val unliftErrorP: PartialFunction[E, Throwable] = { case x => unliftError(x) }
 
   def pure[A](value: A): ZIO[R, E, A] =
     ZIO.succeed(value)
 
   def delay[A](value: => A): ZIO[R, E, A] =
     IO.effect(value).mapError(liftError)
+
+  def blocking[T](f: => T)(implicit ec: ExecutionContext): ZIO[R, E, T] =
+    zio.blocking.Blocking.Service.live.effectBlocking(f).mapError(liftError)
 
   def fail[A](e: Throwable): ZIO[R, E, A] =
     Task.fail(e).mapError(liftError)
@@ -52,7 +53,7 @@ class ZioEffect[R, E](rts: Runtime[R],
       callback { either =>
         register {
           either match {
-            case Left(error) => ZIO.fail(liftError(error))
+            case Left(error)  => ZIO.fail(liftError(error))
             case Right(value) => ZIO.succeed(value)
           }
         }
@@ -64,7 +65,7 @@ class ZioEffect[R, E](rts: Runtime[R],
       callback { either =>
         register {
           either match {
-            case Left(error) => ZIO.fail(liftError(error))
+            case Left(error)  => ZIO.fail(liftError(error))
             case Right(value) => ZIO.succeed(value)
           }
         }

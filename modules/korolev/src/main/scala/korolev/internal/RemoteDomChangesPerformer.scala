@@ -17,75 +17,108 @@
 package korolev.internal
 
 import korolev.internal.Frontend.ModifyDomProcedure
-import levsha.Id
+import levsha.FastId
 import levsha.impl.DiffRenderContext.ChangesPerformer
 
 import scala.collection.mutable
 
 private[korolev] class RemoteDomChangesPerformer extends ChangesPerformer {
 
-  val buffer: mutable.ArrayBuffer[Any] =
-    mutable.ArrayBuffer.empty[Any]
+  final val buffer = new mutable.StringBuilder()
 
-  def remove(id: Id): Unit = {
-    buffer += ModifyDomProcedure.Remove.code
-    buffer += id.parent.get.mkString
-    buffer += id.mkString
+  private def append(s: String): Unit = {
+    buffer.append(s)
+    buffer.append(',')
   }
 
-  def createText(id: Id, text: String): Unit = {
-    buffer += ModifyDomProcedure.CreateText.code
-    buffer += id.parent.get.mkString
-    buffer += id.mkString
-    buffer += text
+  private def appendId(id: FastId): Unit = {
+    buffer.append('"')
+    id.mkString(buffer)
+    buffer.append('"')
+    buffer.append(',')
   }
 
-  def create(id: Id, xmlNs: String, tag: String): Unit = {
-    val parent = id.parent.fold("0")(_.mkString)
-    val pXmlns =
-      if (xmlNs eq levsha.XmlNs.html.uri) 0
-      else xmlNs
-    buffer += ModifyDomProcedure.Create.code
-    buffer += parent
-    buffer += id.mkString
-    buffer += pXmlns
-    buffer += tag
+  private def appendParentId(id: FastId): Unit = {
+    buffer.append('"')
+    id.mkStringParent(buffer)
+    buffer.append('"')
+    buffer.append(',')
   }
 
-  def removeStyle(id: Id, name: String): Unit = {
-    buffer += ModifyDomProcedure.RemoveStyle.code
-    buffer += id.mkString
-    buffer += name
+  private def appendString(s: String): Unit = {
+    buffer.append('"')
+    buffer.append(s)
+    buffer.append('"')
+    buffer.append(',')
   }
 
-  def setStyle(id: Id, name: String, value: String): Unit = {
-    buffer += ModifyDomProcedure.SetStyle.code
-    buffer += id.mkString
-    buffer += name
-    buffer += value
+  private def appendStringEscape(s: String): Unit = {
+    buffer.append('"')
+    jsonEscape(buffer, s, unicode = true)
+    buffer.append('"')
+    buffer.append(',')
   }
 
-  def setAttr(id: Id, xmlNs: String, name: String, value: String): Unit = {
-    val pXmlns =
-      if (xmlNs eq levsha.XmlNs.html.uri) 0
-      else xmlNs
-    buffer += ModifyDomProcedure.SetAttr.code
-    buffer += id.mkString
-    buffer += pXmlns
-    buffer += name
-    buffer += value
-    buffer += false
+  private def appendXmlNs(xmlNs: String): Unit = {
+    if (xmlNs eq levsha.XmlNs.html.uri) {
+      buffer.append('0')
+      buffer.append(',')
+    } else appendString(xmlNs)
   }
 
-  def removeAttr(id: Id, xmlNs: String, name: String): Unit = {
-    val pXmlns =
-      if (xmlNs eq levsha.XmlNs.html.uri) 0
-      else xmlNs
-    buffer += ModifyDomProcedure.RemoveAttr.code
-    buffer += id.mkString
-    buffer += pXmlns
-    buffer += name
-    buffer += false
+  def remove(id: FastId): Unit = {
+    append(ModifyDomProcedure.Remove.codeString)
+    appendParentId(id)
+    appendId(id)
+  }
+
+  def createText(id: FastId, text: String): Unit = {
+    append(ModifyDomProcedure.CreateText.codeString)
+    appendParentId(id)
+    appendId(id)
+    appendStringEscape(text)
+  }
+
+  def create(id: FastId, xmlNs: String, tag: String): Unit = {
+    append(ModifyDomProcedure.Create.codeString)
+    if (!id.hasParent) {
+      appendString("0")
+    } else {
+      appendParentId(id)
+    }
+    appendId(id)
+    appendXmlNs(xmlNs)
+    appendString(tag)
+  }
+
+  def removeStyle(id: FastId, name: String): Unit = {
+    append(ModifyDomProcedure.RemoveStyle.codeString)
+    appendId(id)
+    appendString(name)
+  }
+
+  def setStyle(id: FastId, name: String, value: String): Unit = {
+    append(ModifyDomProcedure.SetStyle.codeString)
+    appendId(id)
+    appendString(name)
+    appendStringEscape(value)
+  }
+
+  def setAttr(id: FastId, xmlNs: String, name: String, value: String): Unit = {
+    append(ModifyDomProcedure.SetAttr.codeString)
+    appendId(id)
+    appendXmlNs(xmlNs)
+    appendString(name)
+    appendStringEscape(value)
+    append("false")
+  }
+
+  def removeAttr(id: FastId, xmlNs: String, name: String): Unit = {
+    append(ModifyDomProcedure.RemoveAttr.codeString)
+    appendId(id)
+    appendXmlNs(xmlNs)
+    appendString(name)
+    append("false")
   }
 
 }

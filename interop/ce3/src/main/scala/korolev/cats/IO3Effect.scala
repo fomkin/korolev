@@ -38,6 +38,9 @@ class IO3Effect(runtime: IORuntime) extends KEffect[IO] {
   def fork[A](m: => IO[A])(implicit ec: ExecutionContext): IO[A] =
     m.evalOn(ec)
 
+  def blocking[A](f: => A)(implicit ec: ExecutionContext): IO[A] =
+    IO.blocking(f)
+
   def unit: IO[Unit] =
     IO.unit
 
@@ -47,13 +50,13 @@ class IO3Effect(runtime: IORuntime) extends KEffect[IO] {
   def fromTry[A](value: => Try[A]): IO[A] =
     IO.fromTry(value)
 
-  def start[A](m: => IO[A])(implicit ec: ExecutionContext): IO[KEffect.Fiber[IO, A]] = m
-    .startOn(ec)
-    .map { fiber =>
-      new KEffect.Fiber[IO, A] {
-        def join(): IO[A] = fiber.joinWithNever
+  def start[A](m: => IO[A])(implicit ec: ExecutionContext): IO[KEffect.Fiber[IO, A]] =
+    m.startOn(ec)
+      .map { fiber =>
+        new KEffect.Fiber[IO, A] {
+          def join(): IO[A] = fiber.joinWithNever
+        }
       }
-    }
 
   def promise[A](cb: (Either[Throwable, A] => Unit) => Unit): IO[A] =
     IO.async_(cb)
