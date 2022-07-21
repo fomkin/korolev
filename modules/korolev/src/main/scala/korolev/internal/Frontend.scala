@@ -23,6 +23,7 @@ import korolev.Context.FileHandler
 import korolev.data.Bytes
 import korolev.web.{FormData, PathAndQuery}
 import korolev.effect.syntax._
+import korolev.Metrics
 import korolev.effect.{AsyncTable, Effect, Queue, Reporter, Stream}
 import levsha.Id
 import levsha.impl.DiffRenderContext.ChangesPerformer
@@ -180,7 +181,7 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
 
   def performDomChanges(f: ChangesPerformer => Unit): F[Unit] = {
     def diff = {
-      val startTime = System.nanoTime()
+      val timeStart = System.nanoTime()
       val sb = remoteDomChangesPerformer.buffer
       sb.append('[')
       sb.append(Procedure.ModifyDom.codeString)
@@ -189,8 +190,11 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
       sb.update(sb.length - 1, ' ') // replace last comma to space
       sb.append(']')
       val result = remoteDomChangesPerformer.buffer.result()
-      val endTime = System.nanoTime()
-      avgDiffTime.set((avgDiffTime.get + endTime - startTime) / 2)
+      val timeEnd = System.nanoTime()
+      val timeTotal = timeEnd - timeStart
+      Metrics.MaxDiffNanos.update(prev => Math.max(prev, timeTotal))
+      Metrics.MinDiffNanos.update(prev => if (prev == 0) timeTotal else Math.min(prev, timeTotal))
+      avgDiffTime.set((avgDiffTime.get + timeTotal) / 2)
       result
     }
     for {
