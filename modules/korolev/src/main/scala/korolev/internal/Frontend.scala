@@ -23,6 +23,7 @@ import korolev.Context.FileHandler
 import korolev.data.Bytes
 import korolev.web.{FormData, PathAndQuery}
 import korolev.effect.syntax._
+import korolev.Metrics
 import korolev.effect.{AsyncTable, Effect, Queue, Reporter, Stream}
 import levsha.Id
 import levsha.impl.DiffRenderContext.ChangesPerformer
@@ -193,7 +194,8 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
       result <- stringPromises.get(descriptor)
     } yield result
 
-  def performDomChanges(f: ChangesPerformer => Unit): F[Unit] =
+  def performDomChanges(f: ChangesPerformer => Unit): F[Unit] = {
+    val startTime = System.nanoTime()
     for {
       _ <- Effect[F]
         .delay {
@@ -201,8 +203,13 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
           f(remoteDomChangesPerformer)
         }
       _ <- send(remoteDomChangesPerformer.buffer.toSeq: _*)
+      endTime = System.nanoTime()
+      time = endTime - startTime
+      _ = Metrics.MaxDiffNanos.update(prev => Math.max(prev, time))
+      _ = Metrics.MinDiffNanos.update(prev => if (prev == 0) time else Math.min(prev, time))
       _ <- Effect[F].delay(remoteDomChangesPerformer.buffer.clear())
     } yield ()
+  }
 
   def resolveFile(descriptor: String, file: Stream[F, Bytes]): F[Unit] =
     filesPromises
