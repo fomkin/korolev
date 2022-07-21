@@ -177,12 +177,10 @@ class ZioHttpKorolev[R] {
     if(data.isEmpty) {
       ZIO.succeed(KStream.empty)
     } else {
-      ZIO.scoped[R] {
-        ZStreamOps[R, ByteBuf](data.toByteBufStream).toKorolev(eff)
-          .map { kStream =>
-            kStream.map(bytes => Bytes.wrap(bytes.toArray.flatMap(ByteBufUtil.getBytes(_))))
-          }
-      }.asInstanceOf[RIO[R, KStream[RIO[R, *], Bytes]]]
+      ZStreamOps[R, ByteBuf](data.toByteBufStream).toKorolev(eff)
+        .map { kStream =>
+          kStream.map(bytes => Bytes.wrap(bytes.toArray.flatMap(ByteBufUtil.getBytes)))
+        }.asInstanceOf[RIO[R, KStream[RIO[R, *], Bytes]]]
     }
   }
 
