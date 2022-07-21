@@ -4,7 +4,7 @@ import _root_.zhttp.http.*
 import _root_.zhttp.socket.*
 import _root_.zio.stream.ZStream
 import _root_.zio.{RIO, ZIO}
-import io.netty.buffer.ByteBufUtil
+import io.netty.buffer.{ByteBuf, ByteBufUtil}
 import korolev.data.Bytes
 import korolev.effect.syntax.EffectOps
 import korolev.effect.{Queue, Stream as KStream}
@@ -177,10 +177,11 @@ class ZioHttpKorolev[R] {
     if(data.isEmpty) {
       ZIO.succeed(KStream.empty)
     } else {
-      ZIO.scoped {
-        data.toByteBufStream.toKorolev(eff).map { kStream =>
-          kStream.map(bytes => Bytes.wrap(bytes.toArray.flatMap(ByteBufUtil.getBytes)))
-        }
+      ZIO.scoped[R] {
+        ZStreamOps[R, ByteBuf](data.toByteBufStream).toKorolev(eff)
+          .map { kStream =>
+            kStream.map(bytes => Bytes.wrap(bytes.toArray.flatMap(ByteBufUtil.getBytes(_))))
+          }
       }.asInstanceOf[RIO[R, KStream[RIO[R, *], Bytes]]]
     }
   }
