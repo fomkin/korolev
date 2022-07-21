@@ -45,6 +45,7 @@ object Headers {
   final val TransferEncodingChunked = TransferEncoding -> "chunked"
   final val CacheControlNoCache = CacheControl -> "no-store, no-cache, must-revalidate"
   final val PragmaNoCache = Pragma -> "no-cache"
+  final val ContentTypeTextUtf8 = ContentType -> "text/plain; charset=utf-8"
   final val ContentTypeHtmlUtf8 = ContentType -> "text/html; charset=utf-8"
   final val ConnectionUpgrade = Connection -> "Upgrade"
   final val UpgradeWebSocket = Upgrade -> "websocket"

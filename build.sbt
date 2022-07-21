@@ -150,6 +150,17 @@ lazy val http = project
   )
   .dependsOn(effect, web)
 
+lazy val webDsl = project
+  .in(modules / "web-dsl")
+  .enablePlugins(GitVersioning)
+  .settings(crossVersionSettings)
+  .settings(commonSettings: _*)
+  .settings(
+    description := "Convenient DSL for web purposes",
+    normalizedName := "korolev-web-dsl"
+  )
+  .dependsOn(effect, web)
+
 lazy val korolev = project
   .in(modules / "korolev")
   .enablePlugins(GitVersioning)
@@ -562,7 +573,7 @@ lazy val root = project
   .settings(name := "Korolev Project")
   .aggregate(
     korolev, effect, web, http, standalone, testkit,
-    bytes,
+    bytes, webDsl,
     // Interop
     akka, ce2, ce3, monix, zio, zioStreams, zio2, zio2Streams, slf4j,
     scodec, fs2ce2, fs2ce3, http4s, zioHttp,
