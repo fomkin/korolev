@@ -39,7 +39,6 @@ val dontPublishSettings = Seq(
 )
 
 val publishSettings = Seq(
-  version := "1.4.2-SNAPSHOT",
   publishMavenStyle := true,
   Test / publishArtifact := false,
   pomIncludeRepository := { _ => false },
