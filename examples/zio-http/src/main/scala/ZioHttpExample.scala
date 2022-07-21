@@ -1,10 +1,10 @@
 
-import zio.{App, RIO, Runtime, ZEnv, ZIO, ExitCode => ZExitCode}
+import zio.{RIO, Runtime, ZIO, ZIOAppDefault, ExitCode as ZExitCode}
 import korolev.Context
 import korolev.server.{KorolevServiceConfig, StateLoader}
 import korolev.web.PathAndQuery
-import korolev.zio.ZioEffect
-import korolev.state.javaSerialization._
+import korolev.zio.Zio2Effect
+import korolev.state.javaSerialization.*
 import korolev.zio.http.ZioHttpKorolev
 import zhttp.http.HttpApp
 import zhttp.service.Server
@@ -12,20 +12,20 @@ import zhttp.service.Server
 import scala.concurrent.ExecutionContext
 
 
-object ZioHttpExample extends App {
+object ZioHttpExample extends ZIOAppDefault {
 
-  type AppTask[A] = RIO[ZEnv, A]
+  type AppTask[A] = RIO[Any, A]
 
-  private class Service()(implicit runtime: Runtime[ZEnv])  {
+  private class Service()(implicit runtime: Runtime[Any])  {
 
     import levsha.dsl._
     import levsha.dsl.html._
     import scala.concurrent.duration._
 
-    implicit val ec: ExecutionContext = runtime.platform.executor.asEC
-    implicit val effect: ZioEffect[ZEnv, Throwable] = new ZioEffect[ZEnv, Throwable](runtime, identity, identity)
+    implicit val ec: ExecutionContext = Runtime.defaultExecutor.asExecutionContext
+    implicit val effect: Zio2Effect[Any, Throwable] = new Zio2Effect[Any, Throwable](runtime, identity, identity)
 
-    val ctx = Context[ZIO[ZEnv, Throwable, *], Option[Int], Any]
+    val ctx = Context[ZIO[Any, Throwable, *], Option[Int], Any]
 
     import ctx._
 
@@ -69,20 +69,20 @@ object ZioHttpExample extends App {
       }
     )
 
-    def route(): HttpApp[ZEnv, Throwable] = {
-      new ZioHttpKorolev[ZEnv].service(config)
+    def route(): HttpApp[Any, Throwable] = {
+      new ZioHttpKorolev[Any].service(config)
     }
 
   }
 
-  private def getAppRoute(): ZIO[ZEnv, Nothing, HttpApp[ZEnv, Throwable]] = {
-    ZIO.runtime[ZEnv].map { implicit rts =>
+  private def getAppRoute(): ZIO[Any, Nothing, HttpApp[Any, Throwable]] = {
+    ZIO.runtime[Any].map { implicit rts =>
       new Service().route()
     }
   }
 
 
-  override def run(args: List[String]): ZIO[ZEnv, Nothing, ZExitCode] = {
+  override def run = {
 
     val prog = for {
       httpApp <- getAppRoute()
