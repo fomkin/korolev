@@ -179,7 +179,7 @@ class ZioHttpKorolev[R] {
     } else {
       ZStreamOps[R, ByteBuf](data.toByteBufStream).toKorolev(eff)
         .map { kStream =>
-          kStream.map(bytes => Bytes.wrap(bytes.toArray.flatMap(ByteBufUtil.getBytes)))
+          kStream.map(bytes => Bytes.wrap(bytes.toArray.flatMap(ByteBufUtil.getBytes(_))))
         }.asInstanceOf[RIO[R, KStream[RIO[R, *], Bytes]]]
     }
   }
