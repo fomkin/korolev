@@ -41,7 +41,8 @@ case class KorolevServiceConfig[F[_]: Effect, S, M](
   idGenerator: IdGenerator[F] = IdGenerator.default[F](),
   heartbeatInterval: FiniteDuration = 5.seconds,
   reporter: Reporter = Reporter.PrintReporter,
-  recovery: PartialFunction[Throwable, S => S] = PartialFunction.empty[Throwable, S => S]
+  recovery: PartialFunction[Throwable, S => S] = PartialFunction.empty[Throwable, S => S],
+  sessionTimeout: FiniteDuration = 60.seconds,
 )(implicit val executionContext: ExecutionContext)
 
 object KorolevServiceConfig {

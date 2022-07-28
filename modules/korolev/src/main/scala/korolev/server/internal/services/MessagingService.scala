@@ -90,6 +90,7 @@ private[korolev] final class MessagingService[F[_]: Effect](reporter: Reporter,
     * Sessions created via long polling subscription
     * takes messages from topics stored in this table.
     */
+  //TODO: Need figure out how to clean this Map on session destroy
   private val longPollingTopics = TrieMap.empty[Qsid, Queue[F, String]]
 
   /**

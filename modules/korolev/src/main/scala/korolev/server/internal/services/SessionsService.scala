@@ -16,13 +16,13 @@
 
 package korolev.server.internal.services
 
-import korolev.effect.syntax._
-import korolev.effect.{AsyncTable, Effect, Scheduler, Stream}
+import korolev.effect.Effect.Fiber
+import korolev.effect.syntax.*
+import korolev.effect.{AsyncTable, Effect, Hub, Scheduler, Stream, Var}
 import korolev.internal.{ApplicationInstance, Frontend}
 import korolev.server.KorolevServiceConfig
 import korolev.server.internal.{BadRequestException, Cookies}
 import korolev.state.{StateDeserializer, StateSerializer, StateStorage}
-import korolev.web.PathAndQuery
 import korolev.web.Request.Head
 import korolev.{Extension, Qsid}
 
@@ -67,12 +67,13 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
 
     val (incomingConsumed, incoming) = incomingStream.handleConsumed
 
-    def handleAppOrWsOutgoingClose(frontend: Frontend[F], app: App, ehs: ExtensionsHandlers): F[Unit] = {
+    def handleAppOrWsOutgoingCloseOrTimeout(frontend: Frontend[F], app: App, ehs: ExtensionsHandlers): F[Unit] = {
       val consumed: F[Unit] = Effect[F].promise[Unit] { cb =>
         val invoked = new AtomicBoolean(false)
-        val invokeOnce = (x: Either[Throwable, Unit]) =>
+        val invokeOnce: Either[Throwable, Unit] => Unit = (x: Either[Throwable, Unit]) =>
           if (invoked.compareAndSet(false, true)) cb(x)
 
+        handleCommunicationTimeout().runAsync(invokeOnce)
         frontend.outgoingConsumed.runAsync(invokeOnce)
         incomingConsumed.runAsync(invokeOnce)
       }
@@ -85,6 +86,32 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
         _ <- Effect[F].delay(stateStorage.remove(qsid.deviceId, qsid.sessionId))
         _ <- apps.remove(qsid)
       } yield ()
+    }
+
+    def handleCommunicationTimeout(): F[Unit] = {
+      def createTimeout(cb: Either[Throwable, Unit] => Unit, stream: Stream[F, String]): F[Fiber[F, Scheduler.JobHandler[F, Unit]]] = {
+        scheduler.scheduleOnce(config.sessionTimeout)({
+          Effect[F].unit.runAsync(cb)
+          stream.cancel()
+        }).start
+      }
+
+      Effect[F].promise[Unit] { cb =>
+        for {
+          in <- Hub(incoming).newStream()
+          initialTimeout <- createTimeout(cb, in)
+          schedulerVar = Var[F, Fiber[F, Scheduler.JobHandler[F, Unit]]](initialTimeout)
+          _ = in.foreach { msg =>
+            for {
+              currentTimerF <- schedulerVar.get
+              currentTimer <- currentTimerF.join()
+              _ <- currentTimer.cancel()
+              timeout <- createTimeout(cb, in)
+              _ = schedulerVar.set(timeout)
+            } yield ()
+          }
+        } yield ()
+      }
     }
 
     def handleStateChange(app: App, ehs: ExtensionsHandlers): F[Unit] = {
@@ -130,7 +157,7 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
             for {
               _ <- Effect[F].start(handleStateChange(app, ehs))
               _ <- Effect[F].start(handleMessages(app, ehs))
-              _ <- Effect[F].start(handleAppOrWsOutgoingClose(frontend, app, ehs))
+              _ <- Effect[F].start(handleAppOrWsOutgoingCloseOrTimeout(frontend, app, ehs))
             } yield ()
           }
           .start
