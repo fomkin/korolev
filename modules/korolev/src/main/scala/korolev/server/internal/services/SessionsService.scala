@@ -64,10 +64,9 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
     apps.getImmediately(qsid)
 
   def createAppIfNeeded(qsid: Qsid, rh: Head, incomingStream: Stream[F, String]): F[Unit] = {
+    val incomingHub: Hub[F, String] = Hub(incomingStream)
 
-    val (incomingConsumed, incoming) = incomingStream.handleConsumed
-
-    def handleAppOrWsOutgoingCloseOrTimeout(frontend: Frontend[F], app: App, ehs: ExtensionsHandlers): F[Unit] = {
+    def handleAppOrWsOutgoingCloseOrTimeout(frontend: Frontend[F], app: App, ehs: ExtensionsHandlers, incomingConsumed: F[Unit]): F[Unit] = {
       val consumed: F[Unit] = Effect[F].promise[Unit] { cb =>
         val invoked = new AtomicBoolean(false)
         val invokeOnce: Either[Throwable, Unit] => Unit = (x: Either[Throwable, Unit]) =>
@@ -98,10 +97,10 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
 
       Effect[F].promise[Unit] { cb =>
         for {
-          in <- Hub(incoming).newStream()
+          in <- incomingHub.newStream()
           initialTimeout <- createTimeout(cb, in)
           schedulerVar = Var[F, Fiber[F, Scheduler.JobHandler[F, Unit]]](initialTimeout)
-          _ = in.foreach { msg =>
+          _ = in.foreach { _ =>
             for {
               currentTimerF <- schedulerVar.get
               currentTimer <- currentTimerF.join()
@@ -130,12 +129,14 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
           ehs.map(_.onMessage(m)).sequence.unit
         }
 
-    def create() =
+    def create(): F[ApplicationInstance[F, S, M]] =
       for {
         stateManager <- stateStorage.get(qsid.deviceId, qsid.sessionId)
         maybeInitialState <- stateManager.read[S](levsha.Id.TopLevel)
         // Top level state should exists. See 'initAppState'.
         initialState <- maybeInitialState.fold(Effect[F].fail[S](BadRequestException(s"Top level state should exists. Snapshot for $qsid is corrupted")))(Effect[F].pure(_))
+        in <- incomingHub.newStream()
+        (incomingConsumed, incoming) = in.handleConsumed
         frontend = new Frontend[F](incoming)
         app = new ApplicationInstance[F, S, M](
           qsid,
@@ -157,7 +158,7 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
             for {
               _ <- Effect[F].start(handleStateChange(app, ehs))
               _ <- Effect[F].start(handleMessages(app, ehs))
-              _ <- Effect[F].start(handleAppOrWsOutgoingCloseOrTimeout(frontend, app, ehs))
+              _ <- Effect[F].start(handleAppOrWsOutgoingCloseOrTimeout(frontend, app, ehs, incomingConsumed))
             } yield ()
           }
           .start
