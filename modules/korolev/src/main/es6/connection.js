@@ -97,7 +97,7 @@ export class Connection {
   _connectUsingLongPolling() {
 
     let url = (this._useSSL ? "https://" : "http://") + this._hostPort;
-    let path = this._serverRootPath + `bridge/long-polling/${this._sessionId}`;
+    let path = this._serverRootPath + `bridge/long-polling/${this._sessionId}/`;
     let uriPrefix = url + path;
 
     /** @type {function(boolean)} */
