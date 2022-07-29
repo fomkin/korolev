@@ -14,14 +14,12 @@ export const ConnectionType = {
 export class Connection {
 
   /**
-   * @param {string} deviceId
    * @param {string} sessionId
    * @param {string} serverRootPath
    * @param {Location} location
    */
-  constructor(deviceId, sessionId, serverRootPath, location) {
+  constructor(sessionId, serverRootPath, location) {
     this._reconnect = true;
-    this._deviceId = deviceId;
     this._sessionId = sessionId;
     this._serverRootPath = serverRootPath;
 
@@ -80,7 +78,7 @@ export class Connection {
   _connectUsingWebSocket() {
 
     let url = (this._useSSL ? "wss://" : "ws://") + this._hostPort;
-    let path = this._serverRootPath + `bridge/web-socket/${this._deviceId}/${this._sessionId}`;
+    let path = this._serverRootPath + `bridge/web-socket/${this._sessionId}`;
     let uri = url + path;
 
     this._webSocket = new WebSocket(uri);
@@ -99,7 +97,7 @@ export class Connection {
   _connectUsingLongPolling() {
 
     let url = (this._useSSL ? "https://" : "http://") + this._hostPort;
-    let path = this._serverRootPath + `bridge/long-polling/${this._deviceId}/${this._sessionId}/`;
+    let path = this._serverRootPath + `bridge/long-polling/${this._sessionId}`;
     let uriPrefix = url + path;
 
     /** @type {function(boolean)} */

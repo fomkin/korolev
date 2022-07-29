@@ -1,6 +1,6 @@
 import { Connection } from './connection.js';
 import { Bridge, setProtocolDebugEnabled } from './bridge.js';
-import { ConnectionLostWidget, getDeviceId } from './utils.js';
+import { ConnectionLostWidget } from './utils.js';
 
 function showKorolevIsNotReadyMessage() {
   console.log("Korolev is not ready");
@@ -19,7 +19,6 @@ window.document.addEventListener("DOMContentLoaded", () => {
   let config = window['kfg'];
   let clw = new ConnectionLostWidget(config['clw']);
   let connection = new Connection(
-    getDeviceId(),
     config['sid'],
     config['r'],
     window.location

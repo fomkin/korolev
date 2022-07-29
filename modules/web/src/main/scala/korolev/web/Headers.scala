@@ -51,6 +51,6 @@ object Headers {
   final val UpgradeWebSocket = Upgrade -> "websocket"
 
   def setCookie(cookie: String, value: String, path: String, maxAge: Int): (String, String) =
-    SetCookie -> s"$cookie=$value; Path=$path; Max-Age=$maxAge; SameSite=Lax"
+    SetCookie -> s"$cookie=$value; Path=$path; Max-Age=$maxAge; SameSite=Lax; HttpOnly"
 
 }

@@ -32,32 +32,32 @@ private[korolev] final class KorolevServiceImpl[F[_]: Effect](http: PartialFunct
     extends KorolevService[F] {
 
   def http(request: HttpRequest[F]): F[HttpResponse[F]] = {
-    request.pq match {
+    (request.cookie(Cookies.DeviceId), request.pq) match {
 
       // Static files
-      case Root / "static" =>
+      case _ -> Root / "static" =>
         commonService.notFoundResponseF
-      case path if path.startsWith("static") =>
+      case _ -> path if path.startsWith("static") =>
         filesService.resourceFromClasspath(path)
 
       // Long polling
-      case Root / "bridge" / "long-polling" / deviceId / sessionId / "publish" =>
+      case Some(deviceId) -> Root / "bridge" / "long-polling" / sessionId / "publish" =>
         messagingService.longPollingPublish(Qsid(deviceId, sessionId), request.body)
-      case Root / "bridge" / "long-polling" / deviceId / sessionId / "subscribe" =>
+      case Some(deviceId) -> Root / "bridge" / "long-polling" / sessionId / "subscribe" =>
         messagingService.longPollingSubscribe(Qsid(deviceId, sessionId), request)
 
       // Data for app given via POST requests
-      case Root / "bridge" / deviceId / sessionId / "form-data" / descriptor =>
+      case Some(deviceId) -> Root / "bridge" / sessionId / "form-data" / descriptor =>
         postService.formData(Qsid(deviceId, sessionId), descriptor, request.headers, request.body)
-      case Root / "bridge" / deviceId / sessionId / "file" / descriptor / "info" =>
+      case Some(deviceId) -> Root / "bridge" / sessionId / "file" / descriptor / "info" =>
         postService.filesInfo(Qsid(deviceId, sessionId), descriptor, request.body)
-      case Root / "bridge" / deviceId / sessionId / "file" / descriptor / _ =>
+      case Some(deviceId) -> Root / "bridge" / sessionId / "file" / descriptor / _ =>
         postService.downloadFile(Qsid(deviceId, sessionId), descriptor)
-      case Root / "bridge" / deviceId / sessionId / "file" / descriptor =>
+      case Some(deviceId) -> Root / "bridge" / sessionId / "file" / descriptor =>
         postService.uploadFile(Qsid(deviceId, sessionId), descriptor, request.headers, request.body)
 
       // Server side rendering
-      case path if path == Root || ssrService.canBeRendered(request.pq) =>
+      case _ -> path if path == Root || ssrService.canBeRendered(request.pq) =>
         ssrService.serverSideRenderedPage(request)
 
       // Not found
@@ -67,8 +67,8 @@ private[korolev] final class KorolevServiceImpl[F[_]: Effect](http: PartialFunct
   }
 
   def ws(request: WebSocketRequest[F]): F[WebSocketResponse[F]] = {
-    request.pq match {
-      case Root / "bridge" / "web-socket" / deviceId / sessionId =>
+    (request.cookie(Cookies.DeviceId), request.pq) match {
+      case (Some(deviceId), Root / "bridge" / "web-socket" / sessionId) =>
         messagingService.webSocketMessaging(Qsid(deviceId, sessionId), request, request.body)
       case _ =>
         webSocketBadRequestF
@@ -76,7 +76,7 @@ private[korolev] final class KorolevServiceImpl[F[_]: Effect](http: PartialFunct
   }
 
   private val webSocketBadRequestF = {
-    val error = BadRequestException("Wrong path. Should be '/bridge/web-socket/<device>/<session>'.")
+    val error = BadRequestException("Malformed request. Headers MUST contain deviceId cookie. Path MUST be '/bridge/web-socket/<session>'.")
     Effect[F].fail[WebSocketResponse[F]](error)
   }
 }

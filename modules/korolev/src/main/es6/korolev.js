@@ -1,4 +1,4 @@
-import { getDeviceId, encodeRFC5987ValueChars } from './utils.js';
+import { encodeRFC5987ValueChars } from './utils.js';
 
 /** @enum {number} */
 export const CallbackType = {
@@ -334,10 +334,8 @@ export class Korolev {
     var form = self.els[id];
     var formData = new FormData(form);
     var request = new XMLHttpRequest();
-    var deviceId = getDeviceId();
     var uri = self.config['r'] +
       'bridge' +
-      '/' + deviceId +
       '/' + self.config['sid'] +
       '/form-data' +
       '/' + descriptor;
@@ -356,11 +354,9 @@ export class Korolev {
   listFiles(id, descriptor) {
     let self = this;
     let input = self.els[id];
-    let deviceId = getDeviceId();
     let files = [];
     let uri = self.config['r'] +
       'bridge' +
-      '/' + deviceId +
       '/' + self.config['sid'] +
       '/file' +
       '/' + descriptor;
@@ -381,10 +377,8 @@ export class Korolev {
   uploadFile(id, descriptor, fileName) {
     let self = this;
     let input = self.els[id];
-    let deviceId = getDeviceId();
     let uri = self.config['r'] +
         'bridge' +
-        '/' + deviceId +
         '/' + self.config['sid'] +
         '/file' +
         '/' + descriptor;
@@ -407,14 +401,12 @@ export class Korolev {
 
   downloadFile(descriptor, name) {
     const self = this;
-    const deviceId = getDeviceId();
     const a = document.createElement('a');
     document.body.appendChild(a);
     a.style.display = 'none';
     a.download = name;
     a.href = self.config['r'] +
       'bridge' +
-      '/' + deviceId +
       '/' + self.config['sid'] +
       '/file' +
       '/' + descriptor +

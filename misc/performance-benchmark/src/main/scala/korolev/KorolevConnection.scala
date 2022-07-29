@@ -5,6 +5,7 @@ import akka.actor.ActorSystem
 import akka.actor.typed.{ActorRef, Behavior, Terminated}
 import akka.actor.typed.scaladsl.Behaviors
 import akka.http.scaladsl.Http
+import akka.http.scaladsl.model.headers.Cookie
 import akka.http.scaladsl.model.headers.`Set-Cookie`
 import akka.http.scaladsl.model.ws._
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse, StatusCodes}
@@ -98,11 +99,12 @@ object KorolevConnection {
           val protocol = if (ssl) "wss" else "ws"
           val deviceId = connectionInfo.deviceId
           val sessionId = connectionInfo.sessionId
-          val uri = s"$protocol://$host:$port${escapedPath}bridge/web-socket/$deviceId/$sessionId"
+          val uri = s"$protocol://$host:$port${escapedPath}bridge/web-socket/$sessionId"
+          val request = WebSocketRequest(uri, extraHeaders = Seq(Cookie(Cookies.DeviceId, deviceId)))
 
           Source
             .queue[Message](1024, OverflowStrategy.backpressure)
-            .viaMat(Http().webSocketClientFlow(WebSocketRequest(uri)))(Keep.both)
+            .viaMat(Http().webSocketClientFlow(request))(Keep.both)
             .viaMat(KillSwitches.single)(Keep.both)
             .toMat(incoming)(Keep.both)
             .run()
