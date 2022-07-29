@@ -63,7 +63,7 @@ object BodyFactory {
   implicit def streamedBodyFactory[F[_]: Effect, A, B](implicit bf: BodyFactory[F, A, B]): BodyFactory[F, A, Stream[F, B]] =
     new StreamedBodyFactory[F, A, B]()
 
-  implicit def streamedEmptyBodyFactory[F[_], A]: EmptyBodyFactory[Stream[F, A]] = new EmptyBodyFactory[Stream[F, A]] {
+  implicit def streamedEmptyBodyFactory[F[_]: Effect, A]: EmptyBodyFactory[Stream[F, A]] = new EmptyBodyFactory[Stream[F, A]] {
     val emptyBody: Body[Stream[F, A]] =
       Body(Stream.empty, Map.empty, None)
   }

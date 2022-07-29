@@ -35,29 +35,29 @@ private[korolev] final class KorolevServiceImpl[F[_]: Effect](http: PartialFunct
     (request.cookie(Cookies.DeviceId), request.pq) match {
 
       // Static files
-      case _ -> Root / "static" =>
+      case (_, Root / "static") =>
         commonService.notFoundResponseF
-      case _ -> path if path.startsWith("static") =>
+      case (_, path) if path.startsWith("static") =>
         filesService.resourceFromClasspath(path)
 
       // Long polling
-      case Some(deviceId) -> Root / "bridge" / "long-polling" / sessionId / "publish" =>
+      case (Some(deviceId), Root / "bridge" / "long-polling" / sessionId / "publish") =>
         messagingService.longPollingPublish(Qsid(deviceId, sessionId), request.body)
-      case Some(deviceId) -> Root / "bridge" / "long-polling" / sessionId / "subscribe" =>
+      case (Some(deviceId), Root / "bridge" / "long-polling" / sessionId / "subscribe") =>
         messagingService.longPollingSubscribe(Qsid(deviceId, sessionId), request)
 
       // Data for app given via POST requests
-      case Some(deviceId) -> Root / "bridge" / sessionId / "form-data" / descriptor =>
+      case (Some(deviceId), Root / "bridge" / sessionId / "form-data" / descriptor) =>
         postService.formData(Qsid(deviceId, sessionId), descriptor, request.headers, request.body)
-      case Some(deviceId) -> Root / "bridge" / sessionId / "file" / descriptor / "info" =>
+      case (Some(deviceId), Root / "bridge" / sessionId / "file" / descriptor / "info") =>
         postService.filesInfo(Qsid(deviceId, sessionId), descriptor, request.body)
-      case Some(deviceId) -> Root / "bridge" / sessionId / "file" / descriptor / _ =>
+      case (Some(deviceId), Root / "bridge" / sessionId / "file" / descriptor / _) =>
         postService.downloadFile(Qsid(deviceId, sessionId), descriptor)
-      case Some(deviceId) -> Root / "bridge" / sessionId / "file" / descriptor =>
+      case (Some(deviceId), Root / "bridge" / sessionId / "file" / descriptor) =>
         postService.uploadFile(Qsid(deviceId, sessionId), descriptor, request.headers, request.body)
 
       // Server side rendering
-      case _ -> path if path == Root || ssrService.canBeRendered(request.pq) =>
+      case (_, path) if path == Root || ssrService.canBeRendered(request.pq) =>
         ssrService.serverSideRenderedPage(request)
 
       // Not found
