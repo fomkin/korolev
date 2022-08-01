@@ -45,7 +45,7 @@ object Reporter {
 
   final object PrintReporter extends Reporter {
 
-    var level: Level.Value = Level.Info
+    var level: Level.Value = Level.Debug
 
     def error(message: String, error: Throwable): Unit = if (level <= Level.Error) {
       println(s"[ERROR] $message")

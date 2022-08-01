@@ -14,7 +14,12 @@ export class ConnectionLostWidget {
 
     // Parse template
     var element = document.createElement('div');
-    element.innerHTML = this._template;
+    element.innerHTML = this._template
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, "\"")
+      .replace(/&#039;/g, "'");
     element = element.children[0];
 
     // Append to document body

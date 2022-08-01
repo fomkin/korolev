@@ -90,7 +90,6 @@ private[korolev] final class MessagingService[F[_]: Effect](reporter: Reporter,
     * Sessions created via long polling subscription
     * takes messages from topics stored in this table.
     */
-  //TODO: Need figure out how to clean this Map on session destroy
   private val longPollingTopics = TrieMap.empty[Qsid, Queue[F, String]]
 
   /**
@@ -129,7 +128,9 @@ private[korolev] final class MessagingService[F[_]: Effect](reporter: Reporter,
     }
 
   private def createTopic(qsid: Qsid) = {
+    reporter.debug(s"Create long-polling topic for $qsid")
     val topic = Queue[F, String]()
+    topic.cancelSignal.runAsync(_ => longPollingTopics.remove(qsid))
     longPollingTopics.putIfAbsent(qsid, topic)
     topic.stream
   }

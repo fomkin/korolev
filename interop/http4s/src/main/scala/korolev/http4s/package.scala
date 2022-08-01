@@ -49,11 +49,14 @@ package object http4s {
     }
   }
 
+  private final val ConnectionHeader = CIString("Connection")
+  private final val UpgradeHeader = CIString("Upgrade")
+
   private def containsUpgradeHeader[F[_] : Effect : Concurrent](req: Request[F]): Boolean = {
     val headers = req.headers.headers
     val found = for {
-      _ <- headers.find(h => h.name.value.toLowerCase == "connection" && h.value.toLowerCase == "upgrade")
-      _ <- headers.find(h => h.name.value.toLowerCase == "upgrade" && h.value.toLowerCase == "websocket")
+      _ <- headers.find(h => h.name == ConnectionHeader && h.value.toLowerCase.indexOf("upgrade") > -1)
+      _ <- headers.find(h => h.name == UpgradeHeader && h.value.toLowerCase == "websocket")
     } yield {}
     found.isDefined
   }

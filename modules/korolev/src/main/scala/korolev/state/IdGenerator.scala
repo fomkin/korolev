@@ -27,12 +27,12 @@ trait IdGenerator[F[_]] {
 
 object IdGenerator {
 
-  val DefaultDeviceIdLength = 64
-  val DefaultSessionIdLength = 64
+  val DefaultDeviceIdLength = 16
+  val DefaultSessionIdLength = 8
 
   def default[F[_]](deviceIdLength: Int = DefaultDeviceIdLength,
-                     sessionIdLength: Int = DefaultSessionIdLength): IdGenerator[F] =
-    new DefaultIdGenerator[F](DefaultDeviceIdLength, DefaultSessionIdLength)
+                    sessionIdLength: Int = DefaultSessionIdLength): IdGenerator[F] =
+    new DefaultIdGenerator[F](deviceIdLength, sessionIdLength)
 
   private class DefaultIdGenerator[F[_]](deviceIdLength: Int,
                                           sessionIdLength: Int) extends IdGenerator[F] {

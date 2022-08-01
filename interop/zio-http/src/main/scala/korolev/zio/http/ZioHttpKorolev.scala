@@ -80,8 +80,8 @@ class ZioHttpKorolev[R] {
   private def containsUpgradeHeader(req: Request): Boolean = {
     val headers = req.headers.toList
     val found = for {
-      _ <- headers.find{ case (k, v) => k.toLowerCase == "connection" && v.toLowerCase == "upgrade"}
-      _ <- headers.find { case (k, v) => k.toLowerCase == "upgrade" && v.toLowerCase == "websocket"  }
+      _ <- headers.find{ case (k, v) => k.equalsIgnoreCase("connection") && v.toLowerCase.indexOf("upgrade") > -1 }
+      _ <- headers.find { case (k, v) => k.equalsIgnoreCase("upgrade") && v.toLowerCase == "websocket"  }
     } yield {}
     found.isDefined
   }
