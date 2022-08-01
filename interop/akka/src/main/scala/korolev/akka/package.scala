@@ -17,10 +17,10 @@
 package korolev
 
 import _root_.akka.actor.ActorSystem
-import _root_.akka.http.scaladsl.model._
+import _root_.akka.http.scaladsl.model.*
 import _root_.akka.http.scaladsl.model.headers.RawHeader
 import _root_.akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
-import _root_.akka.http.scaladsl.server.Directives._
+import _root_.akka.http.scaladsl.server.Directives.*
 import _root_.akka.http.scaladsl.server.Route
 import _root_.akka.stream.Materializer
 import _root_.akka.stream.scaladsl.{Flow, Keep, Sink}
@@ -28,9 +28,10 @@ import _root_.akka.util.ByteString
 import korolev.akka.util.LoggingReporter
 import korolev.data.Bytes
 import korolev.effect.{Effect, Reporter, Stream}
-import korolev.server.{KorolevService, KorolevServiceConfig, HttpRequest => KorolevHttpRequest}
+import korolev.server.internal.BadRequestException
+import korolev.server.{KorolevService, KorolevServiceConfig, HttpRequest as KorolevHttpRequest}
 import korolev.state.{StateDeserializer, StateSerializer}
-import korolev.web.{PathAndQuery, Request => KorolevRequest, Response => KorolevResponse}
+import korolev.web.{PathAndQuery, Request as KorolevRequest, Response as KorolevResponse}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -104,6 +105,9 @@ package object akka {
                 )
               case _ =>
                 throw new RuntimeException // cannot happen
+            }.recover {
+              case BadRequestException(message) =>
+                HttpResponse(StatusCodes.BadRequest, entity = HttpEntity(message))
             }
           }
         }

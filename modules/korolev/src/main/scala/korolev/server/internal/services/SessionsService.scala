@@ -16,7 +16,6 @@
 
 package korolev.server.internal.services
 
-import korolev.effect.Effect.Fiber
 import korolev.effect.syntax.*
 import korolev.effect.{AsyncTable, Effect, Hub, Scheduler, Stream, Var}
 import korolev.internal.{ApplicationInstance, Frontend}
@@ -64,53 +63,57 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
     apps.getImmediately(qsid)
 
   def createAppIfNeeded(qsid: Qsid, rh: Head, incomingStream: Stream[F, String]): F[Unit] = {
-    val incomingHub: Hub[F, String] = Hub(incomingStream)
+    val (incomingConsumed, managedIncomingStream) = incomingStream.handleConsumed
+    val incomingHub: Hub[F, String] = Hub(managedIncomingStream)
 
-    def handleAppOrWsOutgoingCloseOrTimeout(frontend: Frontend[F], app: App, ehs: ExtensionsHandlers, incomingConsumed: F[Unit]): F[Unit] = {
+    def handleAppOrWsOutgoingCloseOrTimeout(frontend: Frontend[F], app: App, ehs: ExtensionsHandlers): F[Unit] = {
+
       val consumed: F[Unit] = Effect[F].promise[Unit] { cb =>
         val invoked = new AtomicBoolean(false)
-        val invokeOnce: Either[Throwable, Unit] => Unit = (x: Either[Throwable, Unit]) =>
-          if (invoked.compareAndSet(false, true)) cb(x)
+        def invokeOnce(reason: String): Either[Throwable, Unit] => Unit = (x: Either[Throwable, Unit]) =>
+          if (invoked.compareAndSet(false, true)) {
+            config.reporter.debug(s"Session $qsid closed due $reason")
+            cb(x)
+          }
 
-        handleCommunicationTimeout().runAsync(invokeOnce)
-        frontend.outgoingConsumed.runAsync(invokeOnce)
-        incomingConsumed.runAsync(invokeOnce)
+        def handleCommunicationTimeout(): F[Unit] = {
+          def createTimeout(stream: Stream[F, String]): F[Scheduler.JobHandler[F, Unit]] = {
+            scheduler.scheduleOnce(config.sessionIdleTimeout) {
+              invokeOnce("session idle timeout")(Right(()))
+              stream.cancel()
+            }
+          }
+
+          for {
+            in <- incomingHub.newStream()
+            initialTimeout <- createTimeout(in)
+            _ = config.reporter.debug(s"Create idle timeout for $qsid")
+            schedulerVar = Var[F, Scheduler.JobHandler[F, Unit]](initialTimeout)
+            _ = in.foreach { _ =>
+              config.reporter.debug(s"Reset idle timeout for $qsid")
+              for {
+                currentTimer <- schedulerVar.get
+                _ <- currentTimer.cancel()
+                timeout <- createTimeout(in)
+                _ <- schedulerVar.set(timeout)
+              } yield ()
+            }
+          } yield ()
+        }
+
+        handleCommunicationTimeout().runSyncForget
+        incomingConsumed.runAsync(invokeOnce("due connection close"))
       }
 
       for {
         _ <- consumed
+        _ <- incomingStream.cancel()
         _ <- frontend.outgoingMessages.cancel()
         _ <- app.topLevelComponentInstance.destroy()
         _ <- ehs.map(_.onDestroy()).sequence
         _ <- Effect[F].delay(stateStorage.remove(qsid.deviceId, qsid.sessionId))
         _ <- apps.remove(qsid)
       } yield ()
-    }
-
-    def handleCommunicationTimeout(): F[Unit] = {
-      def createTimeout(cb: Either[Throwable, Unit] => Unit, stream: Stream[F, String]): F[Fiber[F, Scheduler.JobHandler[F, Unit]]] = {
-        scheduler.scheduleOnce(config.sessionTimeout)({
-          Effect[F].unit.runAsync(cb)
-          stream.cancel()
-        }).start
-      }
-
-      Effect[F].promise[Unit] { cb =>
-        for {
-          in <- incomingHub.newStream()
-          initialTimeout <- createTimeout(cb, in)
-          schedulerVar = Var[F, Fiber[F, Scheduler.JobHandler[F, Unit]]](initialTimeout)
-          _ = in.foreach { _ =>
-            for {
-              currentTimerF <- schedulerVar.get
-              currentTimer <- currentTimerF.join()
-              _ <- currentTimer.cancel()
-              timeout <- createTimeout(cb, in)
-              _ = schedulerVar.set(timeout)
-            } yield ()
-          }
-        } yield ()
-      }
     }
 
     def handleStateChange(app: App, ehs: ExtensionsHandlers): F[Unit] = {
@@ -129,15 +132,15 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
           ehs.map(_.onMessage(m)).sequence.unit
         }
 
-    def create(): F[ApplicationInstance[F, S, M]] =
+    def create(): F[ApplicationInstance[F, S, M]] = {
+      config.reporter.debug(s"Create session $qsid")
       for {
         stateManager <- stateStorage.get(qsid.deviceId, qsid.sessionId)
         maybeInitialState <- stateManager.read[S](levsha.Id.TopLevel)
         // Top level state should exists. See 'initAppState'.
         initialState <- maybeInitialState.fold(Effect[F].fail[S](BadRequestException(s"Top level state should exists. Snapshot for $qsid is corrupted")))(Effect[F].pure(_))
         in <- incomingHub.newStream()
-        (incomingConsumed, incoming) = in.handleConsumed
-        frontend = new Frontend[F](incoming)
+        frontend = new Frontend[F](in)
         app = new ApplicationInstance[F, S, M](
           qsid,
           frontend,
@@ -158,7 +161,7 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
             for {
               _ <- Effect[F].start(handleStateChange(app, ehs))
               _ <- Effect[F].start(handleMessages(app, ehs))
-              _ <- Effect[F].start(handleAppOrWsOutgoingCloseOrTimeout(frontend, app, ehs, incomingConsumed))
+              _ <- Effect[F].start(handleAppOrWsOutgoingCloseOrTimeout(frontend, app, ehs))
             } yield ()
           }
           .start
@@ -166,6 +169,7 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
       } yield {
         app
       }
+    }
 
     stateStorage.exists(qsid.deviceId, qsid.sessionId) flatMap {
       case true =>

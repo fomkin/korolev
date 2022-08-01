@@ -61,7 +61,7 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
       case _                               => 2
     }
 
-  val (outgoingConsumed, outgoingMessages: Stream[F, String]) = outgoingQueue.stream.handleConsumed
+  val outgoingMessages: Stream[F, String] = outgoingQueue.stream
 
   val domEventMessages: Stream[F, Frontend.DomEventMessage] =
     rawDomEvents.map {

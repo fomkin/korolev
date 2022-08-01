@@ -21,7 +21,6 @@ import korolev.effect.Effect
 import korolev.server.internal.services._
 import korolev.server._
 import korolev.web.PathAndQuery._
-import korolev.web.Request
 
 private[korolev] final class KorolevServiceImpl[F[_]: Effect](http: PartialFunction[HttpRequest[F], F[HttpResponse[F]]],
                                                               commonService: CommonService[F],
