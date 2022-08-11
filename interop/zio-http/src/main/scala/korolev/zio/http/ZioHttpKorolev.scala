@@ -14,7 +14,8 @@ import korolev.web.{PathAndQuery as PQ, Request as KorolevRequest, Response as K
 import korolev.zio.Zio2Effect
 import korolev.zio.streams.*
 import zhttp.service.ChannelEvent
-import zhttp.service.ChannelEvent.{ChannelRead, ChannelRegistered}
+import zhttp.service.ChannelEvent.UserEvent.HandshakeComplete
+import zhttp.service.ChannelEvent.{ChannelRead, ChannelRegistered, ChannelUnregistered, UserEventTriggered}
 
 
 class ZioHttpKorolev[R] {
@@ -80,7 +81,7 @@ class ZioHttpKorolev[R] {
   private def containsUpgradeHeader(req: Request): Boolean = {
     val headers = req.headers.toList
     val found = for {
-      _ <- headers.find{ case (k, v) => k.equalsIgnoreCase("connection") && v.toLowerCase.indexOf("upgrade") > -1 }
+      _ <- headers.find { case (k, v) => k.equalsIgnoreCase("connection") && v.toLowerCase.indexOf("upgrade") > -1 }
       _ <- headers.find { case (k, v) => k.equalsIgnoreCase("upgrade") && v.toLowerCase == "websocket"  }
     } yield {}
     found.isDefined
@@ -93,14 +94,12 @@ class ZioHttpKorolev[R] {
 
     val fromClientKQueue = Queue[RIO[R, *], String]()
     val korolevRequest = mkKorolevRequest[KStream[RIO[R, *], String]](req, fullPath, fromClientKQueue.stream)
-
     for {
       response <- korolevServer.ws(korolevRequest)
-
       toClient = response match {
         case KorolevResponse(_, outStream, _, _) =>
           outStream
-            .map(out => WebSocketFrame.Text(out))
+            .map( out => WebSocketFrame.Text(out))
             .toZStream
         case null =>
           throw new RuntimeException
@@ -117,12 +116,14 @@ class ZioHttpKorolev[R] {
                          ): RIO[R, Response] = {
 
     val app = Http.collectZIO[WebSocketChannelEvent] {
-      case ChannelEvent(channel,ChannelRegistered) =>
-        toClientStream.mapZIO(frame => channel.writeAndFlush(frame)).runDrain.fork
+      case ChannelEvent(channel,UserEventTriggered(HandshakeComplete)) =>
+        toClientStream.mapZIO(frame => channel.writeAndFlush(frame)).runDrain
       case ChannelEvent(_, ChannelRead(WebSocketFrame.Text(t))) =>
         fromClientKQueue.offer(t)
       case ChannelEvent(_, ChannelRead(WebSocketFrame.Close(_, _))) =>
         fromClientKQueue.close()
+      case ChannelEvent(channel, ChannelUnregistered) =>
+        ZIO.unit
       case frame =>
         ZIO.fail(new Exception(s"Invalid frame type ${frame.getClass.getName}"))
     }.toSocketApp
@@ -180,7 +181,7 @@ class ZioHttpKorolev[R] {
       ZStreamOps[R, ByteBuf](data.toByteBufStream).toKorolev(eff)
         .map { kStream =>
           kStream.map(bytes => Bytes.wrap(bytes.toArray.flatMap(ByteBufUtil.getBytes(_))))
-        }.asInstanceOf[RIO[R, KStream[RIO[R, *], Bytes]]]
+        }
     }
   }
 
