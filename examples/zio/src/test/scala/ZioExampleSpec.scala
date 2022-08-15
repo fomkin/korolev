@@ -1,6 +1,7 @@
+import korolev.effect.Effect
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should.Matchers
-import korolev.testkit._
+import korolev.testkit.*
 import zio.Task
 
 class ZioExampleSpec extends AsyncFlatSpec with Matchers {
@@ -11,7 +12,7 @@ class ZioExampleSpec extends AsyncFlatSpec with Matchers {
     .value(aInput, "2")
     .value(bInput, "3")
 
-  "onChange" should "read inputs and put calculation result to the view state" in runtime.unsafeRunToFuture {
+  "onChange" should "read inputs and put calculation result to the view state" in Effect[Task].toFuture {
     browser
       .access[Task, Option[Int], Any](Option.empty[Int], onChange)
       .map { actions =>
@@ -21,7 +22,7 @@ class ZioExampleSpec extends AsyncFlatSpec with Matchers {
       }
   }
 
-  it should "be handled" in runtime.unsafeRunToFuture {
+  it should "be handled" in Effect[Task].toFuture {
     browser.event(Option.empty[Int],
       renderForm(None),
       "input",

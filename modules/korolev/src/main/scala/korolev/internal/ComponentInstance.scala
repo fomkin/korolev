@@ -20,14 +20,13 @@ import korolev.*
 import korolev.effect.{Effect, Queue, Reporter, Scheduler, Stream}
 import korolev.effect.syntax.*
 import korolev.state.{StateDeserializer, StateManager, StateSerializer}
-import levsha.Document.Node
-import levsha.{Id, StatefulRenderContext, XmlNs}
+import levsha.{Id, StatefulRenderContext}
 import levsha.events.EventId
 
 import scala.collection.mutable
 import Context.*
 import korolev.data.Bytes
-import korolev.util.JsCode
+import korolev.util.{JsCode, Lens}
 import korolev.web.FormData
 
 import scala.concurrent.ExecutionContext
@@ -59,7 +58,7 @@ final class ComponentInstance
      stateManager: StateManager[F],
      getRenderNum: () => Int,
      val component: Component[F, CS, P, E],
-     stateQueue: Queue[F, (Id, Any)],
+     stateQueue: Queue[F, (Id, Any, Option[Effect.Promise[Unit]])],
      createMiscProxy: (StatefulRenderContext[Binding[F, AS, M]], (StatefulRenderContext[Binding[F, CS, E]], Binding[F, CS, E]) => Unit) => StatefulRenderContext[Binding[F, CS, E]],
      scheduler: Scheduler[F],
      reporter: Reporter,
@@ -81,11 +80,11 @@ final class ComponentInstance
   // Why we use '() => F[Unit]'? Because should
   // support scala.concurrent.Future which is has
   // strict semantic (runs immediately).
-  private val immediatePendingEffects = Queue[F, () => F[Unit]]()
+  private val pendingEffects = Queue[F, () => F[Unit]]()
 
   @volatile private var eventSubscription = Option.empty[E => _]
 
-  private[korolev] object browserAccess extends Access[F, CS, E] {
+  private[korolev] object browserAccess extends BaseAccessDefault[F, CS, E] {
 
     private def getId(elementId: ElementId): F[Id] = Effect[F].delay {
       unsafeGetId(elementId)
@@ -106,9 +105,6 @@ final class ComponentInstance
         }
       }
     }
-
-    def imap[S2](read: PartialFunction[CS, S2], write: PartialFunction[(CS, S2), CS]): Access[F, S2, E] =
-      new MappedAccess[F, CS, S2, E](this, read, write)
 
     def property(elementId: ElementId): PropertyHandler[F] = {
       val idF = getId(elementId)
@@ -140,9 +136,10 @@ final class ComponentInstance
 
     def sessionId: F[Qsid] = Effect[F].delay(self.sessionId)
 
-    def transition(f: Transition[CS]): F[Unit] = applyTransition(f, sync = false)
-
-    def syncTransition(f: Transition[CS]): F[Unit] = applyTransition(f, sync = true)
+    def transition(f: Transition[CS]): F[Unit] = applyTransition(x => Effect[F].pure(f(x)))
+    def transitionForce(f: Transition[CS]): F[Unit] = applyTransitionForce(x => Effect[F].pure(f(x)))
+    def transitionAsync(f: TransitionAsync[F, CS]): F[Unit] = applyTransition(f)
+    def transitionForceAsync(f: TransitionAsync[F, CS]): F[Unit] = applyTransitionForce(f)
 
     def downloadFormData(element: ElementId): F[FormData] =
       for {
@@ -273,16 +270,29 @@ final class ComponentInstance
     node(proxy)
   }
 
-  def applyTransition(transition: Transition[CS], sync: Boolean): F[Unit] = {
+  private def applyTransitionEffect(transition: TransitionAsync[F, CS]): F[CS] =
+    for {
+      state <- stateManager.read[CS](nodeId)
+      newState <- transition(state.getOrElse(component.initialState))
+      _ <- stateManager.write(nodeId, newState)
+    } yield newState
+
+  private def applyTransition(transition: TransitionAsync[F, CS]): F[Unit] = {
     val effect = () =>
       for {
-        state <- stateManager.read[CS](nodeId)
-        newState = transition(state.getOrElse(component.initialState))
-        _ <- stateManager.write(nodeId, newState)
-        _ <- stateQueue.enqueue(nodeId, newState)
+        newState <- applyTransitionEffect(transition)
+        _ <- stateQueue.enqueue(nodeId, newState, None)
       } yield ()
-    if (sync) effect()
-    else immediatePendingEffects.enqueue(effect)
+    pendingEffects.enqueue(effect)
+  }
+
+  private def applyTransitionForce(transition: TransitionAsync[F, CS]): F[Unit] = Effect[F].promiseF[Unit] { cb =>
+    val effect = () =>
+      for {
+        newState <- applyTransitionEffect(transition)
+        _ <- stateQueue.enqueue(nodeId, newState, Some(cb))
+      } yield ()
+    pendingEffects.enqueue(effect)
   }
 
   def applyEvent(eventId: EventId): Boolean = {
@@ -355,14 +365,14 @@ final class ComponentInstance
   }
 
   /**
-    * Close 'immediatePendingEffects' in this component and
+    * Close 'pendingEffects' in this component and
     * all nested components.
     *
     * MUST be invoked after closing connection.
     */
   def destroy(): F[Unit] =
     for {
-      _ <- immediatePendingEffects.close()
+      _ <- pendingEffects.close()
       _ <- nestedComponents
         .values
         .toList
@@ -372,13 +382,13 @@ final class ComponentInstance
     } yield ()
 
   protected def unsafeInitialize(): Unit =
-    immediatePendingEffects.stream
+    pendingEffects.stream
       .foreach(_.apply())
       .runAsyncForget
 
   // Execute effects sequentially
   def initialize()(implicit ec: ExecutionContext): F[Effect.Fiber[F, Unit]] =
-    Effect[F].start(immediatePendingEffects.stream.foreach(_.apply()))
+    Effect[F].start(pendingEffects.stream.foreach(_.apply()))
 }
 
 private object ComponentInstance {

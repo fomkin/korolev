@@ -714,6 +714,27 @@ Now you have context scoped to Tab2. If this context is imported, you will have 
 
 Sometimes, being in context scope, you need to apply a transition to all state. In this case, you can handle an event using `eventUnscoped` method of the context. You will get `UnscopedAccess` which ignores current context scope.
 
+Also you can use similar approach on transition level.
+
+[source,scala]
+-------------------------------------------------------------------------------
+
+import korolev.util.Lens
+
+val scopedContext = Lens[ViewState, Tab2](
+  read = { case ViewState(tab: Tab2) => tab },
+  write = { case (orig, s) => orig.copy(tab = s) }
+)
+
+// ...
+
+access.transition(lens) { tab2 =>
+  tab2.copy(...)
+}
+-------------------------------------------------------------------------------
+
+
+
 https://github.com/fomkin/korolev/blob/v1.4.0/examples/context-scope/src/main/scala/ContextScopeExample.scala[See full example]
 
 == Testing Korolev applications

@@ -114,10 +114,10 @@ object Context {
 
   trait BaseAccess[F[_], S, M] {
 
-    def imap[S2](lens: Lens[S, S2]): Access[F, S2, M] =
-      imap(lens.read, lens.write)
+    def imap[S2](lens: Lens[S, S2]): Access[F, S2, M]
 
-    def imap[S2](map: PartialFunction[S, S2], contramap: PartialFunction[(S, S2), S]): Access[F, S2, M]
+    def imap[S2](map: PartialFunction[S, S2], contramap: PartialFunction[(S, S2), S]): Access[F, S2, M] =
+      imap(Lens(map, contramap))
 
     /**
       * Extracts property of element from client-side DOM.
@@ -240,12 +240,39 @@ object Context {
       */
     def transition(f: Transition[S]): F[Unit]
 
-    /**
-      * Applies transition to current state
-      * and awaits render.
-      */
-    def syncTransition(f: Transition[S]): F[Unit]
+    def transition[B](lens: Lens[S, B])(f: Transition[B]): F[Unit]
 
+    /**
+     * Applies asynchronous transition to current state. All transitions
+     * will wait until this transition will executed.
+     *
+     * NOTE: Do not use this method id you work with effects
+     * which take lot of time for execution. It's may lead to hanging
+     * of your app.
+     * @return
+     */
+    def transitionAsync(f: TransitionAsync[F, S]): F[Unit]
+
+    def transitionAsync[B](lens: Lens[S, B])(f: TransitionAsync[F, B]): F[Unit]
+
+    /**
+     * Applies transition to current state and awaits render.
+     */
+    def transitionForce(f: Transition[S]): F[Unit]
+
+    def transitionForce[B](lens: Lens[S, B])(f: Transition[B]): F[Unit]
+
+    /**
+     * @see [[transitionForce]]
+     * @see [[transitionAsync]]
+     */
+    def transitionForceAsync(f: TransitionAsync[F, S]): F[Unit]
+    def transitionForceAsync[B](lens: Lens[S, B])(f: TransitionAsync[F, B]): F[Unit]
+
+    @deprecated("Use transitionForce instead", since = "1.5.0")
+    def syncTransition(f: Transition[S]): F[Unit] = transitionForce(f)
+
+    // TODO maybeTransitionAsync, maybeTransitionForceAsync
     /**
       * Applies transition to current state.
       */
@@ -304,8 +331,34 @@ object Context {
     */
   trait Access[F[_], S, M] extends BaseAccess[F, S, M] with EventAccess[F, S, M]
 
-  class MappedAccess[F[_]: Effect, S1, SN, E](self: Access[F, S1, E], read: PartialFunction[S1, SN], write: PartialFunction[(S1, SN), S1]) extends Access[F, SN, E] {
-    def imap[S2](read: PartialFunction[SN, S2], write: PartialFunction[(SN, S2), SN]): Access[F, S2, E] = new MappedAccess[F, SN, S2, E](this, read, write)
+  private[korolev] abstract class BaseAccessDefault[F[_]: Effect, S, M] extends Access[F, S, M] {
+
+    import korolev.effect.syntax._
+
+    def imap[S2](lens: Lens[S, S2]): Access[F, S2, M] = new MappedAccess[F, S, S2, M](this, lens)
+
+    def transitionAsync[B](lens: Lens[S, B])(f: TransitionAsync[F, B]): F[Unit] =
+      transitionAsync(transitionAsyncWithLens(lens, f))
+
+    def transitionForceAsync[B](lens: Lens[S, B])(f: TransitionAsync[F, B]): F[Unit] =
+      transitionAsync(transitionAsyncWithLens(lens, f))
+
+    def transition[B](lens: Lens[S, B])(f: Transition[B]): F[Unit] =
+      transition(x => lens.modify(x)(f))
+
+    def transitionForce[B](lens: Lens[S, B])(f: Transition[B]): F[Unit] =
+      transitionForce(x => lens.modify(x)(f))
+
+    private def transitionAsyncWithLens[B](lens: Lens[S, B], f: TransitionAsync[F, B]): TransitionAsync[F, S] = a =>
+      lens.get(a).fold(Effect[F].pure(a)) { b =>
+        f(b).map(b2 => lens.modify(a)(_ => b2))
+      }
+  }
+
+  class MappedAccess[F[_]: Effect, S1, SN, E](self: Access[F, S1, E], lens: Lens[S1, SN]) extends Access[F, SN, E] { mapped =>
+    private final val read = lens.read
+    private final val write = lens.write
+    def imap[S2](lens: Lens[SN, S2]): Access[F, S2, E] = new MappedAccess[F, SN, S2, E](this, lens)
     def eventData: F[String] = self.eventData
     def property(id: Context.ElementId): PropertyHandler[F] = self.property(id)
     def focus(id: Context.ElementId): F[Unit] = self.focus(id)
@@ -318,8 +371,14 @@ object Context {
     def uploadFile(name: String, stream: Stream[F, Bytes], size: Option[Long], mimeType: String): F[Unit] = self.uploadFile(name, stream, size, mimeType)
     def resetForm(id: Context.ElementId): F[Unit] = self.resetForm(id)
     def state: F[SN] = Effect[F].map(self.state)(read)
-    def transition(f: korolev.Transition[SN]): F[Unit] = self.transition(s => write((s, f(read(s)))))
-    def syncTransition(f: korolev.Transition[SN]): F[Unit] = self.syncTransition(s => write((s, f(read(s)))))
+    def transition(f: korolev.Transition[SN]): F[Unit] = self.transition(this.lens)(f)
+    def transition[B](lens: Lens[SN, B])(f: Transition[B]): F[Unit] = self.transition(this.lens ++ lens)(f)
+    def transitionAsync(f: TransitionAsync[F, SN]): F[Unit] = self.transitionAsync(this.lens)(f)
+    def transitionAsync[B](lens: Lens[SN, B])(f: TransitionAsync[F, B]): F[Unit] = self.transitionAsync(this.lens ++ lens)(f)
+    def transitionForce(f: Transition[SN]): F[Unit] = self.transitionForce(this.lens)(f)
+    def transitionForce[B](lens: Lens[SN, B])(f: Transition[B]): F[Unit] = self.transitionForce(this.lens ++ lens)(f)
+    def transitionForceAsync(f: TransitionAsync[F, SN]): F[Unit] = self.transitionForceAsync(this.lens)(f)
+    def transitionForceAsync[B](lens: Lens[SN, B])(f: TransitionAsync[F, B]): F[Unit] = self.transitionForceAsync(this.lens ++ lens)(f)
     def sessionId: F[Qsid] = self.sessionId
     def evalJs(code: JsCode): F[String] = self.evalJs(code)
     def registerCallback(name: String)(f: String => F[Unit]): F[Unit] = self.registerCallback(name)(f)
@@ -356,7 +415,7 @@ object Context {
                        eventRegistry: EventRegistry[F],
                        stateManager: StateManager[F],
                        getRenderNum: () => Int,
-                       stateQueue: Queue[F, (Id, Any)],
+                       stateQueue: Queue[F, (Id, Any, Option[Effect.Promise[Unit]])],
                        scheduler: Scheduler[F],
                        reporter: Reporter,
                        recovery: PartialFunction[Throwable, F[Unit]]): ComponentInstance[F, AS, M, CS, P, E] = {

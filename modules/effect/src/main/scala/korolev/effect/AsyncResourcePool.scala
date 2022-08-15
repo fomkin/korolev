@@ -29,7 +29,7 @@ class AsyncResourcePool[F[_] : Effect, T: Close[F, *]](name: String,
           val id = System.identityHashCode(value)
           val newState = ref.copy(closedItems = ref.closedItems - id)
           if (pool.compareAndSet(ref, newState)) {
-            reporter.debug("%s - Closed item finally removed from pool", name)
+            //reporter.debug("%s - Closed item finally removed from pool", name)
           } else {
             loop(nanos)
           }
@@ -39,7 +39,7 @@ class AsyncResourcePool[F[_] : Effect, T: Close[F, *]](name: String,
             val item = PoolItem(nanos, value)
             val newState = ref.copy(items = item :: ref.items)
             if (pool.compareAndSet(ref, newState)) {
-              reporter.debug("%s - Item has gave back to pool", name)
+              //reporter.debug("%s - Item has gave back to pool", name)
             } else {
               loop(nanos)
             }
@@ -48,7 +48,7 @@ class AsyncResourcePool[F[_] : Effect, T: Close[F, *]](name: String,
             val cb :: restOfCbs = ref.cbs
             val newState = ref.copy(cbs = restOfCbs)
             if (pool.compareAndSet(ref, newState)) {
-              reporter.debug("%s - Returned item transferred to next taker", name)
+              //reporter.debug("%s - Returned item transferred to next taker", name)
               cb(Right(new BorrowImpl(value)))
             } else {
               loop(nanos)
@@ -110,7 +110,7 @@ class AsyncResourcePool[F[_] : Effect, T: Close[F, *]](name: String,
 
     def createNew(): F[Borrow[F, T]] = {
       factory.map { value =>
-        reporter.debug("%s - Resource created", name)
+        //reporter.debug("%s - Resource created", name)
         Close[F, T].onClose(value).runAsync(_ => onCloseLoop(value))
         new BorrowImpl(value)
       }
@@ -121,7 +121,7 @@ class AsyncResourcePool[F[_] : Effect, T: Close[F, *]](name: String,
         case ref @ PoolState(_, x :: xs, _, _, _, _) =>
           // Return item from pool
           if (pool.compareAndSet(ref, ref.copy(items = xs))) {
-            reporter.debug("%s - Return item from pool", name)
+            //reporter.debug("%s - Return item from pool", name)
             cb(Right(new BorrowImpl(x.value)))
           } else {
             loop()
@@ -130,14 +130,14 @@ class AsyncResourcePool[F[_] : Effect, T: Close[F, *]](name: String,
           // Save callback
           val newState = ref.copy(cbs = cb :: ref.cbs)
           if (pool.compareAndSet(ref, newState)) {
-            reporter.debug("%s - maxCount excited. save callback", name)
+            //reporter.debug("%s - maxCount excited. save callback", name)
           } else {
             loop()
           }
         case ref if ref.items.isEmpty =>
           val newState = ref.copy(total = ref.total + 1)
           if (pool.compareAndSet(ref, newState)) {
-            reporter.debug("%s - Pool is empty. Try to create new item, increment total", name)
+            //reporter.debug("%s - Pool is empty. Try to create new item, increment total", name)
             createNew().runAsync(cb)
           }
           else {

@@ -54,7 +54,7 @@ final class ApplicationInstance
 
   private val devMode = new DevMode.ForRenderContext(sessionId.toString)
   private val currentRenderNum = new AtomicInteger(0)
-  private val stateQueue = Queue[F, (Id, Any)]()
+  private val stateQueue = Queue[F, (Id, Any, Option[Effect.Promise[Unit]])]()
   private val stateHub = Hub(stateQueue.stream)
   private val messagesQueue = Queue[F, M]()
 
@@ -102,7 +102,7 @@ final class ApplicationInstance
   private def nextRenderNum(): F[Int] =
     Effect[F].delay(currentRenderNum.incrementAndGet())
 
-  private def onState(): F[Unit] =
+  private def onState(maybeRenderCallback: Option[Effect.Promise[Unit]]): F[Unit] =
     for {
       snapshot <- stateManager.snapshot
       // Set page url if router exists
@@ -126,6 +126,7 @@ final class ApplicationInstance
       renderNum <- nextRenderNum()
       _ <- Effect[F].delay(topLevelComponentInstance.dropObsoleteMisc())
       _ <- frontend.setRenderNum(renderNum)
+      _ = maybeRenderCallback.foreach(_(Right(())))
     } yield ()
 
 
@@ -142,7 +143,7 @@ final class ApplicationInstance
         case Some(newState) =>
           stateManager
             .write(Id.TopLevel, newState)
-            .after(stateQueue.enqueue(Id.TopLevel, newState))
+            .after(stateQueue.enqueue(Id.TopLevel, newState, None))
         case None =>
           Effect[F].unit
       }
@@ -169,11 +170,21 @@ final class ApplicationInstance
 
   stateHub
     .newStream()
-    .flatMap(_.foreach(_ => onState()))
+    .flatMap { stream =>
+      stream.foreach {
+        case (_, _, cb) =>
+          onState(cb)
+      }
+    }
     .runAsyncForget
 
   val stateStream: F[Stream[F, (Id, Any)]] =
-    stateHub.newStream()
+    stateHub.newStream().map { stream =>
+      stream.map {
+        case (id, state, _) =>
+          (id, state)
+      }
+    }
 
   val messagesStream: Stream[F, M] =
     messagesQueue.stream

@@ -28,4 +28,6 @@ case class Lens[S, S2](read: PartialFunction[S, S2],
     }
     Lens(this.read.andThen(read), Function.unlift(composedWrite.tupled))
   }
+
+  def ++[S3](lens: Lens[S2, S3]): Lens[S, S3] = focus(lens.read, lens.write)
 }

@@ -1,13 +1,13 @@
 package korolev.testkit
 
-import korolev.Context.{Access, Binding, ElementId, MappedAccess}
+import korolev.Context.{Access, BaseAccessDefault, Binding, ElementId, MappedAccess}
 import korolev.data.Bytes
 import korolev.effect.Effect
-import korolev.effect.syntax._
+import korolev.effect.syntax.*
 import korolev.internal.Frontend.ClientSideException
-import korolev.util.JsCode
+import korolev.util.{JsCode, Lens}
 import korolev.web.FormData
-import korolev.{Context, Qsid, Transition}
+import korolev.{Context, Qsid, Transition, TransitionAsync}
 import org.graalvm.polyglot.HostAccess
 
 import java.nio.ByteBuffer
@@ -123,10 +123,7 @@ case class Browser(properties: Map[(ElementId, String), String] = Map.empty,
     val actions = mutable.Buffer.empty[Action[F, S, M]]
     var browser = this
     var currentState = initialState
-    val stub = new Access[F, S, M] {
-
-      def imap[S2](read: PartialFunction[S, S2], write: PartialFunction[(S, S2), S]): Access[F, S2, M] =
-        new MappedAccess[F, S, S2, M](this, read, write)
+    val stub = new BaseAccessDefault[F, S, M] {
 
       def property(id: ElementId): Context.PropertyHandler[F] =
         new Context.PropertyHandler[F] {
@@ -154,8 +151,18 @@ case class Browser(properties: Map[(ElementId, String), String] = Map.empty,
         }
       }
 
-      def syncTransition(f: Transition[S]): F[Unit] =
+      def transitionAsync(f: TransitionAsync[F, S]): F[Unit] = {
+        f(currentState).map { newState =>
+          currentState = newState
+          actions += Action.Transition(newState)
+        }
+      }
+
+      def transitionForce(f: Transition[S]): F[Unit] =
         transition(f)
+
+      def transitionForceAsync(f: TransitionAsync[F, S]): F[Unit] =
+        transitionAsync(f)
 
       def sessionId: F[Qsid] = Effect[F].pure(Qsid("test-device", "test-session"))
 

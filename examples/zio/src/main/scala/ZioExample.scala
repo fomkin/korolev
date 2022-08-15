@@ -4,14 +4,14 @@ import korolev.effect.Effect
 import korolev.server.{KorolevServiceConfig, StateLoader}
 import korolev.state.javaSerialization._
 import korolev.zio.taskEffectInstance
-import zio.{Runtime, Task, ZIO}
+
+import zio._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
 object ZioExample extends SimpleAkkaHttpKorolevApp {
 
-  implicit val runtime: Runtime[zio.ZEnv] = Runtime.default
-  implicit val effect: Effect[Task] = taskEffectInstance(runtime)
+  implicit val effect: Effect[Task] = taskEffectInstance(Runtime.default)
 
   val ctx = Context[Task, Option[Int], Any]
 
@@ -57,8 +57,6 @@ object ZioExample extends SimpleAkkaHttpKorolevApp {
     for {
       a <- access.valueOf(aInput)
       b <- access.valueOf(bInput)
-      _ <-
-        if (a.trim.isEmpty || b.trim.isEmpty) ZIO.unit
-        else access.transition(_ => Some(a.toInt + b.toInt))
+      _ <- access.transition(_ => Some(a.toInt + b.toInt)).unless(a.trim.isEmpty || b.trim.isEmpty)
     } yield ()
 }
