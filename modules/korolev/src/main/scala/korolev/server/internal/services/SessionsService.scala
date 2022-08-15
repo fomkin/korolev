@@ -89,7 +89,7 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
             initialTimeout <- createTimeout(in)
             _ = config.reporter.debug(s"Create idle timeout for $qsid")
             schedulerVar = Var[F, Scheduler.JobHandler[F, Unit]](initialTimeout)
-            _ = in.foreach { _ =>
+            _ <- in.foreach { _ =>
               config.reporter.debug(s"Reset idle timeout for $qsid")
               for {
                 currentTimer <- schedulerVar.get
