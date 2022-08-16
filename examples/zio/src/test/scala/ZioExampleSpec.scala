@@ -8,6 +8,9 @@ class ZioExampleSpec extends AsyncFlatSpec with Matchers {
 
   import ZioExample._
 
+  private implicit val taskEffectInstance: Effect[Task] =
+    korolev.zio.taskEffectInstance(zio.Runtime.default)
+
   private val browser = Browser()
     .value(aInput, "2")
     .value(bInput, "3")

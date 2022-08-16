@@ -79,13 +79,17 @@ final class Hub[F[_]: Effect, T](upstream: Stream[F, T], bufferSize: Int) {
     }
   }
 
-  def newStream(): F[Stream[F, T]] = Effect[F].delay {
+  def newStreamUnsafe(): Stream[F, T] = {
     if (closed)
       throw new IllegalStateException("Hub is closed")
     val queue = new QueueRemoveFromHubOnClose()
     val stream = new StreamOnePullAtTime(queue)
     queues.put(queue, ())
     stream
+  }
+
+  def newStream(): F[Stream[F, T]] = Effect[F].delay {
+    newStreamUnsafe()
   }
 }
 
