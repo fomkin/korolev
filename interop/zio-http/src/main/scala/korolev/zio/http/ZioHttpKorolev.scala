@@ -123,8 +123,8 @@ class ZioHttpKorolev[R] {
         fromClientKQueue.offer(t)
       case ChannelEvent(_, ChannelRead(WebSocketFrame.Close(_, _))) =>
         fromClientKQueue.close()
-      case frame =>
-        ZIO.fail(new Exception(s"Invalid frame type ${frame.getClass.getName}"))
+      case ChannelEvent(_, event) =>
+        ZIO.unit
     }.toSocketApp
 
     Response.fromSocketApp(app)
