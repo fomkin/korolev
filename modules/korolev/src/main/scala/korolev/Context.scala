@@ -235,6 +235,8 @@ object Context {
       */
     def state: F[S]
 
+    def stateFocus[B](lens: Lens[S, B]): F[B]
+
     /**
       * Applies transition to current state.
       */
@@ -267,6 +269,7 @@ object Context {
      * @see [[transitionAsync]]
      */
     def transitionForceAsync(f: TransitionAsync[F, S]): F[Unit]
+
     def transitionForceAsync[B](lens: Lens[S, B])(f: TransitionAsync[F, B]): F[Unit]
 
     @deprecated("Use transitionForce instead", since = "1.5.0")
@@ -337,11 +340,13 @@ object Context {
 
     def imap[S2](lens: Lens[S, S2]): Access[F, S2, M] = new MappedAccess[F, S, S2, M](this, lens)
 
+    def stateFocus[B](lens: Lens[S, B]): F[B] = state.map(lens.read)
+
     def transitionAsync[B](lens: Lens[S, B])(f: TransitionAsync[F, B]): F[Unit] =
       transitionAsync(transitionAsyncWithLens(lens, f))
 
     def transitionForceAsync[B](lens: Lens[S, B])(f: TransitionAsync[F, B]): F[Unit] =
-      transitionAsync(transitionAsyncWithLens(lens, f))
+      transitionForceAsync(transitionAsyncWithLens(lens, f))
 
     def transition[B](lens: Lens[S, B])(f: Transition[B]): F[Unit] =
       transition(x => lens.modify(x)(f))
@@ -371,6 +376,7 @@ object Context {
     def uploadFile(name: String, stream: Stream[F, Bytes], size: Option[Long], mimeType: String): F[Unit] = self.uploadFile(name, stream, size, mimeType)
     def resetForm(id: Context.ElementId): F[Unit] = self.resetForm(id)
     def state: F[SN] = Effect[F].map(self.state)(read)
+    def stateFocus[B](lens: Lens[SN, B]): F[B] = self.stateFocus(this.lens ++ lens)
     def transition(f: korolev.Transition[SN]): F[Unit] = self.transition(this.lens)(f)
     def transition[B](lens: Lens[SN, B])(f: Transition[B]): F[Unit] = self.transition(this.lens ++ lens)(f)
     def transitionAsync(f: TransitionAsync[F, SN]): F[Unit] = self.transitionAsync(this.lens)(f)

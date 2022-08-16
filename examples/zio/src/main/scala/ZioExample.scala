@@ -1,17 +1,18 @@
 import korolev.Context
-import korolev.akka._
 import korolev.effect.Effect
 import korolev.server.{KorolevServiceConfig, StateLoader}
-import korolev.state.javaSerialization._
-import korolev.zio.taskEffectInstance
+import korolev.state.javaSerialization.*
+import korolev.zio.taskEffectLayer
+import korolev.server.standalone
+import korolev.server
+import zio.*
 
-import zio._
-
+import java.net.InetSocketAddress
 import scala.concurrent.ExecutionContext.Implicits.global
 
-object ZioExample extends SimpleAkkaHttpKorolevApp {
+object ZioExample extends ZIOAppDefault {
 
-  implicit val effect: Effect[Task] = taskEffectInstance(Runtime.default)
+  val address = new InetSocketAddress("localhost", 8080)
 
   val ctx = Context[Task, Option[Int], Any]
 
@@ -42,21 +43,37 @@ object ZioExample extends SimpleAkkaHttpKorolevApp {
     )
   }
 
-  def service: AkkaHttpService = akkaHttpService {
-    KorolevServiceConfig[Task, Option[Int], Any](
-      stateLoader = StateLoader.default(None),
-      document = maybeResult => optimize {
-        Html(
-          body(renderForm(maybeResult))
-        )
-      }
-    )
-  }
-
   def onChange(access: Access) =
     for {
       a <- access.valueOf(aInput)
+      _ <- ZIO.logInfo(s"a = $a")
       b <- access.valueOf(bInput)
+      _ <- ZIO.logInfo(s"b = $b")
       _ <- access.transition(_ => Some(a.toInt + b.toInt)).unless(a.trim.isEmpty || b.trim.isEmpty)
     } yield ()
+
+  final val app = ZIO.service[Effect[Task]].flatMap { implicit taskEffect =>
+    val config =
+      KorolevServiceConfig[Task, Option[Int], Any](
+        stateLoader = StateLoader.default(None),
+        document = maybeResult => optimize {
+          Html(
+            body(renderForm(maybeResult))
+          )
+        }
+      )
+    for {
+      _ <- ZIO.logInfo(s"Try to start server at $address")
+      handler <- standalone.buildServer[Task, Array[Byte]](
+        service = server.korolevService(config),
+        address = address,
+        gracefulShutdown = false
+      )
+      _ <- ZIO.unit.forkDaemon *> ZIO.logInfo(s"Server started")
+      _ <- handler.awaitShutdown()
+    } yield ()
+  }
+
+  final val run =
+    app.provide(taskEffectLayer)
 }

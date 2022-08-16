@@ -17,7 +17,7 @@
 package korolev
 
 import korolev.effect.Effect
-import _root_.zio.{Runtime, Task, ZIO}
+import _root_.zio._
 
 package object zio {
 
@@ -27,6 +27,9 @@ package object zio {
     */
   def taskEffectInstance[R](runtime: Runtime[R]): Effect[Task] =
     new Zio2Effect[Any, Throwable](runtime, identity, identity)
+
+  final val taskEffectLayer: ULayer[Effect[Task]] =
+    ZLayer(ZIO.runtime.map(taskEffectInstance))
 
   /**
     * Provides [[Effect]] instance for ZIO with arbitrary runtime

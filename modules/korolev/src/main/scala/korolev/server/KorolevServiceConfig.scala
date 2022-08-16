@@ -25,7 +25,7 @@ import scala.concurrent.duration._
 
 import korolev.web.{Path, PathAndQuery}
 
-case class KorolevServiceConfig[F[_]: Effect, S, M](
+case class KorolevServiceConfig[F[_], S, M](
   stateLoader: StateLoader[F, S],
   stateStorage: korolev.state.StateStorage[F, S] = null, // By default it StateStorage.DefaultStateStorage
   http: PartialFunction[HttpRequest[F], F[HttpResponse[F]]] = PartialFunction.empty[HttpRequest[F], F[HttpResponse[F]]],

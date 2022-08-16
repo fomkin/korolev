@@ -48,7 +48,7 @@ package object server {
               config.render(state)
             )
           }
-        })(implicitly[Effect[F]], config.executionContext)
+        })(config.executionContext)
       } else {
         config
       }
