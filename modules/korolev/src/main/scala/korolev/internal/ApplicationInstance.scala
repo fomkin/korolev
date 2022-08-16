@@ -72,10 +72,12 @@ final class ApplicationInstance
           case e: MatchError =>
             Document.Node[Binding[F, S, M]] { rc =>
               reporter.error(s"Render is not defined for $state")
+              rc.openNode(XmlNs.html, "html")
               rc.openNode(XmlNs.html, "body")
               rc.addTextNode("Render is not defined for the state. ")
               rc.addTextNode(e.getMessage())
               rc.closeNode("body")
+              rc.closeNode("html")
             }
         }
       }
@@ -158,25 +160,8 @@ final class ApplicationInstance
       }
     }
 
-  frontend
-    .browserHistoryMessages
-    .foreach(onHistory)
-    .runAsyncForget
-
-  frontend
-    .domEventMessages
-    .foreach(onEvent)
-    .runAsyncForget
-
-  stateHub
-    .newStream()
-    .flatMap { stream =>
-      stream.foreach {
-        case (_, _, cb) =>
-          onState(cb)
-      }
-    }
-    .runAsyncForget
+  private final val internalStateStream =
+    stateHub.newStreamUnsafe()
 
   val stateStream: F[Stream[F, (Id, Any)]] =
     stateHub.newStream().map { stream =>
@@ -237,6 +222,22 @@ final class ApplicationInstance
         _ <- frontend.setRenderNum(0)
         _ <- reloadCssIfNecessary()
         _ <- render(f => Effect[F].delay(f(DiffRenderContext.DummyChangesPerformer)))
+        // Start handlers
+        _ <- frontend
+          .browserHistoryMessages
+          .foreach(onHistory)
+          .start
+        _ <- frontend
+          .domEventMessages
+          .foreach(onEvent)
+          .start
+        _ <- internalStateStream
+          .foreach {
+            case (_, _, cb) =>
+              onState(cb)
+          }
+          .start
+        // Init component
         _ <- topLevelComponentInstance.initialize()
       } yield ()
     }
