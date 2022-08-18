@@ -62,7 +62,7 @@ final class ComponentInstance
      createMiscProxy: (StatefulRenderContext[Binding[F, AS, M]], (StatefulRenderContext[Binding[F, CS, E]], Binding[F, CS, E]) => Unit) => StatefulRenderContext[Binding[F, CS, E]],
      scheduler: Scheduler[F],
      reporter: Reporter,
-     recovery: PartialFunction[Throwable, F[Unit]],
+     upgradeEventEffect: Context.Access[F, AS, M] => F[Unit] => F[Unit],
   ) { self =>
 
   import ComponentInstance._
@@ -257,7 +257,7 @@ final class ComponentInstance
               val n = entry.createInstance(
                 id, sessionId, frontend, eventRegistry,
                 stateManager, getRenderNum, stateQueue,
-                scheduler, reporter, recovery
+                scheduler, reporter, upgradeEventEffect
               )
               markedComponentInstances += id
               nestedComponents.put(id, n)
@@ -296,28 +296,22 @@ final class ComponentInstance
   }
 
   def applyEvent(eventId: EventId): Boolean = {
-    try {
-      events.get(eventId) match {
-        case Some(events: Vector[Event[F, CS, E]]) =>
-          // A user defines the event effect, so we
-          // don't control the time of execution.
-          // We shouldn't block the application if
-          // the user's code waits for something
-          // for a long time.
-          events.forall { event =>
-            event.effect(browserAccess).runAsyncForget
-            !event.stopPropagation
-          }
-        case None =>
-          nestedComponents.values.forall { nested =>
-            nested.applyEvent(eventId)
-          }
-      }
-    } catch {
-      case NonFatal(ex) =>
-        recovery(ex).runAsyncForget
-        // Stop event propagation because error happen
-        false
+    events.get(eventId) match {
+      case Some(events: Vector[Event[F, CS, E]]) =>
+        // A user defines the event effect, so we
+        // don't control the time of execution.
+        // We shouldn't block the application if
+        // the user's code waits for something
+        // for a long time.
+        events.forall { event =>
+          upgradeEventEffect(browserAccess)()
+          .runAsyncForget
+          !event.stopPropagation
+        }
+      case None =>
+        nestedComponents.values.forall { nested =>
+          nested.applyEvent(eventId)
+        }
     }
   }
 

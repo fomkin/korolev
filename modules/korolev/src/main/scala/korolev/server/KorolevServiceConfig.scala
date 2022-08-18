@@ -25,6 +25,26 @@ import scala.concurrent.duration._
 
 import korolev.web.{Path, PathAndQuery}
 
+/**
+  * @param stateLoader Provides application state for new session
+  * @param stateStorage The way to store application state. Use this for complex state management. Redis, JCache, Hazelcast etc.
+  * @param document The function map app state to DOM.
+  * @param http Use this to serve regular HTTP requests.
+  * @param router App navigation with path in URI.
+  * @param rootPath Path of the app in users browser. Useful if you app is not on root. For example https://example.com/myapp/.
+  * @param connectionLostWidget This widget shows when connection lost. You can customize this with Levsha template. Note that events are not supported here. Also you have not access to the app state.
+  * @param upgradeEventEffect
+  * @param maxFormDataEntrySize
+  * @param extensions
+  * @param idGenerator
+  * @param heartbeatInterval
+  * @param reporter
+  * @param sessionIdleTimeout
+  * @param executionContext
+  * @tparam F
+  * @tparam S
+  * @tparam M
+  */
 case class KorolevServiceConfig[F[_], S, M](
   stateLoader: StateLoader[F, S],
   stateStorage: korolev.state.StateStorage[F, S] = null, // By default it StateStorage.DefaultStateStorage
@@ -41,7 +61,7 @@ case class KorolevServiceConfig[F[_], S, M](
   idGenerator: IdGenerator[F] = IdGenerator.default[F](),
   heartbeatInterval: FiniteDuration = 5.seconds,
   reporter: Reporter = Reporter.PrintReporter,
-  recovery: PartialFunction[Throwable, S => S] = PartialFunction.empty[Throwable, S => S],
+  upgradeEventEffect: Context.Access[F, S, M] => F[Unit] => F[Unit] = _ => identity,
   sessionIdleTimeout: FiniteDuration = 60.seconds,
 )(implicit val executionContext: ExecutionContext)
 

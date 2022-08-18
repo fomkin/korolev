@@ -424,7 +424,7 @@ object Context {
                        stateQueue: Queue[F, (Id, Any, Option[Effect.Promise[Unit]])],
                        scheduler: Scheduler[F],
                        reporter: Reporter,
-                       recovery: PartialFunction[Throwable, F[Unit]]): ComponentInstance[F, AS, M, CS, P, E] = {
+                       upgradeEventEffect: Context.Access[F, AS, M] => F[Unit] => F[Unit]): ComponentInstance[F, AS, M, CS, P, E] = {
       new ComponentInstance(
         node, sessionId, frontend, eventRegistry, stateManager, getRenderNum, component, stateQueue,
         createMiscProxy = (rc, k) => new StatefulRenderContext[Binding[F, CS, E]] {
@@ -438,7 +438,7 @@ object Context {
           def addTextNode(text: String): Unit = rc.addTextNode(text)
           def addMisc(misc: Binding[F, CS, E]): Unit = k(this, misc)
         },
-        scheduler, reporter, recovery
+        scheduler, reporter, upgradeEventEffect
       )
     }
   }

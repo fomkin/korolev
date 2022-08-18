@@ -99,22 +99,7 @@ object Effect {
       Try(Await.result(m, Duration.Inf)).toEither
     def recover[A, AA >: A](m: Future[A])(f: PartialFunction[Throwable, AA]): Future[AA] = m.recover(f)
     def recoverF[A, AA >: A](m: Future[A])(f: PartialFunction[Throwable, Future[AA]]): Future[AA] = m.recoverWith(f)
-//    def onError[A](m: Future[A])(f: Throwable => Unit): Future[A] = {
-//      m.onComplete {
-//        case Success(value) => ()
-//        case Failure(exception) =>
-//          f(exception)
-//      }
-//      m
-//    }
-//    def onErrorF[A](m: Future[A])(f: Throwable => Future[Unit]): Future[A] = {
-//      m.onComplete {
-//        case Success(value) => ()
-//        case Failure(exception) =>
-//          f(exception)
-//      }
-//      m
-//    }
+
     /** Keep in mind that when [[F]] has strict semantic, effect should
       * created inside 'start()' brackets. */
     def sequence[A](in: List[Future[A]]): Future[List[A]] =
