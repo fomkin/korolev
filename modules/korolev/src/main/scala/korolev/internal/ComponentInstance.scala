@@ -289,7 +289,10 @@ final class ComponentInstance
   private def applyTransitionForce(transition: TransitionAsync[F, CS]): F[Unit] = Effect[F].promiseF[Unit] { cb =>
     val effect = () =>
       for {
-        newState <- applyTransitionEffect(transition)
+        newState <- applyTransitionEffect(transition).recoverF { e =>
+          cb(Left(e))
+          Effect[F].fail[CS](e)
+        }
         _ <- stateQueue.enqueue(nodeId, newState, Some(cb))
       } yield ()
     pendingEffects.enqueue(effect)
@@ -305,7 +308,10 @@ final class ComponentInstance
           // the user's code waits for something
           // for a long time.
           events.forall { event =>
-            event.effect(browserAccess).runAsyncForget
+            event.effect(browserAccess).runAsync {
+              case Left(e) => reporter.error(s"Event handler for ${eventId.`type`} at ${eventId.target} failed", e)
+              case _ => () // Do nothing
+            }
             !event.stopPropagation
           }
         case None =>
@@ -381,14 +387,17 @@ final class ComponentInstance
         .unit
     } yield ()
 
+  private def applyPendingEffect(f: () => F[Unit]): F[Unit] =
+    f().recover(reporter.error("Transition failed", _))
+
   protected def unsafeInitialize(): Unit =
     pendingEffects.stream
-      .foreach(_.apply())
+      .foreach(applyPendingEffect)
       .runAsyncForget
 
   // Execute effects sequentially
   def initialize()(implicit ec: ExecutionContext): F[Effect.Fiber[F, Unit]] =
-    Effect[F].start(pendingEffects.stream.foreach(_.apply()))
+    Effect[F].start(pendingEffects.stream.foreach(applyPendingEffect))
 }
 
 private object ComponentInstance {
