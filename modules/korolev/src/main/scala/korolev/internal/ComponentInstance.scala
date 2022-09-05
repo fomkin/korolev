@@ -289,7 +289,7 @@ final class ComponentInstance
   private def applyTransitionForce(transition: TransitionAsync[F, CS]): F[Unit] = Effect[F].promiseF[Unit] { cb =>
     val effect = () =>
       for {
-        newState <- applyTransitionEffect(transition).recoverF { e =>
+        newState <- applyTransitionEffect(transition).recoverF { case e =>
           cb(Left(e))
           Effect[F].fail[CS](e)
         }
@@ -388,7 +388,7 @@ final class ComponentInstance
     } yield ()
 
   private def applyPendingEffect(f: () => F[Unit]): F[Unit] =
-    f().recover(reporter.error("Transition failed", _))
+    f().recover { case e => reporter.error("Transition failed", e) }
 
   protected def unsafeInitialize(): Unit =
     pendingEffects.stream
