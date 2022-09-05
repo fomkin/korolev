@@ -110,7 +110,7 @@ case class State(
   selectedTab: String = "Tab1",
   todos: Map[String, Vector[State.Todo]] = State.Tabs
     .zipWithIndex
-    .map { case (tab, i) => tab -> State.Todo(i) }
+    .map { case (tab, i) => tab -> State.Todo(i * 10000) }
     .toMap
 )
 

@@ -4,7 +4,7 @@ val scala2_12Version = "2.12.15"
 val scala2_13Version = "2.13.8"
 val scala3Version = "3.1.1"
 
-val levshaVersion = "1.3.0"
+val levshaVersion = "1.4.0-M1"
 
 val akkaVersion = "2.6.19"
 val akkaHttpVersion = "10.2.9"
@@ -94,7 +94,8 @@ val commonSettings = publishSettings ++ Seq(
           "-Ykind-projector"
         )
     }
-  }
+  },
+  testOptions in Test += Tests.Argument(TestFrameworks.ScalaCheck, "-verbosity", "3")
 )
 
 val exampleSettings = commonSettings ++ dontPublishSettings ++ Seq(

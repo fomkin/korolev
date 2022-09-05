@@ -293,7 +293,7 @@ object Browser {
     }
     @HostAccess.Export
     def error(value: String): Unit = {
-      val result = Left(ClientSideException(value))
+      val result = Left(new ClientSideException(value))
       actions += Action.EvalJs(result)
       cb(result)
     }

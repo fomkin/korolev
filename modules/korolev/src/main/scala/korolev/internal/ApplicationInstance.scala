@@ -26,7 +26,7 @@ import korolev.state.{StateDeserializer, StateManager, StateSerializer}
 import korolev.web.{Path, PathAndQuery}
 import levsha.events.calculateEventPropagation
 import levsha.impl.DiffRenderContext
-import levsha.impl.DiffRenderContext.ChangesPerformer
+import levsha.impl.DiffRenderContext.{ChangesPerformer, FastChangesPerformer}
 import levsha.{Document, Id, StatefulRenderContext, XmlNs}
 
 import scala.concurrent.ExecutionContext
@@ -114,12 +114,14 @@ final class ApplicationInstance
       _ <- Effect[F].delay {
         // Prepare render context
         renderContext.swap()
+        renderContext.reset()
         // Perform rendering
         topLevelComponentInstance.applyRenderContext(
           parameters = (), // Boxed unit as parameter. Top level component doesn't need parameters
           snapshot = snapshot,
           rc = renderContext
         )
+        renderContext.finalizeDocument()
       }
       // Infer and perform changes
       _ <- frontend.performDomChanges(renderContext.diff)
@@ -189,10 +191,13 @@ final class ApplicationInstance
       else Effect[F].unit
 
     // Render current state using 'performDiff'.
-    def render(performDiff: (ChangesPerformer => Unit) => F[Unit]) =
+    def render(performDiff: (FastChangesPerformer => Unit) => F[Unit]) =
       for {
         snapshot <- stateManager.snapshot
-        _ <- Effect[F].delay(topLevelComponentInstance.applyRenderContext((), renderContext, snapshot))
+        _ <- Effect[F].delay {
+          topLevelComponentInstance.applyRenderContext((), renderContext, snapshot)
+          renderContext.finalizeDocument()
+        }
         _ <- performDiff(renderContext.diff)
         _ <- saveRenderContextIfNecessary()
       } yield ()
