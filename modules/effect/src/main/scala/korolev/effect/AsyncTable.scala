@@ -105,7 +105,7 @@ final class AsyncTable[F[_] : Effect, K, V](elems: Seq[(K, V)]) {
         ref.get(key) match {
           case Some(Right(_)) if silent => () // Do nothing
           case Some(Right(_)) =>
-            throw AlreadyContainsKeyException(key)
+            throw new AlreadyContainsKeyException(key)
           case Some(Left(callbacks)) =>
             val newValue = ref.updated(key, Right(errorOrValue))
             if (state.compareAndSet(ref, newValue)) {
@@ -132,7 +132,7 @@ final class AsyncTable[F[_] : Effect, K, V](elems: Seq[(K, V)]) {
       if (state.compareAndSet(ref, updatedRef)) {
         value match {
           case Some(Left(callbacks)) =>
-            val result = Left(RemovedBeforePutException(key))
+            val result = Left(new RemovedBeforePutException(key))
             callbacks.foreach(_(result))
           case _ => ()
         }
@@ -146,10 +146,10 @@ final class AsyncTable[F[_] : Effect, K, V](elems: Seq[(K, V)]) {
 
 object AsyncTable {
 
-  final case class RemovedBeforePutException(key: Any)
+  final class RemovedBeforePutException(key: Any)
     extends Exception(s"Key '$key' removed before value was added.")
 
-  final case class AlreadyContainsKeyException(key: Any)
+  final class AlreadyContainsKeyException(key: Any)
     extends Exception(s"Already contains value for '$key'.")
 
   def apply[F[_] : Effect, K, V](elems: (K, V)*) =

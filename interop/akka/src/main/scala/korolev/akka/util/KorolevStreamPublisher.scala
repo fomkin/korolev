@@ -80,7 +80,7 @@ final class KorolevStreamPublisher[F[_] : Effect, T](stream: Stream[F, T],
       }
     } else {
       if (hasActualSubscriber)
-        throw MultipleSubscribersProhibitedException()
+        throw new MultipleSubscribersProhibitedException()
       subscriber.onSubscribe(new StreamSubscription(stream, subscriber))
     }
     hasActualSubscriber = true
@@ -88,6 +88,6 @@ final class KorolevStreamPublisher[F[_] : Effect, T](stream: Stream[F, T],
 }
 
 object KorolevStreamPublisher {
-  final case class MultipleSubscribersProhibitedException()
+  final class MultipleSubscribersProhibitedException()
     extends Exception("Multiple subscribers prohibited for this KorolevStreamPublisher")
 }
