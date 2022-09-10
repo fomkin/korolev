@@ -44,7 +44,7 @@ class Issue14Spec extends AnyFlatSpec with Matchers {
         )
       },
       stateManager = new StateStorage.SimpleInMemoryStateManager[Future](),
-      initialState = "firstState",
+      iState = "firstState",
       reporter = Reporter.PrintReporter,
       scheduler = new Scheduler[Future](),
       createMiscProxy = (rc, k) => new StatefulRenderContext[Context.Binding[Future, Issue14Spec.S, Any]] { proxy =>

@@ -100,7 +100,7 @@ object Context {
 
     val emptyTransition: PartialFunction[S, S] = { case x => x }
 
-    implicit final class ComponentDsl[CS: StateSerializer: StateDeserializer, P, E](component: Component[F, CS, P, E])
+    implicit final class ComponentDsl[CS: StateSerializer: StateDeserializer, P, E](component: ComponentBase[F, CS, P, E])
                                                                                    (implicit _e: Effect[F],
                                                                                     _css: StateSerializer[S],
                                                                                     _csd: StateDeserializer[S]) {
@@ -409,7 +409,7 @@ object Context {
       AS: StateSerializer: StateDeserializer, M,
       CS: StateSerializer: StateDeserializer, P, E
     ](
-      component: Component[F, CS, P, E],
+      component: ComponentBase[F, CS, P, E],
       parameters: P,
       eventHandler: (Access[F, AS, M], E) => F[Unit]
     )
@@ -434,7 +434,7 @@ object Context {
           def openNode(xmlns: XmlNs, name: String): Unit = rc.openNode(xmlns, name)
           def closeNode(name: String): Unit = rc.closeNode(name)
           def setAttr(xmlNs: XmlNs, name: String, value: String): Unit = rc.setAttr(xmlNs, name, value)
-          def setStyle(name: String, value: String): Unit = rc.setStyle(name, value) 
+          def setStyle(name: String, value: String): Unit = rc.setStyle(name, value)
           def addTextNode(text: String): Unit = rc.addTextNode(text)
           def addMisc(misc: Binding[F, CS, E]): Unit = k(this, misc)
         },

@@ -27,21 +27,16 @@ import scala.util.Random
   * Component definition. Every Korolev application is a component.
   * Extent it to declare component in object oriented style.
   *
-  * @param id Unique identifier of the component.
-  *           Use it when you create component declaration dynamically
-  *
   * @tparam F Control monad
   * @tparam S State of the component
   * @tparam E Type of events produced by component
   */
-abstract class Component
-  [
-    F[_],
-    S, P, E
-  ](
-    val initialState: S,
-    val id: String = Component.randomId()
-  ) {
+sealed trait ComponentBase[F[_], S, P, E] {
+
+  /**
+    * Default component state
+    */
+  def initialState: S
 
   /**
     * Component context.
@@ -50,15 +45,48 @@ abstract class Component
     *  import context._
     * }}}
     */
-  val context = Context[F, S, E]
+  val context: Context[F, S, E] = Context[F, S, E]
+}
+
+/**
+  * Component definition. Every Korolev application is a component.
+  * Extent it to declare component in object oriented style.
+  *
+  * @tparam F Control monad
+  * @tparam S State of the component
+  * @tparam E Type of events produced by component
+  */
+trait Component[F[_], S, P, E] extends ComponentBase[F, S, P, E] {
 
   /**
     * Component render
     */
-  def render(parameters: P, state: S): context.Node
+  def render(parameters: P, state: S): Node[Binding[F, S, E]]
+}
+
+/**
+  * Asynchronous Component definition.
+  *
+  * @tparam F Control monad
+  * @tparam S State of the component
+  * @tparam E Type of events produced by component
+  */
+trait AsyncComponent[F[_], S, P, E] extends ComponentBase[F, S, P, E] {
+
+  /**
+    * Asynchronous Component render
+    */
+  def render(parameters: P, state: S): Node[Binding[F, S, E]]
+
+  /**
+    * Component placeholder that rendered in synchronous way for static page requests
+    */
+  def placeholder(parameters: P, state: S): Node[Binding[F, S, E]]
 }
 
 object Component {
+//  private[korolev] def randomId() = Random.alphanumeric.take(6).mkString
+//  final val TopLevelComponentId = "top-level"
 
   /** (context, state) => document */
   type Render[F[_], S, P, E] = (Context[F, S, E], P, S) => Node[Binding[F, S, E]]
@@ -68,15 +96,38 @@ object Component {
     * @param f Component renderer
     * @see [[Component]]
     */
-  def apply[F[_]: Effect, S: StateSerializer: StateDeserializer, P, E]
-           (initialState: S, id: String = Component.randomId())
-           (f: Render[F, S, P, E]): Component[F, S, P, E] = {
-    new Component[F, S, P, E](initialState, id) {
-      def render(parameters: P, state: S): Node[Binding[F, S, E]] = f(context, parameters, state)
+  def apply[F[_]: Effect, S: StateSerializer: StateDeserializer, P, E](defaultState: S)(
+      f: Render[F, S, P, E]): Component[F, S, P, E] = {
+    new Component[F, S, P, E] {
+      override val initialState: S = defaultState
+
+      override def render(parameters: P, state: S): Node[Binding[F, S, E]] = f(context, parameters, state)
     }
   }
 
-  final val TopLevelComponentId = "top-level"
+  /** (context, state) => F[document] */
+//  type AsyncRender[F[_], S, P, E] = (P, S) => F[Node[Binding[F, S, E]]]
 
-  private[korolev] def randomId() = Random.alphanumeric.take(6).mkString
+  /**
+    * Create component in functional style
+    * @param p Component placeholder renderer
+    * @param r Component asynchronous renderer
+    * @see [[Component]]
+    */
+  def apply[F[_]: Effect, S: StateSerializer: StateDeserializer, P, E](
+      defaultState: S)(p: Render[F, S, P, E], r: Render[F, S, P, E]): AsyncComponent[F, S, P, E] = {
+    new AsyncComponent[F, S, P, E] {
+      override val initialState: S = defaultState
+
+      /**
+        * Asynchronous Component render
+        */
+      override def render(parameters: P, state: S): Node[Binding[F, S, E]] = r(context, parameters, state)
+
+      /**
+        * Component placeholder that rendered in synchronous way for static page requests
+        */
+      override def placeholder(parameters: P, state: S): Node[Binding[F, S, E]] = p(context, parameters, state)
+    }
+  }
 }

@@ -40,7 +40,7 @@ final class ApplicationInstance
      sessionId: Qsid,
      val frontend: Frontend[F],
      stateManager: StateManager[F],
-     initialState: S,
+     iState: S,
      render: S => Document.Node[Binding[F, S, M]],
      rootPath: Path,
      router: Router[F, S],
@@ -64,7 +64,9 @@ final class ApplicationInstance
 
   val topLevelComponentInstance: ComponentInstance[F, S, M, S, Any, M] = {
     val eventRegistry = new EventRegistry[F](frontend)
-    val component = new Component[F, S, Any, M](initialState, Component.TopLevelComponentId) {
+    val component = new Component[F, S, Any, M] {
+      override val initialState: S = iState
+
       def render(parameters: Any, state: S): Document.Node[Binding[F, S, M]] = {
         try {
           application.render(state)
@@ -109,7 +111,7 @@ final class ApplicationInstance
       snapshot <- stateManager.snapshot
       // Set page url if router exists
       _ <- router.fromState
-        .lift(snapshot(Id.TopLevel).getOrElse(initialState))
+        .lift(snapshot(Id.TopLevel).getOrElse(iState))
         .fold(Effect[F].unit)(uri => frontend.changePageUrl(rootPath ++ uri))
       _ <- Effect[F].delay {
         // Prepare render context
@@ -139,7 +141,7 @@ final class ApplicationInstance
         router
           .toState
           .lift(pq)
-          .fold(Effect[F].delay(Option.empty[S]))(_(maybeTopLevelState.getOrElse(initialState)).map(Some(_)))
+          .fold(Effect[F].delay(Option.empty[S]))(_(maybeTopLevelState.getOrElse(iState)).map(Some(_)))
       }
       .flatMap {
         case Some(newState) =>

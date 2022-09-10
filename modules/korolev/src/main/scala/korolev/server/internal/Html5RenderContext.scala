@@ -16,21 +16,28 @@
 
 package korolev.server.internal
 
-import korolev.Context
-import korolev.Context._
+import korolev.{AsyncComponent, Component, Context}
+import korolev.Context.*
 import korolev.effect.Effect
 import levsha.RenderContext
 import levsha.impl.TextPrettyPrintingConfig
 
 private[korolev] final class Html5RenderContext[F[_]: Effect, S, M]
-  extends levsha.impl.Html5RenderContext[Binding[F, S, M]](TextPrettyPrintingConfig.noPrettyPrinting) {
+    extends levsha.impl.Html5RenderContext[Binding[F, S, M]](TextPrettyPrintingConfig.noPrettyPrinting) {
 
   override def addMisc(misc: Binding[F, S, M]): Unit = misc match {
     case ComponentEntry(component, parameters, _) =>
       val rc = this.asInstanceOf[RenderContext[Context.Binding[F, Any, Any]]]
+
       // Static pages always made from scratch
-      component.render(parameters, component.initialState).apply(rc)
-    case _ => ()
+      component match {
+        case c: AsyncComponent[F, Any, Any, _] =>
+          c.placeholder(parameters, component.initialState).apply(rc)
+        case c: Component[F, Any, Any, _] =>
+          c.render(parameters, component.initialState).apply(rc)
+      }
+    case _ =>
+      ()
   }
 
 }

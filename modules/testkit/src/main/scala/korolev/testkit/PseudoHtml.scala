@@ -1,6 +1,6 @@
 package korolev.testkit
 
-import korolev.Context
+import korolev.{AsyncComponent, Component, Context}
 import korolev.Context.{Binding, ComponentEntry, ElementId}
 import levsha.Document.Node
 import levsha.events.EventId
@@ -89,7 +89,7 @@ object PseudoHtml {
 
   private class PseudoDomRenderContext[F[_], S, M] extends RenderContext[Binding[F, S, M]] {
 
-    val idBuilder = new IdBuilder(256)
+    val idBuilder = IdBuilder(256)
     var currentChildren: List[List[PseudoHtml]] = List(Nil)
     var currentNode = List.empty[(XmlNs, String)]
     var currentAttrs = List.empty[(XmlNs, String, String)]
@@ -142,9 +142,15 @@ object PseudoHtml {
     def addMisc(misc: Binding[F, S, M]): Unit = {
       idBuilder.decLevel()
       misc match {
-        case ComponentEntry(c, p, _) =>
+        case ComponentEntry(component, p, _) =>
           val rc = this.asInstanceOf[RenderContext[Context.Binding[F, Any, Any]]]
-          c.render(p, c.initialState).apply(rc)
+          component match {
+            case c: AsyncComponent[F, Any, Any, _] =>
+              c.render(p, c.initialState).apply(rc)
+            case c: Component[F, Any, Any, _] =>
+              c.render(p, c.initialState).apply(rc)
+          }
+
         case elementId: ElementId =>
           elements = (idBuilder.mkId, elementId) :: elements
         case event: Context.Event[F, S, M] =>

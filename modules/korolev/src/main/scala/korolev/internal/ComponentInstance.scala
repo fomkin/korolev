@@ -20,7 +20,7 @@ import korolev.*
 import korolev.effect.{Effect, Queue, Reporter, Scheduler, Stream}
 import korolev.effect.syntax.*
 import korolev.state.{StateDeserializer, StateManager, StateSerializer}
-import levsha.{Id, StatefulRenderContext}
+import levsha.{Document, Id, IdBuilder, StatefulRenderContext}
 import levsha.events.EventId
 
 import scala.collection.mutable
@@ -28,6 +28,7 @@ import Context.*
 import korolev.data.Bytes
 import korolev.util.{JsCode, Lens}
 import korolev.web.FormData
+import levsha.impl.CustomDiffRenderContext
 
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
@@ -51,13 +52,13 @@ final class ComponentInstance
     AS: StateSerializer: StateDeserializer, M,
     CS: StateSerializer: StateDeserializer, P, E
   ](
-     nodeId: Id,
+     val nodeId: Id,
      sessionId: Qsid,
      frontend: Frontend[F],
      eventRegistry: EventRegistry[F],
      stateManager: StateManager[F],
      getRenderNum: () => Int,
-     val component: Component[F, CS, P, E],
+     val component: ComponentBase[F, CS, P, E],
      stateQueue: Queue[F, (Id, Any, Option[Effect.Promise[Unit]])],
      createMiscProxy: (StatefulRenderContext[Binding[F, AS, M]], (StatefulRenderContext[Binding[F, CS, E]], Binding[F, CS, E]) => Unit) => StatefulRenderContext[Binding[F, CS, E]],
      scheduler: Scheduler[F],
@@ -76,6 +77,7 @@ final class ComponentInstance
   private val elements = mutable.Map.empty[ElementId, Id]
   private val events = mutable.Map.empty[EventId, Vector[Event[F, CS, E]]]
   private val nestedComponents = mutable.Map.empty[Id, ComponentInstance[F, CS, E, _, _, _]]
+  private val nestedRC = mutable.Map.empty[Id, CustomDiffRenderContext[Binding[F, CS, E]]]
 
   // Why we use '() => F[Unit]'? Because should
   // support scala.concurrent.Future which is has
@@ -218,56 +220,129 @@ final class ComponentInstance
     eventSubscription = Some(callback)
   }
 
+  private def miscEvent(id: Id, event: Event[F, CS, E]): Unit = {
+    val eid = EventId(id, event.`type`, event.phase)
+    val es = events.getOrElseUpdate(eid, Vector.empty)
+    events.put(eid, es :+ event)
+    eventRegistry.registerEventType(event.`type`)
+  }
+
+  private def miscElementId(id: Id, element: ElementId): Unit = {
+    elements.put(element, id)
+  }
+
+  private def miscDelay(id: Id, delay: Delay[F, CS, E]): Unit = {
+    markedDelays += id
+    if (!delays.contains(id)) {
+      val delayInstance = new DelayInstance(delay, scheduler, reporter)
+      delays.put(id, delayInstance)
+      delayInstance.start(browserAccess)
+    }
+  }
+
+  private def miscComponent(id: Id, entry: ComponentEntry[F, CS, E, Any, Any, Any], snapshot: StateManager.Snapshot, proxy: StatefulRenderContext[Binding[F, CS, E]]): Unit = {
+    nestedComponents.get(id) match {
+      case Some(n: ComponentInstance[F, CS, E, Any, Any, Any]) if n.nodeId == id =>
+        // Use nested component instance
+        markedComponentInstances += id
+        n.setEventsSubscription((e: Any) => entry.eventHandler(browserAccess, e).runAsyncForget)
+        n.applyRenderContext(entry.parameters, proxy, snapshot)
+      case _ =>
+        val n = entry.createInstance(
+          id, sessionId, frontend, eventRegistry,
+          stateManager, getRenderNum, stateQueue,
+          scheduler, reporter, recovery
+        )
+        markedComponentInstances += id
+        nestedComponents.put(id, n)
+        n.unsafeInitialize()
+        n.setEventsSubscription((e: Any) => entry.eventHandler(browserAccess, e).runAsyncForget)
+        n.applyRenderContext(entry.parameters, proxy, snapshot)
+    }
+  }
+
+  private def getOrCreateAsyncComponentRC(id: Id): CustomDiffRenderContext[Binding[F, CS, E]] = {
+    nestedRC.get(id) match {
+      case Some(rc) =>
+        rc
+      case None =>
+        val result = CustomDiffRenderContext(
+//          onMisc = {
+//            case event: Event[F, CS, E] =>
+//              miscEvent(result.currentContainerId, event)
+//            case element: ElementId =>
+//              miscElementId(result.currentContainerId, element)
+//            case delay: Delay[F, CS, E] =>
+//              miscDelay(result.currentContainerId, delay)
+//            case entry: ComponentEntry[F, CS, E, Any, Any, Any] =>
+//              entry.component match {
+//                case _: Component[F, Any, Any, Any] =>
+//                  miscComponent(result.subsequentId, entry, snapshot, proxy)
+//                case _: AsyncComponent[F, Any, Any, Any] =>
+//                  val id = rc.currentId
+//                  val componentRC = getOrCreateAsyncComponentRC(id)
+//                  miscComponent(id, entry, snapshot, componentRC)
+//                  ()
+//              }
+//          },
+          idb = IdBuilder(id.toList.toArray)
+        )
+
+        nestedRC.put(id, result)
+
+        result
+    }
+  }
+
   def applyRenderContext(parameters: P,
                          rc: StatefulRenderContext[Binding[F, AS, M]],
-                         snapshot: StateManager.Snapshot): Unit = miscLock.synchronized {
+                         snapshot: StateManager.Snapshot
+                        ): Unit = miscLock.synchronized {
     // Reset all event handlers delays and elements
     prepare()
     val state = snapshot[CS](nodeId).getOrElse(component.initialState)
-    val node = component.render(parameters, state)
-    val proxy = createMiscProxy(rc, { (proxy, misc) =>
+
+    val node: Document.Node[Binding[F, CS, E]] = component match {
+      case component: Component[F, CS, P, E] =>
+         component.render(parameters, state)
+      case component: AsyncComponent[F, CS, P, E] =>
+        component.placeholder(parameters, state)
+    }
+
+    val proxy: StatefulRenderContext[Binding[F, CS, E]] = createMiscProxy(rc, { (proxy, misc) =>
       misc match {
         case event: Event[F, CS, E] =>
-          val id = rc.currentContainerId
-          val eid = EventId(id, event.`type`, event.phase)
-          val es = events.getOrElseUpdate(eid, Vector.empty)
-          events.put(eid, es :+ event)
-          eventRegistry.registerEventType(event.`type`)
+          miscEvent(rc.currentContainerId, event)
         case element: ElementId =>
-          val id = rc.currentContainerId
-          elements.put(element, id)
-          ()
+          miscElementId(rc.currentContainerId, element)
         case delay: Delay[F, CS, E] =>
-          val id = rc.currentContainerId
-          markedDelays += id
-          if (!delays.contains(id)) {
-            val delayInstance = new DelayInstance(delay, scheduler, reporter)
-            delays.put(id, delayInstance)
-            delayInstance.start(browserAccess)
-          }
+          miscDelay(rc.currentContainerId, delay)
         case entry: ComponentEntry[F, CS, E, Any, Any, Any] =>
-          val id = rc.subsequentId
-          nestedComponents.get(id) match {
-            case Some(n: ComponentInstance[F, CS, E, Any, Any, Any]) if n.component.id == entry.component.id =>
-              // Use nested component instance
-              markedComponentInstances += id
-              n.setEventsSubscription((e: Any) => entry.eventHandler(browserAccess, e).runAsyncForget)
-              n.applyRenderContext(entry.parameters, proxy, snapshot)
-            case _ =>
-              val n = entry.createInstance(
-                id, sessionId, frontend, eventRegistry,
-                stateManager, getRenderNum, stateQueue,
-                scheduler, reporter, recovery
-              )
-              markedComponentInstances += id
-              nestedComponents.put(id, n)
-              n.unsafeInitialize()
-              n.setEventsSubscription((e: Any) => entry.eventHandler(browserAccess, e).runAsyncForget)
-              n.applyRenderContext(entry.parameters, proxy, snapshot)
+          entry.component match {
+            case _: Component[F, Any, Any, Any] =>
+              miscComponent(rc.subsequentId, entry, snapshot, proxy)
+            case _: AsyncComponent[F, Any, Any, Any] =>
+              val id = rc.currentId
+              val componentRC = getOrCreateAsyncComponentRC(id)
+              miscComponent(id, entry, snapshot, componentRC)
+              ()
           }
       }
     })
+
     node(proxy)
+
+
+//    component match {
+//      case component: AsyncComponent[F, CS, P, E] =>
+//        Effect[F].delay(component.render(parameters, state)).map { node =>
+//          val componentRC = getOrCreateAsyncComponentRC(nodeId)
+//          node(componentRC)
+//          frontend.performDomChanges(componentRC.diff)
+//        }
+//      case _ =>
+//        ()
+//    }
   }
 
   private def applyTransitionEffect(transition: TransitionAsync[F, CS]): F[CS] =
@@ -309,6 +384,7 @@ final class ComponentInstance
             !event.stopPropagation
           }
         case None =>
+          // TODO: Maybe tree data structure can be more optimal
           nestedComponents.values.forall { nested =>
             nested.applyEvent(eventId)
           }
