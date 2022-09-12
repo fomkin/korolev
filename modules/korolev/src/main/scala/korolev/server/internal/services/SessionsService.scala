@@ -101,7 +101,7 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
           } yield ()
         }
 
-        handleCommunicationTimeout().runSyncForget
+        handleCommunicationTimeout().runAsyncForget
         incomingConsumed.runAsync(invokeOnce("due connection close"))
       }
 
