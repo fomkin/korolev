@@ -311,7 +311,13 @@ lazy val zio2 = project
   .settings(commonSettings: _*)
   .settings(
     normalizedName := "korolev-zio2",
-    libraryDependencies += "dev.zio" %% "zio" % zio2Version
+    libraryDependencies ++= Seq(
+      "dev.zio" %% "zio" % zio2Version,
+      "dev.zio" %% "zio-test" % zio2Version % Test,
+      "dev.zio" %% "zio-test-sbt" % zio2Version % Test,
+      "dev.zio" %% "zio-test-magnolia" % zio2Version % Test
+    ),
+    testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework")
   )
   .dependsOn(effect)
 
