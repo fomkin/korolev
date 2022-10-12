@@ -123,15 +123,6 @@ export class Korolev {
     this.listenRoot(type, preventDefault);
   }
 
-  stringifyXmlNs(xmlNs) {
-    switch (xmlNs) {
-      case 0: return "http://www.w3.org/1999/xhtml";
-      case 1: return "http://www.w3.org/2000/svg";
-      case 2: return "http://www.w3.org/1998/Math/MathML";
-      case 3: return "http://www.w3.org/1999/xlink";
-    }
-  }
-
   /**
    * @param {Array} data
    */
@@ -166,7 +157,7 @@ export class Korolev {
     if (xmlNs === 0) {
       newElement = document.createElement(tag);
     } else {
-      newElement = document.createElementNS(this.stringifyXmlNs(xmlNs), tag);
+      newElement = document.createElementNS(xmlNs, tag);
     }
     newElement.vId = childId;
     if (child && child.parentNode === parent) {
@@ -263,7 +254,7 @@ export class Korolev {
     else if (xmlNs === 0) {
       element.setAttribute(name, value);
     } else {
-      element.setAttributeNS(this.stringifyXmlNs(xmlNs), name, value);
+      element.setAttributeNS(xmlNs, name, value);
     }
   }
 
@@ -278,7 +269,7 @@ export class Korolev {
     else if (xmlNs === 0) {
       element.removeAttribute(name);
     } else {
-      element.removeAttributeNS(this.stringifyXmlNs(xmlNs), name);
+      element.removeAttributeNS(xmlNs, name);
     }
   }
 

@@ -22,11 +22,11 @@ import scala.annotation.switch
 import korolev.Context.FileHandler
 import korolev.data.Bytes
 import korolev.web.{FormData, PathAndQuery}
-import korolev.effect.syntax.*
+import korolev.effect.syntax._
 import korolev.Metrics
 import korolev.effect.{AsyncTable, Effect, Queue, Reporter, Stream}
 import levsha.Id
-import levsha.impl.DiffRenderContext.{ChangesPerformer, FastChangesPerformer}
+import levsha.impl.DiffRenderContext.ChangesPerformer
 
 import scala.concurrent.ExecutionContext
 
@@ -179,19 +179,14 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
       result <- stringPromises.get(descriptor)
     } yield result
 
-  def performDomChanges(f: FastChangesPerformer => Unit): F[Unit] = {
+  def performDomChanges(f: ChangesPerformer => Unit): F[Unit] = {
     def diff = {
       val timeStart = System.nanoTime()
       val sb = remoteDomChangesPerformer.buffer
       sb.append('[')
       sb.append(Procedure.ModifyDom.codeString)
       sb.append(',')
-      try {
-        f(remoteDomChangesPerformer)
-      } catch {
-        case e =>
-          e.printStackTrace()
-      }
+      f(remoteDomChangesPerformer)
       sb.update(sb.length - 1, ' ') // replace last comma to space
       sb.append(']')
       val result = remoteDomChangesPerformer.buffer.result()
@@ -281,7 +276,7 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
       propertyType.toInt match {
         case PropertyType.Error.code =>
           stringPromises
-            .fail(descriptor, new ClientSideException(value))
+            .fail(descriptor, ClientSideException(value))
             .after(stringPromises.remove(descriptor))
         case _ =>
           stringPromises
@@ -302,7 +297,7 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
             .after(stringPromises.remove(descriptor))
         case EvalJsStatus.Failure.code =>
           stringPromises
-            .fail(descriptor, new ClientSideException(json))
+            .fail(descriptor, ClientSideException(json))
             .after(stringPromises.remove(descriptor))
       }
     case (CallbackType.CustomCallback.code, args) =>
@@ -312,7 +307,7 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
         case None    => Effect[F].unit
       }
     case (callbackType, args) =>
-      Effect[F].fail(new UnknownCallbackException(callbackType, args))
+      Effect[F].fail(UnknownCallbackException(callbackType, args))
   }.runAsyncForget
 }
 
@@ -419,8 +414,8 @@ object Frontend {
       All.find(_.code == n)
   }
 
-  class ClientSideException(message: String) extends Exception(message)
-  class UnknownCallbackException(callbackType: Int, args: String)
+  case class ClientSideException(message: String) extends Exception(message)
+  case class UnknownCallbackException(callbackType: Int, args: String)
       extends Exception(s"Unknown callback $callbackType with args '$args' received")
 
   final case class DownloadFileMeta[F[_]: Effect](stream: Stream[F, Bytes], size: Option[Long], mimeType: String)

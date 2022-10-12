@@ -17,27 +17,14 @@
 package korolev.internal
 
 import korolev.internal.Frontend.ModifyDomProcedure
-import levsha.{FastId, XmlNs}
-import levsha.impl.DiffRenderContext.{ChangesPerformer, FastChangesPerformer}
-import levsha.impl.internal.StringHelper.appendFromSource
+import levsha.FastId
+import levsha.impl.DiffRenderContext.ChangesPerformer
 
-import java.nio.ByteBuffer
 import scala.collection.mutable
 
-private[korolev] class RemoteDomChangesPerformer extends FastChangesPerformer {
+private[korolev] class RemoteDomChangesPerformer extends ChangesPerformer {
 
   final val buffer = new mutable.StringBuilder()
-
-  private def appendFromSourceEscape(source: ByteBuffer, offset: Int, bytesLength: Int): Unit = {
-    if (bytesLength > 0) {
-      var i = 0
-      while (i < bytesLength) {
-        val c = source.getChar(offset + i)
-        jsonCharAppend(buffer, c, unicode = true)
-        i += 2
-      }
-    }
-  }
 
   private def append(s: String): Unit = {
     buffer.append(s)
@@ -65,27 +52,18 @@ private[korolev] class RemoteDomChangesPerformer extends FastChangesPerformer {
     buffer.append(',')
   }
 
-  private def appendString(source: ByteBuffer, offset: Int, byteLength: Int): Unit = {
+  private def appendStringEscape(s: String): Unit = {
     buffer.append('"')
-    appendFromSource(source, buffer, offset, byteLength)
-    buffer.append('"')
-    buffer.append(',')
-  }
-
-  private def appendStringEscape(source: ByteBuffer, offset: Int, byteLength: Int): Unit = {
-    buffer.append('"')
-    appendFromSourceEscape(source, offset, byteLength)
+    jsonEscape(buffer, s, unicode = true)
     buffer.append('"')
     buffer.append(',')
   }
 
-  private def appendXmlNs(xmlNs: XmlNs): Unit = {
-    buffer.append(xmlNs.code)
-    buffer.append(',')
-//    if (xmlNs eq levsha.XmlNs.HTML) {
-//      buffer.append('0')
-//      buffer.append(',')
-//    } else appendString(xmlNs.uri)
+  private def appendXmlNs(xmlNs: String): Unit = {
+    if (xmlNs eq levsha.XmlNs.html.uri) {
+      buffer.append('0')
+      buffer.append(',')
+    } else appendString(xmlNs)
   }
 
   def remove(id: FastId): Unit = {
@@ -94,14 +72,14 @@ private[korolev] class RemoteDomChangesPerformer extends FastChangesPerformer {
     appendId(id)
   }
 
-  def createText(id: FastId, source: ByteBuffer, offset: Int, length: Int): Unit = {
+  def createText(id: FastId, text: String): Unit = {
     append(ModifyDomProcedure.CreateText.codeString)
     appendParentId(id)
     appendId(id)
-    appendStringEscape(source, offset, length)
+    appendStringEscape(text)
   }
 
-  def create(id: FastId, xmlNs: XmlNs, source: ByteBuffer, offset: Int, bytesLength: Int): Unit = {
+  def create(id: FastId, xmlNs: String, tag: String): Unit = {
     append(ModifyDomProcedure.Create.codeString)
     if (!id.hasParent) {
       appendString("0")
@@ -110,36 +88,37 @@ private[korolev] class RemoteDomChangesPerformer extends FastChangesPerformer {
     }
     appendId(id)
     appendXmlNs(xmlNs)
-    appendString(source, offset, bytesLength)
+    appendString(tag)
   }
 
-  def removeStyle(id: FastId, source: ByteBuffer, offset: Int, bytesLength: Int): Unit = {
+  def removeStyle(id: FastId, name: String): Unit = {
     append(ModifyDomProcedure.RemoveStyle.codeString)
     appendId(id)
-    appendString(source, offset, bytesLength)
+    appendString(name)
   }
 
-  def setStyle(id: FastId, source: ByteBuffer, nameOffset: Int, nameBytesLength: Int, valueOffset: Int, valueBytesLength: Int): Unit = {
+  def setStyle(id: FastId, name: String, value: String): Unit = {
     append(ModifyDomProcedure.SetStyle.codeString)
     appendId(id)
-    appendString(source, nameOffset, nameBytesLength)
-    appendStringEscape(source, valueOffset, valueBytesLength)
+    appendString(name)
+    appendStringEscape(value)
   }
 
-  def setAttr(id: FastId, xmlNs: XmlNs, source: ByteBuffer, nameOffset: Int, nameBytesLength: Int, valueOffset: Int, valueBytesLength: Int): Unit = {
+  def setAttr(id: FastId, xmlNs: String, name: String, value: String): Unit = {
     append(ModifyDomProcedure.SetAttr.codeString)
     appendId(id)
     appendXmlNs(xmlNs)
-    appendString(source, nameOffset, nameBytesLength)
-    appendStringEscape(source, valueOffset, valueBytesLength)
+    appendString(name)
+    appendStringEscape(value)
     append("false")
   }
 
-  def removeAttr(id: FastId, xmlNs: XmlNs, source: ByteBuffer, offset: Int, bytesLength: Int): Unit = {
+  def removeAttr(id: FastId, xmlNs: String, name: String): Unit = {
     append(ModifyDomProcedure.RemoveAttr.codeString)
     appendId(id)
     appendXmlNs(xmlNs)
-    appendString(source, offset, bytesLength)
+    appendString(name)
     append("false")
   }
+
 }
