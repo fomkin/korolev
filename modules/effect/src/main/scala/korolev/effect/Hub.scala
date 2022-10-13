@@ -62,17 +62,12 @@ final class Hub[F[_]: Effect, T](upstream: Stream[F, T], bufferSize: Int) {
         maybeItem
       }
 
-    def pull(): F[Option[T]] =
-      for {
-        began <- begin()
-        result <- if (began)
-          for {
-            size <- thisQueue.size()
-            result <- if (size > 0) end() *> thisQueue.stream.pull()
-            else pullUpstream().flatMap(v => end().as(v))
-          } yield result
-        else thisQueue.stream.pull()
-      } yield result
+    def pull(): F[Option[T]] = begin()
+      .flatMap { began =>
+        if (!began) thisQueue.stream.pull()
+        else for (result <- pullUpstream(); _ <- end())
+          yield result
+      }
 
     def cancel(): F[Unit] = thisQueue.close()
   }

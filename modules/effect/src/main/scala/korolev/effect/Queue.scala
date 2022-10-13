@@ -245,17 +245,6 @@ class Queue[F[_]: Effect, T](maxSize: Int) {
     aux()
   }
 
-  /**
-   * Returns the size of the queue. This property takes into account canOfferCallbacks and pullCallbacks to
-   * determine the real size of the queue after all of them are resolved.
-   * @return
-   */
-  def size(): F[Int] =
-    Effect[F].delay {
-      val s = state.get()
-      s.queue.size + s.canOfferCallbacks.size - s.pullCallbacks.length
-    }
-
   val stream: Stream[F, T] = new QueueStream()
 }
 
