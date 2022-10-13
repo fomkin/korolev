@@ -80,10 +80,9 @@ class Zio2Effect[R, E](rts: Runtime[R], liftError: Throwable => E, unliftError: 
 
   def recover[A, AA >: A](m: ZIO[R, E, A])(f: PartialFunction[Throwable, AA]): ZIO[R, E, AA] =
     m.catchSome(unliftErrorP.andThen(f).andThen(result => ZIO.succeed(result)))
-      .catchSomeDefect(f.andThen(result => ZIO.succeed(result)))
 
   def recoverF[A, AA >: A](m: ZIO[R, E, A])(f: PartialFunction[Throwable, ZIO[R, E, AA]]): ZIO[R, E, AA] =
-    m.catchSome(unliftErrorP.andThen(f).andThen(result => result)).catchSomeDefect(f)
+    m.catchSome(unliftErrorP.andThen(f).andThen(result => result))
 
   def start[A](task: => ZIO[R, E, A])(implicit ec: ExecutionContext): ZIO[R, E, Effect.Fiber[ZIO[R, E, *], A]] =
     ZIO
