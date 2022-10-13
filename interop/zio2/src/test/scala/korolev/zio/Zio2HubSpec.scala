@@ -4,7 +4,7 @@ import zio.{Queue as _, Hub as _, Console as _, _}
 import korolev.effect._
 
 import zio.test.Assertion.*
-import zio.test.TestAspect.{identity as _, _}
+import zio.test.TestAspect.{repeat, silent}
 import zio.test.*
 
 object Zio2HubSpec extends ZIOSpecDefault {
@@ -35,7 +35,7 @@ object Zio2HubSpec extends ZIOSpecDefault {
                 values <- subscriber.join
               } yield assert(values.flatten)(equalTo(as.take(n)))
           }
-        } @@ timeout(10.seconds),
+        },
         test("with one publisher and two subscribers") {
           check(smallInt, Gen.listOf(smallInt)) {
             (n, as) =>
@@ -68,7 +68,7 @@ object Zio2HubSpec extends ZIOSpecDefault {
                 assert(values1.flatten)(equalTo(as.take(n))) &&
                   assert(values2.flatten)(equalTo(as.take(n)))
           }
-        } @@ timeout(20.seconds)
+        }
       ),
       suite("concurrent publishers and subscribers")(
         test("one to one") {
