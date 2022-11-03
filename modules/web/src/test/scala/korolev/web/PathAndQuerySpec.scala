@@ -135,6 +135,16 @@ class PathAndQuerySpec extends AnyFlatSpec with Matchers {
     path.reverse shouldBe Root / "system" / "v1" / "api"
   }
 
+  ".params" should "return Some for an existing param" in {
+    val head = Root :? "k1" -> "v1"
+    head.param("k1") shouldBe Some("v1")
+  }
+
+  ".params" should "return None for a missing param" in {
+    val head = Root :? "k1" -> "v1"
+    head.param("k2") shouldBe None
+  }
+
   "path matching" should "correct extract parameters as a Map[String, String]" in {
     val path = Root / "test" :? "k1" -> "v1"
 
