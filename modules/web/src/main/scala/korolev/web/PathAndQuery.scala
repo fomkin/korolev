@@ -119,6 +119,7 @@ sealed trait PathAndQuery {
         case :&(_, (k, v)) if k == name => Some(v)
         case :&(prev, _)                => aux(prev)
         case _ :? tpl if tpl._1 == name => Some(tpl._2)
+        case _ :? _                     => None
       }
     }
 
