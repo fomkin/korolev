@@ -90,6 +90,12 @@ package object akka {
                       materializer.system.log.warning("WS connection receive 'BinaryMessage' but currently it not supported")
                       Future.successful(None)
                   }
+                  .recover {
+                    case ex =>
+                      korolevServiceConfig.reporter.error(s"WebSocket exception ${ex.getMessage}, shutdown output stream", ex)
+                      outStream.cancel()
+                      None
+                  }
                   .collect {
                     case Some(message) =>
                       message
