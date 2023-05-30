@@ -162,57 +162,18 @@ object Zio2QueueSpec extends ZIOSpecDefault {
         } yield count
       )(equalTo(300))
     ),
-//    test("canOffer")(
-//      assertZIO {
-//        def checkCanOffer(maxSize: Int) = {
-//          val queue = Queue[Task, Int](maxSize)
-//
-//          def offeringProcess =
-//            for {
-//              s1 <- Stream(0 until 1000: _*).mat()
-//              s2 <- Stream(1000 until 2000: _*).mat()
-//              s3 <- Stream(2000 until 3000: _*).mat()
-//              sem <- Semaphore.make(permits = 4)
-//              ss = Seq(s1, s2, s3)
-//              _ <- sem.withPermit(
-//                ZIO.foreachDiscard(ss)(
-//                  s =>
-//                    sem.withPermit(
-//                      ZIO.foreachDiscard(1 to 1000)(
-//                        _ =>
-//                          s.pull()
-//                            .some
-//                            .flatMap(i => {
-//                              def aux(): Task[Unit] = queue.offer(i) flatMap {
-//                                case false => queue.canOffer *> aux()
-//                                case true  => ZIO.unit
-//                              }
-//                              aux()
-//                            }.fork))
-//                  ))
-//              )
-//              _ <- sem.withPermits(4)(queue.stop())
-//            } yield ()
-//
-//          for {
-//            offerring <- offeringProcess.fork
-//            count <- (1 to 3000).foldLeft(ZIO.attempt(0))((acc, _) =>
-//              for {
-//                c <- acc
-//                _ <- queue.stream.pull()
-//              } yield c + 1
-//            )
-//            _ <- offerring.join
-//          } yield count
-//        }
-//
-//        for {
-//          c1 <- checkCanOffer(1)
-//          c5 <- checkCanOffer(5)
-//          c10 <- checkCanOffer(10)
-//        } yield Seq(c1, c5, c10)
-//      }(forall(equalTo(3000)))
-//    )
+   test("canOffer")(
+      assertZIO {
+        val queue = Queue[Task, Int](2)
+        for {
+          _ <- ZIO.foreachParDiscard(Seq(1, 2))(queue.offer).fork
+          _ <- waitForSize(queue, 2)
+          canOffer <- queue.canOffer.fork
+          _ <- queue.stream.pull().repeatN(1)
+          _ <- canOffer.join
+        } yield ()
+      }(isUnit)
+    ) @@ diagnose(5.seconds)
   )
 }
 
