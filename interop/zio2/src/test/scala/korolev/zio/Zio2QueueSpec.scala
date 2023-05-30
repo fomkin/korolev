@@ -173,7 +173,7 @@ object Zio2QueueSpec extends ZIOSpecDefault {
           _ <- canOffer.join
         } yield ()
       }(isUnit)
-    ) @@ diagnose(5.seconds)
+    )
   )
 }
 
