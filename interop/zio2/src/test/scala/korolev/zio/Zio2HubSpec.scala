@@ -199,31 +199,21 @@ object Zio2HubSpec extends ZIOSpecDefault {
               } yield assert(values)(equalTo(as))
           }
         },
-        // this test does not work with bounded hubs
-//      test("one to many") {
-//        check(smallInt, Gen.listOf(smallInt)) { (n, as) =>
-//          for {
-//            promise1 <- Promise.make[Nothing, Unit]
-//            promise2 <- Promise.make[Nothing, Unit]
-//            queue <- ZIO.succeed(Queue[Task, Int](n))
-//            hub = Hub[Task, Int](queue.stream, n)
-//            subscriber1 <-
-//              hub.newStream().flatMap { subscription =>
-//                promise1.succeed(()) *> ZIO.foreach(as)(_ => subscription.pull().some)
-//              }.fork
-//            subscriber2 <-
-//              hub.newStream().flatMap { subscription =>
-//                promise2.succeed(()) *> ZIO.foreach(as)(_ => subscription.pull().some)
-//              }.fork
-//            _       <- promise1.await
-//            _       <- promise2.await
-//            _       <- ZIO.foreach(as)(queue.enqueue).fork
-//            values1 <- subscriber1.join.disconnect.timeoutFail(new Exception(s"timeout ${n} ${as}"))(1.second)
-//            values2 <- subscriber2.join.disconnect.timeoutFail(new Exception(s"timeout ${n} ${as}"))(1.second)
-//          } yield assert(values1)(equalTo(as)) &&
-//            assert(values2)(equalTo(as))
-//        }
-//      },
-      )
+        test("one to many") {
+          check(smallInt, Gen.listOf(smallInt)) { (n, as) =>
+            for {
+              queue <- ZIO.succeed(Queue[Task, Int](n))
+              hub = Hub[Task, Int](queue.stream, n)
+              subscription1 <- hub.newStream()
+              subscription2 <- hub.newStream()
+              subscriber1 <- ZIO.foreach(as.take(n))(_ => subscription1.pull().some).fork
+              subscriber2 <- ZIO.foreach(as.take(n))(_ => subscription2.pull().some).fork
+              _ <- ZIO.foreach(as.take(n))(queue.enqueue).fork
+              values1 <- subscriber1.join
+              values2 <- subscriber2.join
+            } yield assert(values1)(equalTo(as.take(n))) && assert(values2)(equalTo(as.take(n)))
+          }
+        },
+      ) @@ repeat(Schedule.recurs(200))
     ) @@ silent
 }
