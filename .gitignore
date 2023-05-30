@@ -7,3 +7,12 @@ target/
 .settings/
 *.iml
 
+# vscode
+/.vscode
+
+# metals
+.metals
+.bloop
+project/**/metals.sbt
+
+.bsp
