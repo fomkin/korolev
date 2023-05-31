@@ -6,8 +6,10 @@ import korolev.web.PathAndQuery
 import korolev.zio.Zio2Effect
 import korolev.state.javaSerialization.*
 import korolev.zio.http.ZioHttpKorolev
-import zhttp.http.HttpApp
-import zhttp.service.Server
+import zio.http.HttpApp
+import zio.http.Response
+import zio.http.Server
+import zio.http.Status
 
 import scala.concurrent.ExecutionContext
 
@@ -82,14 +84,13 @@ object ZioHttpExample extends ZIOAppDefault {
   }
 
 
-  override def run = {
-
-    val prog = for {
+  override def run =
+    for {
       httpApp <- getAppRoute()
-      _   <- Server.start(8088, httpApp)
+      _ <- Server
+        .serve(httpApp.catchAllZIO(_ => ZIO.debug("error") *> ZIO.succeed(Response.status(Status.InternalServerError))))
+        .provide(Server.defaultWithPort(8078))
+        .orDie
     } yield ZExitCode.success
-
-    prog.orDie
-  }
 
 }

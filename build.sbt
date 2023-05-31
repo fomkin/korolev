@@ -16,7 +16,7 @@ val ce3Version = "3.3.12"
 
 val zioVersion = "1.0.15"
 val zio2Version = "2.0.0"
-val zioHttpVersion = "2.0.0-RC10"
+val zioHttpVersion = "3.0.0-RC2"
 
 val fs2ce2Version = "2.5.11"
 val fs2ce3Version = "3.2.8"
@@ -242,7 +242,7 @@ lazy val zioHttp = project
   .settings(commonSettings: _*)
   .settings(
     normalizedName := "korolev-zio-http",
-    libraryDependencies += "io.d11" %% "zhttp" % zioHttpVersion
+    libraryDependencies += "dev.zio" %% "zio-http" % zioHttpVersion
   )
   .dependsOn(korolev, web, zio2, zio2Streams)
 
