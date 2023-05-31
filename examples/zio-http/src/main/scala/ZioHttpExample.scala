@@ -88,8 +88,8 @@ object ZioHttpExample extends ZIOAppDefault {
     for {
       httpApp <- getAppRoute()
       _ <- Server
-        .serve(httpApp.catchAllZIO(_ => ZIO.debug("error") *> ZIO.succeed(Response.status(Status.InternalServerError))))
-        .provide(Server.defaultWithPort(8078))
+        .serve(httpApp.catchAllZIO(_ => ZIO.succeed(Response.status(Status.InternalServerError))))
+        .provide(Server.defaultWithPort(8088))
         .orDie
     } yield ZExitCode.success
 
