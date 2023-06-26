@@ -65,10 +65,10 @@ private[korolev] final class KorolevServiceImpl[F[_]: Effect](http: PartialFunct
 
   }
 
-  def ws(request: WebSocketRequest[F]): F[WebSocketResponse[F]] = {
-    (request.cookie(Cookies.DeviceId), request.pq) match {
+  def ws(wsRequest: WebSocketRequest[F]): F[WebSocketResponse[F]] = {
+    (wsRequest.httpRequest.cookie(Cookies.DeviceId), wsRequest.httpRequest.pq) match {
       case (Some(deviceId), Root / "bridge" / "web-socket" / sessionId) =>
-        messagingService.webSocketMessaging(Qsid(deviceId, sessionId), request, request.body)
+        messagingService.webSocketMessaging(Qsid(deviceId, sessionId), wsRequest.httpRequest, wsRequest.httpRequest.body, wsRequest.protocols)
       case _ =>
         webSocketBadRequestF
     }

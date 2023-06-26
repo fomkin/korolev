@@ -29,8 +29,10 @@ package object server {
 
   type HttpRequest[F[_]] = Request[Stream[F, Bytes]]
   type HttpResponse[F[_]] = Response[Stream[F, Bytes]]
-  type WebSocketRequest[F[_]] = Request[Stream[F, String]]
-  type WebSocketResponse[F[_]] = Response[Stream[F, String]]
+
+  final case class WebSocketRequest[F[_]](httpRequest: Request[Stream[F, Bytes]], protocols: Seq[String])
+  final case class WebSocketResponse[F[_]](httpResponse: Response[Stream[F, Bytes]], selectedProtocol: String)
+
   type StateLoader[F[_], S] = (DeviceId, Head) => F[S]
 
   def korolevService[F[_]: Effect, S: StateSerializer: StateDeserializer, M](

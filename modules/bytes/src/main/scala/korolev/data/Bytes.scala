@@ -34,7 +34,7 @@ object Bytes {
 
   def apply[T: BytesLike](xs: Int*): Bytes =
     Bytes.wrap(BytesLike[T].wrapArray(xs.toArray.map(_.toByte)))
-  def empty: Bytes = Bytes.wrap(new Array[Byte](0))
+  val empty: Bytes = Bytes.wrap(new Array[Byte](0))
 
   def wrap[T: BytesLike](that: T): Bytes = new Bytes {
     def apply(i: Int): Byte = BytesLike[T].get(that, i)

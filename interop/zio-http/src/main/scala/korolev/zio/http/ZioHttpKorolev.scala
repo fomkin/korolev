@@ -2,14 +2,15 @@ package korolev.zio.http
 
 import _root_.zio.http.*
 import _root_.zio.stream.ZStream
-import _root_.zio.{RIO, ZIO}
-import korolev.data.Bytes
+import _root_.zio.{Chunk, NonEmptyChunk, RIO, ZIO}
+import korolev.data.{Bytes, BytesLike}
 import korolev.effect.{Queue, Stream as KStream}
-import korolev.server.{KorolevService, KorolevServiceConfig, HttpRequest as KorolevHttpRequest}
+import korolev.server.{KorolevService, KorolevServiceConfig, WebSocketRequest, WebSocketResponse, HttpRequest as KorolevHttpRequest}
 import korolev.state.{StateDeserializer, StateSerializer}
 import korolev.web.{PathAndQuery as PQ, Request as KorolevRequest, Response as KorolevResponse}
 import korolev.zio.Zio2Effect
 import korolev.zio.streams.*
+import korolev.zio.ChunkBytesLike
 
 
 class ZioHttpKorolev[R] {
@@ -85,36 +86,40 @@ class ZioHttpKorolev[R] {
   (implicit eff:  ZEffect): ZIO[R, Throwable, Response] = {
 
 
-    val fromClientKQueue = Queue[RIO[R, *], String]()
-    val korolevRequest = mkKorolevRequest[KStream[RIO[R, *], String]](req, fullPath, fromClientKQueue.stream)
+    val fromClientKQueue = Queue[RIO[R, *], Bytes]()
+    val korolevRequest = mkKorolevRequest[KStream[RIO[R, *], Bytes]](req, fullPath, fromClientKQueue.stream)
+    val maybeSecWebSocketProtocol = req.headers.getAll(Header.SecWebSocketProtocol)
+    val protocols = maybeSecWebSocketProtocol.flatMap(_.renderedValue.split(',').map(_.trim))
     for {
-      response <- korolevServer.ws(korolevRequest)
-      toClient = response match {
-        case KorolevResponse(_, outStream, _, _) =>
-          outStream
-            .map(out => WebSocketFrame.Text(out))
+      // FIXME https://github.com/zio/zio-http/issues/2278
+      response <- korolevServer.ws(WebSocketRequest(korolevRequest, Nil))
+      (selectedProtocol, toClient) = response match {
+        case WebSocketResponse(KorolevResponse(_, outStream, _, _), selectedProtocol) =>
+          selectedProtocol -> outStream
+            .map(out => WebSocketFrame.Binary(out.as[Chunk[Byte]]))
             .toZStream
         case null =>
           throw new RuntimeException
       }
       route <- buildSocket(toClient, fromClientKQueue)
     } yield {
-      route
+      route.withHeader(Header.SecWebSocketProtocol(NonEmptyChunk(selectedProtocol)))
     }
   }
 
   private def buildSocket(
                            toClientStream: ZStream[R, Throwable, WebSocketFrame],
-                           fromClientKQueue: Queue[RIO[R, *], String]
+                           fromClientKQueue: Queue[RIO[R, *], Bytes]
                          ): RIO[R, Response] = {
     val socket = Handler.webSocket { channel =>
       channel.receiveAll {
         case ChannelEvent.UserEventTriggered(ChannelEvent.UserEvent.HandshakeComplete) => {
           toClientStream.mapZIO(frame => channel.send(ChannelEvent.Read(frame))).runDrain.forkDaemon
         }
-          
+        case ChannelEvent.Read(WebSocketFrame.Binary(bytes)) =>
+          fromClientKQueue.offer(Bytes.wrap(bytes))
         case ChannelEvent.Read(WebSocketFrame.Text(t)) => 
-          fromClientKQueue.offer(t)
+          fromClientKQueue.offer(BytesLike[Bytes].utf8(t))
         case ChannelEvent.Read(WebSocketFrame.Close(_, _)) => 
           fromClientKQueue.close()
         case ChannelEvent.Unregistered =>

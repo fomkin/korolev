@@ -81,14 +81,43 @@ export class Connection {
     let path = this._serverRootPath + `bridge/web-socket/${this._sessionId}`;
     let uri = url + path;
 
-    this._webSocket = new WebSocket(uri);
-    this._send = (data) => this._webSocket.send(data);
+    let protocols = [ 'json' ];
+
+    if (typeof CompressionStream != 'undefined') {
+      protocols.push('json-deflate');
+    }
+
+    this._textEncoder = new TextEncoder();
+    this._webSocket = new WebSocket(uri, protocols);
+    this._webSocket.binaryType = 'blob';
+    this._send = async (message) => {
+      let blob = new Blob([this._textEncoder.encode(message)]);
+      if (this._webSocket.protocol == 'json-deflate') {
+        let stream = blob
+          .stream()
+          .pipeThrough(new CompressionStream('deflate-raw'))
+        blob = await new Response(stream).blob();
+      }
+      this._webSocket.send(blob);
+    }
     this._connectionType = ConnectionType.WEB_SOCKET;
 
     this._webSocket.addEventListener('open', (event) => this._onOpen());
     this._webSocket.addEventListener('close', (event) => this._onClose());
     this._webSocket.addEventListener('error', (event) => this._onError());
-    this._webSocket.addEventListener('message', (event) => this._onMessage(event.data));
+    this._webSocket.addEventListener('message', async (event) => {
+      let data = event.data;
+      if (data instanceof Blob) {
+        if (this._webSocket.protocol == 'json-deflate') {
+          let stream = data
+            .stream()
+            .pipeThrough(new DecompressionStream('deflate-raw'));
+          data = await new Response(stream).blob();
+        }
+        data = await data.text();
+      }
+      this._onMessage(data);
+    });
     
     console.log(`Trying to open connection to ${uri} using WebSocket`);
   }

@@ -17,7 +17,11 @@
 package korolev
 
 import korolev.effect.Effect
-import _root_.zio._
+import _root_.zio.*
+import korolev.data.BytesLike
+
+import java.nio.ByteBuffer
+import java.nio.charset.{Charset, StandardCharsets}
 
 package object zio {
 
@@ -57,4 +61,111 @@ package object zio {
                                    (liftError: Throwable => E)
                                    (unliftError: E => Throwable): Effect[ZIO[R, E, *]] =
     new Zio2Effect[R, E](runtime, liftError, unliftError)
+
+  implicit object ChunkBytesLike extends BytesLike[Chunk[Byte]] {
+    override def empty: Chunk[Byte] = Chunk.empty[Byte]
+
+    override def ascii(s: String): Chunk[Byte] = {
+      val buffer = StandardCharsets.US_ASCII.encode(s)
+      buffer.flip()
+      Chunk.fromByteBuffer(buffer)
+    }
+
+    override def utf8(s: String): Chunk[Byte] = {
+      val buffer = StandardCharsets.UTF_8.encode(s)
+      buffer.flip()
+      Chunk.fromByteBuffer(buffer)
+    }
+
+    override def wrapArray(bytes: Array[Byte]): Chunk[Byte] = Chunk.fromArray(bytes)
+
+    override def copyBuffer(buffer: ByteBuffer): Chunk[Byte] = Chunk.fromByteBuffer(buffer)
+
+    override def copyToBuffer(b: Chunk[Byte], buffer: ByteBuffer): Int = {
+      val c = Math.min(b.length, buffer.remaining())
+      b.foreach { x =>
+        buffer.put(x)
+      }
+      c
+    }
+
+    override def copyFromArray(bytes: Array[Byte]): Chunk[Byte] = Chunk.fromArray(bytes)
+
+    override def copyFromArray(bytes: Array[Byte], offset: Int, size: Int): Chunk[Byte] = {
+      val builder = Chunk.newBuilder[Byte]
+      for (i <- offset until size) {
+        builder += (bytes(i))
+      }
+      builder.result()
+    }
+
+    override def copyToArray(value: Chunk[Byte], array: Array[Byte], sourceOffset: Int, targetOffset: Int, length: Int): Unit = {
+      // TODO optimize me
+      for (i <- sourceOffset until length) {
+        array(targetOffset + i) = value(i)
+      }
+    }
+
+    override def asAsciiString(bytes: Chunk[Byte]): String =
+      StandardCharsets.US_ASCII.decode(asBuffer(bytes)).toString
+
+    override def asUtf8String(bytes: Chunk[Byte]): String =
+      StandardCharsets.UTF_8.decode(asBuffer(bytes)).toString
+
+    override def asString(bytes: Chunk[Byte], charset: Charset): String =
+      charset.decode(asBuffer(bytes)).toString
+
+    override def asArray(bytes: Chunk[Byte]): Array[Byte] =
+      bytes.toArray
+
+    override def asBuffer(bytes: Chunk[Byte]): ByteBuffer = {
+      val buff = ByteBuffer.allocate(bytes.length)
+      copyToBuffer(bytes, buff)
+      buff.flip()
+      buff
+    }
+
+    override def eq(l: Chunk[Byte], r: Chunk[Byte]): Boolean =
+      l.equals(r)
+
+    override def get(bytes: Chunk[Byte], i: Long): Byte =
+      bytes(i.toInt)
+
+    override def length(bytes: Chunk[Byte]): Long =
+      bytes.length.toLong
+
+    override def concat(left: Chunk[Byte], right: Chunk[Byte]): Chunk[Byte] =
+      left ++ right
+
+    override def slice(bytes: Chunk[Byte], start: Long, end: Long): Chunk[Byte] =
+      bytes.slice(start.toInt, end.toInt)
+
+    override def mapWithIndex(bytes: Chunk[Byte], f: (Byte, Long) => Byte): Chunk[Byte] = {
+      val builder = Chunk.newBuilder[Byte]
+      var i = 0L
+      bytes.foreach { x =>
+        val res = f(x, i)
+        builder += (res)
+        i += 1
+      }
+      builder.result()
+    }
+
+    override def foreach(bytes: Chunk[Byte], f: Byte => Unit): Unit =
+      bytes.foreach(f)
+    override def indexOf(where: Chunk[Byte], that: Byte): Long =
+      where.indexOf(that)
+
+    override def indexOf(where: Chunk[Byte], that: Byte, from: Long): Long =
+      where.indexOf(that, from.toInt)
+
+    override def lastIndexOf(where: Chunk[Byte], that: Byte): Long =
+      where.lastIndexOf(that)
+
+    override def indexOfSlice(where: Chunk[Byte], that: Chunk[Byte]): Long =
+      where.indexOfSlice(that)
+
+    override def lastIndexOfSlice(where: Chunk[Byte], that: Chunk[Byte]): Long =
+      where.lastIndexOfSlice(that)
+  }
 }

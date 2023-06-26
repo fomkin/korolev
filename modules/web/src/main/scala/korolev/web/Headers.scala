@@ -39,6 +39,7 @@ object Headers {
   final val SecWebSocketAccept = "Sec-WebSocket-Accept"
   final val TransferEncoding  = "Transfer-Encoding"
   final val SecWebSocketVersion = "Sec-WebSocket-Version"
+  final val SecWebSocketProtocol = "Sec-WebSocket-Protocol"
   final val AcceptEncoding = "Accept-Encoding"
 
   final val SecWebSocketVersion13 = SecWebSocketVersion -> "13"

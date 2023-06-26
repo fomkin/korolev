@@ -121,7 +121,7 @@ object State {
   val globalContext = Context[Future, State, Any]
   case class Todo(text: String, done: Boolean)
   object Todo {
-    def apply(n: Int): Vector[Todo] = (0 to n).toVector map {
+    def apply(n: Int): Vector[Todo] = (0 to n * 10).toVector map {
       i => Todo(s"This is TODO #$i", done = false)
     }
   }

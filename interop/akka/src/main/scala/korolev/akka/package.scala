@@ -26,9 +26,10 @@ import _root_.akka.stream.Materializer
 import _root_.akka.stream.scaladsl.{Flow, Keep, Sink}
 import _root_.akka.util.ByteString
 import korolev.akka.util.LoggingReporter
-import korolev.data.Bytes
+import korolev.data.{Bytes, BytesLike}
 import korolev.effect.{Effect, Reporter, Stream}
 import korolev.server.internal.BadRequestException
+import korolev.server.{WebSocketRequest as KorolevWebSocketRequest, WebSocketResponse as KorolevWebSocketResponse}
 import korolev.server.{KorolevService, KorolevServiceConfig, HttpRequest as KorolevHttpRequest}
 import korolev.state.{StateDeserializer, StateSerializer}
 import korolev.web.{PathAndQuery, Request as KorolevRequest, Response as KorolevResponse}
@@ -67,28 +68,32 @@ package object akka {
         extractWebSocketUpgrade { upgrade =>
           // inSink - consume messages from the client
           // outSource - push messages to the client
-          val (inStream, inSink) = Sink.korolevStream[F, String].preMaterialize()
+          val (inStream, inSink) = Sink.korolevStream[F, Bytes].preMaterialize()
           val korolevRequest = mkKorolevRequest(request, path.toString, inStream)
 
           complete {
-            Effect[F].toFuture(korolevServer.ws(korolevRequest)).map {
-              case KorolevResponse(_, outStream, _, _) =>
+            val korolevWsRequest = KorolevWebSocketRequest(korolevRequest, upgrade.requestedProtocols)
+            Effect[F].toFuture(korolevServer.ws(korolevWsRequest)).map {
+              case KorolevWebSocketResponse(KorolevResponse(_, outStream, _, _), selectedProtocol) =>
                 val source = outStream
                     .asAkkaSource
-                    .map(text => TextMessage.Strict(text))
-
+                    .map(text => BinaryMessage.Strict(text.as[ByteString]))
                 val sink = Flow[Message]
                   .mapAsync(akkaHttpConfig.wsStreamedParallelism) {
                     case TextMessage.Strict(message) =>
-                      Future.successful(Some(message))
+                      Future.successful(Some(BytesLike[Bytes].utf8(message)))
                     case TextMessage.Streamed(stream) =>
                       stream
                         .completionTimeout(akkaHttpConfig.wsStreamedCompletionTimeout)
                         .runFold("")(_ + _)
-                        .map(Some(_))
-                    case _: BinaryMessage =>
-                      materializer.system.log.warning("WS connection receive 'BinaryMessage' but currently it not supported")
-                      Future.successful(None)
+                        .map(message => Some(BytesLike[Bytes].utf8(message)))
+                    case BinaryMessage.Strict(data) =>
+                      Future.successful(Some(Bytes.wrap(data)))
+                    case BinaryMessage.Streamed(stream) =>
+                      stream
+                        .completionTimeout(akkaHttpConfig.wsStreamedCompletionTimeout)
+                        .runFold(ByteString.empty)(_ ++ _)
+                        .map(message => Some(Bytes.wrap(message)))
                   }
                   .recover {
                     case ex =>
@@ -107,7 +112,8 @@ package object akka {
                     Flow.fromSinkAndSourceCoupled(sink, source).log("korolev-ws")
                   } else {
                     Flow.fromSinkAndSourceCoupled(sink, source)
-                  }
+                  },
+                  Some(selectedProtocol)
                 )
               case _ =>
                 throw new RuntimeException // cannot happen
