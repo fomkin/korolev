@@ -8,7 +8,6 @@ val levshaVersion = "1.3.0"
 
 val akkaVersion = "2.6.19"
 val akkaHttpVersion = "10.2.9"
-val http4sVersion = "0.23.12"
 
 val circeVersion = "0.14.1"
 val ce2Version = "2.5.5"
@@ -220,20 +219,6 @@ lazy val akka = project
     )
   )
   .dependsOn(korolev)
-
-lazy val http4s = project
-  .in(interop / "http4s")
-  .enablePlugins(GitVersioning)
-  .settings(crossVersionSettings)
-  .settings(commonSettings: _*)
-  .settings(
-    normalizedName := "korolev-http4s",
-    libraryDependencies ++= Seq(
-      "org.http4s"     %% "http4s-server" % http4sVersion,
-      "org.http4s"     %% "http4s-dsl"    % http4sVersion
-    )
-  )
-  .dependsOn(korolev, web, fs2ce3, scodec)
 
 lazy val zioHttp = project
   .in(interop / "zio-http")
@@ -458,16 +443,6 @@ lazy val akkaHttpExample = project
   .settings(mainClass := Some("AkkaHttpExample"))
   .dependsOn(akka)
 
-lazy val http4sZioExample = project
-  .in(examples / "http4s-zio")
-  .disablePlugins(HeaderPlugin)
-  .settings(crossVersionSettings)
-  .settings(exampleSettings: _*)
-  .settings(mainClass := Some("Http4sZioExample"))
-  .settings(libraryDependencies += "dev.zio" %% "zio-interop-cats" % "3.2.9.0")
-  .settings(libraryDependencies += "org.http4s" %% "http4s-blaze-server" % http4sVersion)
-  .dependsOn(zio, http4s)
-
 lazy val zioHttpExample = project
   .in(examples / "zio-http")
   .disablePlugins(HeaderPlugin)
@@ -582,14 +557,14 @@ lazy val root = project
     bytes, webDsl,
     // Interop
     akka, ce2, ce3, monix, zio, zioStreams, zio2, zio2Streams, slf4j,
-    scodec, fs2ce2, fs2ce3, http4s, zioHttp,
+    scodec, fs2ce2, fs2ce3, zioHttp,
     // Examples
     simpleExample, routingExample, gameOfLifeExample,
     formDataExample, `file-streaming-example`, delayExample,
     focusExample, webComponentExample, componentExample,
     akkaHttpExample, contextScopeExample, eventDataExample,
     extensionExample, zioExample, monixExample,
-    catsEffectExample, evalJsExample, http4sZioExample,
+    catsEffectExample, evalJsExample,
     zioHttpExample
   )
 

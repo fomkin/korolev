@@ -1001,49 +1001,6 @@ This integration overrides default logging behavior to `akka.event.Logging`.
 Despite the fact that Akka uses standard Scala futures, the module can
 work we any effect type supported by Korolev
 
-=== Http4s
-
-Korolev provides smooth Http4s HTTP integration out of the box.
-Module can work with every effect processor which supports cats-effect.
-
-To use it, add a dependency:
-
-[source,scala]
-------------------------------
-libraryDependencies += "org.fomkin" %% "korolev-http4s" % "1.5.0"
-------------------------------
-
-[source,scala]
-------------------------------
-val service = KorolevServiceConfig[...](
-  ...
-))
-------------------------------
-
-And create Korolev route, for example, parametrized with ZIO effect type:
-
-[source,scala]
-------------------------------
-
-type AppTask[A] = RIO[ZEnv, A]
-implicit val effect = zioEffectInstance[ZEnv, Throwable](runtime)(identity)(identity)
-
-val config = KorolevServiceConfig[AppTask, String, Any](
-  stateLoader = StateLoader.default("world"),
-  document = state => Html(body(div(s"Hello $state")))
-)
-
-def route(): ZIO[ZEnv, Throwable, HttpRoutes[AppTask]] = {
-  RIO.concurrentEffectWith { implicit CE: ConcurrentEffect[AppTask] =>
-    ZIO(http4s.http4sKorolevService(config))
-  }
-}
-------------------------------
-
-Then embed the route into your Http4 HTTP routes structure.
-
-https://github.com/fomkin/korolev/blob/v1.5.0/examples/http4s-zio/src/main/scala/Http4sZioExample.scala[See full example]
-
 === Zio-Http
 
 Korolev provides smooth Zio-Http integration out of the box.
