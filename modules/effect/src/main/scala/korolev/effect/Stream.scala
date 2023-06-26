@@ -18,8 +18,10 @@ package korolev.effect
 
 import java.io.Closeable
 import java.util.concurrent.atomic.AtomicBoolean
+import korolev.effect.syntax.*
 
-import korolev.effect.syntax._
+import scala.collection.mutable
+import scala.concurrent.duration.FiniteDuration
 
 abstract class Stream[F[_]: Effect, A] { self =>
 
@@ -331,6 +333,37 @@ abstract class Stream[F[_]: Effect, A] { self =>
       }
     }
     aux()
+  }
+
+  def buffer(duration: FiniteDuration)(implicit scheduler: Scheduler[F]): Stream[F, Seq[A]] = new Stream[F, Seq[A]] {
+    private val buff = mutable.Buffer.empty[Option[A]]
+    override def pull(): F[Option[Seq[A]]] = {
+      var stop = false
+      def aux(): Unit = {
+        self.pull().runAsync {
+          case Left(_) => buff.synchronized(buff += None)
+          case Right(None) => buff.synchronized(buff += None)
+          case Right(x: Some[A]) =>
+            buff.synchronized {
+              buff += x
+              if (!stop) {
+                aux()
+              }
+            }
+        }
+      }
+      for {
+        firstItem <- self.pull()
+        _ = buff.+=(firstItem)
+        _ <- Effect[F].delay(aux())
+        _ <- scheduler.sleep(duration)
+        _ =  buff.synchronized { stop = true }
+        result = buff.toVector.flatten
+      } yield if (result.isEmpty) None else Some(result)
+    }
+    override def cancel(): F[Unit] = {
+      self.cancel()
+    }
   }
 }
 

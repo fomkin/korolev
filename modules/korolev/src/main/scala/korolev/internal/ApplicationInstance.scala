@@ -30,6 +30,7 @@ import levsha.impl.DiffRenderContext.ChangesPerformer
 import levsha.{Document, Id, StatefulRenderContext, XmlNs}
 
 import scala.concurrent.ExecutionContext
+import scala.concurrent.duration.*
 
 final class ApplicationInstance
   [
@@ -232,6 +233,8 @@ final class ApplicationInstance
           .foreach(onEvent)
           .start
         _ <- internalStateStream
+          .buffer(1.millis)
+          .map(_.last)
           .foreach {
             case (_, _, cb) =>
               onState(cb)
