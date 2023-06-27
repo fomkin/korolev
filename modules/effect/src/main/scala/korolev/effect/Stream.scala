@@ -17,10 +17,11 @@
 package korolev.effect
 
 import java.io.Closeable
-import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger, AtomicReference}
 import korolev.effect.syntax.*
 
 import scala.collection.mutable
+import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
 
 abstract class Stream[F[_]: Effect, A] { self =>
@@ -335,32 +336,29 @@ abstract class Stream[F[_]: Effect, A] { self =>
     aux()
   }
 
-  def buffer(duration: FiniteDuration)(implicit scheduler: Scheduler[F]): Stream[F, Seq[A]] = new Stream[F, Seq[A]] {
-    private val buff = mutable.Buffer.empty[Option[A]]
-    override def pull(): F[Option[Seq[A]]] = {
-      var stop = false
-      def aux(): Unit = {
-        self.pull().runAsync {
-          case Left(_) => buff.synchronized(buff += None)
-          case Right(None) => buff.synchronized(buff += None)
-          case Right(x: Some[A]) =>
-            buff.synchronized {
-              buff += x
-              if (!stop) {
-                aux()
-              }
+  def buffer(duration: FiniteDuration, maxSize: Int = 16)(implicit scheduler: Scheduler[F], ec: ExecutionContext, reporter: Reporter): Stream[F, Seq[A]] = new Stream[F, Seq[A]] {
+
+    final val queue = Queue[F, A](maxSize)
+
+    self
+      .foreach(queue.enqueue)
+      .start
+      .runAsyncForget
+
+    override def pull(): F[Option[Seq[A]]] = if (duration.toMillis > 0) {
+      queue.stream.pull().flatMap {
+        case None => Effect[F].none
+        case Some(first) =>
+          scheduler.sleep(duration).flatMap { _ =>
+            queue.dequeueAll().map { rest =>
+              Some(first +: rest)
             }
-        }
+          }
       }
-      for {
-        firstItem <- self.pull()
-        _ = buff.+=(firstItem)
-        _ <- Effect[F].delay(aux())
-        _ <- scheduler.sleep(duration)
-        _ =  buff.synchronized { stop = true }
-        result = buff.toVector.flatten
-      } yield if (result.isEmpty) None else Some(result)
+    } else {
+      queue.stream.pull().map(x => x.map(Seq(_)))
     }
+
     override def cancel(): F[Unit] = {
       self.cancel()
     }

@@ -1,9 +1,12 @@
-import korolev._
-import korolev.akka._
+import korolev.*
+import korolev.akka.*
+
 import scala.concurrent.ExecutionContext.Implicits.global
-import korolev.server._
-import korolev.state.javaSerialization._
+import korolev.server.*
+import korolev.state.javaSerialization.*
+
 import scala.concurrent.Future
+import scala.concurrent.duration.DurationInt
 
 object RoutingExample extends SimpleAkkaHttpKorolevApp {
 
@@ -73,7 +76,7 @@ object RoutingExample extends SimpleAkkaHttpKorolevApp {
                 access.valueOf(inputId) flatMap { value =>
                   val todo = State.Todo(value, done = false)
                   Future.successful {
-                    for (_ <- 0 until 10) {
+                    for (_ <- 0 until 3) {
                       access.transition { s =>
                         s.copy(todos = s.todos + (s.selectedTab -> (s.todos(s.selectedTab) :+ todo)))
                       }
@@ -105,7 +108,8 @@ object RoutingExample extends SimpleAkkaHttpKorolevApp {
               val key = initialState.todos.keys.find(_.toLowerCase == name)
               Future.successful(key.fold(initialState)(k => initialState.copy(selectedTab = k)))
         }
-      )
+      ),
+      delayedRender = 1.millis
     )
   }
 }

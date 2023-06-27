@@ -3,13 +3,14 @@ package korolev
 import korolev.effect.{Queue, Reporter, Scheduler}
 import korolev.internal.{ApplicationInstance, Frontend}
 import korolev.state.StateStorage
-import korolev.state.javaSerialization._
-import korolev.testExecution._
+import korolev.state.javaSerialization.*
+import korolev.testExecution.*
 import levsha.{Id, StatefulRenderContext, XmlNs}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import scala.concurrent.Future
+import scala.concurrent.duration.*
 
 class Issue14Spec extends AnyFlatSpec with Matchers {
 
@@ -58,7 +59,8 @@ class Issue14Spec extends AnyFlatSpec with Matchers {
         def addTextNode(text: String): Unit = rc.addTextNode(text)
         def addMisc(misc: Context.Binding[Future, Issue14Spec.S, Any]): Unit = k(rc, misc)
       },
-      recovery = PartialFunction.empty
+      recovery = PartialFunction.empty,
+      delayedRender = 0.seconds
     )
 
     def fireEvent(data: String) =

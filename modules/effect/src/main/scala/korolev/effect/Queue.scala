@@ -150,6 +150,18 @@ class Queue[F[_]: Effect, T](maxSize: Int) {
     aux()
   }
 
+  def dequeueAll(): F[Seq[T]] = Effect[F].delay {
+    def aux(): Seq[T] = {
+      val s = state.get()
+      if (state.compareAndSet(s, s.copy(queue = IQueue.empty))) {
+        s.queue
+      } else {
+        aux()
+      }
+    }
+    aux()
+  }
+
   /**
    * Signals that queue size became less than [[maxSize]].
    * @example {{{

@@ -43,6 +43,7 @@ case class KorolevServiceConfig[F[_], S, M](
   reporter: Reporter = Reporter.PrintReporter,
   recovery: PartialFunction[Throwable, S => S] = PartialFunction.empty[Throwable, S => S],
   sessionIdleTimeout: FiniteDuration = 60.seconds,
+  delayedRender: FiniteDuration = 0.seconds,
 )(implicit val executionContext: ExecutionContext)
 
 object KorolevServiceConfig {

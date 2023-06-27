@@ -48,7 +48,8 @@ final class ApplicationInstance
      createMiscProxy: (StatefulRenderContext[Binding[F, S, M]], (StatefulRenderContext[Binding[F, S, M]], Binding[F, S, M]) => Unit) => StatefulRenderContext[Binding[F, S, M]],
      scheduler: Scheduler[F],
      reporter: Reporter,
-     recovery: PartialFunction[Throwable, S => S]
+     recovery: PartialFunction[Throwable, S => S],
+     delayedRender: FiniteDuration
   ) { application =>
 
   import reporter.Implicit
@@ -105,7 +106,7 @@ final class ApplicationInstance
   private def nextRenderNum(): F[Int] =
     Effect[F].delay(currentRenderNum.incrementAndGet())
 
-  private def onState(maybeRenderCallback: Option[Effect.Promise[Unit]]): F[Unit] =
+  private def onState(maybeRenderCallback: Seq[Effect.Promise[Unit]]): F[Unit] = {
     for {
       snapshot <- stateManager.snapshot
       // Set page url if router exists
@@ -131,6 +132,7 @@ final class ApplicationInstance
       _ <- frontend.setRenderNum(renderNum)
       _ = maybeRenderCallback.foreach(_(Right(())))
     } yield ()
+  }
 
 
   private def onHistory(pq: PathAndQuery): F[Unit] =
@@ -234,10 +236,8 @@ final class ApplicationInstance
           .start
         _ <- internalStateStream
           .buffer(1.millis)
-          .map(_.last)
-          .foreach {
-            case (_, _, cb) =>
-              onState(cb)
+          .foreach { xs =>
+            onState(xs.flatMap(_._3))
           }
           .start
         // Init component
