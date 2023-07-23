@@ -6,8 +6,8 @@ val scala3Version = "3.3.0"
 
 val levshaVersion = "1.3.0"
 
-val akkaVersion = "2.6.19"
-val akkaHttpVersion = "10.2.9"
+val akkaVersion = "2.8.3"
+val akkaHttpVersion = "10.5.2"
 
 val circeVersion = "0.14.1"
 val ce2Version = "2.5.5"
@@ -142,9 +142,9 @@ lazy val http = project
   .settings(
     normalizedName := "korolev-http",
     libraryDependencies ++= Seq(
-      ("com.typesafe.akka" %% "akka-actor-typed" % akkaVersion % Test).cross(CrossVersion.for3Use2_13),
-      ("com.typesafe.akka" %% "akka-stream" % akkaVersion % Test).cross(CrossVersion.for3Use2_13),
-      ("com.typesafe.akka" %% "akka-http" % akkaHttpVersion % Test).cross(CrossVersion.for3Use2_13),
+      "com.typesafe.akka" %% "akka-actor-typed" % akkaVersion % Test,
+      "com.typesafe.akka" %% "akka-stream" % akkaVersion % Test,
+      "com.typesafe.akka" %% "akka-http" % akkaHttpVersion % Test,
     )
   )
   .dependsOn(effect, web)
@@ -213,9 +213,9 @@ lazy val akka = project
   .settings(
     normalizedName := "korolev-akka",
     libraryDependencies ++= Seq(
-      ("com.typesafe.akka" %% "akka-actor" % akkaVersion).cross(CrossVersion.for3Use2_13),
-      ("com.typesafe.akka" %% "akka-stream" % akkaVersion).cross(CrossVersion.for3Use2_13),
-      ("com.typesafe.akka" %% "akka-http" % akkaHttpVersion).cross(CrossVersion.for3Use2_13)
+      "com.typesafe.akka" %% "akka-actor" % akkaVersion,
+      "com.typesafe.akka" %% "akka-stream" % akkaVersion,
+      "com.typesafe.akka" %% "akka-http" % akkaHttpVersion
     )
   )
   .dependsOn(korolev)
@@ -537,10 +537,10 @@ lazy val `performance-benchmark` = project
   .settings(
     run / fork := true,
     libraryDependencies ++= Seq(
-      ("com.typesafe.akka" %% "akka-http" % akkaHttpVersion).cross(CrossVersion.for3Use2_13),
-      ("com.typesafe.akka" %% "akka-stream" % akkaVersion).cross(CrossVersion.for3Use2_13),
-      ("com.typesafe.akka" %% "akka-actor"  % akkaVersion).cross(CrossVersion.for3Use2_13),
-      ("com.typesafe.akka" %% "akka-actor-typed" % akkaVersion).cross(CrossVersion.for3Use2_13),
+      "com.typesafe.akka" %% "akka-http" % akkaHttpVersion,
+      "com.typesafe.akka" %% "akka-stream" % akkaVersion,
+      "com.typesafe.akka" %% "akka-actor"  % akkaVersion,
+      "com.typesafe.akka" %% "akka-actor-typed" % akkaVersion,
       "com.lihaoyi" %% "ujson" % "1.3.15"
     )
   )
