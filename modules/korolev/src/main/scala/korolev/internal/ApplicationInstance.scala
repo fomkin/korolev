@@ -234,12 +234,20 @@ final class ApplicationInstance
           .domEventMessages
           .foreach(onEvent)
           .start
-        _ <- internalStateStream
-          .buffer(1.millis)
-          .foreach { xs =>
-            onState(xs.flatMap(_._3))
-          }
-          .start
+        _ <- if (delayedRender.toMillis > 0) {
+          internalStateStream
+            .buffer(delayedRender)
+            .foreach { xs =>
+              onState(xs.flatMap(_._3))
+            }
+            .start
+        } else {
+          internalStateStream
+            .foreach { xs =>
+              onState(xs._3.toSeq)
+            }
+            .start
+        }
         // Init component
         _ <- topLevelComponentInstance.initialize()
       } yield ()
