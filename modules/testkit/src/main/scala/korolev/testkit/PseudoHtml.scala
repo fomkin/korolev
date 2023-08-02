@@ -144,7 +144,10 @@ object PseudoHtml {
       misc match {
         case ComponentEntry(c, p, _) =>
           val rc = this.asInstanceOf[RenderContext[Context.Binding[F, Any, Any]]]
-          c.render(p, c.initialState).apply(rc)
+          c.initialState match {
+            case Right(s) => c.render(p, s).apply(rc)
+            case Left(_) => c.renderNoState(p).apply(rc)
+          }
         case elementId: ElementId =>
           elements = (idBuilder.mkId, elementId) :: elements
         case event: Context.Event[F, S, M] =>

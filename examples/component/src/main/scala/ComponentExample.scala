@@ -1,10 +1,14 @@
-import korolev._
-import korolev.akka._
-import korolev.server._
-import korolev.state.javaSerialization._
+import ComponentExample.ComponentWithStateLoader
+import korolev.*
+import korolev.akka.*
+import korolev.effect.Scheduler
+import korolev.effect.syntax.*
+import korolev.server.*
+import korolev.state.javaSerialization.*
 
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration.DurationInt
 import scala.util.Random
 
 object ComponentExample extends SimpleAkkaHttpKorolevApp {
@@ -64,6 +68,19 @@ object ComponentExample extends SimpleAkkaHttpKorolevApp {
     }
   }
 
+  object ComponentWithStateLoader extends Component[Future, String, Int, Any](
+    loadState = (params: Int) =>
+      Scheduler[Future].sleep(1000.millis).as(params.toString)
+  ) {
+    def render(parameters: Int, state: String): context.Node = {
+      div(s"Render with state, State is ${state}")
+    }
+
+    override def renderNoState(parameters: Int): context.Node = {
+      div(s"Render without state")
+    }
+  }
+
   val service: AkkaHttpService = akkaHttpService {
     KorolevServiceConfig[Future, String, Any] (
       stateLoader = StateLoader.default("a"),
@@ -77,6 +94,7 @@ object ComponentExample extends SimpleAkkaHttpKorolevApp {
             ComponentAsFunction("Click me, i'm object") { (access, _) =>
               access.transition(_ + Random.nextPrintableChar())
             },
+            ComponentWithStateLoader.silent(42),
             button(
               "Click me too",
               event("click") { access =>

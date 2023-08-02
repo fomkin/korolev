@@ -29,7 +29,10 @@ private[korolev] final class Html5RenderContext[F[_]: Effect, S, M]
     case ComponentEntry(component, parameters, _) =>
       val rc = this.asInstanceOf[RenderContext[Context.Binding[F, Any, Any]]]
       // Static pages always made from scratch
-      component.render(parameters, component.initialState).apply(rc)
+      component.initialState match {
+        case Right(state) => component.render(parameters, state).apply(rc)
+        case Left(_) => component.renderNoState(parameters).apply(rc)
+      }
     case _ => ()
   }
 

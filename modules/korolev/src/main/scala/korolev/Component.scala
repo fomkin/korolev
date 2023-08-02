@@ -34,14 +34,19 @@ import scala.util.Random
   * @tparam S State of the component
   * @tparam E Type of events produced by component
   */
-abstract class Component
-  [
+abstract class Component[
     F[_],
-    S, P, E
-  ](
-    val initialState: S,
-    val id: String = Component.randomId()
-  ) {
+    S,
+    P,
+    E
+](
+    val initialState: Either[P => F[S], S],
+    val id: String
+) {
+
+  def this(initialState: S) = this(Right(initialState), Component.randomId())
+  def this(initialState: S, id: String) = this(Right(initialState), id)
+  def this(loadState: P => F[S]) = this(Left(loadState), Component.randomId())
 
   /**
     * Component context.
@@ -56,6 +61,9 @@ abstract class Component
     * Component render
     */
   def render(parameters: P, state: S): context.Node
+
+  def renderNoState(parameters: P): context.Node =
+    levsha.dsl.html.div()
 }
 
 object Component {
@@ -68,9 +76,9 @@ object Component {
     * @param f Component renderer
     * @see [[Component]]
     */
-  def apply[F[_]: Effect, S: StateSerializer: StateDeserializer, P, E]
-           (initialState: S, id: String = Component.randomId())
-           (f: Render[F, S, P, E]): Component[F, S, P, E] = {
+  def apply[F[_]: Effect, S: StateSerializer: StateDeserializer, P, E](
+      initialState: S,
+      id: String = Component.randomId())(f: Render[F, S, P, E]): Component[F, S, P, E] = {
     new Component[F, S, P, E](initialState, id) {
       def render(parameters: P, state: S): Node[Binding[F, S, E]] = f(context, parameters, state)
     }
