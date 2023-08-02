@@ -114,11 +114,24 @@ export class Connection {
             .pipeThrough(new DecompressionStream('deflate-raw'));
           data = await new Response(stream).blob();
         }
-        data = await data.text();
+
+        // Check is Blob.text supported
+        if(data.text) {
+          data = await data.text();
+          this._onMessage(data);
+        } else {
+          let reader = new FileReader();
+          reader.onload = async () => {
+            data = reader.result;
+            this._onMessage(data);
+          }
+          reader.readAsText(data);
+        }
+      } else {
+        this._onMessage(data);
       }
-      this._onMessage(data);
     });
-    
+
     console.log(`Trying to open connection to ${uri} using WebSocket`);
   }
 
