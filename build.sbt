@@ -10,7 +10,7 @@ val akkaVersion = "2.6.19"
 val akkaHttpVersion = "10.2.9"
 
 val pekkoVersion = "1.0.0"
-val pekkoHttpVersion = "0.0.0+4469-fb6a5426-SNAPSHOT"
+val pekkoHttpVersion = "1.0.0"
 
 val circeVersion = "0.14.1"
 val ce2Version = "2.5.5"
@@ -229,7 +229,6 @@ lazy val pekko = project
   .settings(crossVersionSettings)
   .settings(commonSettings: _*)
   .settings(
-    resolvers += "pekko-http-snapshot-repository" at "https://repository.apache.org/content/repositories/snapshots",
     normalizedName := "korolev-pekko",
     libraryDependencies ++= Seq(
       "org.apache.pekko" %% "pekko-actor" % pekkoVersion,
