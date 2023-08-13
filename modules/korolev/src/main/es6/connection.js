@@ -105,31 +105,47 @@ export class Connection {
     this._webSocket.addEventListener('open', (event) => this._onOpen());
     this._webSocket.addEventListener('close', (event) => this._onClose());
     this._webSocket.addEventListener('error', (event) => this._onError());
-    this._webSocket.addEventListener('message', async (event) => {
-      let data = event.data;
-      if (data instanceof Blob) {
-        if (this._webSocket.protocol == 'json-deflate') {
-          let stream = data
-            .stream()
-            .pipeThrough(new DecompressionStream('deflate-raw'));
-          data = await new Response(stream).blob();
-        }
 
-        // Check is Blob.text supported
-        if(data.text) {
-          data = await data.text();
-          this._onMessage(data);
-        } else {
-          let reader = new FileReader();
-          reader.onload = async () => {
-            data = reader.result;
-            this._onMessage(data);
+    this._currentMessagesProcessing = [];
+    this._webSocket.addEventListener('message', async (event) => {
+      const messageProcessing = new Promise(async (resolve) => {
+            let data = event.data;
+            if (data instanceof Blob) {
+              if (this._webSocket.protocol == 'json-deflate') {
+                let stream = data
+                    .stream()
+                    .pipeThrough(new DecompressionStream('deflate-raw'));
+                data = await new Response(stream).blob();
+              }
+
+              // Check is Blob.text supported
+              if (data.text) {
+                data = await data.text();
+                this._onMessage(data);
+                resolve();
+              } else {
+                let reader = new FileReader();
+                reader.onload = async () => {
+                  data = reader.result;
+                  this._onMessage(data);
+                  resolve();
+                }
+                reader.readAsText(data);
+              }
+            } else {
+              this._onMessage(data);
+              resolve();
+            }
           }
-          reader.readAsText(data);
+      );
+
+      this._currentMessagesProcessing.push(messageProcessing);
+      messageProcessing.then(() => {
+        const index = this._currentMessagesProcessing.indexOf(messageProcessing);
+        if (index > -1) {
+          this._currentMessagesProcessing.splice(index, 1);
         }
-      } else {
-        this._onMessage(data);
-      }
+      });
     });
 
     console.log(`Trying to open connection to ${uri} using WebSocket`);
@@ -219,7 +235,10 @@ export class Connection {
   }
 
   /** @private */
-  _onClose() {
+  async _onClose() {
+    if (this._currentMessagesProcessing && this._currentMessagesProcessing.length > 0) {
+      await Promise.all(this._currentMessagesProcessing);
+    }
     console.log('Connection closed');
     let event = this._createEvent('close');
     this._dispatcher.dispatchEvent(event);
