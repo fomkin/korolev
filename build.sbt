@@ -231,9 +231,9 @@ lazy val pekko = project
   .settings(
     normalizedName := "korolev-pekko",
     libraryDependencies ++= Seq(
-      "org.apache.pekko" %% "pekko-actor" % pekkoVersion,
-      "org.apache.pekko" %% "pekko-stream" % pekkoVersion,
-      "org.apache.pekko" %% "pekko-http" % pekkoHttpVersion
+      ("org.apache.pekko" %% "pekko-actor" % pekkoVersion).cross(CrossVersion.for3Use2_13),
+      ("org.apache.pekko" %% "pekko-stream" % pekkoVersion).cross(CrossVersion.for3Use2_13),
+      ("org.apache.pekko" %% "pekko-http" % pekkoHttpVersion).cross(CrossVersion.for3Use2_13)
     )
   )
   .dependsOn(korolev)
