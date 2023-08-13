@@ -9,6 +9,9 @@ val levshaVersion = "1.3.0"
 val akkaVersion = "2.6.19"
 val akkaHttpVersion = "10.2.9"
 
+val pekkoVersion = "1.0.0"
+val pekkoHttpVersion = "1.0.0"
+
 val circeVersion = "0.14.1"
 val ce2Version = "2.5.5"
 val ce3Version = "3.3.12"
@@ -216,6 +219,21 @@ lazy val akka = project
       ("com.typesafe.akka" %% "akka-actor" % akkaVersion).cross(CrossVersion.for3Use2_13),
       ("com.typesafe.akka" %% "akka-stream" % akkaVersion).cross(CrossVersion.for3Use2_13),
       ("com.typesafe.akka" %% "akka-http" % akkaHttpVersion).cross(CrossVersion.for3Use2_13)
+    )
+  )
+  .dependsOn(korolev)
+
+lazy val pekko = project
+  .in(interop / "pekko")
+  .enablePlugins(GitVersioning)
+  .settings(crossVersionSettings)
+  .settings(commonSettings: _*)
+  .settings(
+    normalizedName := "korolev-pekko",
+    libraryDependencies ++= Seq(
+      ("org.apache.pekko" %% "pekko-actor" % pekkoVersion).cross(CrossVersion.for3Use2_13),
+      ("org.apache.pekko" %% "pekko-stream" % pekkoVersion).cross(CrossVersion.for3Use2_13),
+      ("org.apache.pekko" %% "pekko-http" % pekkoHttpVersion).cross(CrossVersion.for3Use2_13)
     )
   )
   .dependsOn(korolev)
@@ -556,7 +574,7 @@ lazy val root = project
     korolev, effect, web, http, standalone, testkit,
     bytes, webDsl,
     // Interop
-    akka, ce2, ce3, monix, zio, zioStreams, zio2, zio2Streams, slf4j,
+    akka, pekko, ce2, ce3, monix, zio, zioStreams, zio2, zio2Streams, slf4j,
     scodec, fs2ce2, fs2ce3, zioHttp,
     // Examples
     simpleExample, routingExample, gameOfLifeExample,
